@@ -2,36 +2,72 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/typescript-node
 {
   "name": "Node.js & TypeScript",
-  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:22-bookworm",
-  "postCreateCommand": "npm install -g @anthropic-ai/claude-code",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
   // Features to add to the dev container. More info: https://containers.dev/features.
   "features": {
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
+    "ghcr.io/devcontainers-extra/features/tmux-apt-get:1": {},
+    "ghcr.io/postfinance/devcontainer-features/playwright-deps:1.0.0": {
+      "installChromiumDeps": true
+    }
   },
+  "runArgs": [
+    "--cap-drop=ALL"
+  ],
+  "containerEnv": {
+    // If unset, herdr (multiplexer) falls back to a dumb /bin/sh
+    "SHELL": "/bin/bash",
+    // If a user lands in /bin/sh somehow, warn them. dash uses $ENV for init scripts
+    "ENV": "/etc/dash-warning.sh"
+  },
+  // Named Docker volume (not a host bind mount) so Claude Code's OAuth
+  // credentials survive container rebuilds without ever touching the host
+  // filesystem. First container creation copies the claude-code feature's
+  // freshly-installed ~/.claude into the volume; every rebuild after that
+  // reuses the same (already logged-in) volume instead of a clean one, so
+  // the browser/magic-link login only has to happen once per machine.
+  "mounts": [
+    "source=pillbug-claude-code-auth,target=/home/node/.claude,type=volume"
+  ],
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
-  // "forwardPorts": [],
+  // Port 4387 (Lavish) isn't picked up by VS Code's automatic port
+  // forwarding since it's opened by a process outside the integrated
+  // terminal's visibility. 5173 (Vite) added alongside for the same
+  // reliability, since it's currently only auto-forwarded.
+  "forwardPorts": [
+    4387,
+    5173
+  ],
+  "updateContentCommand": "npm install",
   // Use 'postCreateCommand' to run commands after the container is created.
-  // "postCreateCommand": "yarn install",
+  // "onCreateCommand": "curl -fsSL https://claude.ai/install.sh | bash"
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
   // Configure tool-specific properties.
+  // Store downloaded browsers in the workspace checkout (bind-mounted, so it
+  // inherits the same ownership as node_modules/.git) rather than in
+  // ~/.cache, which the playwright-deps feature otherwise clears on rebuild
+  // and which a root-owned Docker volume couldn't fix without sudo.
+  // arm64: point miniflare at Playwright's Chromium instead of downloading x86-64 Chrome-for-Testing
+  // Update the version segment (chromium-NNNN) when Playwright is upgraded
+  "remoteEnv": {
+    "MINIFLARE_CHROME_EXECUTABLE": "${containerWorkspaceFolder}/.devcontainer/.ms-playwright/chromium-1208/chrome-linux/chrome",
+    "CLAUDE_CODE_DISABLE_MOUSE_CLICKS": "1"
+  },
   "customizations": {
     "vscode": {
-      "extensions": ["bierner.markdown-mermaid", "esbenp.prettier-vscode"],
-      "settings": {
-        "editor.formatOnSave": true,
-        "editor.defaultFormatter": "esbenp.prettier-vscode",
-        "[javascript]": {
-          "editor.defaultFormatter": "esbenp.prettier-vscode"
-        },
-        "[typescript]": {
-          "editor.defaultFormatter": "esbenp.prettier-vscode"
-        },
-        "[json]": {
-          "editor.defaultFormatter": "esbenp.prettier-vscode"
-        }
-      }
+      "extensions": [
+        "bierner.markdown-mermaid",
+        "esbenp.prettier-vscode"
+      ]
     }
-  }
+  },
+  // Login as "node" so that:
+  // - We keep file-ownership the same as when the files were created
+  // - We pick up the fancy prompt defined in post-create.sh
+  "containerUser": "node"
   // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
   // "remoteUser": "root"
 }
