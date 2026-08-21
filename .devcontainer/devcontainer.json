@@ -14,9 +14,7 @@
       "installChromiumDeps": true
     }
   },
-  "runArgs": [
-    "--cap-drop=ALL"
-  ],
+  "runArgs": ["--cap-drop=ALL"],
   "containerEnv": {
     // If unset, herdr (multiplexer) falls back to a dumb /bin/sh
     "SHELL": "/bin/bash",
@@ -37,10 +35,7 @@
   // forwarding since it's opened by a process outside the integrated
   // terminal's visibility. 5173 (Vite) added alongside for the same
   // reliability, since it's currently only auto-forwarded.
-  "forwardPorts": [
-    4387,
-    5173
-  ],
+  "forwardPorts": [4387, 5173],
   "updateContentCommand": "npm install",
   // Use 'postCreateCommand' to run commands after the container is created.
   // "onCreateCommand": "curl -fsSL https://claude.ai/install.sh | bash"
@@ -53,15 +48,17 @@
   // arm64: point miniflare at Playwright's Chromium instead of downloading x86-64 Chrome-for-Testing
   // Update the version segment (chromium-NNNN) when Playwright is upgraded
   "remoteEnv": {
-    "MINIFLARE_CHROME_EXECUTABLE": "${containerWorkspaceFolder}/.devcontainer/.ms-playwright/chromium-1208/chrome-linux/chrome",
+    "PLAYWRIGHT_BROWSERS_PATH": "/workspaces/.ms-playwright-cache",
+    "MINIFLARE_CHROME_EXECUTABLE": "/workspaces/.ms-playwright-cache/chromium-1208/chrome-linux/chrome",
     "CLAUDE_CODE_DISABLE_MOUSE_CLICKS": "1"
   },
   "customizations": {
     "vscode": {
-      "extensions": [
-        "bierner.markdown-mermaid",
-        "esbenp.prettier-vscode"
-      ]
+      "extensions": ["bierner.markdown-mermaid", "esbenp.prettier-vscode"],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+      }
     }
   },
   // Login as "node" so that:
