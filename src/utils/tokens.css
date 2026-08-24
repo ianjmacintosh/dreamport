@@ -1,0 +1,65 @@
+:root {
+  --page-width: min(92vw, 60rem);
+
+  /* ── Palette ──────────────────────────────────────────────── */
+  /* Neutral grayscale only — no brand color chosen yet. */
+  /* See README "Quick Start: Application Code" step 11. */
+
+  --gray-05: oklch(0.98 0 0);
+  --gray-10: oklch(0.96 0 0);
+  --gray-30: oklch(0.85 0 0);
+  --gray-50: oklch(0.6 0 0);
+  --gray-70: oklch(0.45 0 0);
+  --gray-90: oklch(0.25 0 0);
+  --gray-99: oklch(0.12 0 0);
+
+  /* Placeholder accent — swap for a real brand color (README step 11). */
+  --accent-50: oklch(0.55 0.18 250);
+  --accent-70: oklch(0.4 0.18 250);
+
+  /* ── Semantic color tokens ────────────────────────────────── */
+
+  --color-page-bg: oklch(1 0 0);
+  --color-surface: var(--gray-05);
+  --color-border: var(--gray-30);
+  --color-text-primary: var(--gray-99);
+  --color-text-muted: var(--gray-70);
+  --color-link: var(--accent-50);
+  --color-link-hover: var(--accent-70);
+  --color-focus-ring: var(--accent-50);
+  --color-accent: var(--accent-50);
+  --color-accent-hover: var(--accent-70);
+  --color-accent-text: oklch(1 0 0);
+
+  /* ── Typography ───────────────────────────────────────────── */
+  /* System fonts only — no typeface chosen yet. */
+  /* See README "Quick Start: Application Code" step 10. */
+
+  --font-sans:
+    system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* ── Type scale ───────────────────────────────────────────── */
+
+  --text-h1: 2.5rem;
+  --text-h2: 1.875rem;
+  --text-h3: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-base: 1rem;
+  --text-sm: 0.875rem;
+  --text-xs: 0.75rem;
+
+  /* ── Spacing scale (4px grid) ─────────────────────────────── */
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 1.75rem;
+  --space-8: 2rem;
+  --space-9: 2.5rem;
+  --space-10: 3rem;
+}
