@@ -1,0 +1,96 @@
+@import "./reset.css";
+@import "./utils/tokens.css";
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+  background-color: var(--color-page-bg);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-sans);
+  font-weight: 700;
+}
+
+h1 {
+  font-size: var(--text-h1);
+  line-height: 1.15;
+}
+
+h2 {
+  font-size: var(--text-h2);
+  line-height: 1.2;
+}
+
+h3 {
+  font-size: var(--text-h3);
+  line-height: 1.25;
+}
+
+a {
+  color: var(--color-link);
+}
+
+a:hover {
+  color: var(--color-link-hover);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+main {
+  width: var(--page-width);
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6);
+}
+
+/* ── Primitives: buttons ──────────────────────────────────── */
+/* See README "Quick Start: Application Code" step 12. */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: 6px;
+  border: 1px solid transparent;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.button--primary {
+  background-color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.button--primary:hover {
+  background-color: var(--color-accent-hover);
+}
+
+.button--secondary {
+  background-color: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.button--secondary:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
