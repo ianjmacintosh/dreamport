@@ -97,8 +97,17 @@ export function StyleGuide() {
 
       <Section id="palette" label="Palette — Solarized Light">
         <p className="sg-note">
-          The raw swatches. Nothing here should be used directly in a component
-          — it&apos;s the source material for the semantic colors below.
+          The raw swatches, from{" "}
+          <a
+            href="https://ethanschoonover.com/solarized/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Ethan Schoonover&apos;s Solarized
+          </a>{" "}
+          — the official spec these values and names come from. Nothing here
+          should be used directly in a component — it&apos;s the source material
+          for the semantic colors below.
         </p>
         <div className="sg-palette">
           {SOLARIZED_PALETTE.map(({ label, role }) => (
