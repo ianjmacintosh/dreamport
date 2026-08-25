@@ -15,7 +15,7 @@
 }
 
 .sg-header-sub {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   color: var(--color-text-muted);
 }
 
@@ -62,7 +62,7 @@
 }
 
 .sg-note {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   color: var(--color-text-muted);
 }
 
