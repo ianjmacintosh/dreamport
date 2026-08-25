@@ -32,11 +32,10 @@
   --color-accent-text: oklch(1 0 0);
 
   /* ── Typography ───────────────────────────────────────────── */
-  /* System fonts only — no typeface chosen yet. */
-  /* See README "Quick Start: Application Code" step 10. */
 
   --font-sans:
-    system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    "Elms Sans Variable", system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
   --font-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 

@@ -62,8 +62,8 @@ export function StyleGuide() {
       <header className="sg-header">
         <h1>Style Guide</h1>
         <p className="sg-header-sub">
-          Placeholder tokens — no font or brand color has been picked yet. See
-          the README&apos;s Quick Start steps for what&apos;s still open.
+          Font: Elms Sans. Brand color still placeholder — see the README&apos;s
+          Quick Start steps for what&apos;s still open.
         </p>
       </header>
 
