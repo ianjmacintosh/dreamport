@@ -1,0 +1,35 @@
+/* ── Type scale utilities ─────────────────────────────────── */
+/* Override an element's size independent of its semantic tag — e.g. an
+   <h2> that needs to look like an <h3>. Change the class, not the tag;
+   never skip a heading level for looks. */
+
+.text-h1 {
+  font-size: var(--text-h1);
+  line-height: 1.15;
+}
+
+.text-h2 {
+  font-size: var(--text-h2);
+  line-height: 1.2;
+}
+
+.text-h3 {
+  font-size: var(--text-h3);
+  line-height: 1.25;
+}
+
+.text-lg {
+  font-size: var(--text-lg);
+}
+
+.text-base {
+  font-size: var(--text-base);
+}
+
+.text-sm {
+  font-size: var(--text-sm);
+}
+
+.text-xs {
+  font-size: var(--text-xs);
+}

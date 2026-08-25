@@ -1,3 +1,7 @@
+import Button from "../Button";
+import Link from "../Link";
+import TextInput from "../TextInput";
+
 import "./StyleGuide.css";
 
 function cssVar(name: string): string {
@@ -5,6 +9,14 @@ function cssVar(name: string): string {
   return getComputedStyle(document.documentElement)
     .getPropertyValue(name)
     .trim();
+}
+
+function Snippet({ code }: { code: string }) {
+  return (
+    <pre className="sg-snippet">
+      <code>{code}</code>
+    </pre>
+  );
 }
 
 function Section({
@@ -78,7 +90,7 @@ const SPACING = [
 
 export function StyleGuide() {
   return (
-    <main className="sg">
+    <main className="sg" id="top">
       <header className="sg-header">
         <h1>Style Guide</h1>
         <p className="sg-header-sub">
@@ -91,7 +103,11 @@ export function StyleGuide() {
         <a href="#palette">Palette</a>
         <a href="#colors">Colors</a>
         <a href="#typography">Typography</a>
+        <a href="#headings">Headings</a>
+        <a href="#body-text">Body text</a>
+        <a href="#links">Links</a>
         <a href="#buttons">Buttons</a>
+        <a href="#text-inputs">Text inputs</a>
         <a href="#spacing">Spacing</a>
       </nav>
 
@@ -168,15 +184,98 @@ export function StyleGuide() {
         </div>
       </Section>
 
+      <Section id="headings" label="Headings">
+        <div className="sg-heading-stack">
+          <h1>Heading level 1</h1>
+          <h2>Heading level 2</h2>
+          <h3>Heading level 3</h3>
+        </div>
+        <Snippet
+          code={`<h1>Heading level 1</h1>\n<h2>Heading level 2</h2>\n<h3>Heading level 3</h3>`}
+        />
+        <p className="sg-note">
+          Use a real <code>&lt;h1&gt;</code>–<code>&lt;h3&gt;</code> — size
+          follows the tag automatically. When the visual size needs to diverge
+          from the semantic level (say, an <code>&lt;h2&gt;</code> that should
+          look like an <code>&lt;h3&gt;</code>), override just the size with a{" "}
+          <code>.text-h1</code>/<code>.text-h2</code>/<code>.text-h3</code>{" "}
+          class — never change the tag just to change how it looks.
+        </p>
+        <div className="sg-heading-stack">
+          <h2 className="text-h3">
+            An &lt;h2&gt; sized like an &lt;h3&gt;, via <code>.text-h3</code>
+          </h2>
+        </div>
+        <Snippet code={`<h2 className="text-h3">Looks like an h3</h2>`} />
+      </Section>
+
+      <Section id="body-text" label="Body text">
+        <div className="sg-heading-stack">
+          <p className="text-lg">Large body text</p>
+          <p className="text-base">Base body text</p>
+          <p className="text-sm">Small body text</p>
+          <p className="text-xs">Extra-small body text</p>
+        </div>
+        <Snippet
+          code={`<p className="text-lg">Large body text</p>\n<p className="text-base">Base body text</p>\n<p className="text-sm">Small body text</p>\n<p className="text-xs">Extra-small body text</p>`}
+        />
+        <p className="sg-note">
+          Use a plain <code>&lt;p&gt;</code> (or <code>&lt;span&gt;</code> for
+          inline text) with a <code>.text-lg</code>/<code>.text-base</code>/
+          <code>.text-sm</code>/<code>.text-xs</code> class for size.
+        </p>
+      </Section>
+
+      <Section id="links" label="Links">
+        <p className="sg-note">
+          An internal <Link href="#top">link</Link>, and an{" "}
+          <Link href="https://ethanschoonover.com/solarized/" external>
+            external link
+          </Link>{" "}
+          that opens in a new tab.
+        </p>
+        <Snippet
+          code={`<Link href="/about">Internal link</Link>\n<Link href="https://example.com" external>\n  External link\n</Link>`}
+        />
+        <p className="sg-note">
+          Use the <code>&lt;Link&gt;</code> component with the{" "}
+          <code>external</code> prop instead of setting <code>target</code>/
+          <code>rel</code> by hand.
+        </p>
+      </Section>
+
       <Section id="buttons" label="Buttons">
         <div className="sg-button-row">
-          <button className="button button--primary">Primary</button>
-          <button className="button button--secondary">Secondary</button>
+          <Button variant="primary">Primary</Button>
+          <Button variant="secondary">Secondary</Button>
         </div>
+        <Snippet
+          code={`<Button variant="primary">Primary</Button>\n<Button variant="secondary">Secondary</Button>`}
+        />
         <p className="sg-note">
-          Use the <code>.button</code> base class plus a{" "}
-          <code>.button--primary</code> or <code>.button--secondary</code>{" "}
-          modifier — never style a raw <code>&lt;button&gt;</code> directly.
+          Use the <code>&lt;Button&gt;</code> component with a{" "}
+          <code>variant</code> of <code>primary</code> or <code>secondary</code>{" "}
+          — never style a raw <code>&lt;button&gt;</code> directly.
+        </p>
+      </Section>
+
+      <Section id="text-inputs" label="Text inputs">
+        <div className="sg-input-row">
+          <TextInput id="sg-name" label="Name" placeholder="Ada Lovelace" />
+          <TextInput
+            id="sg-email"
+            label="Email"
+            type="email"
+            helperText="We'll never share your email."
+          />
+        </div>
+        <Snippet
+          code={`<TextInput id="name" label="Name" placeholder="Ada Lovelace" />\n<TextInput\n  id="email"\n  label="Email"\n  type="email"\n  helperText="We'll never share your email."\n/>`}
+        />
+        <p className="sg-note">
+          Use the <code>&lt;TextInput&gt;</code> component — it pairs an{" "}
+          <code>.input</code> with an accessible <code>.input-label</code> and
+          optional <code>.input-helper</code> text.
         </p>
       </Section>
 
