@@ -16,7 +16,7 @@
 
 .sg-header-sub {
   font-size: var(--text-base);
-  color: var(--color-text-muted);
+  color: var(--color-text-primary);
 }
 
 /* ── Nav ── */
@@ -63,7 +63,7 @@
 
 .sg-note {
   font-size: var(--text-base);
-  color: var(--color-text-muted);
+  color: var(--color-text-primary);
 }
 
 /* ── Color palette ── */
