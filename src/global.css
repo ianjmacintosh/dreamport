@@ -3,10 +3,13 @@
 
 :root {
   color-scheme: light;
+  /* 112.5% of the 16px browser default = 18px base, while still
+     respecting a user's own browser font-size setting. */
+  font-size: 112.5%;
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   color: var(--color-text-primary);
   background-color: var(--color-page-bg);
 }
@@ -17,8 +20,9 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-sans);
+  font-family: var(--font-heading);
   font-weight: 700;
+  color: var(--color-heading);
 }
 
 h1 {

@@ -1,42 +1,70 @@
 :root {
   --page-width: min(92vw, 60rem);
 
-  /* ── Palette ──────────────────────────────────────────────── */
-  /* Neutral grayscale only — no brand color chosen yet. */
-  /* See README "Quick Start: Application Code" step 11. */
+  /* ── Palette: Solarized Light ─────────────────────────────── */
+  /* Ethan Schoonover's Solarized — https://ethanschoonover.com/solarized/ */
+  /* Raw swatches only. Nothing below should be used directly in a
+     component — go through the semantic layer underneath instead. */
 
-  --gray-05: oklch(0.98 0 0);
-  --gray-10: oklch(0.96 0 0);
-  --gray-30: oklch(0.85 0 0);
-  --gray-50: oklch(0.6 0 0);
-  --gray-70: oklch(0.45 0 0);
-  --gray-90: oklch(0.25 0 0);
-  --gray-99: oklch(0.12 0 0);
+  --sol-base03: #002b36;
+  --sol-base02: #073642;
+  --sol-base01: #586e75;
+  --sol-base00: #657b83;
+  --sol-base0: #839496;
+  --sol-base1: #93a1a1;
+  --sol-base2: #eee8d5;
+  --sol-base3: #fdf6e3;
 
-  /* Placeholder accent — swap for a real brand color (README step 11). */
-  --accent-50: oklch(0.55 0.18 250);
-  --accent-70: oklch(0.4 0.18 250);
+  --sol-yellow: #b58900;
+  --sol-orange: #cb4b16;
+  --sol-red: #dc322f;
+  --sol-magenta: #d33682;
+  --sol-violet: #6c71c4;
+  --sol-blue: #268bd2;
+  --sol-cyan: #2aa198;
+  --sol-green: #859900;
 
   /* ── Semantic color tokens ────────────────────────────────── */
+  /* Deviations from Solarized's textbook light-scheme role table:
 
-  --color-page-bg: oklch(1 0 0);
-  --color-surface: var(--gray-05);
-  --color-border: var(--gray-30);
-  --color-text-primary: var(--gray-99);
-  --color-text-muted: var(--gray-70);
-  --color-link: var(--accent-50);
-  --color-link-hover: var(--accent-70);
-  --color-focus-ring: var(--accent-50);
-  --color-accent: var(--accent-50);
-  --color-accent-hover: var(--accent-70);
-  --color-accent-text: oklch(1 0 0);
+     Body text uses base01, not base00. base00-on-base3 measures
+     ~4.13:1 (under WCAG AA's 4.5:1 floor for normal text); base01
+     clears it at ~4.99:1 and is still a stock Solarized tone.
+
+     (base01 was briefly bumped to base02 over a "Nunito reads too
+     light" complaint, but the text actually being judged at the time
+     was miswired to --color-text-muted/base1 — ~2.48:1, quite washed
+     out — not --color-text-primary/base01 at all. Reverted once that
+     wiring bug was fixed and base01 could be judged fairly.)
+
+     Known, accepted trade-off: --sol-blue (link/accent) measures
+     ~3.41:1 against base3 — under AA for normal text. Checked
+     cyan/violet too; none of Solarized's accents clear 4.5:1 on this
+     background. Kept as authentic Solarized blue by deliberate
+     choice, not an oversight — don't "fix" this without revisiting
+     that decision first. */
+
+  --color-page-bg: var(--sol-base3);
+  --color-surface: var(--sol-base2);
+  --color-border: var(--sol-base1);
+  --color-text-primary: var(--sol-base01);
+  --color-text-muted: var(--sol-base1);
+  --color-heading: var(--sol-base02);
+  --color-link: var(--sol-blue);
+  --color-link-hover: var(--sol-cyan);
+  --color-focus-ring: var(--sol-blue);
+  --color-accent: var(--sol-blue);
+  --color-accent-hover: var(--sol-cyan);
+  --color-accent-text: var(--sol-base3);
 
   /* ── Typography ───────────────────────────────────────────── */
-  /* System fonts only — no typeface chosen yet. */
-  /* See README "Quick Start: Application Code" step 10. */
 
-  --font-sans:
-    system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-heading:
+    "Elms Sans Variable", system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-body:
+    "Nunito Variable", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
   --font-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
