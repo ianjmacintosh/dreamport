@@ -7,7 +7,7 @@ import "./Homepage.css";
 export function Homepage() {
   return (
     <main className="hp">
-      <Link href="/" className="hp-back">
+      <Link href="/internal/pattern-library" className="hp-back">
         ← Pattern library
       </Link>
 

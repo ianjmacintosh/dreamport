@@ -96,8 +96,8 @@ export function StyleGuide() {
         <p className="sg-header-sub">
           Headings: Elms Sans. Body: Nunito. Colors: Solarized Light. See the
           README&apos;s Quick Start steps for what&apos;s still open. See the{" "}
-          <Link href="/">pattern library</Link> for full-page mockups built from
-          these primitives.
+          <Link href="/internal/pattern-library">pattern library</Link> for
+          full-page mockups built from these primitives.
         </p>
       </header>
 

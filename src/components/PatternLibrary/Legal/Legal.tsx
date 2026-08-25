@@ -5,7 +5,7 @@ import "./Legal.css";
 export function Legal() {
   return (
     <main className="lg">
-      <Link href="/" className="lg-back">
+      <Link href="/internal/pattern-library" className="lg-back">
         ← Pattern library
       </Link>
 

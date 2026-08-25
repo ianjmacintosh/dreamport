@@ -10,10 +10,6 @@
   margin: 0 calc(-1 * var(--space-6)) var(--space-10);
 }
 
-.sg-header h1 {
-  margin-bottom: var(--space-2);
-}
-
 .sg-header-sub {
   font-size: var(--text-base);
   color: var(--color-text-primary);

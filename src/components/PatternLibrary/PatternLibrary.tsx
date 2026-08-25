@@ -4,14 +4,14 @@ import "./PatternLibrary.css";
 
 const PAGE_TYPES = [
   {
-    href: "/patterns/homepage",
+    href: "/internal/pattern-library/homepage",
     name: "Homepage",
-    description: "Big hero, signup, etc.",
+    description: "Uses Button, Link, TextInput.",
   },
   {
-    href: "/patterns/legal",
+    href: "/internal/pattern-library/legal",
     name: "Legal",
-    description: "Terms, policies, and other dense legal text.",
+    description: "Uses Link.",
   },
 ];
 
@@ -22,18 +22,16 @@ export function PatternLibrary() {
         <h1>Pattern Library</h1>
         <p className="pl-header-sub">
           Full-page mockups, grouped by page type. See the{" "}
-          <Link href="/style-guide">style guide</Link> for the underlying
-          primitives.
+          <Link href="/internal/style-guide">style guide</Link> for the
+          underlying primitives.
         </p>
       </header>
 
+      <h2>Page types</h2>
       <ul className="pl-list">
         {PAGE_TYPES.map(({ href, name, description }) => (
-          <li key={href} className="pl-item">
-            <Link href={href} className="pl-item-link">
-              <span className="pl-item-name">{name}</span>
-              <span className="pl-item-description">{description}</span>
-            </Link>
+          <li key={href}>
+            <Link href={href}>{name}</Link> — {description}
           </li>
         ))}
       </ul>
