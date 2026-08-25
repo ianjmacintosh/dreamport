@@ -64,15 +64,18 @@ main {
 
 /* ── Primitives: flow spacing ─────────────────────────────── */
 /* Default vertical rhythm for stacked page content, so pages don't
-   need their own layout CSS. Margin-top only, so a block's first
-   child sits flush with its container. */
+   need their own layout CSS. */
 
+/* Top-level page blocks: margin-top only, so a block's first child
+   sits flush with its container. */
 main > * + * {
   margin-top: var(--space-4);
 }
 
-p + p {
-  margin-top: var(--space-4);
+/* Text elements: margin-bottom, so trailing space follows them
+   wherever they're nested, not just at the top level. */
+p {
+  margin-bottom: var(--space-4);
 }
 
 /* ── Primitives: buttons ──────────────────────────────────── */
@@ -134,6 +137,7 @@ p + p {
   color: var(--color-text-primary);
   padding: var(--space-2) var(--space-3);
   font-size: var(--text-base);
+  margin-bottom: var(--space-4);
   transition: border-color 0.15s;
 }
 

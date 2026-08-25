@@ -11,7 +11,7 @@ The design system has four tiers:
   `tokens.css`.
 - **Component** — built from primitives (`Button`, `Link`, `TextInput`).
   Lives in the component library.
-- **Pattern** — a page (e.g. Homepage, Legal) composed *only* by arranging
+- **Pattern** — a page (e.g. Homepage, Legal) composed _only_ by arranging
   existing components in plain document order. No page-specific CSS, no new
   visual identity — whatever spacing the cascade already gives is the
   spacing it gets.

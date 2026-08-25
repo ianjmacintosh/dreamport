@@ -14,7 +14,7 @@ export function Homepage() {
           place, so planning feels like part of the adventure.
         </p>
         <div>
-          <Button variant="primary">Get started</Button>
+          <Button variant="primary">Get started</Button>{" "}
           <Button variant="secondary">See how it works</Button>
         </div>
       </section>
