@@ -27,14 +27,15 @@
   /* ── Semantic color tokens ────────────────────────────────── */
   /* Deviations from Solarized's textbook light-scheme role table:
 
-     Body text uses base02, not base00 (or base01). base00-on-base3
-     measures ~4.13:1 (under WCAG AA's 4.5:1 floor for normal text);
-     base01 clears AA at ~4.99:1, but Nunito's regular weight still
-     read too light at that value in practice, so body text was
-     pushed one more step to base02 (~12:1 — well past AA/AAA).
-     Heading text was bumped in turn from base02 to base03, so
-     headings keep a visible step above body instead of colliding
-     with it — both are still stock Solarized tones.
+     Body text uses base01, not base00. base00-on-base3 measures
+     ~4.13:1 (under WCAG AA's 4.5:1 floor for normal text); base01
+     clears it at ~4.99:1 and is still a stock Solarized tone.
+
+     (base01 was briefly bumped to base02 over a "Nunito reads too
+     light" complaint, but the text actually being judged at the time
+     was miswired to --color-text-muted/base1 — ~2.48:1, quite washed
+     out — not --color-text-primary/base01 at all. Reverted once that
+     wiring bug was fixed and base01 could be judged fairly.)
 
      Known, accepted trade-off: --sol-blue (link/accent) measures
      ~3.41:1 against base3 — under AA for normal text. Checked
@@ -46,9 +47,9 @@
   --color-page-bg: var(--sol-base3);
   --color-surface: var(--sol-base2);
   --color-border: var(--sol-base1);
-  --color-text-primary: var(--sol-base02);
+  --color-text-primary: var(--sol-base01);
   --color-text-muted: var(--sol-base1);
-  --color-heading: var(--sol-base03);
+  --color-heading: var(--sol-base02);
   --color-link: var(--sol-blue);
   --color-link-hover: var(--sol-cyan);
   --color-focus-ring: var(--sol-blue);
