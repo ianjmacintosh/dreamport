@@ -1,17 +1,7 @@
-.sg {
-  max-width: var(--page-width);
-  margin: 0 auto;
-  padding: 0 var(--space-6) var(--space-10);
-}
-
 .sg-header {
   background: var(--color-surface);
   padding: var(--space-8) var(--space-6);
   margin: 0 calc(-1 * var(--space-6)) var(--space-10);
-}
-
-.sg-header h1 {
-  margin-bottom: var(--space-2);
 }
 
 .sg-header-sub {

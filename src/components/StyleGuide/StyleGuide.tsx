@@ -90,12 +90,14 @@ const SPACING = [
 
 export function StyleGuide() {
   return (
-    <main className="sg" id="top">
+    <div id="top">
       <header className="sg-header">
         <h1>Style Guide</h1>
         <p className="sg-header-sub">
           Headings: Elms Sans. Body: Nunito. Colors: Solarized Light. See the
-          README&apos;s Quick Start steps for what&apos;s still open.
+          README&apos;s Quick Start steps for what&apos;s still open. See the{" "}
+          <Link href="/internal/pattern-library">pattern library</Link> for
+          full-page mockups built from these primitives.
         </p>
       </header>
 
@@ -261,7 +263,7 @@ export function StyleGuide() {
 
       <Section id="text-inputs" label="Text inputs">
         <div className="sg-input-row">
-          <TextInput id="sg-name" label="Name" placeholder="Ada Lovelace" />
+          <TextInput id="sg-name" label="Name" />
           <TextInput
             id="sg-email"
             label="Email"
@@ -270,7 +272,7 @@ export function StyleGuide() {
           />
         </div>
         <Snippet
-          code={`<TextInput id="name" label="Name" placeholder="Ada Lovelace" />\n<TextInput\n  id="email"\n  label="Email"\n  type="email"\n  helperText="We'll never share your email."\n/>`}
+          code={`<TextInput id="name" label="Name" />\n<TextInput\n  id="email"\n  label="Email"\n  type="email"\n  helperText="We'll never share your email."\n/>`}
         />
         <p className="sg-note">
           Use the <code>&lt;TextInput&gt;</code> component — it pairs an{" "}
@@ -298,7 +300,7 @@ export function StyleGuide() {
           ))}
         </div>
       </Section>
-    </main>
+    </div>
   );
 }
 

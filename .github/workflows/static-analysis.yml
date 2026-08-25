@@ -31,4 +31,4 @@ jobs:
       - name: Install deps
         run: npm ci
       - name: Run TypeScript type checking
-        run: npm run typecheck
+        run: npm run build
