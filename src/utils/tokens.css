@@ -33,9 +33,12 @@
 
   /* ── Typography ───────────────────────────────────────────── */
 
-  --font-sans:
+  --font-heading:
     "Elms Sans Variable", system-ui, -apple-system, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
+  --font-body:
+    "Nunito Variable", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
   --font-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
