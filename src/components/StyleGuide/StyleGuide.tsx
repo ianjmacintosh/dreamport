@@ -90,7 +90,7 @@ const SPACING = [
 
 export function StyleGuide() {
   return (
-    <main className="sg" id="top">
+    <div id="top">
       <header className="sg-header">
         <h1>Style Guide</h1>
         <p className="sg-header-sub">
@@ -300,7 +300,7 @@ export function StyleGuide() {
           ))}
         </div>
       </Section>
-    </main>
+    </div>
   );
 }
 

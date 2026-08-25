@@ -6,7 +6,7 @@ import "./Homepage.css";
 
 export function Homepage() {
   return (
-    <main className="hp">
+    <>
       <Link href="/internal/pattern-library" className="hp-back">
         ← Pattern library
       </Link>
@@ -44,7 +44,7 @@ export function Homepage() {
           </Button>
         </form>
       </section>
-    </main>
+    </>
   );
 }
 
