@@ -8,7 +8,6 @@
   // Features to add to the dev container. More info: https://containers.dev/features.
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
     "ghcr.io/devcontainers-extra/features/tmux-apt-get:1": {},
     "ghcr.io/postfinance/devcontainer-features/playwright-deps:1.0.0": {
       "installChromiumDeps": true
@@ -23,10 +22,13 @@
   },
   // Named Docker volume (not a host bind mount) so Claude Code's OAuth
   // credentials survive container rebuilds without ever touching the host
-  // filesystem. First container creation copies the claude-code feature's
-  // freshly-installed ~/.claude into the volume; every rebuild after that
+  // filesystem. First container creation copies the Dockerfile's freshly
+  // node-owned, empty ~/.claude into the volume; every rebuild after that
   // reuses the same (already logged-in) volume instead of a clean one, so
   // the browser/magic-link login only has to happen once per machine.
+  // Login state actually spans ~/.claude/ AND a sibling ~/.claude.json —
+  // post-create.sh symlinks the latter into this volume too, since only
+  // ~/.claude/ itself is mounted here.
   "mounts": [
     "source=pillbug-claude-code-auth,target=/home/node/.claude,type=volume"
   ],
