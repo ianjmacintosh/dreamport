@@ -263,7 +263,7 @@ export function StyleGuide() {
 
       <Section id="text-inputs" label="Text inputs">
         <div className="sg-input-row">
-          <TextInput id="sg-name" label="Name" placeholder="Ada Lovelace" />
+          <TextInput id="sg-name" label="Name" />
           <TextInput
             id="sg-email"
             label="Email"
@@ -272,7 +272,7 @@ export function StyleGuide() {
           />
         </div>
         <Snippet
-          code={`<TextInput id="name" label="Name" placeholder="Ada Lovelace" />\n<TextInput\n  id="email"\n  label="Email"\n  type="email"\n  helperText="We'll never share your email."\n/>`}
+          code={`<TextInput id="name" label="Name" />\n<TextInput\n  id="email"\n  label="Email"\n  type="email"\n  helperText="We'll never share your email."\n/>`}
         />
         <p className="sg-note">
           Use the <code>&lt;TextInput&gt;</code> component — it pairs an{" "}

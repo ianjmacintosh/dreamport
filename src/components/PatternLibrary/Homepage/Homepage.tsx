@@ -26,12 +26,7 @@ export function Homepage() {
           we&apos;ll let you know when it&apos;s your turn.
         </p>
         <form onSubmit={(event) => event.preventDefault()}>
-          <TextInput
-            id="hp-signup-email"
-            label="Email"
-            type="email"
-            placeholder="ada@example.com"
-          />
+          <TextInput id="hp-signup-email" label="Email" type="email" />
           <Button variant="primary" type="submit">
             Join the waitlist
           </Button>
