@@ -30,7 +30,14 @@
      One deviation from Solarized's textbook role table: body text
      uses base01, not base00 — base00-on-base3 measures ~4.13:1,
      under WCAG AA's 4.5:1 floor for normal text; base01 clears it
-     at ~4.99:1 and is still a stock Solarized tone. */
+     at ~4.99:1 and is still a stock Solarized tone.
+
+     Known, accepted trade-off: --sol-blue (link/accent) measures
+     ~3.41:1 against base3 — under AA for normal text. Checked
+     cyan/violet too; none of Solarized's accents clear 4.5:1 on this
+     background. Kept as authentic Solarized blue by deliberate
+     choice, not an oversight — don't "fix" this without revisiting
+     that decision first. */
 
   --color-page-bg: var(--sol-base3);
   --color-surface: var(--sol-base2);
