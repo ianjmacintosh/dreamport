@@ -62,6 +62,19 @@ main {
   padding: var(--space-8) var(--space-6);
 }
 
+/* ── Primitives: flow spacing ─────────────────────────────── */
+/* Default vertical rhythm for stacked page content, so pages don't
+   need their own layout CSS. Margin-top only, so a block's first
+   child sits flush with its container. */
+
+main > * + * {
+  margin-top: var(--space-4);
+}
+
+p + p {
+  margin-top: var(--space-4);
+}
+
 /* ── Primitives: buttons ──────────────────────────────────── */
 /* See README "Quick Start: Application Code" step 12. */
 
