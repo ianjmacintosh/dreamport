@@ -111,7 +111,7 @@ You'll have to do this manually when you merge your first PR, but there may be a
 8. Get to "Hello World" deployed; Cloudflare setup, GitHub setup, CI, dev container
 9. Style guide created
 10. ~~Pick fonts: 1 heading font, 1 body text font~~ Elms Sans (heading), Nunito (body)
-11. Pick color scheme relying on one of the main four brands
+11. ~~Pick color scheme relying on one of the main four brands~~ Solarized Light (Ethan Schoonover)
 12. Define primitive design elements like buttons, links, headings
 13. If a motif arises, use it
 

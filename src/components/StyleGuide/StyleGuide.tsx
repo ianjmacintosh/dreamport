@@ -24,13 +24,33 @@ function Section({
   );
 }
 
-const PALETTE = [
+const SOLARIZED_PALETTE = [
+  { label: "Base03", role: "--sol-base03" },
+  { label: "Base02", role: "--sol-base02" },
+  { label: "Base01", role: "--sol-base01" },
+  { label: "Base00", role: "--sol-base00" },
+  { label: "Base0", role: "--sol-base0" },
+  { label: "Base1", role: "--sol-base1" },
+  { label: "Base2", role: "--sol-base2" },
+  { label: "Base3", role: "--sol-base3" },
+  { label: "Yellow", role: "--sol-yellow" },
+  { label: "Orange", role: "--sol-orange" },
+  { label: "Red", role: "--sol-red" },
+  { label: "Magenta", role: "--sol-magenta" },
+  { label: "Violet", role: "--sol-violet" },
+  { label: "Blue", role: "--sol-blue" },
+  { label: "Cyan", role: "--sol-cyan" },
+  { label: "Green", role: "--sol-green" },
+];
+
+const SEMANTIC_COLORS = [
   { label: "Page background", role: "--color-page-bg" },
   { label: "Surface", role: "--color-surface" },
   { label: "Border", role: "--color-border" },
   { label: "Muted text", role: "--color-text-muted" },
-  { label: "Primary text", role: "--color-text-primary" },
-  { label: "Accent (placeholder)", role: "--color-accent" },
+  { label: "Body text", role: "--color-text-primary" },
+  { label: "Heading text", role: "--color-heading" },
+  { label: "Accent / link", role: "--color-accent" },
 ];
 
 const TYPE_SCALE = [
@@ -62,21 +82,49 @@ export function StyleGuide() {
       <header className="sg-header">
         <h1>Style Guide</h1>
         <p className="sg-header-sub">
-          Headings: Elms Sans. Body: Nunito. Brand color still placeholder — see
-          the README&apos;s Quick Start steps for what&apos;s still open.
+          Headings: Elms Sans. Body: Nunito. Colors: Solarized Light. See the
+          README&apos;s Quick Start steps for what&apos;s still open.
         </p>
       </header>
 
       <nav className="sg-nav" aria-label="Style guide sections">
-        <a href="#color">Color</a>
+        <a href="#palette">Palette</a>
+        <a href="#colors">Colors</a>
         <a href="#typography">Typography</a>
         <a href="#buttons">Buttons</a>
         <a href="#spacing">Spacing</a>
       </nav>
 
-      <Section id="color" label="Color palette">
+      <Section id="palette" label="Palette — Solarized Light">
+        <p className="sg-note">
+          The raw swatches. Nothing here should be used directly in a component
+          — it&apos;s the source material for the semantic colors below.
+        </p>
         <div className="sg-palette">
-          {PALETTE.map(({ label, role }) => (
+          {SOLARIZED_PALETTE.map(({ label, role }) => (
+            <div key={label} className="sg-swatch">
+              <div
+                className="sg-swatch-block"
+                style={{ background: `var(${role})` }}
+                aria-hidden="true"
+              />
+              <div className="sg-swatch-meta">
+                <div className="sg-swatch-name">{label}</div>
+                <div className="sg-swatch-token">{role}</div>
+                <div className="sg-swatch-value">{cssVar(role)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section id="colors" label="Colors — by purpose">
+        <p className="sg-note">
+          What each palette swatch is actually used for. Components should only
+          ever reference these, never a raw <code>--sol-*</code> value.
+        </p>
+        <div className="sg-palette">
+          {SEMANTIC_COLORS.map(({ label, role }) => (
             <div key={label} className="sg-swatch">
               <div
                 className="sg-swatch-block"
