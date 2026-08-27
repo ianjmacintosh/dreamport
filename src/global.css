@@ -73,9 +73,11 @@ main > * + * {
 }
 
 /* Text elements: margin-bottom, so trailing space follows them
-   wherever they're nested, not just at the top level. */
+   wherever they're nested, not just at the top level. In em, not a
+   --space-* token, so spacing scales with whatever .text-* size class
+   is applied instead of staying fixed regardless of font size. */
 p {
-  margin-bottom: var(--space-4);
+  margin-bottom: 1em;
 }
 
 /* ── Primitives: buttons ──────────────────────────────────── */
@@ -153,4 +155,20 @@ p {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   margin-top: var(--space-1);
+}
+
+/* ── Primitives: footer ───────────────────────────────────── */
+
+.footer {
+  width: var(--page-width);
+  margin: var(--space-10) auto 0;
+  padding: var(--space-6) var(--space-6) var(--space-8);
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+}
+
+.footer-copyright {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-bottom: 0;
 }

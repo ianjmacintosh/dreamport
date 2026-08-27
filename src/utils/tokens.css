@@ -49,7 +49,7 @@
   --color-border: var(--sol-base1);
   --color-text-primary: var(--sol-base01);
   --color-text-muted: var(--sol-base1);
-  --color-heading: var(--sol-base02);
+  --color-heading: var(--sol-violet);
   --color-link: var(--sol-blue);
   --color-link-hover: var(--sol-cyan);
   --color-focus-ring: var(--sol-blue);
@@ -60,8 +60,8 @@
   /* ── Typography ───────────────────────────────────────────── */
 
   --font-heading:
-    "Elms Sans Variable", system-ui, -apple-system, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
+    "Funnel Display", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
   --font-body:
     "Nunito Variable", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
@@ -70,9 +70,13 @@
 
   /* ── Type scale ───────────────────────────────────────────── */
 
+  --text-hero: clamp(3rem, 12vw, 10rem);
+  --text-display: 6rem;
   --text-h1: 2.5rem;
   --text-h2: 1.875rem;
   --text-h3: 1.5rem;
+  --text-2xl: 1.5rem;
+  --text-xl: 1.25rem;
   --text-lg: 1.125rem;
   --text-base: 1rem;
   --text-sm: 0.875rem;

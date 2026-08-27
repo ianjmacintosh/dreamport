@@ -3,6 +3,16 @@
    <h2> that needs to look like an <h3>. Change the class, not the tag;
    never skip a heading level for looks. */
 
+.text-hero {
+  font-size: var(--text-hero);
+  line-height: 1;
+}
+
+.text-display {
+  font-size: var(--text-display);
+  line-height: 1;
+}
+
 .text-h1 {
   font-size: var(--text-h1);
   line-height: 1.15;
@@ -16,6 +26,14 @@
 .text-h3 {
   font-size: var(--text-h3);
   line-height: 1.25;
+}
+
+.text-2xl {
+  font-size: var(--text-2xl);
+}
+
+.text-xl {
+  font-size: var(--text-xl);
 }
 
 .text-lg {
