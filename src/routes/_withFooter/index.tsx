@@ -16,8 +16,8 @@ function Home() {
       <p className="text-2xl">
         Record your ideas and refine them with as much or as little structure as
         you want. Add details however you like, organize your thoughts by topic
-        (like style, pricing, staff, or distribution), follow exercises built to
-        push your concept to the next level.
+        (like style, pricing, staff, or distribution), follow exercises to push
+        your concept to the next level.
       </p>
       <p className="text-2xl">
         For more structure, buy paid toolsets and programs built around specific
