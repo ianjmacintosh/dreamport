@@ -15,14 +15,13 @@ function Home() {
       </p>
       <p className="text-2xl">
         Record your ideas and refine them with as much or as little structure as
-        you want. You can cut your own path and add details however you like,
-        organizing your thoughts by topic (like style, pricing, staff, or
-        distribution), with questions and exercises built to push your concept
-        to the next level.
+        you want. Add details however you like, organize your thoughts by topic
+        (like style, pricing, staff, or distribution), follow exercises built to
+        push your concept to the next level.
       </p>
       <p className="text-2xl">
-        If you want more structure, you can upgrade to use paid toolsets built
-        around proven methodologies like <strong>Build-Measure-Learn</strong> or{" "}
+        For more structure, buy paid toolsets and programs built around specific
+        proven methodologies like <strong>Build-Measure-Learn</strong> or{" "}
         <strong>Lean Analytics</strong> with guard rails to keep you on track
         and on schedule.
       </p>
