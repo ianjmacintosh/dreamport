@@ -34,22 +34,45 @@ added for local use it will resolve to Miniflare's local SQLite under
 `dreamport-dev` is a real remote D1 database for the occasional
 database-heavy change you want to exercise against real D1 behaviour
 (no transactions, real error semantics) **before** opening a PR. It is opt-in:
-nothing points at it unless you pass `--env dev` yourself.
+nothing points at it unless you build with `CLOUDFLARE_ENV=dev` (deploys) or
+pass `--env dev` (`wrangler d1` commands).
 
-### Preview deployments → `dreamport-stage`
+### Deploying — production and previews
 
-Per-PR previews come from Cloudflare's GitHub integration building every
-non-production branch. They must never read or write production data, so the
-build commands — set once in the Worker's build configuration in the
-Cloudflare dashboard, not in this repo — pass `--env` explicitly:
+> **Environment is chosen at _build_ time, not deploy time.**
+> `@cloudflare/vite-plugin` resolves exactly one Wrangler environment during
+> `vite build` — picked from the **`CLOUDFLARE_ENV`** env var — and writes a
+> fully-resolved `dist/wrangler.json` plus a `.wrangler/deploy/config.json`
+> redirect. `wrangler deploy` / `wrangler versions upload` then read that
+> redirect. Passing `--env` to the deploy is **silently ignored** once the
+> redirect exists, so a `wrangler deploy --env prod` run after a plain
+> `npm run build` ships the top-level config with **no D1 binding**. Always
+> select the environment with `CLOUDFLARE_ENV` at build time.
 
-- **Production branch (`main`):** `npx wrangler deploy --env prod`
-- **Non-production branch (preview):** `npx wrangler versions upload --env stage`
-  (a preview version with its own URL; it does not take production traffic)
+Deploys run in Cloudflare's Workers Builds (GitHub integration). The **build
+command** is shared across branches; only the **deploy command** differs
+(production vs non-production), so the build command carries the branch check:
 
-`scripts/setup-d1.sh` includes a stage that walks through applying these in
-the dashboard. Previews are served on `*.workers.dev` — Cloudflare's Git
-integration does not mint per-PR custom subdomains.
+| Setting                                   | Value                                                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Build command                             | `CLOUDFLARE_ENV="$([ "$WORKERS_CI_BRANCH" = main ] && echo prod \|\| echo stage)" npm run build` |
+| Deploy command (production branch `main`) | `npx wrangler deploy`                                                                            |
+| Non-production branch deploy command      | `npx wrangler versions upload`                                                                   |
+
+So `main` builds and deploys `dreamport-prod` (→ `dreamport-prod` D1); every
+other branch builds and uploads a preview version of `dreamport-stage` (→
+`dreamport-stage` D1), with its own `*.workers.dev` URL and no production
+traffic. Cloudflare's Git integration does not mint per-PR custom subdomains.
+
+To deploy by hand, select the environment the same way:
+
+```bash
+CLOUDFLARE_ENV=stage npm run build && npx wrangler versions upload
+CLOUDFLARE_ENV=prod  npm run build && npx wrangler deploy
+```
+
+`scripts/setup-d1.sh` includes a stage that walks through entering these in
+the dashboard.
 
 ## First-time setup (human-in-the-loop)
 
@@ -62,9 +85,8 @@ access, so it is not something CI or an agent can do. Run the wizard:
 
 It walks through `wrangler login`, `wrangler d1 create
 dreamport-{prod,stage,dev}`, pasting each returned `database_id` into the
-matching block in `wrangler.jsonc`, and the one dashboard setting that points
-preview builds at `--env stage`. Database IDs are **not secrets** — commit
-them.
+matching block in `wrangler.jsonc`, and the Workers Builds build/deploy
+commands from the table above. Database IDs are **not secrets** — commit them.
 
 Until the wizard has run, the `database_id` values in `wrangler.jsonc` are
 `PLACEHOLDER-run-scripts/setup-d1.sh` and any real deploy or remote migration
@@ -90,6 +112,11 @@ dreamport-<env> --env <env> --remote` shows what is pending without applying
 anything. Without `--remote`, Wrangler targets the local Miniflare copy of the
 database instead.
 
+Note the asymmetry: `wrangler d1` commands read `wrangler.jsonc` directly and
+so take `--env <env>`, whereas **deploys** go through the vite-plugin build
+output and so take `CLOUDFLARE_ENV` at build time and no `--env` (see
+[Deploying](#deploying--production-and-previews)).
+
 ### Order relative to a deploy
 
 Migrations are additive and must be applied **before** the Worker code that
@@ -97,9 +124,11 @@ depends on the new schema, so that at no point is deployed code reading a
 column that does not exist yet:
 
 1. Merge the migration + code change to `main`.
-2. **Staging:** `npm run migrate:stage`, then let the preview/staging deploy
-   run (or `npx wrangler deploy --env stage`). Verify sign-in still works.
-3. **Production:** `npm run migrate:prod`, then `npx wrangler deploy --env prod`.
+2. **Staging:** `npm run migrate:stage`, then let a preview deploy run (or
+   `CLOUDFLARE_ENV=stage npm run build && npx wrangler versions upload`).
+   Verify sign-in still works.
+3. **Production:** `npm run migrate:prod`, then let the `main` deploy run (or
+   `CLOUDFLARE_ENV=prod npm run build && npx wrangler deploy`).
 
 Roll forward, not back: a follow-up migration fixes a bad one. D1 has no
 transactions (see [ADR-0002](adr/0002-better-auth-over-homegrown.md)), so a
