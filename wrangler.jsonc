@@ -5,4 +5,57 @@
   "assets": {
     "not_found_handling": "single-page-application",
   },
+  // Default vars for `npm run dev` (Miniflare local SQLite, no remote D1).
+  // Each named environment below redeclares these — wrangler does not
+  // inherit `vars` or bindings into environments.
+  "vars": {
+    "EMAIL_MODE": "mock",
+  },
+
+  // Three deployment environments, one per Cloudflare D1 database. See
+  // docs/deployment.md for how previews, production, and migrations map onto
+  // these. `database_id`s are placeholders until `scripts/setup-d1.sh` has
+  // run `wrangler d1 create` and written the real IDs back here (they are
+  // not secrets and belong in version control).
+  "env": {
+    "prod": {
+      "name": "dreamport-prod",
+      "vars": {
+        "EMAIL_MODE": "mock",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "dreamport-prod",
+          "database_id": "PLACEHOLDER-run-scripts/setup-d1.sh",
+        },
+      ],
+    },
+    "stage": {
+      "name": "dreamport-stage",
+      "vars": {
+        "EMAIL_MODE": "mock",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "dreamport-stage",
+          "database_id": "PLACEHOLDER-run-scripts/setup-d1.sh",
+        },
+      ],
+    },
+    "dev": {
+      "name": "dreamport-dev",
+      "vars": {
+        "EMAIL_MODE": "mock",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "dreamport-dev",
+          "database_id": "PLACEHOLDER-run-scripts/setup-d1.sh",
+        },
+      ],
+    },
+  },
 }

@@ -131,10 +131,13 @@ npm run build
 
 ## Deployment
 
-### Deploying to Preview Environments
+See [`docs/deployment.md`](docs/deployment.md) for the full picture:
+environments, the three Cloudflare D1 databases, and the migration procedure.
 
-This project was intended to work with GitHub and Cloudflare to deploy each branch associated with a pull request to `main` to a new preview environment
-
-### Deploying to Production
-
-This project was intended to work with GitHub and Cloudflare to deploy all changes merged to `main` to production
+- **Preview:** every non-production branch with a PR to `main` is built by
+  Cloudflare's GitHub integration with `--env stage`, so preview testing uses
+  the `dreamport-stage` database, never production data. (See the doc for the
+  exact build commands — previews upload a version, they don't deploy.)
+- **Production:** changes merged to `main` deploy with `--env prod`.
+- **First-time D1 setup:** run [`scripts/setup-d1.sh`](scripts/setup-d1.sh)
+  (needs `wrangler login` and Cloudflare account access).
