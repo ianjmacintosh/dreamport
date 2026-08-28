@@ -14,9 +14,8 @@
 
   // Three deployment environments, one per Cloudflare D1 database. See
   // docs/deployment.md for how previews, production, and migrations map onto
-  // these. `database_id`s are placeholders until `scripts/setup-d1.sh` has
-  // run `wrangler d1 create` and written the real IDs back here (they are
-  // not secrets and belong in version control).
+  // these. `database_id`s are created by `scripts/setup-d1.sh` (`wrangler d1
+  // create`) and committed here — they are not secrets.
   "env": {
     "prod": {
       "name": "dreamport-prod",
@@ -27,7 +26,7 @@
         {
           "binding": "DB",
           "database_name": "dreamport-prod",
-          "database_id": "PLACEHOLDER-run-scripts/setup-d1.sh",
+          "database_id": "0f2a6296-4fb3-4025-b7d8-0906cfbda0e1",
         },
       ],
     },
@@ -40,7 +39,7 @@
         {
           "binding": "DB",
           "database_name": "dreamport-stage",
-          "database_id": "PLACEHOLDER-run-scripts/setup-d1.sh",
+          "database_id": "1c11e9b8-b82d-4c9f-bf39-4af52e7ab3c8",
         },
       ],
     },
@@ -53,7 +52,7 @@
         {
           "binding": "DB",
           "database_name": "dreamport-dev",
-          "database_id": "PLACEHOLDER-run-scripts/setup-d1.sh",
+          "database_id": "8394c659-6f81-4f97-9332-dcc13ba7505c",
         },
       ],
     },
