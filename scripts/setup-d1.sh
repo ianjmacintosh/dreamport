@@ -304,20 +304,21 @@ say "Local 'npm run dev' keeps using Miniflare's local SQLite regardless."
 provision_db dev
 
 # ── Stage 6 ──────────────────────────────────────────────────────────────
-stage "Point preview deployments at dreamport-stage"
-say "Per-PR previews must bind the dreamport-stage database, never production."
-say "That is set once, in the Worker's build configuration in the Cloudflare"
-say "dashboard — not in this repo — so it needs a human."
+stage "Set the Workers Builds build & deploy commands"
+say "@cloudflare/vite-plugin picks the environment at BUILD time from"
+say "CLOUDFLARE_ENV — not from --env on deploy (which the plugin's deploy"
+say "redirect silently ignores). So the environment goes in the build command."
+say "Main -> dreamport-prod; every other branch -> a dreamport-stage preview."
 open_url "https://dash.cloudflare.com/?to=/:account/workers-and-pages"
 step "Open the 'dreamport' Worker (create it via 'Connect to Git' first if it"
 step "  does not exist yet), then: Settings -> Build."
-step "Set the NON-production branch deploy command to:"
-say "      npx wrangler versions upload --env stage"
-step "Set the production branch deploy command to:"
-say "      npx wrangler deploy --env prod"
+step 'Set the Build command to:'
+say  '      CLOUDFLARE_ENV="$([ "$WORKERS_CI_BRANCH" = main ] && echo prod || echo stage)" npm run build'
+step "Leave the production deploy command as:   npx wrangler deploy"
+step "Leave the non-production deploy command as:   npx wrangler versions upload"
 step "Save."
-note "The exact dashboard labels move around; docs/deployment.md records the"
-note "two commands so you can reconcile whatever the UI calls them."
+note "Neither deploy command takes --env. docs/deployment.md has the details"
+note "and the by-hand equivalent."
 pause "Done (or noted to do later)?"
 # ──────────────────────────────────────────────────────────────────────────
 
