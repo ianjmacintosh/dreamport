@@ -5,4 +5,56 @@
   "assets": {
     "not_found_handling": "single-page-application",
   },
+  // Default vars for `npm run dev` (Miniflare local SQLite, no remote D1).
+  // Each named environment below redeclares these — wrangler does not
+  // inherit `vars` or bindings into environments.
+  "vars": {
+    "EMAIL_MODE": "mock",
+  },
+
+  // Three deployment environments, one per Cloudflare D1 database. See
+  // docs/deployment.md for how previews, production, and migrations map onto
+  // these. `database_id`s are created by `scripts/setup-d1.sh` (`wrangler d1
+  // create`) and committed here — they are not secrets.
+  "env": {
+    "prod": {
+      "name": "dreamport-prod",
+      "vars": {
+        "EMAIL_MODE": "mock",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "dreamport-prod",
+          "database_id": "0f2a6296-4fb3-4025-b7d8-0906cfbda0e1",
+        },
+      ],
+    },
+    "stage": {
+      "name": "dreamport-stage",
+      "vars": {
+        "EMAIL_MODE": "mock",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "dreamport-stage",
+          "database_id": "1c11e9b8-b82d-4c9f-bf39-4af52e7ab3c8",
+        },
+      ],
+    },
+    "dev": {
+      "name": "dreamport-dev",
+      "vars": {
+        "EMAIL_MODE": "mock",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "dreamport-dev",
+          "database_id": "8394c659-6f81-4f97-9332-dcc13ba7505c",
+        },
+      ],
+    },
+  },
 }
