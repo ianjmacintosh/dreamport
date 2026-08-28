@@ -49,7 +49,12 @@
   --color-border: var(--sol-base1);
   --color-text-primary: var(--sol-base01);
   --color-text-muted: var(--sol-base1);
-  --color-heading: var(--sol-base02);
+  /* --color-text-primary/muted both fail AA on --color-surface (4.39:1 and
+     2.18:1) — base2 is darker than base3, so text tuned for the page
+     background isn't automatically safe on the surface background too.
+     base02 clears it at ~10.6:1. */
+  --color-text-on-surface: var(--sol-base02);
+  --color-heading: var(--sol-violet);
   --color-link: var(--sol-blue);
   --color-link-hover: var(--sol-cyan);
   --color-focus-ring: var(--sol-blue);
@@ -57,11 +62,18 @@
   --color-accent-hover: var(--sol-cyan);
   --color-accent-text: var(--sol-base3);
 
+  --color-selection-bg: var(--sol-magenta);
+  /* True white, not a Solarized swatch — no in-palette color clears
+     AA (4.5:1) against magenta from either direction: base3 (the
+     lightest swatch) only reaches 4.22:1, and base03 (the darkest)
+     only reaches 3.30:1. Pure white hits 4.55:1. */
+  --color-selection-text: #ffffff;
+
   /* ── Typography ───────────────────────────────────────────── */
 
   --font-heading:
-    "Elms Sans Variable", system-ui, -apple-system, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
+    "Funnel Display", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
   --font-body:
     "Nunito Variable", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
@@ -70,9 +82,13 @@
 
   /* ── Type scale ───────────────────────────────────────────── */
 
+  --text-hero: clamp(3rem, 12vw, 10rem);
+  --text-display: 6rem;
   --text-h1: 2.5rem;
   --text-h2: 1.875rem;
   --text-h3: 1.5rem;
+  --text-2xl: 1.5rem;
+  --text-xl: 1.25rem;
   --text-lg: 1.125rem;
   --text-base: 1rem;
   --text-sm: 0.875rem;

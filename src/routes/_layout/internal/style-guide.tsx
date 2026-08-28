@@ -67,14 +67,21 @@ const SEMANTIC_COLORS = [
   { label: "Border", role: "--color-border" },
   { label: "Muted text", role: "--color-text-muted" },
   { label: "Body text", role: "--color-text-primary" },
+  { label: "Text on surface", role: "--color-text-on-surface" },
   { label: "Heading text", role: "--color-heading" },
   { label: "Accent / link", role: "--color-accent" },
+  { label: "Selection background", role: "--color-selection-bg" },
+  { label: "Selection text", role: "--color-selection-text" },
 ];
 
 const TYPE_SCALE = [
+  { token: "--text-hero", sample: "Hero", tag: "h1" },
+  { token: "--text-display", sample: "Display", tag: "h1" },
   { token: "--text-h1", sample: "Heading 1", tag: "h1" },
   { token: "--text-h2", sample: "Heading 2", tag: "h2" },
   { token: "--text-h3", sample: "Heading 3", tag: "h3" },
+  { token: "--text-2xl", sample: "2XL text", tag: "p" },
+  { token: "--text-xl", sample: "XL text", tag: "p" },
   { token: "--text-lg", sample: "Large text", tag: "p" },
   { token: "--text-base", sample: "Body text", tag: "p" },
   { token: "--text-sm", sample: "Small text", tag: "p" },
@@ -100,9 +107,9 @@ function StyleGuide() {
       <header className="sg-header">
         <h1>Style Guide</h1>
         <p className="sg-header-sub">
-          Headings: Elms Sans. Body: Nunito. Colors: Solarized Light. See the
-          README&apos;s Quick Start steps for what&apos;s still open. See the{" "}
-          <Link href="/internal/pattern-library">pattern library</Link> for
+          Headings: Funnel Display. Body: Nunito. Colors: Solarized Light. See
+          the README&apos;s Quick Start steps for what&apos;s still open. See
+          the <Link href="/internal/pattern-library">pattern library</Link> for
           full-page mockups built from these primitives.
         </p>
       </header>
@@ -172,6 +179,12 @@ function StyleGuide() {
             </div>
           ))}
         </div>
+        <p className="sg-note">
+          <code>--color-selection-text</code> is true white (
+          <code>#ffffff</code>), not a Solarized swatch — no in-palette color
+          clears WCAG AA (4.5:1) against magenta from either direction; pure
+          white hits 4.55:1. Try selecting this text to see it.
+        </p>
       </Section>
 
       <Section id="typography" label="Typography">
@@ -219,18 +232,23 @@ function StyleGuide() {
 
       <Section id="body-text" label="Body text">
         <div className="sg-heading-stack">
+          <p className="text-2xl">2XL body text</p>
+          <p className="text-xl">XL body text</p>
           <p className="text-lg">Large body text</p>
           <p className="text-base">Base body text</p>
           <p className="text-sm">Small body text</p>
           <p className="text-xs">Extra-small body text</p>
         </div>
         <Snippet
-          code={`<p className="text-lg">Large body text</p>\n<p className="text-base">Base body text</p>\n<p className="text-sm">Small body text</p>\n<p className="text-xs">Extra-small body text</p>`}
+          code={`<p className="text-2xl">2XL body text</p>\n<p className="text-xl">XL body text</p>\n<p className="text-lg">Large body text</p>\n<p className="text-base">Base body text</p>\n<p className="text-sm">Small body text</p>\n<p className="text-xs">Extra-small body text</p>`}
         />
         <p className="sg-note">
           Use a plain <code>&lt;p&gt;</code> (or <code>&lt;span&gt;</code> for
-          inline text) with a <code>.text-lg</code>/<code>.text-base</code>/
-          <code>.text-sm</code>/<code>.text-xs</code> class for size.
+          inline text) with a <code>.text-2xl</code>/<code>.text-xl</code>/
+          <code>.text-lg</code>/<code>.text-base</code>/<code>.text-sm</code>/
+          <code>.text-xs</code> class for size. Note <code>.text-2xl</code> is
+          the same 1.5rem size as <code>.text-h3</code> — same rung, different
+          semantic role (a large lead paragraph vs. an actual heading).
         </p>
       </Section>
 

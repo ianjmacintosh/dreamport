@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
-import "@fontsource-variable/elms-sans/wght.css";
+import "@fontsource/funnel-display/700.css";
 import "@fontsource-variable/nunito/wght.css";
 import "./global.css";
 import { routeTree } from "./routeTree.gen";

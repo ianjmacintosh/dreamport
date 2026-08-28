@@ -37,3 +37,10 @@ Rules for building or editing a page:
    than a plain description.
 
 This applies everywhere in the app, not just the pattern library.
+
+## Layout
+
+Structural page layout — page shells, full-bleed sections, sticky
+footers, breakout grids — is managed with CSS Grid, not Flexbox.
+Flexbox is still fine for small component-internal alignment (e.g. a
+button centering its icon and label), which isn't structural layout.
