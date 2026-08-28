@@ -49,6 +49,11 @@
   --color-border: var(--sol-base1);
   --color-text-primary: var(--sol-base01);
   --color-text-muted: var(--sol-base1);
+  /* --color-text-primary/muted both fail AA on --color-surface (4.39:1 and
+     2.18:1) — base2 is darker than base3, so text tuned for the page
+     background isn't automatically safe on the surface background too.
+     base02 clears it at ~10.6:1. */
+  --color-text-on-surface: var(--sol-base02);
   --color-heading: var(--sol-violet);
   --color-link: var(--sol-blue);
   --color-link-hover: var(--sol-cyan);

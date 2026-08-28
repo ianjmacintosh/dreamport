@@ -16,6 +16,18 @@ body {
   background-color: var(--color-page-bg);
 }
 
+/* Vite mounts the app into #root, so it — not body — is what needs to
+   be the full-height row track for a footer to stick to the bottom of
+   short pages instead of riding up under the content. main (or main +
+   footer) are auto-placed into the rows in DOM order: main gets the
+   1fr track and stretches to fill it, footer (when present) gets its
+   own auto-sized track after. */
+#root {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: 1fr auto;
+}
+
 h1,
 h2,
 h3,
@@ -158,17 +170,27 @@ p {
 }
 
 /* ── Primitives: footer ───────────────────────────────────── */
+/* Full-bleed background/border, content column pinned to the same
+   width and horizontal padding as <main> via a 3-column breakout
+   grid — the two 1fr tracks are the bleed, the middle track is where
+   content actually sits. */
 
 .footer {
-  width: var(--page-width);
-  margin: var(--space-10) auto 0;
-  padding: var(--space-6) var(--space-6) var(--space-8);
+  display: grid;
+  grid-template-columns: 1fr var(--page-width) 1fr;
+  margin-top: var(--space-10);
+  background-color: var(--color-surface);
   border-top: 1px solid var(--color-border);
+}
+
+.footer-content {
+  grid-column: 2;
+  padding: var(--space-6) var(--space-6) var(--space-8);
   text-align: center;
 }
 
 .footer-copyright {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  color: var(--color-text-on-surface);
   margin-bottom: 0;
 }

@@ -1,7 +1,9 @@
 export function Footer() {
   return (
     <footer className="footer">
-      <p className="footer-copyright">© 2026 Dreamport</p>
+      <div className="footer-content">
+        <p className="footer-copyright">© 2026 Dreamport</p>
+      </div>
     </footer>
   );
 }

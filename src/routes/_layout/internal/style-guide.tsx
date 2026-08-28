@@ -67,6 +67,7 @@ const SEMANTIC_COLORS = [
   { label: "Border", role: "--color-border" },
   { label: "Muted text", role: "--color-text-muted" },
   { label: "Body text", role: "--color-text-primary" },
+  { label: "Text on surface", role: "--color-text-on-surface" },
   { label: "Heading text", role: "--color-heading" },
   { label: "Accent / link", role: "--color-accent" },
 ];
