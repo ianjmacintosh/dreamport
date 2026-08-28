@@ -70,6 +70,8 @@ const SEMANTIC_COLORS = [
   { label: "Text on surface", role: "--color-text-on-surface" },
   { label: "Heading text", role: "--color-heading" },
   { label: "Accent / link", role: "--color-accent" },
+  { label: "Selection background", role: "--color-selection-bg" },
+  { label: "Selection text", role: "--color-selection-text" },
 ];
 
 const TYPE_SCALE = [
@@ -177,6 +179,12 @@ function StyleGuide() {
             </div>
           ))}
         </div>
+        <p className="sg-note">
+          <code>--color-selection-text</code> is true white (
+          <code>#ffffff</code>), not a Solarized swatch — no in-palette color
+          clears WCAG AA (4.5:1) against magenta from either direction; pure
+          white hits 4.55:1. Try selecting this text to see it.
+        </p>
       </Section>
 
       <Section id="typography" label="Typography">
