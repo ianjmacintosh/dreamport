@@ -305,10 +305,10 @@ provision_db dev
 
 # ── Stage 6 ──────────────────────────────────────────────────────────────
 stage "Set the Workers Builds build & deploy commands"
-say "@cloudflare/vite-plugin picks the environment at BUILD time from"
-say "CLOUDFLARE_ENV — not from --env on deploy (which the plugin's deploy"
-say "redirect silently ignores). So the environment goes in the build command."
-say "Main -> dreamport-prod; every other branch -> a dreamport-stage preview."
+say "The environment is picked at build time from CLOUDFLARE_ENV, not from"
+say "--env on deploy (the vite plugin's deploy redirect ignores --env). So it"
+say "goes in the build command: main -> dreamport-prod, every other branch ->"
+say "a dreamport-stage preview."
 open_url "https://dash.cloudflare.com/?to=/:account/workers-and-pages"
 step "Open the 'dreamport' Worker (create it via 'Connect to Git' first if it"
 step "  does not exist yet), then: Settings -> Build."

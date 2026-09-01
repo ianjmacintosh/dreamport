@@ -134,12 +134,11 @@ npm run build
 See [`docs/deployment.md`](docs/deployment.md) for the full picture:
 environments, the three Cloudflare D1 databases, and the migration procedure.
 
-- **Preview:** every non-production branch with a PR to `main` is built by
-  Cloudflare's Workers Builds with `CLOUDFLARE_ENV=stage` and uploaded as a
-  preview version, so preview testing uses the `dreamport-stage` database,
-  never production data.
-- **Production:** changes merged to `main` build with `CLOUDFLARE_ENV=prod`
-  and deploy. (`@cloudflare/vite-plugin` selects the environment at build
-  time — `--env` on deploy is ignored; see the doc.)
+- **Preview:** every non-`main` branch with a PR is built with
+  `CLOUDFLARE_ENV=stage` and uploaded as a preview version, so preview testing
+  hits `dreamport-stage`, never production data.
+- **Production:** merges to `main` build with `CLOUDFLARE_ENV=prod` and deploy.
+  The environment is set at build time; `--env` on deploy does nothing (see the
+  doc).
 - **First-time D1 setup:** run [`scripts/setup-d1.sh`](scripts/setup-d1.sh)
   (needs `wrangler login` and Cloudflare account access).
