@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host",
+    "dev": "CLOUDFLARE_ENV=local vite --host",
     "build": "vite build && tsc -b",
+    "build:ci": "CLOUDFLARE_ENV=$([ \"$WORKERS_CI_BRANCH\" = main ] && echo prod || echo stage) npm run build",
     "lint": "eslint .",
     "preview": "vite preview --host",
     "format": "prettier --write .",

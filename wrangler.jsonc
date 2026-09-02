@@ -12,10 +12,11 @@
     "EMAIL_MODE": "mock",
   },
 
-  // Three deployment environments, one per Cloudflare D1 database. See
-  // docs/deployment.md for how previews, production, and migrations map onto
-  // these. `database_id`s are created by `scripts/setup-d1.sh` (`wrangler d1
-  // create`) and committed here — they are not secrets.
+  // Three remote deployment environments (prod / stage / dev), one per
+  // Cloudflare D1 database, plus a local-only `local` env used by `npm run
+  // dev`. See docs/deployment.md for how previews, production, and migrations
+  // map onto these. Remote `database_id`s are created by `scripts/setup-d1.sh`
+  // (`wrangler d1 create`) and committed here — they are not secrets.
   "env": {
     "prod": {
       "name": "dreamport-prod",
@@ -53,6 +54,22 @@
           "binding": "DB",
           "database_name": "dreamport-dev",
           "database_id": "8394c659-6f81-4f97-9332-dcc13ba7505c",
+        },
+      ],
+    },
+    // Local-only: `npm run dev` runs with CLOUDFLARE_ENV=local. The
+    // non-UUID database_id never resolves to a real Cloudflare database,
+    // so the DB binding is always the local Miniflare copy.
+    "local": {
+      "name": "dreamport-local",
+      "vars": {
+        "EMAIL_MODE": "mock",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "dreamport-local",
+          "database_id": "local",
         },
       ],
     },

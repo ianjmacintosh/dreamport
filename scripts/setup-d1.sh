@@ -305,20 +305,17 @@ provision_db dev
 
 # ── Stage 6 ──────────────────────────────────────────────────────────────
 stage "Set the Workers Builds build & deploy commands"
-say "The environment is picked at build time from CLOUDFLARE_ENV, not from"
-say "--env on deploy (the vite plugin's deploy redirect ignores --env). So it"
-say "goes in the build command: main -> dreamport-prod, every other branch ->"
-say "a dreamport-stage preview."
+say "The environment is chosen at build time via CLOUDFLARE_ENV. The"
+say "'build:ci' npm script sets it from the branch: main -> prod, every other"
+say "branch -> stage. The deploy commands take no --env."
 open_url "https://dash.cloudflare.com/?to=/:account/workers-and-pages"
 step "Open the 'dreamport' Worker (create it via 'Connect to Git' first if it"
 step "  does not exist yet), then: Settings -> Build."
-step 'Set the Build command to:'
-say  '      CLOUDFLARE_ENV="$([ "$WORKERS_CI_BRANCH" = main ] && echo prod || echo stage)" npm run build'
-step "Leave the production deploy command as:   npx wrangler deploy"
-step "Leave the non-production deploy command as:   npx wrangler versions upload"
+step "Set the Build command to:      npm run build:ci"
+step "Leave the Deploy command as:   npx wrangler deploy"
+step "Leave the Version command as:  npx wrangler versions upload"
 step "Save."
-note "Neither deploy command takes --env. docs/deployment.md has the details"
-note "and the by-hand equivalent."
+note "docs/deployment.md has the full picture."
 pause "Done (or noted to do later)?"
 # ──────────────────────────────────────────────────────────────────────────
 
