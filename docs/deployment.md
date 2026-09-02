@@ -31,6 +31,11 @@ If the build is successful, Cloudflare will deploy a preview version at `???????
 
 All preview versions share the `dreamport-stage` D1 database.
 
+The auth spec ([#18](https://github.com/ianjmacintosh/dreamport/issues/18)) also
+names a stable `staging.dreamport.ianjmacintosh.com` for this environment;
+`trustedOrigins` (in `src/worker/trusted-origins.ts`) trusts both that host and
+any `*.workers.dev` preview.
+
 ### Production
 
 When Cloudflare's Git plugin detects a change pushed to `main`, Cloudflare will build it using `prod` settings in `wrangler.jsonc`
@@ -71,8 +76,10 @@ which never resolves to a real database — it only ever names the Miniflare cop
 ## Migrations
 
 Migration files live in [`migrations/`](../migrations/) as numbered
-`NNNN_description.sql`, committed and reviewed like any schema change. Better
-Auth's generated schema is the first one, added in #20.
+`NNNN_description.sql`, committed and reviewed like any schema change.
+`0001_better_auth_core_schema.sql` is Better Auth's generated core schema;
+regenerate it with `node scripts/generate-auth-schema.mjs <file>` rather than
+editing it by hand.
 
 Apply them per environment:
 
@@ -112,3 +119,6 @@ Database IDs are fine to commit. Secrets aren't: `BETTER_AUTH_SECRET`, the
 Turnstile secret key, and the Resend API key go in with `wrangler secret put
 --env <env>` (or the Cloudflare / GitHub dashboards) and never land in
 `wrangler.jsonc` or the repo.
+
+For local `npm run dev`, put `BETTER_AUTH_SECRET` in a `.dev.vars` file
+(gitignored; see [`.dev.vars.example`](../.dev.vars.example)).

@@ -1,10 +1,13 @@
 {
   "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
-    "target": "ES2023",
-    "lib": ["ES2023"],
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.worker.tsbuildinfo",
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "module": "ESNext",
-    "types": ["node"],
+    "types": [
+      "@cloudflare/workers-types",
+      "@cloudflare/vitest-pool-workers/types"
+    ],
     "skipLibCheck": true,
 
     /* Bundler mode */
@@ -22,10 +25,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": [
-    "vite.config.ts",
-    "vitest.config.ts",
-    "vitest.unit.config.ts",
-    "vitest.workers.config.ts"
-  ]
+  "include": ["src/worker", "test"]
 }

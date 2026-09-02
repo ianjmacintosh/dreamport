@@ -3,10 +3,14 @@
 Numbered SQL migration files applied to each Cloudflare D1 database with
 `wrangler d1 migrations apply`.
 
-This directory is intentionally empty for now. Issue #19 only establishes the
-environment and D1 skeleton; the first migration — Better Auth's generated
-schema (`user`, `session`, `account`, `verification`, `rateLimit`) — is added
-in issue #20.
+`0001_better_auth_core_schema.sql` is Better Auth's generated core schema
+(`user`, `session`, `account`, `verification`). It is produced by
+`scripts/generate-auth-schema.mjs` (which drives Better Auth's own migration
+builder from the `createAuth` config) — regenerate it, don't hand-edit it,
+whenever `better-auth` is upgraded or the auth config changes shape.
+
+The `rateLimit` table arrives with a later migration, when database-backed
+rate limiting is turned on.
 
 ## Conventions
 

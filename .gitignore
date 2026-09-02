@@ -30,6 +30,7 @@ src/routeTree.gen.ts
 # Cloudflare Wrangler
 .wrangler
 .dev.vars*
+!.dev.vars.example
 
 # Playwright
 /test-results/

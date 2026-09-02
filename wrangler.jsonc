@@ -2,12 +2,28 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "dreamport",
   "compatibility_date": "2026-02-05",
+  // Better Auth uses AsyncLocalStorage (docs/adr/0002).
+  "compatibility_flags": ["nodejs_compat"],
+  // The Hono Worker. It is the front door: `run_worker_first` sends every
+  // request to it, it owns `/api/*`, and it forwards everything else to the
+  // static asset layer (`env.ASSETS`) untouched — including the
+  // single-page-application not-found fallback for client routes.
+  //
+  // `run_worker_first: true` (not `["/api/*"]`) so that the whole routing
+  // contract — API vs. SPA vs. not-found — lives in the Worker and is
+  // exercised by the Seam 1 tests, rather than partly in edge asset-router
+  // config the tests can't drive. The asset bytes served are identical
+  // either way.
+  "main": "./src/worker/index.ts",
   "assets": {
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application",
+    "run_worker_first": true,
   },
-  // Default vars for `npm run dev` (Miniflare local SQLite, no remote D1).
-  // Each named environment below redeclares these — wrangler does not
-  // inherit `vars` or bindings into environments.
+  // `main`, `assets` and `compatibility_flags` above are inherited by every
+  // named environment. `vars` and bindings are not — each environment
+  // redeclares them. These defaults are for `npm run dev` (Miniflare local
+  // SQLite, no remote D1).
   "vars": {
     "EMAIL_MODE": "mock",
   },
