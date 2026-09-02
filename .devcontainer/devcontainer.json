@@ -18,7 +18,12 @@
     // If unset, herdr (multiplexer) falls back to a dumb /bin/sh
     "SHELL": "/bin/bash",
     // If a user lands in /bin/sh somehow, warn them. dash uses $ENV for init scripts
-    "ENV": "/etc/dash-warning.sh"
+    "ENV": "/etc/dash-warning.sh",
+    // Low-privilege Cloudflare token (identity only — cannot deploy Workers or
+    // read D1). In containerEnv, not remoteEnv, so it reaches shells spawned by
+    // the herdr daemon too. Value comes from the host var of the same intent;
+    // resolved at container-create time, so a rebuild is needed to rotate it.
+    "CLOUDFLARE_API_TOKEN": "${localEnv:DREAMPORT_CLOUDFLARE_API_TOKEN}"
   },
   // Named Docker volume (not a host bind mount) so Claude Code's OAuth
   // credentials survive container rebuilds without ever touching the host

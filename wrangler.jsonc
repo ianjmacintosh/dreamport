@@ -12,14 +12,19 @@
     "EMAIL_MODE": "mock",
   },
 
-  // Three remote deployment environments (prod / stage / dev), one per
-  // Cloudflare D1 database, plus a local-only `local` env used by `npm run
-  // dev`. See docs/deployment.md for how previews, production, and migrations
-  // map onto these. Remote `database_id`s are created by `scripts/setup-d1.sh`
-  // (`wrangler d1 create`) and committed here — they are not secrets.
+  // Four environments. `prod` and `stage` are the deploy targets: both
+  // resolve to the Worker "dreamport" (the name Workers Builds expects for
+  // this repo) and differ only by DB binding. `dev` and `local` are local
+  // development modes, both named "dreamport-localhost" so a stray
+  // `CLOUDFLARE_ENV=dev`/`local` build can't be deployed onto the production
+  // Worker. `local` is pure Miniflare; `dev` binds the remote dreamport-dev
+  // database. See docs/deployment.md for how previews, production, and
+  // migrations map onto these. Remote `database_id`s are created by
+  // `scripts/setup-d1.sh` (`wrangler d1 create`) and committed here — they
+  // are not secrets.
   "env": {
     "prod": {
-      "name": "dreamport-prod",
+      "name": "dreamport",
       "vars": {
         "EMAIL_MODE": "mock",
       },
@@ -32,7 +37,7 @@
       ],
     },
     "stage": {
-      "name": "dreamport-stage",
+      "name": "dreamport",
       "vars": {
         "EMAIL_MODE": "mock",
       },
@@ -45,7 +50,7 @@
       ],
     },
     "dev": {
-      "name": "dreamport-dev",
+      "name": "dreamport-localhost",
       "vars": {
         "EMAIL_MODE": "mock",
       },
@@ -61,7 +66,7 @@
     // non-UUID database_id never resolves to a real Cloudflare database,
     // so the DB binding is always the local Miniflare copy.
     "local": {
-      "name": "dreamport-local",
+      "name": "dreamport-localhost",
       "vars": {
         "EMAIL_MODE": "mock",
       },
