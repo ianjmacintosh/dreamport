@@ -8,12 +8,12 @@ The logic to set `CLOUDFLARE_ENV` is defined in the `build:ci` npm script
 
 ## Environments
 
-| Environment                 | D1 database                   | Domain                                         | `EMAIL_MODE` |
-| --------------------------- | ----------------------------- | ---------------------------------------------- | ------------ |
-| Production (`prod`)         | `dreamport-prod`              | `dreamport.ianjmacintosh.com`                  | `mock`       |
-| Staging (`stage`)           | `dreamport-stage`             | `????????-dreamport-stage.ian-01c.workers.dev` | `mock`       |
-| **TBD**: Remote dev (`dev`) | `dreamport-dev`               | `localhost`                                    | `mock`       |
-| Local dev (`local`)         | `dreamport-local` (Miniflare) | `localhost`                                    | `mock`       |
+| Environment                 | D1 database                   | Domain                                       | `EMAIL_MODE` |
+| --------------------------- | ----------------------------- | -------------------------------------------- | ------------ |
+| Production (`prod`)         | `dreamport-prod`              | `dreamport.ianjmacintosh.com`                | `mock`       |
+| Staging (`stage`)           | `dreamport-stage`             | `????????-dreamport.bananasquad.workers.dev` | `mock`       |
+| **TBD**: Remote dev (`dev`) | `dreamport-dev`               | `localhost`                                  | `mock`       |
+| Local dev (`local`)         | `dreamport-local` (Miniflare) | `localhost`                                  | `mock`       |
 
 ### Dev (Local)
 
@@ -27,7 +27,7 @@ This command starts Vite with the Cloudflare plugin, using the `local` env setti
 
 When Cloudflare's Git plugin detects a change pushed to a branch other than `main`, Cloudflare will build it using `stage` settings in `wrangler.jsonc`
 
-If the build is successful, Cloudflare will deploy a preview version at `????????-dreamport-stage.ian-01c.workers.dev`
+If the build is successful, Cloudflare will deploy a preview version at `????????-dreamport.bananasquad.workers.dev`
 
 All preview versions share the `dreamport-stage` D1 database.
 
