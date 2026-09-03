@@ -3,14 +3,16 @@ import { Kysely } from "kysely";
 import { D1Dialect } from "kysely-d1";
 
 import type { WorkerEnv } from "./env";
-import { trustedOrigins } from "./trusted-origins";
+import { TRUSTED_ORIGINS } from "./trusted-origins";
 
 /**
- * Build a Better Auth instance for one request.
+ * Build the auth object (the bundle of functions `betterAuth()` returns) for
+ * each request.
  *
- * Deliberately not a module-level singleton: on Workers the `env` bindings
- * this needs (`DB`, `BETTER_AUTH_SECRET`) only exist per request, so the
- * object that closes over them has to be built per request too.
+ * We don't build it once at app startup and reach back into it later. To
+ * build it we need the DB binding and the signing secret, and on Workers
+ * those only arrive with a request, on `c.env`. No request, no `env` — so
+ * we build the auth object fresh on every request instead.
  *
  * Better Auth is hand-wired to D1 through Kysely + the `kysely-d1` dialect
  * rather than the `better-auth-cloudflare` bundle, to keep the code we own
@@ -20,6 +22,17 @@ import { trustedOrigins } from "./trusted-origins";
  * multi-statement write can partially apply. Accepted risk, same ADR.
  */
 export function createAuth(env: WorkerEnv) {
+  // Fail loud, not quiet: without a secret Better Auth would fall back to a
+  // shared default and sign real cookies with it. Locally that means copying
+  // `.dev.vars.example` to `.dev.vars`; deployed it means the Cloudflare
+  // secret is missing.
+  if (!env.BETTER_AUTH_SECRET) {
+    throw new Error(
+      "BETTER_AUTH_SECRET is not set — copy .dev.vars.example to .dev.vars " +
+        "for local dev, or set the Cloudflare secret (see docs/deployment.md).",
+    );
+  }
+
   const db = new Kysely({
     dialect: new D1Dialect({ database: env.DB }),
   });
@@ -28,7 +41,7 @@ export function createAuth(env: WorkerEnv) {
     database: { db, type: "sqlite" },
     secret: env.BETTER_AUTH_SECRET,
     basePath: "/api/auth",
-    trustedOrigins,
+    trustedOrigins: TRUSTED_ORIGINS,
   });
 }
 

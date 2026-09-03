@@ -3,11 +3,13 @@
 Numbered SQL migration files applied to each Cloudflare D1 database with
 `wrangler d1 migrations apply`.
 
-`0001_better_auth_core_schema.sql` is Better Auth's generated core schema
-(`user`, `session`, `account`, `verification`). It is produced by
-`scripts/generate-auth-schema.mjs` (which drives Better Auth's own migration
-builder from the `createAuth` config) — regenerate it, don't hand-edit it,
-whenever `better-auth` is upgraded or the auth config changes shape.
+`0001_better_auth_core_schema.sql` is Better Auth's core schema (`user`,
+`session`, `account`, `verification`), produced once by Better Auth's own
+schema generator for `better-auth@1.7.2` and committed. It is frozen: don't
+hand-edit it, and don't regenerate it in place. When a `better-auth` upgrade
+or an auth-config change alters the schema, add a new numbered migration with
+the delta (get the new shape from `npx @better-auth/cli generate` once that
+CLI supports the pinned version, or from the upstream changelog).
 
 The `rateLimit` table arrives with a later migration, when database-backed
 rate limiting is turned on.

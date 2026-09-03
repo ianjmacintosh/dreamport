@@ -41,6 +41,10 @@ describe("/api/auth/*", () => {
     // createAuth -> Better Auth -> Kysely -> kysely-d1 -> the D1 binding ->
     // the tables from migrations/0001. A broken dialect or an unmigrated
     // database would throw here.
+    //
+    // Interim: goes through the internal adapter, not HTTP, because this
+    // config has no DB-writing route yet. Once the emailOTP plugin lands,
+    // replace this with a real request into the send-code endpoint.
     const ctx = await createAuth(env).$context;
 
     const created = await ctx.internalAdapter.createUser(
@@ -71,16 +75,18 @@ describe("trusted origins (via Better Auth's origin check)", () => {
     ).toBe(200);
   });
 
-  it("accepts the staging origin", async () => {
+  it("accepts a branch-preview origin on this account's subdomain", async () => {
     expect(
-      (await signOutFrom("https://staging.dreamport.ianjmacintosh.com")).status,
+      (await signOutFrom("https://a1b2c3-dreamport.bananasquad.workers.dev"))
+        .status,
     ).toBe(200);
   });
 
-  it("accepts a *.workers.dev preview origin", async () => {
+  it("rejects a workers.dev host outside this account's subdomain", async () => {
     expect(
-      (await signOutFrom("https://a1b2c3-dreamport.acct.workers.dev")).status,
-    ).toBe(200);
+      (await signOutFrom("https://a1b2c3-dreamport.someoneelse.workers.dev"))
+        .status,
+    ).toBe(403);
   });
 
   it("rejects an unrelated origin", async () => {

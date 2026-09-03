@@ -31,10 +31,13 @@ If the build is successful, Cloudflare will deploy a preview version at `???????
 
 All preview versions share the `dreamport-stage` D1 database.
 
-The auth spec ([#18](https://github.com/ianjmacintosh/dreamport/issues/18)) also
-names a stable `staging.dreamport.ianjmacintosh.com` for this environment;
-`trustedOrigins` (in `src/worker/trusted-origins.ts`) trusts both that host and
-any `*.workers.dev` preview.
+There is no long-lived staging host: "staging" is whichever branch preview is
+being reviewed, all sharing the `dreamport-stage` database. The auth spec
+([#18](https://github.com/ianjmacintosh/dreamport/issues/18)) named a stable
+`staging.dreamport.ianjmacintosh.com`; that does not exist and is not planned.
+`TRUSTED_ORIGINS` (in `src/worker/trusted-origins.ts`) therefore trusts only
+production and any `*-dreamport.bananasquad.workers.dev` preview (scoped to this
+account, not every `*.workers.dev` host).
 
 ### Production
 
@@ -77,9 +80,9 @@ which never resolves to a real database — it only ever names the Miniflare cop
 
 Migration files live in [`migrations/`](../migrations/) as numbered
 `NNNN_description.sql`, committed and reviewed like any schema change.
-`0001_better_auth_core_schema.sql` is Better Auth's generated core schema;
-regenerate it with `node scripts/generate-auth-schema.mjs <file>` rather than
-editing it by hand.
+`0001_better_auth_core_schema.sql` is Better Auth's core schema, generated once
+for the pinned `better-auth` version and frozen; schema changes on an upgrade
+land as a new numbered migration (see [`migrations/README.md`](../migrations/README.md)).
 
 Apply them per environment:
 

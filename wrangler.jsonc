@@ -2,42 +2,25 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "dreamport",
   "compatibility_date": "2026-02-05",
-  // Better Auth uses AsyncLocalStorage (docs/adr/0002).
+  // nodejs_compat: Better Auth uses AsyncLocalStorage (ADR-0002).
   "compatibility_flags": ["nodejs_compat"],
-  // The Hono Worker. It is the front door: `run_worker_first` sends every
-  // request to it, it owns `/api/*`, and it forwards everything else to the
-  // static asset layer (`env.ASSETS`) untouched — including the
-  // single-page-application not-found fallback for client routes.
-  //
-  // `run_worker_first: true` (not `["/api/*"]`) so that the whole routing
-  // contract — API vs. SPA vs. not-found — lives in the Worker and is
-  // exercised by the Seam 1 tests, rather than partly in edge asset-router
-  // config the tests can't drive. The asset bytes served are identical
-  // either way.
+  // Gateway Worker: owns /api/*, forwards everything else to env.ASSETS unchanged.
   "main": "./src/worker/index.ts",
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
+    // true, not ["/api/*"], so all routing lives in the Worker and stays testable.
     "run_worker_first": true,
   },
-  // `main`, `assets` and `compatibility_flags` above are inherited by every
-  // named environment. `vars` and bindings are not — each environment
-  // redeclares them. These defaults are for `npm run dev` (Miniflare local
-  // SQLite, no remote D1).
+  // main/assets/compatibility_flags inherit into every env below; vars and bindings don't.
   "vars": {
     "EMAIL_MODE": "mock",
   },
 
-  // Four environments. `prod` and `stage` are the deploy targets: both
-  // resolve to the Worker "dreamport" (the name Workers Builds expects for
-  // this repo) and differ only by DB binding. `dev` and `local` are local
-  // development modes, both named "dreamport-localhost" so a stray
-  // `CLOUDFLARE_ENV=dev`/`local` build can't be deployed onto the production
-  // Worker. `local` is pure Miniflare; `dev` binds the remote dreamport-dev
-  // database. See docs/deployment.md for how previews, production, and
-  // migrations map onto these. Remote `database_id`s are created by
-  // `scripts/setup-d1.sh` (`wrangler d1 create`) and committed here — they
-  // are not secrets.
+  // prod/stage: deploy targets, both Worker "dreamport", differ only by DB.
+  // dev/local: local dev, named "dreamport-localhost" so a stray build can't
+  // deploy over prod. local is pure Miniflare; dev binds remote dreamport-dev.
+  // See docs/deployment.md. database_ids are from scripts/setup-d1.sh, not secrets.
   "env": {
     "prod": {
       "name": "dreamport",
@@ -78,9 +61,7 @@
         },
       ],
     },
-    // Local-only: `npm run dev` runs with CLOUDFLARE_ENV=local. The
-    // non-UUID database_id never resolves to a real Cloudflare database,
-    // so the DB binding is always the local Miniflare copy.
+    // database_id "local" is non-UUID, so DB is always the Miniflare copy.
     "local": {
       "name": "dreamport-localhost",
       "vars": {
