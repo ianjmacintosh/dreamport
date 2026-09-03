@@ -9,8 +9,15 @@ export interface WorkerEnv {
   DB: D1Database;
   /** Signing secret for Better Auth. A Cloudflare secret, never committed. */
   BETTER_AUTH_SECRET: string;
-  /** How sign-in emails are delivered. `mock` in every environment today. */
-  EMAIL_MODE: "mock" | "resend";
+  /**
+   * How sign-in emails are delivered. `mock` in every environment today
+   * (see `wrangler.jsonc`); unset is treated as `mock`.
+   */
+  EMAIL_MODE?: "mock" | "resend";
+  /** Resend API key. Required only when `EMAIL_MODE=resend`. A secret. */
+  RESEND_API_KEY?: string;
+  /** `From:` address for sign-in email. Required only when `EMAIL_MODE=resend`. */
+  EMAIL_FROM?: string;
   /** The static SPA assets (`wrangler.jsonc` `assets.binding`). */
   ASSETS: Fetcher;
 }

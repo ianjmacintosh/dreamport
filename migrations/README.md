@@ -11,8 +11,10 @@ or an auth-config change alters the schema, add a new numbered migration with
 the delta (get the new shape from `npx @better-auth/cli generate` once that
 CLI supports the pinned version, or from the upstream changelog).
 
-The `rateLimit` table arrives with a later migration, when database-backed
-rate limiting is turned on.
+The `emailOTP` plugin (send & verify sign-in codes) needs no migration of its
+own: it stores codes in the existing `verification` table. The `rateLimit`
+table arrives with a later migration, when database-backed rate limiting is
+turned on.
 
 ## Conventions
 

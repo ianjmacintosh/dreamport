@@ -146,6 +146,11 @@ server console), so no Resend key is needed for local work. `stage` and `prod`
 set `BETTER_AUTH_SECRET` with `wrangler secret put` instead — see
 [`docs/deployment.md`](docs/deployment.md).
 
+The session cookie is always `Secure`, so reach the dev server at
+`http://localhost:<port>` (browsers treat `localhost` as a secure context and
+still store the cookie). A bare LAN IP or a non-`localhost` forwarded hostname
+over plain HTTP won't hold the session — use `localhost` or an HTTPS tunnel.
+
 ### Start a dev server
 
 ```bash

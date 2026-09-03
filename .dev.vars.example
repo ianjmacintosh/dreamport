@@ -4,3 +4,11 @@
 # locally; production/staging use a real secret set with
 # `wrangler secret put BETTER_AUTH_SECRET --env <env>`.
 BETTER_AUTH_SECRET=dev-only-change-me-to-something-random-and-long
+
+# How sign-in emails are delivered. Unset (or `mock`) prints the 6-digit code
+# to the dev-server console and sends nothing — the default for local work.
+# Set `resend` only to exercise the real Resend path; it then requires both
+# vars below and throws on first use if either is missing.
+# EMAIL_MODE=resend
+# RESEND_API_KEY=re_...
+# EMAIL_FROM=onboarding@resend.dev
