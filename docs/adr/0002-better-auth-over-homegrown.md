@@ -34,8 +34,11 @@ that would become ours to fix.
   state because its 60-second minimum TTL conflicts with Better Auth's
   ~10-second internal TTLs.
 - We are exposed to Better Auth's own bugs — e.g. the `emailOTP` user
-  enumeration issues — so the version is pinned to one that includes the
-  verify-before-lookup fix (better-auth PR #10605).
+  enumeration issues — so the version is pinned exactly (no `^`) in
+  `package.json`. The current pin is **`better-auth@1.7.2`**, which is well
+  past `1.6.26` where the verify-before-lookup fix (better-auth PR #10605)
+  first shipped. Any bump must be checked to still include that fix before
+  the `^`-less pin is moved.
 - Two ideas are borrowed from pillbug rather than its code: a cron that
   hard-deletes never-verified accounts, and a cron that reaps expired session
   rows (Better Auth does neither).

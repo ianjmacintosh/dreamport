@@ -1,0 +1,6 @@
+# Copy to `.dev.vars` for `npm run dev`. `.dev.vars*` is gitignored.
+#
+# Better Auth's cookie/token signing secret. Any long random string works
+# locally; production/staging use a real secret set with
+# `wrangler secret put BETTER_AUTH_SECRET --env <env>`.
+BETTER_AUTH_SECRET=dev-only-change-me-to-something-random-and-long
