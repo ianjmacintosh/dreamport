@@ -11,13 +11,17 @@
 # this exists: five independent failures, found reactively, over ~2h50m.
 #
 # Usage:
-#   scripts/verify-deployment.sh staging [preview-url]
 #   scripts/verify-deployment.sh production
+#   scripts/verify-deployment.sh staging <preview-url>
+#   scripts/verify-deployment.sh staging --latest
 #
-# preview-url is only meaningful for staging, where every version gets its
-# own throwaway preview URL (there is no stable staging host — see
-# docs/deployment.md). Pass the "Version Preview URL" a build just printed,
-# or omit it to have the script derive it from the latest version's id.
+# Staging has no long-lived host — every version gets its own throwaway
+# preview URL (see docs/deployment.md) — so which one to test is never
+# guessed silently. Either pass the exact "Version Preview URL" a build just
+# printed, or pass --latest to explicitly opt into testing whatever the
+# newest version on the Worker happens to be (which may not be the version
+# your most recent push produced, if something else built more recently).
+# Either way, the resolved URL is printed before any checks run.
 #
 # Needs CLOUDFLARE_API_TOKEN set (same token wrangler already uses), scoped
 # for Workers Scripts (read) and D1 (read) at minimum.
@@ -29,12 +33,27 @@
 
 set -uo pipefail
 
+usage() {
+  cat >&2 <<'USAGE'
+Usage:
+  scripts/verify-deployment.sh production
+  scripts/verify-deployment.sh staging <preview-url>
+  scripts/verify-deployment.sh staging --latest
+USAGE
+}
+
 ENVIRONMENT="${1:-}"
-PREVIEW_URL_ARG="${2:-}"
+URL_ARG="${2:-}"
 TEST_EMAIL="verify-deployment-script@example.com"
 
 if [[ "$ENVIRONMENT" != "staging" && "$ENVIRONMENT" != "production" ]]; then
-  echo "Usage: $0 <staging|production> [preview-url]" >&2
+  usage
+  exit 2
+fi
+
+if [[ "$ENVIRONMENT" == "staging" && -z "$URL_ARG" ]]; then
+  echo "staging needs either an explicit preview URL or --latest — there is no default." >&2
+  usage
   exit 2
 fi
 
@@ -80,10 +99,30 @@ if [[ -z "$ACCOUNT_ID" ]]; then
   exit 2
 fi
 
-# ── 1. Version bindings ─────────────────────────────────────────────────────
+# ── Which version, and which URL, are we actually testing? ─────────────────
+# Resolved and printed up front, before any checks run, so it's never an
+# implicit/hidden detail — see the incident this script came out of.
 LATEST_VERSION_JSON=$(npx wrangler versions list --name "$WORKER" --json 2>/dev/null || true)
 LATEST_VERSION_ID=$(jq -r 'sort_by(.number) | last | .id // empty' <<<"$LATEST_VERSION_JSON")
 
+if [[ "$ENVIRONMENT" == "production" ]]; then
+  BASE_URL="https://dreamport.ianjmacintosh.com"
+  echo "Testing production at: $BASE_URL"
+elif [[ "$URL_ARG" == "--latest" ]]; then
+  if [[ -z "$LATEST_VERSION_ID" ]]; then
+    echo "No versions found for $WORKER — can't resolve --latest." >&2
+    exit 2
+  fi
+  BASE_URL="https://${LATEST_VERSION_ID:0:8}-dreamport-staging.bananasquad.workers.dev"
+  echo "--latest resolved to version $LATEST_VERSION_ID: $BASE_URL"
+  echo "(this may not be the version your most recent push produced — pass the exact preview URL to be sure)"
+else
+  BASE_URL="$URL_ARG"
+  echo "Testing: $BASE_URL"
+fi
+echo
+
+# ── 1. Version bindings ─────────────────────────────────────────────────────
 if [[ -z "$LATEST_VERSION_ID" ]]; then
   record fail "Version bindings" "no versions found for $WORKER"
 else
@@ -139,31 +178,17 @@ else
 fi
 
 # ── 5. Live smoke test ──────────────────────────────────────────────────────
-if [[ "$ENVIRONMENT" == "production" ]]; then
-  BASE_URL="https://dreamport.ianjmacintosh.com"
-elif [[ -n "$PREVIEW_URL_ARG" ]]; then
-  BASE_URL="$PREVIEW_URL_ARG"
-elif [[ -n "${LATEST_VERSION_ID:-}" ]]; then
-  BASE_URL="https://${LATEST_VERSION_ID:0:8}-dreamport-staging.bananasquad.workers.dev"
-else
-  BASE_URL=""
-fi
+ROOT_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/" || echo 000)
+OTP_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/auth/email-otp/send-verification-otp" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"${TEST_EMAIL}\",\"type\":\"sign-in\"}" || echo 000)
 
-if [[ -z "$BASE_URL" ]]; then
-  record fail "Live smoke test" "no URL to test — pass a preview URL as the second argument"
+if [[ "$ROOT_STATUS" != "200" ]]; then
+  record fail "Live smoke test" "GET $BASE_URL/ -> $ROOT_STATUS (expected 200)"
+elif [[ "$OTP_STATUS" != "200" ]]; then
+  record fail "Live smoke test" "POST .../send-verification-otp -> $OTP_STATUS (expected 200)"
 else
-  ROOT_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/" || echo 000)
-  OTP_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/auth/email-otp/send-verification-otp" \
-    -H "Content-Type: application/json" \
-    -d "{\"email\":\"${TEST_EMAIL}\",\"type\":\"sign-in\"}" || echo 000)
-
-  if [[ "$ROOT_STATUS" != "200" ]]; then
-    record fail "Live smoke test" "GET $BASE_URL/ -> $ROOT_STATUS (expected 200)"
-  elif [[ "$OTP_STATUS" != "200" ]]; then
-    record fail "Live smoke test" "POST .../send-verification-otp -> $OTP_STATUS (expected 200)"
-  else
-    record pass "Live smoke test" "$BASE_URL responded correctly end to end"
-  fi
+  record pass "Live smoke test" "$BASE_URL responded correctly end to end"
 fi
 
 # ── Report ───────────────────────────────────────────────────────────────────

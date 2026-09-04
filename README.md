@@ -178,14 +178,16 @@ environments, the three Cloudflare D1 databases, and the migration procedure.
   time; `--env` on deploy does nothing (see the doc).
 - **First-time D1 setup:** run [`scripts/setup-d1.sh`](scripts/setup-d1.sh)
   (needs `wrangler login` and Cloudflare account access).
-- **Troubleshooting a broken environment:** run `npm run verify:staging` or
-  `npm run verify:production`. It checks version bindings, the
-  workers.dev/preview trigger, migrations, secrets, and does a live sign-in
-  request, reporting all five in one pass instead of discovering them one at
-  a time. For staging, pass the version's preview URL as an extra arg
-  (`npm run verify:staging -- https://<version>-dreamport-staging.bananasquad.workers.dev`)
-  if you have it — otherwise it derives one from the latest version. Needs
-  `CLOUDFLARE_API_TOKEN` set. Note: the live check is a real write (a mock
+- **Troubleshooting a broken environment:** run `npm run verify:production`,
+  or for staging — which has no long-lived host, so which preview to test is
+  never guessed — `npm run verify:staging -- <preview-url>` with the version's
+  preview URL, or `npm run verify:staging -- --latest` to explicitly test
+  whatever the newest version on the Worker happens to be (printed up front,
+  since it may not be the version your most recent push produced). It checks
+  version bindings, the workers.dev/preview trigger, migrations, secrets, and
+  does a live sign-in request, reporting all five in one pass instead of
+  discovering them one at a time. Needs `CLOUDFLARE_API_TOKEN` set. Note: the
+  live check is a real write (a mock
   OTP record) against whichever environment's D1 database you point it at,
   including production — `EMAIL_MODE` is `mock` everywhere today, so nothing
   is actually sent. See
