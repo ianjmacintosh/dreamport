@@ -45,6 +45,23 @@ When Cloudflare's Git plugin detects a change pushed to `main`, Cloudflare will 
 
 If the build is successful, Cloudflare will deploy to `dreamport.ianjmacintosh.com`
 
+## Sign-in email
+
+`EMAIL_MODE` (a `wrangler.jsonc` var, `mock` in every environment today)
+picks the email sender inside `createAuth`:
+
+- **`mock`** (also the default when the var is unset) — writes the 6-digit
+  code to the Worker console and to an in-memory record; sends nothing.
+- **`resend`** — sends through the Resend API. It additionally requires the
+  `RESEND_API_KEY` and `EMAIL_FROM` secrets; `createAuth` throws on the first
+  request if either is missing, so there is no silent fallback to `mock`.
+
+Real sending stays off until sender-domain DNS (SPF/DKIM) exists for
+`mail.dreamport.ianjmacintosh.com`; until then every environment runs `mock`.
+Flipping an environment to `resend` is: set the two secrets with `wrangler
+secret put --env <env>`, then change that env's `EMAIL_MODE` in
+`wrangler.jsonc`.
+
 ## Deploying
 
 Environment is set at **build** time, not deploy time.
@@ -119,9 +136,10 @@ multi-statement migration can partially apply — keep each one small.
 ## What's not committed
 
 Database IDs are fine to commit. Secrets aren't: `BETTER_AUTH_SECRET`, the
-Turnstile secret key, and the Resend API key go in with `wrangler secret put
+Turnstile secret key, and `RESEND_API_KEY` go in with `wrangler secret put
 --env <env>` (or the Cloudflare / GitHub dashboards) and never land in
-`wrangler.jsonc` or the repo.
+`wrangler.jsonc` or the repo. `EMAIL_FROM` isn't secret but is only set
+alongside `RESEND_API_KEY`, so it travels with it.
 
 For local `npm run dev`, put `BETTER_AUTH_SECRET` in a `.dev.vars` file
 (gitignored; see [`.dev.vars.example`](../.dev.vars.example)).

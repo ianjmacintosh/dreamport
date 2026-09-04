@@ -97,8 +97,9 @@ You'll have to do this manually when you merge your first PR, but there may be a
 
 1. Prepare to work in a dev container; probably following instructions from [my article](https://www.ianjmacintosh.com/articles/make-a-dev-container/).
 2. npm install
-3. Run `claude` and authenticate
-4. Finish setting up Matt Pocock's skills
+3. Set up local env vars — see [Local development setup](#local-development-setup)
+4. Run `claude` and authenticate
+5. Finish setting up Matt Pocock's skills
 
 - In Claude CLI, run: `/setup-matt-pocock-skills`
 
@@ -116,6 +117,39 @@ You'll have to do this manually when you merge your first PR, but there may be a
 13. If a motif arises, use it
 
 ## Development
+
+### Local development setup
+
+One-time, after cloning:
+
+```bash
+npm install
+cp .dev.vars.example .dev.vars
+```
+
+Then generate a real signing secret and put it in `.dev.vars` as
+`BETTER_AUTH_SECRET`:
+
+```bash
+openssl rand -base64 32
+```
+
+`.dev.vars` is gitignored. `BETTER_AUTH_SECRET` signs Better Auth's session
+cookies and one-time-code tokens; `createAuth()` throws if it's unset, so
+`npm run dev` won't serve auth routes without it. The value is local-only and
+disposable — regenerate it anytime (existing local sessions just stop
+validating). Nothing enforces a length, but treat it like a key: 32 random
+bytes, not a word.
+
+Sign-in email uses the `mock` sender by default (codes are written to the dev
+server console), so no Resend key is needed for local work. `stage` and `prod`
+set `BETTER_AUTH_SECRET` with `wrangler secret put` instead — see
+[`docs/deployment.md`](docs/deployment.md).
+
+The session cookie is always `Secure`, so reach the dev server at
+`http://localhost:<port>` (browsers treat `localhost` as a secure context and
+still store the cookie). A bare LAN IP or a non-`localhost` forwarded hostname
+over plain HTTP won't hold the session — use `localhost` or an HTTPS tunnel.
 
 ### Start a dev server
 
