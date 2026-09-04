@@ -31,4 +31,4 @@ turned on.
 
 See [`docs/deployment.md`](../docs/deployment.md) for the per-environment
 procedure and its ordering relative to a deploy. In short: `npm run
-migrate:stage`, verify, then `npm run migrate:prod`.
+migrate:staging`, verify, then `npm run migrate:production`.

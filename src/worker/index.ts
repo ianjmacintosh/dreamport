@@ -50,9 +50,9 @@ app.get("/api/me", async (c) => {
  *
  * 1. `import.meta.env.DEV` is statically `true` only under `vite dev` (local
  *    `npm run dev`, the Playwright webServer) and the vitest pool. `vite
- *    build` replaces it with `false`, so this route is dropped from the stage
- *    and prod bundles entirely and can never be served there — even though
- *    every deployed environment currently runs `EMAIL_MODE=mock`.
+ *    build` replaces it with `false`, so this route is dropped from the
+ *    staging and production bundles entirely and can never be served there —
+ *    even though every deployed environment currently runs `EMAIL_MODE=mock`.
  * 2. `EMAIL_MODE` (unset ⇒ mock, matching `createEmailSender`) keeps it inert
  *    in a dev server wired to a real sender.
  *

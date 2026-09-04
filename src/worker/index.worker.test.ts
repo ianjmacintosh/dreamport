@@ -385,10 +385,8 @@ describe("trusted origins (via Better Auth's origin check)", () => {
   });
 
   it("accepts a branch-preview origin on this account's subdomain", async () => {
-    expect(
-      (await signOutFrom("https://a1b2c3-dreamport.bananasquad.workers.dev"))
-        .status,
-    ).toBe(200);
+    const origin = "https://a1b2c3-dreamport-staging.bananasquad.workers.dev";
+    expect((await signOutFrom(origin)).status).toBe(200);
   });
 
   it("rejects a workers.dev host outside this account's subdomain", async () => {

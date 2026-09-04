@@ -142,8 +142,8 @@ validating). Nothing enforces a length, but treat it like a key: 32 random
 bytes, not a word.
 
 Sign-in email uses the `mock` sender by default (codes are written to the dev
-server console), so no Resend key is needed for local work. `stage` and `prod`
-set `BETTER_AUTH_SECRET` with `wrangler secret put` instead — see
+server console), so no Resend key is needed for local work. `staging` and
+`production` set `BETTER_AUTH_SECRET` with `wrangler secret put` instead — see
 [`docs/deployment.md`](docs/deployment.md).
 
 The session cookie is always `Secure`, so reach the dev server at
@@ -168,11 +168,13 @@ npm run build
 See [`docs/deployment.md`](docs/deployment.md) for the full picture:
 environments, the three Cloudflare D1 databases, and the migration procedure.
 
-- **Preview:** every non-`main` branch with a PR is built with
-  `CLOUDFLARE_ENV=stage` and uploaded as a preview version, so preview testing
-  hits `dreamport-stage`, never production data.
-- **Production:** merges to `main` build with `CLOUDFLARE_ENV=prod` and deploy.
-  The environment is set at build time; `--env` on deploy does nothing (see the
-  doc).
+- **Preview:** production and staging are two separate Workers Builds
+  projects (`dreamport`, `dreamport-staging`) Git-connected to this repo.
+  Every branch builds under `dreamport-staging` with
+  `CLOUDFLARE_ENV=staging` and uploads as a preview version, so preview
+  testing hits `dreamport-stage`, never production data.
+- **Production:** merges to `main` build under the `dreamport` project with
+  `CLOUDFLARE_ENV=production` and deploy. The environment is set at build
+  time; `--env` on deploy does nothing (see the doc).
 - **First-time D1 setup:** run [`scripts/setup-d1.sh`](scripts/setup-d1.sh)
   (needs `wrangler login` and Cloudflare account access).

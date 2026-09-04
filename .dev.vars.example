@@ -1,8 +1,9 @@
 # Copy to `.dev.vars` for `npm run dev`. `.dev.vars*` is gitignored.
 #
 # Better Auth's cookie/token signing secret. Any long random string works
-# locally; production/staging use a real secret set with
-# `wrangler secret put BETTER_AUTH_SECRET --env <env>`.
+# locally; production/staging use a real secret set per-project with
+# `wrangler secret put BETTER_AUTH_SECRET --name dreamport` (or
+# `--name dreamport-staging`).
 BETTER_AUTH_SECRET=dev-only-change-me-to-something-random-and-long
 
 # How sign-in emails are delivered. Unset (or `mock`) prints the 6-digit code

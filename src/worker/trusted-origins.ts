@@ -10,13 +10,15 @@
 export const TRUSTED_ORIGINS: string[] = [
   // Production.
   "https://dreamport.ianjmacintosh.com",
-  // Every branch preview. Cloudflare's Git integration deploys non-`main`
-  // branches to `https://<commit-hash>-dreamport.bananasquad.workers.dev`;
-  // the `*` stands in for the commit hash. Scoped to this account's
+  // Every branch preview. The `dreamport-staging` Workers Builds project
+  // (a separate Git-connected project from production, see
+  // docs/deployment.md) deploys every non-`main` branch to
+  // `https://<commit-hash>-dreamport-staging.bananasquad.workers.dev`; the
+  // `*` stands in for the commit hash. Scoped to this account's
   // `bananasquad` subdomain so an unrelated `*.workers.dev` host is not
   // trusted. There is no long-lived staging environment — "staging" is
   // whichever preview shares the dreamport-stage DB.
-  "https://*-dreamport.bananasquad.workers.dev",
+  "https://*-dreamport-staging.bananasquad.workers.dev",
 ];
 
 /**
