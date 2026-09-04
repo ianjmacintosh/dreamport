@@ -23,9 +23,19 @@ Version.
 Environment settings are defined in `wrangler.jsonc` and read at build time via the `CLOUDFLARE_ENV` environment variable.
 
 `CLOUDFLARE_ENV` is **not** inferred from the branch. Each Workers Builds
-project sets it directly as a Build variable in its own dashboard settings —
-`dreamport` sets `CLOUDFLARE_ENV=production`, `dreamport-staging` sets
-`CLOUDFLARE_ENV=staging` — and both projects' Build command is plain `npm run build`.
+project sets it inline in its own **Build command** —
+`dreamport` builds with `CLOUDFLARE_ENV=production npm run build`,
+`dreamport-staging` builds with `CLOUDFLARE_ENV=staging npm run build`.
+
+This is deliberately _not_ set via the dashboard's separate "Variables and
+secrets" panel. That panel proved unreliable for this project: a saved
+`CLOUDFLARE_ENV` Build variable silently stopped reaching the actual build
+process, with no error and no amount of re-saving or reconnecting Git fixing
+it — see
+[the postmortem](postmortems/2026-09-04-dreamport-staging-workers-builds.md).
+Baking the value directly into the Build command sidesteps that failure mode
+entirely, since it's then part of the literal shell command Cloudflare runs,
+not a separately-injected variable.
 
 ## Environments
 
@@ -50,7 +60,7 @@ The `dreamport-staging` Workers Builds project builds every branch pushed to
 this repo. Its "production branch" setting deliberately points at a branch
 that's never pushed to, so every real branch takes the preview/version path
 (`wrangler versions upload`), never the promote-to-live path. Its Build
-variable is fixed at `CLOUDFLARE_ENV=staging`.
+command is fixed at `CLOUDFLARE_ENV=staging npm run build`.
 
 If the build is successful, Cloudflare uploads a preview version at
 `????????-dreamport-staging.bananasquad.workers.dev`.
@@ -68,7 +78,7 @@ production and any `*-dreamport-staging.bananasquad.workers.dev` preview
 ### Production
 
 The `dreamport` Workers Builds project's production branch is `main`, its
-Build variable is fixed at `CLOUDFLARE_ENV=production`, and
+Build command is fixed at `CLOUDFLARE_ENV=production npm run build`, and
 non-production-branch builds are disabled on this project — feature
 branches build under `dreamport-staging` instead.
 
@@ -100,13 +110,15 @@ Environment is set at **build** time, not deploy time.
 
 The specific build and deploy commands are managed per-project in the Cloudflare web UI:
 
-| Setting                                   | `dreamport` (production)    | `dreamport-staging` (staging)  |
-| ----------------------------------------- | --------------------------- | ------------------------------ |
-| Build variable                            | `CLOUDFLARE_ENV=production` | `CLOUDFLARE_ENV=staging`       |
-| Build command                             | `npm run build`             | `npm run build`                |
-| Production branch                         | `main`                      | (never pushed to)              |
-| Deploy command (production-branch pushes) | `npx wrangler deploy`       | `npx wrangler deploy`          |
-| Version command (other branches)          | _(disabled)_                | `npx wrangler versions upload` |
+| Setting                                   | `dreamport` (production)                  | `dreamport-staging` (staging)          |
+| ----------------------------------------- | ----------------------------------------- | -------------------------------------- |
+| Build command                             | `CLOUDFLARE_ENV=production npm run build` | `CLOUDFLARE_ENV=staging npm run build` |
+| Production branch                         | `main`                                    | (never pushed to)                      |
+| Deploy command (production-branch pushes) | `npx wrangler deploy`                     | `npx wrangler deploy`                  |
+| Version command (other branches)          | _(disabled)_                              | `npx wrangler versions upload`         |
+
+There is no separate Build _variable_ for `CLOUDFLARE_ENV` — see
+[Build step](#build-step) for why it's baked into the command instead.
 
 ## First-time setup
 
