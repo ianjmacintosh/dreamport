@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { TEST_EMAILS, TEST_FROM } from "../../../test/emails";
 import {
   createEmailSender,
   getMockSender,
@@ -9,7 +10,7 @@ import {
 } from "./sender";
 
 const signIn: OtpEmail = {
-  to: "recruit@resend.dev",
+  to: TEST_EMAILS.recruit,
   otp: "418302",
   type: "sign-in",
 };
@@ -25,11 +26,11 @@ describe("MockEmailSender", () => {
     const sender = new MockEmailSender();
 
     await sender.sendOtp(signIn);
-    await sender.sendOtp({ ...signIn, to: "second@resend.dev", otp: "000123" });
+    await sender.sendOtp({ ...signIn, to: TEST_EMAILS.second, otp: "000123" });
 
     expect(sender.sent).toEqual([
-      { to: "recruit@resend.dev", otp: "418302", type: "sign-in" },
-      { to: "second@resend.dev", otp: "000123", type: "sign-in" },
+      { to: TEST_EMAILS.recruit, otp: "418302", type: "sign-in" },
+      { to: TEST_EMAILS.second, otp: "000123", type: "sign-in" },
     ]);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -81,7 +82,7 @@ describe("ResendEmailSender", () => {
 
     const body = JSON.parse(init.body as string) as Record<string, string>;
     expect(body.from).toBe("noreply@mail.dreamport.ianjmacintosh.com");
-    expect(body.to).toBe("recruit@resend.dev");
+    expect(body.to).toBe(TEST_EMAILS.recruit);
     expect(body.subject).toMatch(/sign-in code/i);
     expect(body.text).toContain("418302");
   });
@@ -92,9 +93,10 @@ describe("ResendEmailSender", () => {
     );
 
     await expect(
-      new ResendEmailSender({ apiKey: "re_test_key", from: "x@y.dev" }).sendOtp(
-        signIn,
-      ),
+      new ResendEmailSender({
+        apiKey: "re_test_key",
+        from: TEST_FROM,
+      }).sendOtp(signIn),
     ).rejects.toThrow(/422/);
   });
 });
@@ -120,7 +122,10 @@ describe("createEmailSender", () => {
 
   it("throws when EMAIL_MODE=resend but RESEND_API_KEY is missing", () => {
     expect(() =>
-      createEmailSender({ EMAIL_MODE: "resend", EMAIL_FROM: "x@y.dev" }),
+      createEmailSender({
+        EMAIL_MODE: "resend",
+        EMAIL_FROM: TEST_FROM,
+      }),
     ).toThrow(/RESEND_API_KEY and EMAIL_FROM/);
   });
 

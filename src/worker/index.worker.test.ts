@@ -2,6 +2,7 @@ import { SELF } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { TEST_EMAILS } from "../../test/emails";
 import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 
@@ -14,7 +15,9 @@ import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
  *
  * The auth flow is driven entirely through `Request`s; the 6-digit code is
  * recovered from the shared mock email sender, which the Worker and this
- * test share by module identity. Every address ends in `@resend.dev`.
+ * test share by module identity. Recipient addresses come from
+ * `TEST_EMAILS` (see `test/emails.ts`) — never a literal — and all sit on
+ * `@resend.dev`, which cannot deliver to a real inbox.
  */
 
 const ORIGIN = "https://dreamport.test";
@@ -121,19 +124,19 @@ describe("/api/auth/* is mounted", () => {
 
 describe("send a sign-in code", () => {
   it("succeeds and hands the mock sender a 6-digit code for that email", async () => {
-    const res = await sendCode("send-basic@resend.dev");
+    const res = await sendCode(TEST_EMAILS.sendBasic);
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ success: true });
-    expect(codeFor("send-basic@resend.dev")).toMatch(/^\d{6}$/);
+    expect(codeFor(TEST_EMAILS.sendBasic)).toMatch(/^\d{6}$/);
   });
 
   it("looks identical for a known and an unknown email", async () => {
-    await signIn("known-sender@resend.dev");
+    await signIn(TEST_EMAILS.knownSender);
     getMockSender().clear();
 
-    const known = await sendCode("known-sender@resend.dev");
-    const unknown = await sendCode("stranger@resend.dev");
+    const known = await sendCode(TEST_EMAILS.knownSender);
+    const unknown = await sendCode(TEST_EMAILS.strangerSender);
 
     expect(known.status).toBe(unknown.status);
     expect(await known.json()).toEqual(await unknown.json());
@@ -143,11 +146,11 @@ describe("send a sign-in code", () => {
 
 describe("verify a sign-in code", () => {
   it("issues a host-only, secure, http-only session cookie on the right code", async () => {
-    await sendCode("verify-ok@resend.dev");
+    await sendCode(TEST_EMAILS.verifyOk);
 
     const res = await verifyCode(
-      "verify-ok@resend.dev",
-      codeFor("verify-ok@resend.dev"),
+      TEST_EMAILS.verifyOk,
+      codeFor(TEST_EMAILS.verifyOk),
     );
 
     expect(res.status).toBe(200);
@@ -165,55 +168,55 @@ describe("verify a sign-in code", () => {
   });
 
   it("creates a User the first time an unknown email verifies", async () => {
-    expect((await countUsers("fresh-user@resend.dev"))?.n).toBe(0);
+    expect((await countUsers(TEST_EMAILS.freshUser))?.n).toBe(0);
 
-    await sendCode("fresh-user@resend.dev");
+    await sendCode(TEST_EMAILS.freshUser);
     const res = await verifyCode(
-      "fresh-user@resend.dev",
-      codeFor("fresh-user@resend.dev"),
+      TEST_EMAILS.freshUser,
+      codeFor(TEST_EMAILS.freshUser),
     );
 
     expect(res.status).toBe(200);
     expect(sessionCookie(res)).toContain("session_token=");
-    expect((await countUsers("fresh-user@resend.dev"))?.n).toBe(1);
+    expect((await countUsers(TEST_EMAILS.freshUser))?.n).toBe(1);
   });
 
   it("rejects a wrong code, decrements the budget, then locks out the 4th try", async () => {
-    await sendCode("attempts@resend.dev");
-    const right = codeFor("attempts@resend.dev");
+    await sendCode(TEST_EMAILS.attempts);
+    const right = codeFor(TEST_EMAILS.attempts);
     const wrong = notCode(right);
 
     for (let i = 0; i < 3; i++) {
-      const res = await verifyCode("attempts@resend.dev", wrong);
+      const res = await verifyCode(TEST_EMAILS.attempts, wrong);
       expect(res.status).toBe(400);
       expect(await errorCode(res)).toBe("INVALID_OTP");
     }
 
     // 4th attempt is refused even though the code is correct.
-    const res = await verifyCode("attempts@resend.dev", right);
+    const res = await verifyCode(TEST_EMAILS.attempts, right);
     expect(res.status).toBe(403);
     expect(await errorCode(res)).toBe("TOO_MANY_ATTEMPTS");
   });
 
   it("rejects a code past its 60-minute expiry", async () => {
-    await sendCode("expired@resend.dev");
-    const code = codeFor("expired@resend.dev");
-    await expireCode("expired@resend.dev");
+    await sendCode(TEST_EMAILS.expired);
+    const code = codeFor(TEST_EMAILS.expired);
+    await expireCode(TEST_EMAILS.expired);
 
-    const res = await verifyCode("expired@resend.dev", code);
+    const res = await verifyCode(TEST_EMAILS.expired, code);
     expect(res.status).toBe(400);
     expect(await errorCode(res)).toBe("OTP_EXPIRED");
   });
 
   it("issues a working code again after the previous one expired", async () => {
-    await sendCode("reissue-expiry@resend.dev");
-    await expireCode("reissue-expiry@resend.dev");
+    await sendCode(TEST_EMAILS.reissueAfterExpiry);
+    await expireCode(TEST_EMAILS.reissueAfterExpiry);
     getMockSender().clear();
 
-    await sendCode("reissue-expiry@resend.dev");
+    await sendCode(TEST_EMAILS.reissueAfterExpiry);
     const res = await verifyCode(
-      "reissue-expiry@resend.dev",
-      codeFor("reissue-expiry@resend.dev"),
+      TEST_EMAILS.reissueAfterExpiry,
+      codeFor(TEST_EMAILS.reissueAfterExpiry),
     );
 
     expect(res.status).toBe(200);
@@ -221,17 +224,17 @@ describe("verify a sign-in code", () => {
   });
 
   it("issues a working code again after the attempt budget was exhausted", async () => {
-    await sendCode("reissue-exhausted@resend.dev");
-    const wrong = notCode(codeFor("reissue-exhausted@resend.dev"));
+    await sendCode(TEST_EMAILS.reissueAfterExhaustion);
+    const wrong = notCode(codeFor(TEST_EMAILS.reissueAfterExhaustion));
     for (let i = 0; i < 4; i++) {
-      await verifyCode("reissue-exhausted@resend.dev", wrong);
+      await verifyCode(TEST_EMAILS.reissueAfterExhaustion, wrong);
     }
     getMockSender().clear();
 
-    await sendCode("reissue-exhausted@resend.dev");
+    await sendCode(TEST_EMAILS.reissueAfterExhaustion);
     const res = await verifyCode(
-      "reissue-exhausted@resend.dev",
-      codeFor("reissue-exhausted@resend.dev"),
+      TEST_EMAILS.reissueAfterExhaustion,
+      codeFor(TEST_EMAILS.reissueAfterExhaustion),
     );
 
     expect(res.status).toBe(200);
@@ -239,22 +242,22 @@ describe("verify a sign-in code", () => {
   });
 
   it("fails identically for a wrong code whether or not the email is known", async () => {
-    await signIn("known-verify@resend.dev");
+    await signIn(TEST_EMAILS.knownVerify);
     getMockSender().clear();
 
-    await sendCode("known-verify@resend.dev");
-    await sendCode("unknown-verify@resend.dev");
+    await sendCode(TEST_EMAILS.knownVerify);
+    await sendCode(TEST_EMAILS.unknownVerify);
 
     // One string that is wrong for both live codes.
     const wrong = [
-      codeFor("known-verify@resend.dev"),
-      codeFor("unknown-verify@resend.dev"),
+      codeFor(TEST_EMAILS.knownVerify),
+      codeFor(TEST_EMAILS.unknownVerify),
     ].includes("000000")
       ? "999999"
       : "000000";
 
-    const known = await verifyCode("known-verify@resend.dev", wrong);
-    const unknown = await verifyCode("unknown-verify@resend.dev", wrong);
+    const known = await verifyCode(TEST_EMAILS.knownVerify, wrong);
+    const unknown = await verifyCode(TEST_EMAILS.unknownVerify, wrong);
 
     expect(known.status).toBe(unknown.status);
     expect(await known.json()).toEqual(await unknown.json());
@@ -271,32 +274,32 @@ describe("verify a sign-in code", () => {
 
     const auth = createAuth(env, { emailSender: spy });
     const res = await auth.api.sendVerificationOTP({
-      body: { email: "injected@resend.dev", type: "sign-in" },
+      body: { email: TEST_EMAILS.injectedSender, type: "sign-in" },
       asResponse: true,
     });
 
     expect(res.status).toBe(200);
     expect(captured).toHaveLength(1);
     expect(captured[0]).toMatchObject({
-      to: "injected@resend.dev",
+      to: TEST_EMAILS.injectedSender,
       type: "sign-in",
     });
     expect(captured[0].otp).toMatch(/^\d{6}$/);
     // The shared mock never saw it.
     expect(
-      getMockSender().sent.some((e) => e.to === "injected@resend.dev"),
+      getMockSender().sent.some((e) => e.to === TEST_EMAILS.injectedSender),
     ).toBe(false);
   });
 });
 
 describe("GET /api/me", () => {
   it("returns the signed-in email with a valid session cookie", async () => {
-    const cookie = await signIn("me-ok@resend.dev");
+    const cookie = await signIn(TEST_EMAILS.meOk);
 
     const res = await SELF.fetch(`${ORIGIN}/api/me`, { headers: { cookie } });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ email: "me-ok@resend.dev" });
+    expect(await res.json()).toEqual({ email: TEST_EMAILS.meOk });
   });
 
   it("rejects a request with no session cookie", async () => {

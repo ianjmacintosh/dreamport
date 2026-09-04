@@ -2,6 +2,13 @@
 
 Run `npm run format` to format all files using Prettier before commiting
 
+## Testing
+
+Tests must only send email to an address defined in `TEST_EMAILS`
+(`test/emails.ts`). Never write a recipient address literal into a test —
+add a named entry to that object and reference it. Every address there sits
+on a domain that cannot reach a real inbox.
+
 ## Design System Discipline
 
 The design system has four tiers:

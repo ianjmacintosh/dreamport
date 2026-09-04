@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { TEST_EMAILS, TEST_FROM } from "../../../test/emails";
 import { ResendEmailSender } from "./sender";
 
 /**
@@ -16,7 +17,7 @@ import { ResendEmailSender } from "./sender";
  * domain verification needed).
  */
 const apiKey = process.env.RESEND_API_KEY;
-const from = process.env.EMAIL_FROM ?? "onboarding@resend.dev";
+const from = process.env.EMAIL_FROM ?? TEST_FROM;
 
 describe("ResendEmailSender (live)", () => {
   it.skipIf(!apiKey)(
@@ -25,7 +26,7 @@ describe("ResendEmailSender (live)", () => {
       // `sendOtp` throws on any non-2xx response, so resolving is the assertion.
       await expect(
         new ResendEmailSender({ apiKey: apiKey!, from }).sendOtp({
-          to: "delivered@resend.dev",
+          to: TEST_EMAILS.liveSink,
           otp: "424242",
           type: "sign-in",
         }),
@@ -42,7 +43,7 @@ describe("ResendEmailSender (live)", () => {
       },
       body: JSON.stringify({
         from,
-        to: "delivered@resend.dev",
+        to: TEST_EMAILS.liveSink,
         subject: "Your Dreamport sign-in code",
         text: "Your Dreamport code is 424242. It expires in 60 minutes.",
       }),
