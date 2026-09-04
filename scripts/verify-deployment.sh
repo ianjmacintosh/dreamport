@@ -6,9 +6,7 @@
 # checks are independent of each other — only the live smoke test at the end
 # genuinely depends on the others to be unambiguous — so a single run
 # surfaces every broken layer instead of discovering them one at a time
-# through live request failures. See
-# docs/postmortems/2026-09-04-dreamport-staging-workers-builds.md for why
-# this exists: five independent failures, found reactively, over ~2h50m.
+# through live request failures.
 #
 # Usage:
 #   scripts/verify-deployment.sh production

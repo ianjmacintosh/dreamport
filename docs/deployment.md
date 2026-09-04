@@ -31,11 +31,9 @@ This is deliberately _not_ set via the dashboard's separate "Variables and
 secrets" panel. That panel proved unreliable for this project: a saved
 `CLOUDFLARE_ENV` Build variable silently stopped reaching the actual build
 process, with no error and no amount of re-saving or reconnecting Git fixing
-it — see
-[the postmortem](postmortems/2026-09-04-dreamport-staging-workers-builds.md).
-Baking the value directly into the Build command sidesteps that failure mode
-entirely, since it's then part of the literal shell command Cloudflare runs,
-not a separately-injected variable.
+it. Baking the value directly into the Build command sidesteps that failure
+mode entirely, since it's then part of the literal shell command Cloudflare
+runs, not a separately-injected variable.
 
 ## Environments
 

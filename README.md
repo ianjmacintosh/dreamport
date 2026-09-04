@@ -190,6 +190,4 @@ environments, the three Cloudflare D1 databases, and the migration procedure.
   live check is a real write (a mock
   OTP record) against whichever environment's D1 database you point it at,
   including production — `EMAIL_MODE` is `mock` everywhere today, so nothing
-  is actually sent. See
-  [`docs/postmortems/2026-09-04-dreamport-staging-workers-builds.md`](docs/postmortems/2026-09-04-dreamport-staging-workers-builds.md)
-  for the incident this came out of.
+  is actually sent.
