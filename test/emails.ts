@@ -51,6 +51,18 @@ export const TEST_EMAILS = {
   /** Signs in, then reads its own email back from the session endpoint. */
   meOk: "delivered+me-ok@resend.dev",
 
+  // --- Seam 1: /api/test/last-otp (mock-only test hook) ---
+  /** A code is sent, then read back through the test hook. */
+  lastOtpHook: "delivered+last-otp-hook@resend.dev",
+  /** Never sent a code; asserts the hook 404s rather than inventing one. */
+  neverSent: "delivered+never-sent@resend.dev",
+
+  // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
+  /** Happy path: email step -> code step -> lands on /app. */
+  e2eHappyPath: "delivered+e2e-happy@resend.dev",
+  /** Persistent session: sign in, navigate away and back, still signed in. */
+  e2ePersistentSession: "delivered+e2e-persistent@resend.dev",
+
   // --- Seam 2: sender unit tests ---
   /** Default recipient for the `OtpEmail` fixture in `sender.test.ts`. */
   recruit: "delivered+recruit@resend.dev",
