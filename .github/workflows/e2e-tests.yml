@@ -6,7 +6,11 @@ jobs:
     name: Test with Playwright
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.58.1-noble
+    # Keep this tag in step with the @playwright/test version in package-lock.json
+    # so the pre-installed browsers match; a mismatch fails with "Executable
+    # doesn't exist". This is the first workflow to actually launch a browser
+    # (earlier e2e specs were all test.skip).
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
     env:
       BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
       EMAIL_MODE: mock
