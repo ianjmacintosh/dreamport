@@ -51,3 +51,13 @@ Structural page layout — page shells, full-bleed sections, sticky
 footers, breakout grids — is managed with CSS Grid, not Flexbox.
 Flexbox is still fine for small component-internal alignment (e.g. a
 button centering its icon and label), which isn't structural layout.
+
+## Explaining Issues
+
+When the user flags a warning or unexpected output, lead the answer with the
+concrete source — which function or file causes it, and why, in one line —
+before anything else. If it's worth fixing, follow with a clear choice: fix
+it now, or after the current task is verified.
+
+Example: "That's coming from `createAuth()` in `src/worker/auth.ts` —
+expected, since `baseURL` isn't set. Fix now, or after we verify the flow?"
