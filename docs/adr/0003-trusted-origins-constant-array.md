@@ -34,9 +34,11 @@ config key.
   `https://*.workers.dev` — scoped to this account's `bananasquad` subdomain,
   so an unrelated Workers host cannot pass the origin / `callbackURL` check.
 - #18 also listed a staging origin (`staging.dreamport.ianjmacintosh.com`).
-  That host does not exist and is not planned — "staging" is whichever branch
-  preview shares the `dreamport-stage` DB — so it is not in the list; the
-  preview wildcard covers it.
+  That specific hostname does not exist. Staging is the bare
+  `dreamport-staging.bananasquad.workers.dev` `workers.dev` host (see
+  `docs/deployment.md`) — it and the `*-dreamport-staging.…` preview wildcard
+  are both in the list; per-branch previews still exist but can't be logged.
+  _(Amended after this ADR: staging was preview-only when this was written.)_
 - If a future auth method needs origins computed per request, this reverts to
   the function form — Better Auth accepts either, so it is a local change to
   this one module.

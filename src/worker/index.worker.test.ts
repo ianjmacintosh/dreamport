@@ -338,6 +338,36 @@ describe("GET /api/me", () => {
   });
 });
 
+describe("GET /api/test/last-otp (mock-only test hook)", () => {
+  // Mounted only when EMAIL_MODE=mock (the `local` test env sets it). It is
+  // the browser's stand-in for the dev console: Playwright reads the code the
+  // mock sender was handed instead of a real inbox.
+  it("returns the most recent code handed to the mock sender for an email", async () => {
+    await sendCode(TEST_EMAILS.lastOtpHook);
+
+    const res = await SELF.fetch(
+      `${ORIGIN}/api/test/last-otp?email=${encodeURIComponent(TEST_EMAILS.lastOtpHook)}`,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ otp: codeFor(TEST_EMAILS.lastOtpHook) });
+  });
+
+  it("404s when no code has been sent to that email", async () => {
+    const res = await SELF.fetch(
+      `${ORIGIN}/api/test/last-otp?email=${encodeURIComponent(TEST_EMAILS.neverSent)}`,
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it("400s when the email query param is missing", async () => {
+    const res = await SELF.fetch(`${ORIGIN}/api/test/last-otp`);
+
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("trusted origins (via Better Auth's origin check)", () => {
   // Better Auth only runs the origin check on state-changing requests that
   // carry a cookie. sign-out fits, and with an unsigned cookie it does no
@@ -354,11 +384,14 @@ describe("trusted origins (via Better Auth's origin check)", () => {
     ).toBe(200);
   });
 
+  it("accepts the long-lived staging origin (bare host, no version prefix)", async () => {
+    const origin = "https://dreamport-staging.bananasquad.workers.dev";
+    expect((await signOutFrom(origin)).status).toBe(200);
+  });
+
   it("accepts a branch-preview origin on this account's subdomain", async () => {
-    expect(
-      (await signOutFrom("https://a1b2c3-dreamport.bananasquad.workers.dev"))
-        .status,
-    ).toBe(200);
+    const origin = "https://a1b2c3-dreamport-staging.bananasquad.workers.dev";
+    expect((await signOutFrom(origin)).status).toBe(200);
   });
 
   it("rejects a workers.dev host outside this account's subdomain", async () => {
@@ -383,6 +416,22 @@ describe("dynamic baseURL (ALLOWED_HOSTS)", () => {
 
   it("resolves for a localhost Host, matching the local-dev pattern", async () => {
     const res = await fetchAs("localhost:5199");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+  });
+
+  it("resolves for the long-lived staging Host (bare, no version prefix)", async () => {
+    const res = await fetchAs("dreamport-staging.bananasquad.workers.dev");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+  });
+
+  it("resolves for a branch-preview Host, matching the staging wildcard", async () => {
+    const res = await fetchAs(
+      "a1b2c3d4-dreamport-staging.bananasquad.workers.dev",
+    );
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });

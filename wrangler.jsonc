@@ -17,13 +17,20 @@
     "EMAIL_MODE": "mock",
   },
 
-  // prod/stage: deploy targets, both Worker "dreamport", differ only by DB.
+  // production/staging: two separate Cloudflare Workers Builds projects
+  // ("dreamport" and "dreamport-staging"), both Git-connected to this repo,
+  // differing by Worker name, D1 database, and (per-project dashboard
+  // secrets) which RESEND_API_KEY etc. they run with.
   // dev/local: local dev, named "dreamport-localhost" so a stray build can't
-  // deploy over prod. local is pure Miniflare; dev binds remote dreamport-dev.
+  // deploy over production. local is pure Miniflare; dev binds remote dreamport-dev.
   // See docs/deployment.md. database_ids are from scripts/setup-d1.sh, not secrets.
   "env": {
-    "prod": {
+    "production": {
       "name": "dreamport",
+      // Custom domain (dreamport.ianjmacintosh.com) is the only intended
+      // entry point; the workers.dev subdomain isn't in TRUSTED_ORIGINS and
+      // has no reason to be publicly reachable.
+      "workers_dev": false,
       "vars": {
         "EMAIL_MODE": "mock",
       },
@@ -35,8 +42,13 @@
         },
       ],
     },
-    "stage": {
-      "name": "dreamport",
+    "staging": {
+      "name": "dreamport-staging",
+      // Pinned, not left to Cloudflare's default: every branch preview
+      // depends on a workers.dev Preview URL existing (see
+      // TRUSTED_ORIGINS and docs/deployment.md).
+      "workers_dev": true,
+      "preview_urls": true,
       "vars": {
         "EMAIL_MODE": "mock",
       },

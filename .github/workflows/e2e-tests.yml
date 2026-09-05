@@ -6,10 +6,14 @@ jobs:
     name: Test with Playwright
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.58.1-noble
+    # Keep this tag in step with the @playwright/test version in package-lock.json
+    # so the pre-installed browsers match; a mismatch fails with "Executable
+    # doesn't exist". This is the first workflow to actually launch a browser
+    # (earlier e2e specs were all test.skip).
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
     env:
-      EMAIL_SECRET: ${{ secrets.EMAIL_SECRET }}
-      PIN_SECRET: ${{ secrets.PIN_SECRET }}
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+      EMAIL_MODE: mock
       VITE_TURNSTILE_SITE_KEY: "1x00000000000000000000AA"
     steps:
       - uses: actions/checkout@v4
@@ -28,10 +32,14 @@ jobs:
           else
             echo "Pre-installed Chromium not found; miniflare will use Chrome-for-Testing (cached if available)"
           fi
-      - name: Write .env for local Worker
+      - name: Write .dev.vars for local Worker
         run: |
-          printf 'TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA\nEMAIL_SECRET=%s\nPIN_SECRET=%s\n' \
-            "$EMAIL_SECRET" "$PIN_SECRET" > .env
+          # The Cloudflare Vite plugin reads .dev.vars (gitignored). A missing
+          # BETTER_AUTH_SECRET repo secret falls back to a throwaway value —
+          # fine because e2e runs entirely in EMAIL_MODE=mock and no session
+          # outlives the run.
+          printf 'BETTER_AUTH_SECRET=%s\nEMAIL_MODE=mock\nTURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA\n' \
+            "${BETTER_AUTH_SECRET:-$(openssl rand -base64 32)}" > .dev.vars
       - name: Run Playwright tests
         run: npm run test:e2e
       - uses: actions/upload-artifact@v4

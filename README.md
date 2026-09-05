@@ -142,8 +142,8 @@ validating). Nothing enforces a length, but treat it like a key: 32 random
 bytes, not a word.
 
 Sign-in email uses the `mock` sender by default (codes are written to the dev
-server console), so no Resend key is needed for local work. `stage` and `prod`
-set `BETTER_AUTH_SECRET` with `wrangler secret put` instead — see
+server console), so no Resend key is needed for local work. `staging` and
+`production` set `BETTER_AUTH_SECRET` with `wrangler secret put` instead — see
 [`docs/deployment.md`](docs/deployment.md).
 
 The session cookie is always `Secure`, so reach the dev server at
@@ -168,11 +168,26 @@ npm run build
 See [`docs/deployment.md`](docs/deployment.md) for the full picture:
 environments, the three Cloudflare D1 databases, and the migration procedure.
 
-- **Preview:** every non-`main` branch with a PR is built with
-  `CLOUDFLARE_ENV=stage` and uploaded as a preview version, so preview testing
-  hits `dreamport-stage`, never production data.
-- **Production:** merges to `main` build with `CLOUDFLARE_ENV=prod` and deploy.
-  The environment is set at build time; `--env` on deploy does nothing (see the
-  doc).
+- **Preview:** production and staging are two separate Workers Builds
+  projects (`dreamport`, `dreamport-staging`) Git-connected to this repo.
+  Every branch builds under `dreamport-staging` with
+  `CLOUDFLARE_ENV=staging` and uploads as a preview version, so preview
+  testing hits `dreamport-stage`, never production data.
+- **Production:** merges to `main` build under the `dreamport` project with
+  `CLOUDFLARE_ENV=production` and deploy. The environment is set at build
+  time; `--env` on deploy does nothing (see the doc).
 - **First-time D1 setup:** run [`scripts/setup-d1.sh`](scripts/setup-d1.sh)
   (needs `wrangler login` and Cloudflare account access).
+- **Troubleshooting a broken environment:** run `npm run verify:production`,
+  or for staging — which has no long-lived host, so which preview to test is
+  never guessed — `npm run verify:staging -- <preview-url>` with the version's
+  preview URL, or `npm run verify:staging -- --latest` to explicitly test
+  whatever the newest version on the Worker happens to be (printed up front,
+  since it may not be the version your most recent push produced). It checks
+  version bindings, the workers.dev/preview trigger, migrations, secrets, and
+  does a live sign-in request, reporting all five in one pass instead of
+  discovering them one at a time. Needs `CLOUDFLARE_API_TOKEN` set. Note: the
+  live check is a real write (a mock
+  OTP record) against whichever environment's D1 database you point it at,
+  including production — `EMAIL_MODE` is `mock` everywhere today, so nothing
+  is actually sent.

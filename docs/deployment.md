@@ -1,19 +1,48 @@
 # Deployment: environments, D1, and migrations
 
+## Two Workers Builds projects, one repo
+
+Production and staging are **two separate Cloudflare Workers Builds
+projects** — `dreamport` and `dreamport-staging` — each Git-connected to
+this same repository and building/deploying independently. This is the
+pattern Cloudflare's own docs use for multi-environment Workers Builds setups
+(see [Advanced setups](https://developers.cloudflare.com/workers/ci-cd/builds/advanced-setups/)):
+one dashboard Worker per environment, all watching the same repo.
+
+They're separate projects — not one project deploying two `wrangler.jsonc`
+`env` blocks picked by branch — specifically so each has its **own runtime
+secrets**: `RESEND_API_KEY` can hold a different value for `dreamport` than
+for `dreamport-staging`, because they're different Worker scripts with
+different secret stores. A single script can't do that — Workers Builds'
+"Variables and Secrets" has no Production/Preview scoping the way Pages
+does; runtime secrets belong to the whole script, not to a branch or a
+Version.
+
 ## Build step
 
-Environment settings are defined in `wrangler.jsonc` and read at build time, using the `CLOUDFLARE_ENV` environment variable
+Environment settings are defined in `wrangler.jsonc` and read at build time via the `CLOUDFLARE_ENV` environment variable.
 
-The logic to set `CLOUDFLARE_ENV` is defined in the `build:ci` npm script
+`CLOUDFLARE_ENV` is **not** inferred from the branch. Each Workers Builds
+project sets it inline in its own **Build command** —
+`dreamport` builds with `CLOUDFLARE_ENV=production npm run build`,
+`dreamport-staging` builds with `CLOUDFLARE_ENV=staging npm run build`.
+
+This is deliberately _not_ set via the dashboard's separate "Variables and
+secrets" panel. That panel proved unreliable for this project: a saved
+`CLOUDFLARE_ENV` Build variable silently stopped reaching the actual build
+process, with no error and no amount of re-saving or reconnecting Git fixing
+it. Baking the value directly into the Build command sidesteps that failure
+mode entirely, since it's then part of the literal shell command Cloudflare
+runs, not a separately-injected variable.
 
 ## Environments
 
-| Environment                 | D1 database                   | Domain                                       | `EMAIL_MODE` |
-| --------------------------- | ----------------------------- | -------------------------------------------- | ------------ |
-| Production (`prod`)         | `dreamport-prod`              | `dreamport.ianjmacintosh.com`                | `mock`       |
-| Staging (`stage`)           | `dreamport-stage`             | `????????-dreamport.bananasquad.workers.dev` | `mock`       |
-| **TBD**: Remote dev (`dev`) | `dreamport-dev`               | `localhost`                                  | `mock`       |
-| Local dev (`local`)         | `dreamport-local` (Miniflare) | `localhost`                                  | `mock`       |
+| Environment                 | Workers Builds project | D1 database                   | Domain                                               | `EMAIL_MODE` |
+| --------------------------- | ---------------------- | ----------------------------- | ---------------------------------------------------- | ------------ |
+| Production (`production`)   | `dreamport`            | `dreamport-prod`              | `dreamport.ianjmacintosh.com`                        | `mock`       |
+| Staging (`staging`)         | `dreamport-staging`    | `dreamport-stage`             | `????????-dreamport-staging.bananasquad.workers.dev` | `mock`       |
+| **TBD**: Remote dev (`dev`) | —                      | `dreamport-dev`               | `localhost`                                          | `mock`       |
+| Local dev (`local`)         | —                      | `dreamport-local` (Miniflare) | `localhost`                                          | `mock`       |
 
 ### Dev (Local)
 
@@ -25,25 +54,53 @@ This command starts Vite with the Cloudflare plugin, using the `local` env setti
 
 ### Staging
 
-When Cloudflare's Git plugin detects a change pushed to a branch other than `main`, Cloudflare will build it using `stage` settings in `wrangler.jsonc`
+The `dreamport-staging` Workers Builds project builds every branch pushed to
+this repo. Its "production branch" setting points at a branch that's never
+pushed to, so every build takes the version path (`wrangler versions
+upload`), not an automatic promote-to-live. Its Build command is fixed at
+`CLOUDFLARE_ENV=staging npm run build`. Every build uploads a preview version
+at `????????-dreamport-staging.bananasquad.workers.dev`.
 
-If the build is successful, Cloudflare will deploy a preview version at `????????-dreamport.bananasquad.workers.dev`
+**The long-lived staging host is the bare
+`dreamport-staging.bananasquad.workers.dev`.** Whatever version is currently
+deployed to 100% traffic serves there, and that's the environment you
+integration-test against — because Cloudflare **cannot** show logs for
+preview URLs (`wrangler tail`, Workers Logs, and Logpush all exclude them,
+see [Preview URLs limitations](https://developers.cloudflare.com/workers/versions-and-deployments/preview-urls/#limitations)),
+so a preview-only "staging" can't be debugged. A branch's per-commit preview
+URL is still fine for eyeballing UI; it just can't be observed.
 
-All preview versions share the `dreamport-stage` D1 database.
+Promote a version to the staging host by hand:
 
-There is no long-lived staging host: "staging" is whichever branch preview is
-being reviewed, all sharing the `dreamport-stage` database. The auth spec
+```bash
+npx wrangler versions deploy <version-id>@100 --name dreamport-staging --yes
+```
+
+(the version ID is in the build log, or `npx wrangler versions list --name
+dreamport-staging`). Nothing auto-promotes today; a future option is to point
+this project's "production branch" at `main` with a `wrangler deploy` deploy
+command so `main` merges land on the staging host automatically, while
+feature branches keep uploading previews to promote manually.
+
+Everything — the staging host and every preview — shares the
+`dreamport-stage` D1 database.
+
+`TRUSTED_ORIGINS` / `ALLOWED_HOSTS` (in `src/worker/trusted-origins.ts`) trust
+production, the bare `dreamport-staging.bananasquad.workers.dev` staging host,
+and any `*-dreamport-staging.bananasquad.workers.dev` preview (scoped to this
+account, not every `*.workers.dev` host). The auth spec
 ([#18](https://github.com/ianjmacintosh/dreamport/issues/18)) named a stable
-`staging.dreamport.ianjmacintosh.com`; that does not exist and is not planned.
-`TRUSTED_ORIGINS` (in `src/worker/trusted-origins.ts`) therefore trusts only
-production and any `*-dreamport.bananasquad.workers.dev` preview (scoped to this
-account, not every `*.workers.dev` host).
+`staging.dreamport.ianjmacintosh.com`; that specific hostname does not exist —
+the `workers.dev` host is staging.
 
 ### Production
 
-When Cloudflare's Git plugin detects a change pushed to `main`, Cloudflare will build it using `prod` settings in `wrangler.jsonc`
+The `dreamport` Workers Builds project's production branch is `main`, its
+Build command is fixed at `CLOUDFLARE_ENV=production npm run build`, and
+non-production-branch builds are disabled on this project — feature
+branches build under `dreamport-staging` instead.
 
-If the build is successful, Cloudflare will deploy to `dreamport.ianjmacintosh.com`
+When a change lands on `main`, Cloudflare builds and deploys it to `dreamport.ianjmacintosh.com`
 
 ## Sign-in email
 
@@ -58,9 +115,10 @@ picks the email sender inside `createAuth`:
 
 Real sending stays off until sender-domain DNS (SPF/DKIM) exists for
 `mail.dreamport.ianjmacintosh.com`; until then every environment runs `mock`.
-Flipping an environment to `resend` is: set the two secrets with `wrangler
-secret put --env <env>`, then change that env's `EMAIL_MODE` in
-`wrangler.jsonc`.
+Flipping an environment to `resend` is: set the two secrets on that
+environment's Workers Builds project — `wrangler secret put --name dreamport`
+or `--name dreamport-staging` (or the Cloudflare dashboard) — then change
+that env's `EMAIL_MODE` in `wrangler.jsonc`.
 
 ## Deploying
 
@@ -68,13 +126,17 @@ Environment is set at **build** time, not deploy time.
 
 `vite build` reads `CLOUDFLARE_ENV` and bakes that one environment into the build output. Don't pass `--env` to `wrangler deploy` or `wrangler versions upload` — the environment is already fixed, and an `--env` that disagrees with the build makes `wrangler` error out.
 
-The specific build and deploy commands are managed in the Cloudflare web UI:
+The specific build and deploy commands are managed per-project in the Cloudflare web UI:
 
-| Setting                          | Value                          |
-| -------------------------------- | ------------------------------ |
-| Build command                    | `npm run build:ci`             |
-| Deploy command (`main`)          | `npx wrangler deploy`          |
-| Version command (other branches) | `npx wrangler versions upload` |
+| Setting                                   | `dreamport` (production)                  | `dreamport-staging` (staging)          |
+| ----------------------------------------- | ----------------------------------------- | -------------------------------------- |
+| Build command                             | `CLOUDFLARE_ENV=production npm run build` | `CLOUDFLARE_ENV=staging npm run build` |
+| Production branch                         | `main`                                    | (never pushed to)                      |
+| Deploy command (production-branch pushes) | `npx wrangler deploy`                     | `npx wrangler deploy`                  |
+| Version command (other branches)          | _(disabled)_                              | `npx wrangler versions upload`         |
+
+There is no separate Build _variable_ for `CLOUDFLARE_ENV` — see
+[Build step](#build-step) for why it's baked into the command instead.
 
 ## First-time setup
 
@@ -105,11 +167,11 @@ Apply them per environment:
 
 ```bash
 npm run migrate:dev
-npm run migrate:stage
-npm run migrate:prod
+npm run migrate:staging
+npm run migrate:production
 ```
 
-Each runs `wrangler d1 migrations apply dreamport-<env> --env <env> --remote`
+Each runs `wrangler d1 migrations apply dreamport-<db> --env <env> --remote`
 (see `package.json`). Swap `apply` for `list` to see what's pending without
 running it. Without `--remote` you hit the local Miniflare copy instead.
 
@@ -123,11 +185,11 @@ Migrations are additive and go out **before** the code that depends on the new
 schema, so deployed code never reads a column that doesn't exist yet:
 
 1. Merge the migration and code change to `main`.
-2. **Staging:** `npm run migrate:stage`, then let a preview deploy run (or
-   `CLOUDFLARE_ENV=stage npm run build && npx wrangler versions upload`). Check
+2. **Staging:** `npm run migrate:staging`, then let a preview deploy run (or
+   `CLOUDFLARE_ENV=staging npm run build && npx wrangler versions upload`). Check
    sign-in still works.
-3. **Production:** `npm run migrate:prod`, then let the `main` deploy run (or
-   `CLOUDFLARE_ENV=prod npm run build && npx wrangler deploy`).
+3. **Production:** `npm run migrate:production`, then let the `main` deploy run (or
+   `CLOUDFLARE_ENV=production npm run build && npx wrangler deploy`).
 
 Roll forward, not back: fix a bad migration with another migration. D1 has no
 transactions (see [ADR-0002](adr/0002-better-auth-over-homegrown.md)), so a
@@ -135,11 +197,24 @@ multi-statement migration can partially apply — keep each one small.
 
 ## What's not committed
 
-Database IDs are fine to commit. Secrets aren't: `BETTER_AUTH_SECRET`, the
-Turnstile secret key, and `RESEND_API_KEY` go in with `wrangler secret put
---env <env>` (or the Cloudflare / GitHub dashboards) and never land in
-`wrangler.jsonc` or the repo. `EMAIL_FROM` isn't secret but is only set
-alongside `RESEND_API_KEY`, so it travels with it.
+Database IDs are fine to commit. Secrets aren't, and go in per-project with
+`wrangler secret put --name dreamport` / `--name dreamport-staging` (or the
+Cloudflare / GitHub dashboards), never in `wrangler.jsonc` or the repo.
+
+- **`BETTER_AUTH_SECRET`** — required now. `createAuth()` throws on every
+  request without it, so a freshly created project (e.g. `dreamport-staging`)
+  isn't functional until this is set, even after a successful build.
+- **`RESEND_API_KEY` + `EMAIL_FROM`** — needed later, only once that
+  project's `EMAIL_MODE` flips from `mock` to `resend` (see
+  [#38](https://github.com/ianjmacintosh/dreamport/issues/38)). Not required
+  today. `EMAIL_FROM` isn't secret but travels with the key.
+- **A Turnstile secret** — not yet, and not yet consumed by any code path
+  (ADR-0001, ADR-0005 plan it; nothing reads it today). Don't set it until
+  the Turnstile integration lands.
+
+Because production and staging are separate Worker scripts, the same secret
+name can (and for `RESEND_API_KEY`, generally should) hold different values
+in each.
 
 For local `npm run dev`, put `BETTER_AUTH_SECRET` in a `.dev.vars` file
 (gitignored; see [`.dev.vars.example`](../.dev.vars.example)).
