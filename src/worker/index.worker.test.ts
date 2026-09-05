@@ -416,6 +416,15 @@ describe("dynamic baseURL (ALLOWED_HOSTS)", () => {
     expect(await res.json()).toEqual({ ok: true });
   });
 
+  it("resolves for a branch-preview Host, matching the staging wildcard", async () => {
+    const res = await fetchAs(
+      "a1b2c3d4-dreamport-staging.bananasquad.workers.dev",
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+  });
+
   it("fails rather than self-trusting a Host matching no allowed pattern", async () => {
     const res = await fetchAs("not-a-known-host.example.com");
 

@@ -27,8 +27,9 @@ export const TRUSTED_ORIGINS: string[] = [
  * `betterAuth({ baseURL: { allowedHosts: ALLOWED_HOSTS } })` in `auth.ts`.
  *
  * A *dynamic* config, not a plain string, because there is no one fixed URL
- * to hard-code: `stage` is a different `<hash>-dreamport.bananasquad.workers.dev`
- * host on every deploy (same reasoning as the wildcard above), and `local`
+ * to hard-code: `stage` is a different
+ * `<hash>-dreamport-staging.bananasquad.workers.dev` host on every deploy
+ * (same reasoning as the wildcard above), and `local`
  * dev's port floats unless pinned. Better Auth resolves the actual `baseURL`
  * per request from whichever pattern the request's Host matches, the same
  * way `TRUSTED_ORIGINS` already works.
@@ -43,7 +44,7 @@ export const TRUSTED_ORIGINS: string[] = [
  */
 export const ALLOWED_HOSTS: string[] = [
   "dreamport.ianjmacintosh.com",
-  "*-dreamport.bananasquad.workers.dev",
+  "*-dreamport-staging.bananasquad.workers.dev",
   // The Vite dev server's port floats (5173, bumped if that's busy) unless
   // pinned, so every port is allowed rather than one.
   "localhost:*",
