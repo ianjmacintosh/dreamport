@@ -115,8 +115,14 @@ elif [[ "$URL_ARG" == "--latest" ]]; then
   echo "--latest resolved to version $LATEST_VERSION_ID: $BASE_URL"
   echo "(this may not be the version your most recent push produced — pass the exact preview URL to be sure)"
 else
-  BASE_URL="$URL_ARG"
-  echo "Testing: $BASE_URL"
+  # Accept a full page URL (address-bar paste) and reduce it to scheme+host,
+  # so ".../login" doesn't turn the smoke test into a POST to a nonsense path.
+  BASE_URL=$(sed -E 's#^(https?://[^/]+).*#\1#' <<<"$URL_ARG")
+  if [[ "$BASE_URL" != "$URL_ARG" ]]; then
+    echo "Testing: $BASE_URL (trimmed from $URL_ARG)"
+  else
+    echo "Testing: $BASE_URL"
+  fi
 fi
 echo
 
