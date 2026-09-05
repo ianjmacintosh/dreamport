@@ -55,23 +55,43 @@ This command starts Vite with the Cloudflare plugin, using the `local` env setti
 ### Staging
 
 The `dreamport-staging` Workers Builds project builds every branch pushed to
-this repo. Its "production branch" setting deliberately points at a branch
-that's never pushed to, so every real branch takes the preview/version path
-(`wrangler versions upload`), never the promote-to-live path. Its Build
-command is fixed at `CLOUDFLARE_ENV=staging npm run build`.
+this repo. Its "production branch" setting points at a branch that's never
+pushed to, so every build takes the version path (`wrangler versions
+upload`), not an automatic promote-to-live. Its Build command is fixed at
+`CLOUDFLARE_ENV=staging npm run build`. Every build uploads a preview version
+at `????????-dreamport-staging.bananasquad.workers.dev`.
 
-If the build is successful, Cloudflare uploads a preview version at
-`????????-dreamport-staging.bananasquad.workers.dev`.
+**The long-lived staging host is the bare
+`dreamport-staging.bananasquad.workers.dev`.** Whatever version is currently
+deployed to 100% traffic serves there, and that's the environment you
+integration-test against — because Cloudflare **cannot** show logs for
+preview URLs (`wrangler tail`, Workers Logs, and Logpush all exclude them,
+see [Preview URLs limitations](https://developers.cloudflare.com/workers/versions-and-deployments/preview-urls/#limitations)),
+so a preview-only "staging" can't be debugged. A branch's per-commit preview
+URL is still fine for eyeballing UI; it just can't be observed.
 
-All preview versions share the `dreamport-stage` D1 database.
+Promote a version to the staging host by hand:
 
-There is no long-lived staging host: "staging" is whichever branch preview is
-being reviewed, all sharing the `dreamport-stage` database. The auth spec
+```bash
+npx wrangler versions deploy <version-id>@100 --name dreamport-staging --yes
+```
+
+(the version ID is in the build log, or `npx wrangler versions list --name
+dreamport-staging`). Nothing auto-promotes today; a future option is to point
+this project's "production branch" at `main` with a `wrangler deploy` deploy
+command so `main` merges land on the staging host automatically, while
+feature branches keep uploading previews to promote manually.
+
+Everything — the staging host and every preview — shares the
+`dreamport-stage` D1 database.
+
+`TRUSTED_ORIGINS` / `ALLOWED_HOSTS` (in `src/worker/trusted-origins.ts`) trust
+production, the bare `dreamport-staging.bananasquad.workers.dev` staging host,
+and any `*-dreamport-staging.bananasquad.workers.dev` preview (scoped to this
+account, not every `*.workers.dev` host). The auth spec
 ([#18](https://github.com/ianjmacintosh/dreamport/issues/18)) named a stable
-`staging.dreamport.ianjmacintosh.com`; that does not exist and is not planned.
-`TRUSTED_ORIGINS` (in `src/worker/trusted-origins.ts`) therefore trusts only
-production and any `*-dreamport-staging.bananasquad.workers.dev` preview
-(scoped to this account, not every `*.workers.dev` host).
+`staging.dreamport.ianjmacintosh.com`; that specific hostname does not exist —
+the `workers.dev` host is staging.
 
 ### Production
 

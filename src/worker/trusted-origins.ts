@@ -10,14 +10,16 @@
 export const TRUSTED_ORIGINS: string[] = [
   // Production.
   "https://dreamport.ianjmacintosh.com",
-  // Every branch preview. The `dreamport-staging` Workers Builds project
-  // (a separate Git-connected project from production, see
-  // docs/deployment.md) deploys every non-`main` branch to
-  // `https://<commit-hash>-dreamport-staging.bananasquad.workers.dev`; the
-  // `*` stands in for the commit hash. Scoped to this account's
-  // `bananasquad` subdomain so an unrelated `*.workers.dev` host is not
-  // trusted. There is no long-lived staging environment — "staging" is
-  // whichever preview shares the dreamport-stage DB.
+  // Long-lived staging. The `dreamport-staging` Workers Builds project
+  // deploys here (100% traffic) so it can be observed with `wrangler tail` —
+  // Cloudflare cannot tail preview URLs (Workers Logs, tail, and Logpush all
+  // exclude them), so a versioned-preview-only "staging" is not debuggable.
+  // See docs/deployment.md.
+  "https://dreamport-staging.bananasquad.workers.dev",
+  // Per-branch preview versions, still uploaded for every branch for visual
+  // review. `<commit-hash>-` prefixes the same host; the `*` stands in for
+  // it. Scoped to this account's `bananasquad` subdomain so an unrelated
+  // `*.workers.dev` host is not trusted. All share the dreamport-stage DB.
   "https://*-dreamport-staging.bananasquad.workers.dev",
 ];
 
@@ -27,12 +29,11 @@ export const TRUSTED_ORIGINS: string[] = [
  * `betterAuth({ baseURL: { allowedHosts: ALLOWED_HOSTS } })` in `auth.ts`.
  *
  * A *dynamic* config, not a plain string, because there is no one fixed URL
- * to hard-code: `stage` is a different
- * `<hash>-dreamport-staging.bananasquad.workers.dev` host on every deploy
- * (same reasoning as the wildcard above), and `local`
- * dev's port floats unless pinned. Better Auth resolves the actual `baseURL`
- * per request from whichever pattern the request's Host matches, the same
- * way `TRUSTED_ORIGINS` already works.
+ * to hard-code: alongside the long-lived staging host, every branch also
+ * gets a `<hash>-dreamport-staging.bananasquad.workers.dev` preview host,
+ * and `local` dev's port floats unless pinned. Better Auth resolves the
+ * actual `baseURL` per request from whichever pattern the request's Host
+ * matches, the same way `TRUSTED_ORIGINS` already works.
  *
  * This closes a real gap, not just a warning: with no `baseURL` config at
  * all, Better Auth resolves it by trusting *whatever Host the request
@@ -44,6 +45,7 @@ export const TRUSTED_ORIGINS: string[] = [
  */
 export const ALLOWED_HOSTS: string[] = [
   "dreamport.ianjmacintosh.com",
+  "dreamport-staging.bananasquad.workers.dev",
   "*-dreamport-staging.bananasquad.workers.dev",
   // The Vite dev server's port floats (5173, bumped if that's busy) unless
   // pinned, so every port is allowed rather than one.

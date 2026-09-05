@@ -384,6 +384,11 @@ describe("trusted origins (via Better Auth's origin check)", () => {
     ).toBe(200);
   });
 
+  it("accepts the long-lived staging origin (bare host, no version prefix)", async () => {
+    const origin = "https://dreamport-staging.bananasquad.workers.dev";
+    expect((await signOutFrom(origin)).status).toBe(200);
+  });
+
   it("accepts a branch-preview origin on this account's subdomain", async () => {
     const origin = "https://a1b2c3-dreamport-staging.bananasquad.workers.dev";
     expect((await signOutFrom(origin)).status).toBe(200);
@@ -411,6 +416,13 @@ describe("dynamic baseURL (ALLOWED_HOSTS)", () => {
 
   it("resolves for a localhost Host, matching the local-dev pattern", async () => {
     const res = await fetchAs("localhost:5199");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+  });
+
+  it("resolves for the long-lived staging Host (bare, no version prefix)", async () => {
+    const res = await fetchAs("dreamport-staging.bananasquad.workers.dev");
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
