@@ -5,7 +5,7 @@ import { D1Dialect } from "kysely-d1";
 
 import { createEmailSender, type EmailSender } from "./email/sender";
 import type { WorkerEnv } from "./env";
-import { TRUSTED_ORIGINS } from "./trusted-origins";
+import { ALLOWED_HOSTS, TRUSTED_ORIGINS } from "./trusted-origins";
 
 /** Seconds in a minute / day, for the time configs below. */
 const MINUTE = 60;
@@ -62,6 +62,13 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
     database: { db, type: "sqlite" },
     secret: env.BETTER_AUTH_SECRET,
     basePath: "/api/auth",
+    // A dynamic config, not a fixed string: `stage` has no one fixed host
+    // (see ALLOWED_HOSTS) and `local`'s port floats. Without this Better
+    // Auth resolves baseURL by trusting whatever Host the request itself
+    // claims — allowedHosts makes that an explicit allowlist instead, and a
+    // request whose Host matches nothing in it fails rather than
+    // self-trusting.
+    baseURL: { allowedHosts: ALLOWED_HOSTS },
     trustedOrigins: TRUSTED_ORIGINS,
     session: {
       // Rolling 30-day session, bumped at most once a day of activity.

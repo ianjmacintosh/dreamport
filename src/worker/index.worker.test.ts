@@ -23,8 +23,22 @@ import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 const ORIGIN = "https://dreamport.test";
 const json = { "content-type": "application/json" };
 
+/**
+ * `SELF.fetch`, but with a `Host` header set — needed since `auth.ts` grew a
+ * dynamic `baseURL` (see `ALLOWED_HOSTS` in `trusted-origins.ts`), which
+ * resolves per request from the Host. A real request always carries one
+ * (confirmed against a live dev server: Cloudflare's edge and the Vite
+ * plugin's local dev server both set it); `SELF.fetch`'s loopback dispatch
+ * does not synthesize one from the URL on its own, so tests must.
+ */
+function fetchWorker(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  if (!headers.has("host")) headers.set("host", new URL(ORIGIN).host);
+  return SELF.fetch(`${ORIGIN}${path}`, { ...init, headers });
+}
+
 function sendCode(email: string) {
-  return SELF.fetch(`${ORIGIN}/api/auth/email-otp/send-verification-otp`, {
+  return fetchWorker("/api/auth/email-otp/send-verification-otp", {
     method: "POST",
     headers: json,
     body: JSON.stringify({ email, type: "sign-in" }),
@@ -32,7 +46,7 @@ function sendCode(email: string) {
 }
 
 function verifyCode(email: string, otp: string) {
-  return SELF.fetch(`${ORIGIN}/api/auth/sign-in/email-otp`, {
+  return fetchWorker("/api/auth/sign-in/email-otp", {
     method: "POST",
     headers: json,
     body: JSON.stringify({ email, otp }),
@@ -99,14 +113,14 @@ beforeEach(() => {
 
 describe("non-/api paths", () => {
   it("serves the SPA shell from the asset layer, not the Worker", async () => {
-    const res = await SELF.fetch(`${ORIGIN}/`);
+    const res = await fetchWorker("/");
 
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('data-fixture="spa-shell"');
   });
 
   it("falls back to the SPA shell for unknown client routes", async () => {
-    const res = await SELF.fetch(`${ORIGIN}/some/client/route`);
+    const res = await fetchWorker("/some/client/route");
 
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('data-fixture="spa-shell"');
@@ -115,7 +129,7 @@ describe("non-/api paths", () => {
 
 describe("/api/auth/* is mounted", () => {
   it("GET /api/auth/ok returns { ok: true }", async () => {
-    const res = await SELF.fetch(`${ORIGIN}/api/auth/ok`);
+    const res = await fetchWorker("/api/auth/ok");
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
@@ -275,6 +289,10 @@ describe("verify a sign-in code", () => {
     const auth = createAuth(env, { emailSender: spy });
     const res = await auth.api.sendVerificationOTP({
       body: { email: TEST_EMAILS.injectedSender, type: "sign-in" },
+      // A direct `auth.api.*` call bypasses the Worker's HTTP boundary
+      // entirely, so there's no Request for the dynamic `baseURL` to read a
+      // Host from — it has to be handed one directly.
+      headers: { host: new URL(ORIGIN).host },
       asResponse: true,
     });
 
@@ -296,21 +314,21 @@ describe("GET /api/me", () => {
   it("returns the signed-in email with a valid session cookie", async () => {
     const cookie = await signIn(TEST_EMAILS.meOk);
 
-    const res = await SELF.fetch(`${ORIGIN}/api/me`, { headers: { cookie } });
+    const res = await fetchWorker("/api/me", { headers: { cookie } });
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ email: TEST_EMAILS.meOk });
   });
 
   it("rejects a request with no session cookie", async () => {
-    const res = await SELF.fetch(`${ORIGIN}/api/me`);
+    const res = await fetchWorker("/api/me");
 
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "Not signed in" });
   });
 
   it("rejects a request with a junk session cookie", async () => {
-    const res = await SELF.fetch(`${ORIGIN}/api/me`, {
+    const res = await fetchWorker("/api/me", {
       headers: {
         cookie: "__Secure-better-auth.session_token=not-a-real-token",
       },
@@ -325,7 +343,7 @@ describe("trusted origins (via Better Auth's origin check)", () => {
   // carry a cookie. sign-out fits, and with an unsigned cookie it does no
   // database work — so the status is purely the origin verdict.
   const signOutFrom = (origin: string) =>
-    SELF.fetch(`${ORIGIN}/api/auth/sign-out`, {
+    fetchWorker("/api/auth/sign-out", {
       method: "POST",
       headers: { origin, cookie: "better-auth.session_token=unsigned" },
     });
@@ -355,9 +373,31 @@ describe("trusted origins (via Better Auth's origin check)", () => {
   });
 });
 
+describe("dynamic baseURL (ALLOWED_HOSTS)", () => {
+  // `auth.ts` resolves Better Auth's `baseURL` per request from the Host
+  // header (see `ALLOWED_HOSTS` in `trusted-origins.ts`), rather than
+  // trusting whatever Host a request claims — these exercise that directly,
+  // independent of the origin-check tests above.
+  const fetchAs = (host: string) =>
+    SELF.fetch(`http://${host}/api/auth/ok`, { headers: { host } });
+
+  it("resolves for a localhost Host, matching the local-dev pattern", async () => {
+    const res = await fetchAs("localhost:5199");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+  });
+
+  it("fails rather than self-trusting a Host matching no allowed pattern", async () => {
+    const res = await fetchAs("not-a-known-host.example.com");
+
+    expect(res.status).toBe(500);
+  });
+});
+
 describe("other /api/* paths", () => {
   it("are owned by the Worker and 404 as JSON", async () => {
-    const res = await SELF.fetch(`${ORIGIN}/api/does-not-exist`);
+    const res = await fetchWorker("/api/does-not-exist");
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "Not found" });
