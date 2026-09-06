@@ -61,9 +61,10 @@ This command starts Vite with the Cloudflare plugin, using the `local` env setti
 The `dreamport-staging` Workers Builds project builds every branch pushed to
 this repo. Its "production branch" setting points at a branch that's never
 pushed to, so every build takes the version path (`wrangler versions
-upload`), not an automatic promote-to-live. Its Build command is fixed at
-`CLOUDFLARE_ENV=staging npm run build`. Every build uploads a preview version
-at `????????-dreamport-staging.bananasquad.workers.dev`.
+upload`), not an automatic promote-to-live. Its Build command is fixed (see
+the [Build step](#build-step) for the exact string, which carries
+`CLOUDFLARE_ENV` and `VITE_TURNSTILE_SITE_KEY`). Every build uploads a
+preview version at `????????-dreamport-staging.bananasquad.workers.dev`.
 
 **The long-lived staging host is the bare
 `dreamport-staging.bananasquad.workers.dev`.** Whatever version is currently
@@ -100,9 +101,9 @@ the `workers.dev` host is staging.
 ### Production
 
 The `dreamport` Workers Builds project's production branch is `main`, its
-Build command is fixed at `CLOUDFLARE_ENV=production npm run build`, and
-non-production-branch builds are disabled on this project — feature
-branches build under `dreamport-staging` instead.
+Build command is fixed (see the [Build step](#build-step) for the exact
+string), and non-production-branch builds are disabled on this project —
+feature branches build under `dreamport-staging` instead.
 
 When a change lands on `main`, Cloudflare builds and deploys it to `dreamport.ianjmacintosh.com`
 
