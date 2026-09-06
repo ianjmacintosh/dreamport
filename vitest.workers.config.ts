@@ -24,6 +24,11 @@ export default defineConfig(async () => {
             TEST_MIGRATIONS: migrations,
             // A Cloudflare secret in real environments; fixed here.
             BETTER_AUTH_SECRET: "test-secret-0000000000000000000000000000",
+            // The send-OTP gate reads this to decide whether Turnstile is
+            // configured (empty ⇒ 503). Seam 1 tests stub the verifier
+            // itself, so the value only needs to be non-empty; the real
+            // `verifyTurnstile` is covered in src/worker/turnstile.test.ts.
+            TURNSTILE_SECRET_KEY: "test-turnstile-secret",
           },
           // `npm run dev` gets its assets directory from the Vite plugin; the
           // pool needs one spelled out. The fixture is a stand-in SPA shell —

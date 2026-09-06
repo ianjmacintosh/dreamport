@@ -120,6 +120,33 @@ environment's Workers Builds project — `wrangler secret put --name dreamport`
 or `--name dreamport-staging` (or the Cloudflare dashboard) — then change
 that env's `EMAIL_MODE` in `wrangler.jsonc`.
 
+## Turnstile (bot check on the send-OTP path)
+
+The `/login` email step renders a Cloudflare Turnstile widget, and the Worker
+verifies its token server-side before Better Auth issues a code (#23). Two
+values, two mechanisms, per environment:
+
+- **`VITE_TURNSTILE_SITE_KEY`** — the public site key, read at **build** time
+  via `import.meta.env` and baked into the client bundle. The committed
+  `.env` defaults it to Cloudflare's always-pass test key (so local dev and
+  the Playwright suite auto-solve the widget). Production and staging set the
+  real site key as a **Workers Builds build-time variable** on each project
+  (Cloudflare dashboard → the project → Settings → Variables and Secrets, or
+  prefix it into the Build command like `CLOUDFLARE_ENV`).
+- **`TURNSTILE_SECRET_KEY`** — the secret key, read at **runtime** from
+  `c.env`. A per-project Cloudflare secret (see [What's not
+  committed](#whats-not-committed)). The send path **fails closed** (503, no
+  code issued) when it is unset.
+
+Both come from the same Turnstile widget in the Cloudflare dashboard; create
+one widget per environment (its allowed hostnames differ) and use that
+widget's site/secret pair. Cloudflare's always-pass test keys — site
+`1x00000000000000000000AA` / secret `1x0000000000000000000000000000000AA` —
+are the committed local/CI defaults, so the Playwright suite auto-solves the
+widget and its token verifies for real. The Vitest suites don't touch
+Cloudflare: `src/worker/index.worker.test.ts` stubs the verifier and
+`src/worker/turnstile.test.ts` stubs `fetch`.
+
 ## Deploying
 
 Environment is set at **build** time, not deploy time.
@@ -208,9 +235,13 @@ Cloudflare / GitHub dashboards), never in `wrangler.jsonc` or the repo.
   project's `EMAIL_MODE` flips from `mock` to `resend` (see
   [#38](https://github.com/ianjmacintosh/dreamport/issues/38)). Not required
   today. `EMAIL_FROM` isn't secret but travels with the key.
-- **A Turnstile secret** — not yet, and not yet consumed by any code path
-  (ADR-0001, ADR-0005 plan it; nothing reads it today). Don't set it until
-  the Turnstile integration lands.
+- **`TURNSTILE_SECRET_KEY`** — required now (#23). The send-OTP path verifies
+  the Turnstile widget token against Cloudflare `siteverify` before issuing a
+  code, and **fails closed** (503, no code sent) when this is unset. Set it
+  per project: `wrangler secret put TURNSTILE_SECRET_KEY --name dreamport` /
+  `--name dreamport-staging` (or the dashboard). Get the key from the
+  Turnstile widget's settings in the Cloudflare dashboard; each environment's
+  widget has its own site/secret pair.
 
 Because production and staging are separate Worker scripts, the same secret
 name can (and for `RESEND_API_KEY`, generally should) hold different values
