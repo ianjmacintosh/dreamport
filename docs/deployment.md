@@ -156,11 +156,14 @@ secret stores, so their keys are set independently:
 | `TURNSTILE_SECRET_KEY` (runtime secret)    | the matching secret from that widget | `1x0000000000000000000000000000000AA` |
 | `TURNSTILE_HOSTNAMES`                      | _(set in `wrangler.jsonc`)_          | _(unset — lenient)_                   |
 
-Staging runs the always-pass test pair deliberately: a real widget's allowed
-hostnames can't cover the `*-dreamport-staging.bananasquad.workers.dev`
-preview-URL sprawl (Turnstile has no prefix wildcard), so with a real widget
-`TURNSTILE_HOSTNAMES` couldn't be pinned there anyway. The test secret still
-exercises the real `siteverify` HTTPS call — it just always answers success.
+The production widget is scoped to `ianjmacintosh.com` (Turnstile authorizes
+a hostname and all its subdomains, so `dreamport.ianjmacintosh.com` is
+covered; the gate still pins the exact host, which is tighter). It has **no**
+`workers.dev` hostname, and a widget can't be created without one — so the
+real widget simply won't render on staging or a preview URL. Staging
+therefore runs Cloudflare's always-pass test pair; `TURNSTILE_HOSTNAMES`
+stays unset there (lenient — `success` check only). The test secret still
+exercises the real `siteverify` HTTPS call, it just always answers success.
 Real-challenge behaviour is a production smoke-test concern.
 
 Cloudflare's always-fail pair (`2x00000000000000000000AB` /
