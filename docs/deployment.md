@@ -127,25 +127,41 @@ verifies its token server-side before Better Auth issues a code (#23). Two
 values, two mechanisms, per environment:
 
 - **`VITE_TURNSTILE_SITE_KEY`** — the public site key, read at **build** time
-  via `import.meta.env` and baked into the client bundle. The committed
-  `.env` defaults it to Cloudflare's always-pass test key (so local dev and
-  the Playwright suite auto-solve the widget). Production and staging set the
-  real site key as a **Workers Builds build-time variable** on each project
-  (Cloudflare dashboard → the project → Settings → Variables and Secrets, or
-  prefix it into the Build command like `CLOUDFLARE_ENV`).
+  via `import.meta.env` and baked into the client bundle. Each Workers Builds
+  project sets its own as a **build variable** (Cloudflare dashboard → the
+  project → Settings → Variables and Secrets, or prefix it into the Build
+  command like `CLOUDFLARE_ENV`): `dreamport` gets the real site key from its
+  Turnstile widget; `dreamport-staging` gets the always-pass test key. There
+  is **no committed default** — `.env` is gitignored, so a build with the var
+  unset ships a widget that can't render (a loud failure, on purpose — better
+  than silently shipping a test key that waves every bot through). Local dev
+  copies `.env.example` to `.env`; CI e2e sets the var in the workflow's
+  `env:` block.
 - **`TURNSTILE_SECRET_KEY`** — the secret key, read at **runtime** from
   `c.env`. A per-project Cloudflare secret (see [What's not
   committed](#whats-not-committed)). The send path **fails closed** (503, no
   code issued) when it is unset.
 
-Both come from the same Turnstile widget in the Cloudflare dashboard; create
-one widget per environment (its allowed hostnames differ) and use that
-widget's site/secret pair. Cloudflare's always-pass test keys — site
-`1x00000000000000000000AA` / secret `1x0000000000000000000000000000000AA` —
-are the committed local/CI defaults, so the Playwright suite auto-solves the
-widget and its token verifies for real. The Vitest suites don't touch
-Cloudflare: `src/worker/index.worker.test.ts` stubs the verifier and
-`src/worker/turnstile.test.ts` stubs `fetch`.
+`dreamport` and `dreamport-staging` are separate projects with separate
+secret stores, so their key pairs are set independently:
+
+|                                            | `dreamport` (prod)                                                | `dreamport-staging`                   |
+| ------------------------------------------ | ----------------------------------------------------------------- | ------------------------------------- |
+| `TURNSTILE_SECRET_KEY` (runtime secret)    | real, from the Turnstile widget for `dreamport.ianjmacintosh.com` | `1x0000000000000000000000000000000AA` |
+| `VITE_TURNSTILE_SITE_KEY` (build variable) | the matching real site key                                        | `1x00000000000000000000AA`            |
+
+Staging runs the always-pass test pair deliberately: a real widget's allowed
+hostnames can't cover the `*-dreamport-staging.bananasquad.workers.dev`
+preview-URL sprawl (Turnstile has no prefix wildcard), and the test secret
+still exercises the real `siteverify` HTTPS call — it just always answers
+success. Real-challenge behaviour is a production smoke-test concern.
+
+Cloudflare's always-fail pair (`2x00000000000000000000AB` /
+`2x0000000000000000000000000000000AA`) drives negative tests. The Vitest
+suites don't touch Cloudflare at all: `src/worker/index.worker.test.ts` stubs
+the verifier and `src/worker/turnstile.test.ts` stubs `fetch`. The Playwright
+suite runs against a local worker with the test pair injected, never a
+deployed environment.
 
 ## Deploying
 

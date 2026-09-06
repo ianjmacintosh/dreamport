@@ -125,7 +125,13 @@ One-time, after cloning:
 ```bash
 npm install
 cp .dev.vars.example .dev.vars
+cp .env.example .env
 ```
+
+`.env` holds Vite build-time values (currently just `VITE_TURNSTILE_SITE_KEY`,
+defaulted to Cloudflare's always-pass test key). It's gitignored; deployed
+environments set their own build variables instead (see
+[`docs/deployment.md`](docs/deployment.md)).
 
 Then generate a real signing secret and put it in `.dev.vars` as
 `BETTER_AUTH_SECRET`:

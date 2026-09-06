@@ -33,6 +33,8 @@ const NETWORK_ERROR =
 const TURNSTILE_INCOMPLETE = "Complete the challenge, then try again.";
 const TURNSTILE_UNAVAILABLE =
   "The challenge didn't load. Reload the page and try again.";
+const SIGNIN_UNAVAILABLE =
+  "Sign-in is temporarily unavailable. Try again in a few minutes.";
 
 /** POST JSON, returning `null` if the request never reached the server. */
 async function postJson(
@@ -61,8 +63,9 @@ async function postJson(
  * react-turnstile`): the widget token rides in the `x-turnstile-token` header
  * and the Worker verifies it server-side before any code is issued (#23).
  * Turnstile tokens are single-use, so the widget lives only on the email step
- * and is reset after every send attempt; "Request a new code" returns to the
- * email step for a fresh challenge.
+ * and is re-armed after a send that actually consumed the token (a 503 from
+ * the gate hasn't — it rejects before verifying); "Request a new code"
+ * returns to the email step for a fresh challenge.
  *
  * Composed only from `TextInput` / `Button` / `Link` / a heading plus the
  * Turnstile widget, with a bare line of error text — the error banner, narrow
@@ -83,6 +86,12 @@ function Login() {
   // disabled state — that is #28.
   const sendingRef = useRef(false);
 
+  /** Drop the current token and make the widget fetch a fresh one. */
+  function rearmTurnstile() {
+    setTurnstileToken("");
+    turnstileRef.current?.reset();
+  }
+
   async function sendCode() {
     if (sendingRef.current) return;
     setError("");
@@ -97,21 +106,26 @@ function Login() {
         { email, type: "sign-in" },
         { "x-turnstile-token": turnstileToken },
       );
-      // However the request turned out, the token has now been spent
-      // server-side — drop it and re-arm the widget for any retry.
-      setTurnstileToken("");
-      turnstileRef.current?.reset();
 
       if (!res) {
         setError(NETWORK_ERROR);
+        rearmTurnstile();
         return;
       }
-      if (!res.ok) {
-        setError("We couldn't send a code. Check the address and try again.");
+      if (res.ok) {
+        setCode("");
+        setStep("code"); // the widget unmounts with the email step
         return;
       }
-      setCode("");
-      setStep("code");
+      if (res.status === 503) {
+        // The gate rejected before verifying, so the token is still good —
+        // keep it and let the user retry once the backend is back.
+        setError(SIGNIN_UNAVAILABLE);
+        return;
+      }
+      // Verification ran: the token is spent. Re-arm for a retry.
+      rearmTurnstile();
+      setError("We couldn't send a code. Check the address and try again.");
     } finally {
       sendingRef.current = false;
     }
@@ -158,10 +172,7 @@ function Login() {
           <Turnstile
             ref={turnstileRef}
             siteKey={TURNSTILE_SITE_KEY}
-            onSuccess={(token) => {
-              setTurnstileToken(token);
-              setError("");
-            }}
+            onSuccess={(token) => setTurnstileToken(token)}
             onExpire={() => setTurnstileToken("")}
             onError={() => {
               setTurnstileToken("");
