@@ -22,18 +22,22 @@ Version.
 
 Environment settings are defined in `wrangler.jsonc` and read at build time via the `CLOUDFLARE_ENV` environment variable.
 
-`CLOUDFLARE_ENV` is **not** inferred from the branch. Each Workers Builds
-project sets it inline in its own **Build command** —
-`dreamport` builds with `CLOUDFLARE_ENV=production npm run build`,
-`dreamport-staging` builds with `CLOUDFLARE_ENV=staging npm run build`.
+Neither `CLOUDFLARE_ENV` nor `VITE_TURNSTILE_SITE_KEY` (the public Turnstile
+site key, baked into the client bundle) is inferred from the branch. Each
+Workers Builds project sets both inline in its own **Build command**:
+
+- `dreamport` — `CLOUDFLARE_ENV=production VITE_TURNSTILE_SITE_KEY=0x4AAAAAAEqY4wvljJsO_dJb npm run build`
+- `dreamport-staging` — `CLOUDFLARE_ENV=staging VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA npm run build`
 
 This is deliberately _not_ set via the dashboard's separate "Variables and
 secrets" panel. That panel proved unreliable for this project: a saved
 `CLOUDFLARE_ENV` Build variable silently stopped reaching the actual build
 process, with no error and no amount of re-saving or reconnecting Git fixing
-it. Baking the value directly into the Build command sidesteps that failure
-mode entirely, since it's then part of the literal shell command Cloudflare
-runs, not a separately-injected variable.
+it (`VITE_TURNSTILE_SITE_KEY` hit the same wall — a build came out with the
+value `undefined` while the dashboard showed it set). Baking values into the
+Build command sidesteps that failure mode entirely, since they're then part
+of the literal shell command Cloudflare runs, not separately-injected
+variables. Shell env wins over `.env`, so local dev still reads `.env`.
 
 ## Environments
 
@@ -127,16 +131,14 @@ The `/login` email step renders a Cloudflare Turnstile widget (rendered with
 Better Auth issues a code (#23). Three values:
 
 - **`VITE_TURNSTILE_SITE_KEY`** — the public site key, read at **build** time
-  via `import.meta.env` and baked into the client bundle. Each Workers Builds
-  project sets its own as a **build variable** (Cloudflare dashboard → the
-  project → Settings → Variables and Secrets, or prefix it into the Build
-  command like `CLOUDFLARE_ENV`): `dreamport` gets the real site key from its
-  Turnstile widget; `dreamport-staging` gets the always-pass test key. There
-  is **no committed default** — `.env` is gitignored, so a build with the var
-  unset ships a widget that can't render (a loud failure, on purpose — better
-  than silently shipping a test key that waves every bot through). Local dev
-  copies `.env.example` to `.env`; CI e2e sets the var in the workflow's
-  `env:` block.
+  via `import.meta.env` and baked into the client bundle. Set in each
+  project's **Build command** (see [Build step](#build-step) — the dashboard
+  Build-variable panel silently drops it): `dreamport` gets the real widget's
+  site key, `dreamport-staging` gets the always-pass test key. Not committed
+  (`.env` is gitignored) — a build with it unset bakes in `undefined` and the
+  widget can't render, so a missing key fails loud rather than shipping a
+  defenceless test key. Local dev copies `.env.example` to `.env`; CI e2e
+  sets the var in the workflow's `env:` block.
 - **`TURNSTILE_SECRET_KEY`** — the secret key, read at **runtime** from
   `c.env`. A per-project Cloudflare secret (see [What's not
   committed](#whats-not-committed)). The send path **fails closed** (503, no
@@ -181,15 +183,16 @@ Environment is set at **build** time, not deploy time.
 
 The specific build and deploy commands are managed per-project in the Cloudflare web UI:
 
-| Setting                                   | `dreamport` (production)                  | `dreamport-staging` (staging)          |
-| ----------------------------------------- | ----------------------------------------- | -------------------------------------- |
-| Build command                             | `CLOUDFLARE_ENV=production npm run build` | `CLOUDFLARE_ENV=staging npm run build` |
-| Production branch                         | `main`                                    | (never pushed to)                      |
-| Deploy command (production-branch pushes) | `npx wrangler deploy`                     | `npx wrangler deploy`                  |
-| Version command (other branches)          | _(disabled)_                              | `npx wrangler versions upload`         |
+| Setting                                   | `dreamport` (production)                                                                   | `dreamport-staging` (staging)                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| Build command                             | `CLOUDFLARE_ENV=production VITE_TURNSTILE_SITE_KEY=0x4AAAAAAEqY4wvljJsO_dJb npm run build` | `CLOUDFLARE_ENV=staging VITE_TURNSTILE_SITE_KEY=1x00000000000000000000AA npm run build` |
+| Production branch                         | `main`                                                                                     | (never pushed to)                                                                       |
+| Deploy command (production-branch pushes) | `npx wrangler deploy`                                                                      | `npx wrangler deploy`                                                                   |
+| Version command (other branches)          | _(disabled)_                                                                               | `npx wrangler versions upload`                                                          |
 
-There is no separate Build _variable_ for `CLOUDFLARE_ENV` — see
-[Build step](#build-step) for why it's baked into the command instead.
+There is no separate Build _variable_ for `CLOUDFLARE_ENV` or
+`VITE_TURNSTILE_SITE_KEY` — see [Build step](#build-step) for why they're
+baked into the command instead.
 
 ## First-time setup
 
@@ -239,10 +242,10 @@ schema, so deployed code never reads a column that doesn't exist yet:
 
 1. Merge the migration and code change to `main`.
 2. **Staging:** `npm run migrate:staging`, then let a preview deploy run (or
-   `CLOUDFLARE_ENV=staging npm run build && npx wrangler versions upload`). Check
-   sign-in still works.
-3. **Production:** `npm run migrate:production`, then let the `main` deploy run (or
-   `CLOUDFLARE_ENV=production npm run build && npx wrangler deploy`).
+   run the project's Build command from the table above, then
+   `npx wrangler versions upload`). Check sign-in still works.
+3. **Production:** `npm run migrate:production`, then let the `main` deploy run
+   (or the Build command from the table above, then `npx wrangler deploy`).
 
 Roll forward, not back: fix a bad migration with another migration. D1 has no
 transactions (see [ADR-0002](adr/0002-better-auth-over-homegrown.md)), so a
