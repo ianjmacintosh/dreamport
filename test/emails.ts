@@ -47,6 +47,16 @@ export const TEST_EMAILS = {
   /** Drives `createAuth` with an injected spy sender, bypassing EMAIL_MODE. */
   injectedSender: "delivered+injected@resend.dev",
 
+  // --- Seam 1: Turnstile gate on the send endpoint (#23) ---
+  /** Send whose Turnstile token passes verification; a code is issued. */
+  turnstilePass: "delivered+turnstile-pass@resend.dev",
+  /** Send with no Turnstile token; rejected before a code is issued. */
+  turnstileNoToken: "delivered+turnstile-no-token@resend.dev",
+  /** Send whose Turnstile token fails verification; rejected before a code is issued. */
+  turnstileBadToken: "delivered+turnstile-bad-token@resend.dev",
+  /** Send while the Turnstile secret is unset; the gate fails closed (503). */
+  turnstileUnconfigured: "delivered+turnstile-unconfigured@resend.dev",
+
   // --- Seam 1: /api/me ---
   /** Signs in, then reads its own email back from the session endpoint. */
   meOk: "delivered+me-ok@resend.dev",

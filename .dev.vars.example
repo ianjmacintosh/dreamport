@@ -6,6 +6,14 @@
 # `--name dreamport-staging`).
 BETTER_AUTH_SECRET=dev-only-change-me-to-something-random-and-long
 
+# Cloudflare Turnstile SECRET key, used server-side to verify the widget
+# token on the send-OTP path. The send path fails closed (503) without it.
+# This default is Cloudflare's documented always-pass test secret — it pairs
+# with the always-pass site key in `.env`. Production/staging set a real
+# per-project secret with `wrangler secret put TURNSTILE_SECRET_KEY
+# --name dreamport` (or `--name dreamport-staging`); see docs/deployment.md.
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+
 # How sign-in emails are delivered. Unset (or `mock`) prints the 6-digit code
 # to the dev-server console and sends nothing — the default for local work.
 # Set `resend` only to exercise the real Resend path; it then requires both

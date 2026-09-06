@@ -32,6 +32,11 @@ src/routeTree.gen.ts
 .dev.vars*
 !.dev.vars.example
 
+# Vite env (VITE_* build vars). Real values are per-environment build
+# variables; local dev copies .env.example (see README).
+.env
+!.env.example
+
 # Playwright
 /test-results/
 /playwright-report/

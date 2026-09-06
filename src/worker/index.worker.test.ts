@@ -1,10 +1,11 @@
-import { SELF } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { TEST_EMAILS } from "../../test/emails";
 import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
+import { createApp } from "./index";
+import type { TurnstileVerifier } from "./turnstile";
 
 /**
  * Seam 1 — the Worker's HTTP boundary.
@@ -18,29 +19,60 @@ import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
  * test share by module identity. Recipient addresses come from
  * `TEST_EMAILS` (see `test/emails.ts`) — never a literal — and all sit on
  * `@resend.dev`, which cannot deliver to a real inbox.
+ *
+ * Since #23 the send-OTP path is behind a Turnstile gate. These tests drive
+ * the Worker through `createApp({ verifyTurnstile })` with a stub verifier,
+ * so nothing here calls Cloudflare's `siteverify` endpoint — the real
+ * `verifyTurnstile` is covered hermetically in `turnstile.test.ts`.
  */
 
 const ORIGIN = "https://dreamport.test";
 const json = { "content-type": "application/json" };
 
+/** Any non-empty token; the stub verifier below only checks presence. */
+const TURNSTILE_TOKEN = "dummy-turnstile-token";
+
+/** Stub verifier: a request passes the gate iff it carried a token header. */
+const acceptTokenIfPresent: TurnstileVerifier = async ({ token }) =>
+  token !== null && token !== "";
+
 /**
- * `SELF.fetch`, but with a `Host` header set — needed since `auth.ts` grew a
- * dynamic `baseURL` (see `ALLOWED_HOSTS` in `trusted-origins.ts`), which
- * resolves per request from the Host. A real request always carries one
- * (confirmed against a live dev server: Cloudflare's edge and the Vite
- * plugin's local dev server both set it); `SELF.fetch`'s loopback dispatch
- * does not synthesize one from the URL on its own, so tests must.
+ * The Worker under test, wired with a stub Turnstile verifier so the send
+ * path never makes a network call. Gate-specific cases in the "Turnstile
+ * gate" block build their own `createApp(...)` with a different stub.
  */
-function fetchWorker(path: string, init: RequestInit = {}): Promise<Response> {
+const app = createApp({ verifyTurnstile: acceptTokenIfPresent });
+
+/**
+ * Drive the Worker like a real client would. A `Host` header is set since
+ * `auth.ts` grew a dynamic `baseURL` (see `ALLOWED_HOSTS` in
+ * `trusted-origins.ts`) that resolves per request from the Host; a real
+ * request always carries one (Cloudflare's edge and the Vite dev server both
+ * set it), but a synthetic `Request` does not, so tests must.
+ */
+async function fetchWorker(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
   const headers = new Headers(init.headers);
   if (!headers.has("host")) headers.set("host", new URL(ORIGIN).host);
-  return SELF.fetch(`${ORIGIN}${path}`, { ...init, headers });
+  return app.fetch(new Request(`${ORIGIN}${path}`, { ...init, headers }), env);
 }
 
-function sendCode(email: string) {
+/**
+ * Drive the send-OTP endpoint. By default it carries a Turnstile token that
+ * the stub verifier accepts; pass `{ token: null }` to omit the header
+ * entirely, or a specific string to send that value.
+ */
+function sendCode(
+  email: string,
+  { token = TURNSTILE_TOKEN }: { token?: string | null } = {},
+) {
+  const headers: Record<string, string> = { ...json };
+  if (token !== null) headers["x-turnstile-token"] = token;
   return fetchWorker("/api/auth/email-otp/send-verification-otp", {
     method: "POST",
-    headers: json,
+    headers,
     body: JSON.stringify({ email, type: "sign-in" }),
   });
 }
@@ -155,6 +187,140 @@ describe("send a sign-in code", () => {
     expect(known.status).toBe(unknown.status);
     expect(await known.json()).toEqual(await unknown.json());
     expect(known.status).toBe(200);
+  });
+});
+
+describe("Turnstile gate on the send-OTP path (#23)", () => {
+  // The gate's job: reject a send whose token is missing or fails
+  // verification *before* Better Auth issues a code, and fail closed when the
+  // secret is unset. Verification itself is stubbed here (the real
+  // `verifyTurnstile` is covered in `turnstile.test.ts`).
+  const originalSecret = env.TURNSTILE_SECRET_KEY;
+  const originalHostnames = env.TURNSTILE_HOSTNAMES;
+
+  afterEach(() => {
+    env.TURNSTILE_SECRET_KEY = originalSecret;
+    env.TURNSTILE_HOSTNAMES = originalHostnames;
+  });
+
+  /** POST the send-OTP endpoint against a Worker built with `verifier`. */
+  function send(
+    verifier: TurnstileVerifier,
+    email: string,
+    { token = TURNSTILE_TOKEN }: { token?: string | null } = {},
+  ) {
+    const headers = new Headers({ ...json, host: new URL(ORIGIN).host });
+    if (token !== null) headers.set("x-turnstile-token", token);
+    return createApp({ verifyTurnstile: verifier }).fetch(
+      new Request(`${ORIGIN}/api/auth/email-otp/send-verification-otp`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ email, type: "sign-in" }),
+      }),
+      env,
+    );
+  }
+
+  const accept: TurnstileVerifier = async () => true;
+  const reject: TurnstileVerifier = async () => false;
+
+  it("issues a code when verification passes", async () => {
+    const res = await send(accept, TEST_EMAILS.turnstilePass);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(codeFor(TEST_EMAILS.turnstilePass)).toMatch(/^\d{6}$/);
+  });
+
+  /** Capture the options the gate hands the verifier for one send. */
+  async function optionsSeenBySend(headerOverrides: Record<string, string>) {
+    let seen: Parameters<TurnstileVerifier>[0] | undefined;
+    const spy: TurnstileVerifier = async (opts) => {
+      seen = opts;
+      return true;
+    };
+    await createApp({ verifyTurnstile: spy }).fetch(
+      new Request(`${ORIGIN}/api/auth/email-otp/send-verification-otp`, {
+        method: "POST",
+        headers: new Headers({
+          ...json,
+          host: new URL(ORIGIN).host,
+          ...headerOverrides,
+        }),
+        body: JSON.stringify({
+          email: TEST_EMAILS.turnstilePass,
+          type: "sign-in",
+        }),
+      }),
+      env,
+    );
+    return seen;
+  }
+
+  it("passes the header token and client IP through to the verifier", async () => {
+    const seen = await optionsSeenBySend({
+      "x-turnstile-token": "tok-123",
+      "cf-connecting-ip": "203.0.113.7",
+    });
+
+    expect(seen).toMatchObject({ token: "tok-123", remoteIp: "203.0.113.7" });
+  });
+
+  it("does not pin action or hostname when TURNSTILE_HOSTNAMES is unset", async () => {
+    env.TURNSTILE_HOSTNAMES = undefined;
+
+    const seen = await optionsSeenBySend({ "x-turnstile-token": "t" });
+
+    expect(seen?.expectedAction).toBeUndefined();
+    expect(seen?.allowedHostnames).toEqual([]);
+  });
+
+  it("pins the send-otp action and the configured hostnames when set", async () => {
+    env.TURNSTILE_HOSTNAMES = " dreamport.example.com , preview.example.com ";
+
+    const seen = await optionsSeenBySend({ "x-turnstile-token": "t" });
+
+    expect(seen?.expectedAction).toBe("send-otp");
+    expect(seen?.allowedHostnames).toEqual([
+      "dreamport.example.com",
+      "preview.example.com",
+    ]);
+  });
+
+  it("rejects a send with no Turnstile token, before any code is issued", async () => {
+    const res = await send(reject, TEST_EMAILS.turnstileNoToken, {
+      token: null,
+    });
+
+    expect(res.status).toBe(403);
+    expect(
+      getMockSender().sent.some((e) => e.to === TEST_EMAILS.turnstileNoToken),
+    ).toBe(false);
+  });
+
+  it("rejects a send whose token fails verification, before any code is issued", async () => {
+    const res = await send(reject, TEST_EMAILS.turnstileBadToken);
+
+    expect(res.status).toBe(403);
+    expect(
+      getMockSender().sent.some((e) => e.to === TEST_EMAILS.turnstileBadToken),
+    ).toBe(false);
+  });
+
+  it("fails closed with 503 when no Turnstile secret is configured, without calling the verifier", async () => {
+    env.TURNSTILE_SECRET_KEY = "";
+    const mustNotRun: TurnstileVerifier = async () => {
+      throw new Error("verifier called despite missing secret");
+    };
+
+    const res = await send(mustNotRun, TEST_EMAILS.turnstileUnconfigured);
+
+    expect(res.status).toBe(503);
+    expect(
+      getMockSender().sent.some(
+        (e) => e.to === TEST_EMAILS.turnstileUnconfigured,
+      ),
+    ).toBe(false);
   });
 });
 
@@ -345,8 +511,8 @@ describe("GET /api/test/last-otp (mock-only test hook)", () => {
   it("returns the most recent code handed to the mock sender for an email", async () => {
     await sendCode(TEST_EMAILS.lastOtpHook);
 
-    const res = await SELF.fetch(
-      `${ORIGIN}/api/test/last-otp?email=${encodeURIComponent(TEST_EMAILS.lastOtpHook)}`,
+    const res = await fetchWorker(
+      `/api/test/last-otp?email=${encodeURIComponent(TEST_EMAILS.lastOtpHook)}`,
     );
 
     expect(res.status).toBe(200);
@@ -354,15 +520,15 @@ describe("GET /api/test/last-otp (mock-only test hook)", () => {
   });
 
   it("404s when no code has been sent to that email", async () => {
-    const res = await SELF.fetch(
-      `${ORIGIN}/api/test/last-otp?email=${encodeURIComponent(TEST_EMAILS.neverSent)}`,
+    const res = await fetchWorker(
+      `/api/test/last-otp?email=${encodeURIComponent(TEST_EMAILS.neverSent)}`,
     );
 
     expect(res.status).toBe(404);
   });
 
   it("400s when the email query param is missing", async () => {
-    const res = await SELF.fetch(`${ORIGIN}/api/test/last-otp`);
+    const res = await fetchWorker("/api/test/last-otp");
 
     expect(res.status).toBe(400);
   });
@@ -412,7 +578,10 @@ describe("dynamic baseURL (ALLOWED_HOSTS)", () => {
   // trusting whatever Host a request claims — these exercise that directly,
   // independent of the origin-check tests above.
   const fetchAs = (host: string) =>
-    SELF.fetch(`http://${host}/api/auth/ok`, { headers: { host } });
+    app.fetch(
+      new Request(`http://${host}/api/auth/ok`, { headers: { host } }),
+      env,
+    );
 
   it("resolves for a localhost Host, matching the local-dev pattern", async () => {
     const res = await fetchAs("localhost:5199");

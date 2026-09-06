@@ -33,6 +33,10 @@
       "workers_dev": false,
       "vars": {
         "EMAIL_MODE": "mock",
+        // Turnstile tokens for production must be solved on this host, and
+        // carry the `send-otp` action (see src/worker/turnstile.ts). Not a
+        // secret. Staging/local omit this and run on Cloudflare test keys.
+        "TURNSTILE_HOSTNAMES": "dreamport.ianjmacintosh.com",
       },
       "d1_databases": [
         {
@@ -51,6 +55,12 @@
       "preview_urls": true,
       "vars": {
         "EMAIL_MODE": "mock",
+        // Cloudflare's always-pass Turnstile test secret. Not a real secret,
+        // and staging can't use the real widget (scoped to ianjmacintosh.com,
+        // not workers.dev — see docs/deployment.md), so it lives here rather
+        // than in the dashboard, which keeps dropping it on save. Production's
+        // real secret is set out-of-band with `wrangler secret put`.
+        "TURNSTILE_SECRET_KEY": "1x0000000000000000000000000000000AA",
       },
       "d1_databases": [
         {
