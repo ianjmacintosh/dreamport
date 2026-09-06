@@ -122,9 +122,9 @@ that env's `EMAIL_MODE` in `wrangler.jsonc`.
 
 ## Turnstile (bot check on the send-OTP path)
 
-The `/login` email step renders a Cloudflare Turnstile widget, and the Worker
-verifies its token server-side before Better Auth issues a code (#23). Two
-values, two mechanisms, per environment:
+The `/login` email step renders a Cloudflare Turnstile widget (rendered with
+`action: "send-otp"`), and the Worker verifies its token server-side before
+Better Auth issues a code (#23). Three values:
 
 - **`VITE_TURNSTILE_SITE_KEY`** — the public site key, read at **build** time
   via `import.meta.env` and baked into the client bundle. Each Workers Builds
@@ -141,20 +141,27 @@ values, two mechanisms, per environment:
   `c.env`. A per-project Cloudflare secret (see [What's not
   committed](#whats-not-committed)). The send path **fails closed** (503, no
   code issued) when it is unset.
+- **`TURNSTILE_HOSTNAMES`** — a comma-separated hostname allowlist, **not** a
+  secret. When set, the gate also requires the verified token's `hostname` to
+  be in the list and its `action` to be `send-otp`. It's pinned for
+  production in `wrangler.jsonc` (`env.production.vars`,
+  `dreamport.ianjmacintosh.com`) and left unset everywhere else.
 
 `dreamport` and `dreamport-staging` are separate projects with separate
-secret stores, so their key pairs are set independently:
+secret stores, so their keys are set independently:
 
-|                                            | `dreamport` (prod)                                                | `dreamport-staging`                   |
-| ------------------------------------------ | ----------------------------------------------------------------- | ------------------------------------- |
-| `TURNSTILE_SECRET_KEY` (runtime secret)    | real, from the Turnstile widget for `dreamport.ianjmacintosh.com` | `1x0000000000000000000000000000000AA` |
-| `VITE_TURNSTILE_SITE_KEY` (build variable) | the matching real site key                                        | `1x00000000000000000000AA`            |
+|                                            | `dreamport` (prod)                   | `dreamport-staging`                   |
+| ------------------------------------------ | ------------------------------------ | ------------------------------------- |
+| `VITE_TURNSTILE_SITE_KEY` (build variable) | `0x4AAAAAAEqY4wvljJsO_dJb`           | `1x00000000000000000000AA`            |
+| `TURNSTILE_SECRET_KEY` (runtime secret)    | the matching secret from that widget | `1x0000000000000000000000000000000AA` |
+| `TURNSTILE_HOSTNAMES`                      | _(set in `wrangler.jsonc`)_          | _(unset — lenient)_                   |
 
 Staging runs the always-pass test pair deliberately: a real widget's allowed
 hostnames can't cover the `*-dreamport-staging.bananasquad.workers.dev`
-preview-URL sprawl (Turnstile has no prefix wildcard), and the test secret
-still exercises the real `siteverify` HTTPS call — it just always answers
-success. Real-challenge behaviour is a production smoke-test concern.
+preview-URL sprawl (Turnstile has no prefix wildcard), so with a real widget
+`TURNSTILE_HOSTNAMES` couldn't be pinned there anyway. The test secret still
+exercises the real `siteverify` HTTPS call — it just always answers success.
+Real-challenge behaviour is a production smoke-test concern.
 
 Cloudflare's always-fail pair (`2x00000000000000000000AB` /
 `2x0000000000000000000000000000000AA`) drives negative tests. The Vitest
@@ -255,9 +262,11 @@ Cloudflare / GitHub dashboards), never in `wrangler.jsonc` or the repo.
   the Turnstile widget token against Cloudflare `siteverify` before issuing a
   code, and **fails closed** (503, no code sent) when this is unset. Set it
   per project: `wrangler secret put TURNSTILE_SECRET_KEY --name dreamport` /
-  `--name dreamport-staging` (or the dashboard). Get the key from the
-  Turnstile widget's settings in the Cloudflare dashboard; each environment's
-  widget has its own site/secret pair.
+  `--name dreamport-staging` (or the dashboard). Production uses the secret
+  from the real widget (site key `0x4AAAAAAEqY4wvljJsO_dJb`); staging uses
+  Cloudflare's always-pass test secret `1x0000000000000000000000000000000AA`.
+  The public `VITE_TURNSTILE_SITE_KEY` build variable and the non-secret
+  `TURNSTILE_HOSTNAMES` are covered in [Turnstile](#turnstile-bot-check-on-the-send-otp-path).
 
 Because production and staging are separate Worker scripts, the same secret
 name can (and for `RESEND_API_KEY`, generally should) hold different values

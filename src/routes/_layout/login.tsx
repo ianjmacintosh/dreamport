@@ -172,6 +172,9 @@ function Login() {
           <Turnstile
             ref={turnstileRef}
             siteKey={TURNSTILE_SITE_KEY}
+            // Server checks this matches (`TURNSTILE_ACTION` in the Worker),
+            // so a token minted elsewhere on the site can't be replayed here.
+            options={{ action: "send-otp" }}
             onSuccess={(token) => setTurnstileToken(token)}
             onExpire={() => setTurnstileToken("")}
             onError={() => {

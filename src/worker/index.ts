@@ -6,6 +6,15 @@ import type { WorkerEnv } from "./env";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
 /**
+ * The `action` the `/login` Turnstile widget is rendered with (see
+ * `data-action` / `options.action` in `src/routes/_layout/login.tsx`). The
+ * gate checks the verified token was minted for this action — but only in
+ * environments that also pin `TURNSTILE_HOSTNAMES` (real widget, real
+ * domain); test keys don't echo a stable action.
+ */
+const TURNSTILE_ACTION = "send-otp";
+
+/**
  * Overrides for {@link createApp}. `verifyTurnstile` lets the Seam 1 tests
  * drive the send-OTP gate with a stub instead of a live call to Cloudflare's
  * `siteverify` endpoint (mirrors `AuthDeps.emailSender`). The Worker itself
@@ -44,6 +53,10 @@ export function createApp(deps: AppDeps = {}) {
    * `TURNSTILE_SECRET_KEY` the send path is unavailable rather than
    * unguarded.
    *
+   * Where `TURNSTILE_HOSTNAMES` is pinned (production), the token's `action`
+   * and `hostname` are checked too; elsewhere (test keys on floating hosts)
+   * only `success` is.
+   *
    * This is half of ADR-0005's mitigation (Turnstile on send); the per-IP
    * and per-identifier rate rule on the verify path is #24.
    */
@@ -56,10 +69,18 @@ export function createApp(deps: AppDeps = {}) {
       );
     }
 
+    const allowedHostnames = (c.env.TURNSTILE_HOSTNAMES ?? "")
+      .split(",")
+      .map((h) => h.trim())
+      .filter(Boolean);
+    const strict = allowedHostnames.length > 0;
+
     const ok = await verifyTurnstileToken({
       secret,
       token: c.req.header("x-turnstile-token") ?? null,
       remoteIp: c.req.header("cf-connecting-ip") ?? null,
+      expectedAction: strict ? TURNSTILE_ACTION : undefined,
+      allowedHostnames,
     });
     if (!ok) {
       return c.json(

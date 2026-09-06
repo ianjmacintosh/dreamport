@@ -196,9 +196,11 @@ describe("Turnstile gate on the send-OTP path (#23)", () => {
   // secret is unset. Verification itself is stubbed here (the real
   // `verifyTurnstile` is covered in `turnstile.test.ts`).
   const originalSecret = env.TURNSTILE_SECRET_KEY;
+  const originalHostnames = env.TURNSTILE_HOSTNAMES;
 
   afterEach(() => {
     env.TURNSTILE_SECRET_KEY = originalSecret;
+    env.TURNSTILE_HOSTNAMES = originalHostnames;
   });
 
   /** POST the send-OTP endpoint against a Worker built with `verifier`. */
@@ -230,23 +232,21 @@ describe("Turnstile gate on the send-OTP path (#23)", () => {
     expect(codeFor(TEST_EMAILS.turnstilePass)).toMatch(/^\d{6}$/);
   });
 
-  it("passes the header token and client IP through to the verifier", async () => {
-    let seen: { token: string | null; remoteIp: string | null } | undefined;
+  /** Capture the options the gate hands the verifier for one send. */
+  async function optionsSeenBySend(headerOverrides: Record<string, string>) {
+    let seen: Parameters<TurnstileVerifier>[0] | undefined;
     const spy: TurnstileVerifier = async (opts) => {
-      seen = { token: opts.token, remoteIp: opts.remoteIp };
+      seen = opts;
       return true;
     };
-
-    const headers = new Headers({
-      ...json,
-      host: new URL(ORIGIN).host,
-      "x-turnstile-token": "tok-123",
-      "cf-connecting-ip": "203.0.113.7",
-    });
     await createApp({ verifyTurnstile: spy }).fetch(
       new Request(`${ORIGIN}/api/auth/email-otp/send-verification-otp`, {
         method: "POST",
-        headers,
+        headers: new Headers({
+          ...json,
+          host: new URL(ORIGIN).host,
+          ...headerOverrides,
+        }),
         body: JSON.stringify({
           email: TEST_EMAILS.turnstilePass,
           type: "sign-in",
@@ -254,8 +254,37 @@ describe("Turnstile gate on the send-OTP path (#23)", () => {
       }),
       env,
     );
+    return seen;
+  }
 
-    expect(seen).toEqual({ token: "tok-123", remoteIp: "203.0.113.7" });
+  it("passes the header token and client IP through to the verifier", async () => {
+    const seen = await optionsSeenBySend({
+      "x-turnstile-token": "tok-123",
+      "cf-connecting-ip": "203.0.113.7",
+    });
+
+    expect(seen).toMatchObject({ token: "tok-123", remoteIp: "203.0.113.7" });
+  });
+
+  it("does not pin action or hostname when TURNSTILE_HOSTNAMES is unset", async () => {
+    env.TURNSTILE_HOSTNAMES = undefined;
+
+    const seen = await optionsSeenBySend({ "x-turnstile-token": "t" });
+
+    expect(seen?.expectedAction).toBeUndefined();
+    expect(seen?.allowedHostnames).toEqual([]);
+  });
+
+  it("pins the send-otp action and the configured hostnames when set", async () => {
+    env.TURNSTILE_HOSTNAMES = " dreamport.example.com , preview.example.com ";
+
+    const seen = await optionsSeenBySend({ "x-turnstile-token": "t" });
+
+    expect(seen?.expectedAction).toBe("send-otp");
+    expect(seen?.allowedHostnames).toEqual([
+      "dreamport.example.com",
+      "preview.example.com",
+    ]);
   });
 
   it("rejects a send with no Turnstile token, before any code is issued", async () => {

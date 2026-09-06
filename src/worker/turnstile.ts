@@ -6,18 +6,29 @@
  * Turnstile token (in the `x-turnstile-token` header) or it is rejected here,
  * before Better Auth issues a code and before the email sender is called.
  *
- * Fail closed, never open: a missing token, a non-2xx `siteverify` response,
- * a malformed body, or a network error all resolve to `false`. A bot check
- * that cannot run is treated as a bot check that failed.
+ * Fail closed, never open: a missing/oversized token, a non-2xx `siteverify`
+ * response, a malformed body, a timeout, a thrown fetch, an `action` that
+ * isn't the one we expect, or a `hostname` outside the allowlist all resolve
+ * to `false`. A bot check that cannot run is a bot check that failed.
  */
 
-/** Cloudflare's token-verification endpoint (POST, JSON in and out). */
+/** Cloudflare's token-verification endpoint. */
 const SITEVERIFY_URL =
   "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
-/** The shape of a `siteverify` response we care about. */
+/** Turnstile tokens are short (~hundreds of chars); anything longer is junk. */
+const MAX_TOKEN_LENGTH = 2048;
+
+/** How long to wait on `siteverify` before giving up (and failing closed). */
+const SITEVERIFY_TIMEOUT_MS = 10_000;
+
+/** The parts of a `siteverify` response the gate looks at. */
 interface SiteverifyResult {
   success?: boolean;
+  /** The `action` the widget was rendered with, echoed back. */
+  action?: string;
+  /** The hostname the challenge was solved on. */
+  hostname?: string;
 }
 
 /** Inputs for {@link verifyTurnstile}. */
@@ -32,6 +43,19 @@ export interface VerifyTurnstileOptions {
   token: string | null;
   /** The caller's IP (`cf-connecting-ip`), passed through to `siteverify`. */
   remoteIp: string | null;
+  /**
+   * If set, the `action` the token must have been minted for. Lets a token
+   * issued for one form on the site not be replayed against this endpoint.
+   * Omitted on test-key environments, whose responses don't carry a stable
+   * action (see `TURNSTILE_HOSTNAMES` in `src/worker/index.ts`).
+   */
+  expectedAction?: string;
+  /**
+   * If non-empty, the set of hostnames the challenge may have been solved
+   * on. Binds a token to the origin that produced it. Empty on test-key
+   * environments (localhost, previews) where the hostname isn't fixed.
+   */
+  allowedHostnames?: string[];
 }
 
 /**
@@ -45,34 +69,49 @@ export type TurnstileVerifier = (
 
 /**
  * Verify a Turnstile token with Cloudflare. Resolves `true` only when
- * `siteverify` explicitly reports `success: true`; every other outcome —
- * including a missing token, an error response, or a thrown fetch — resolves
- * `false`.
+ * `siteverify` reports `success: true` **and** (when asked) the `action` and
+ * `hostname` match; every other outcome resolves `false`.
  *
- * Turnstile tokens are single-use and short-lived (~300s); a token that has
- * already been redeemed comes back `success: false`, so the client must reset
- * the widget after each successful send.
+ * Turnstile tokens are single-use and short-lived (~300s); a redeemed token
+ * comes back `success: false`, so the client resets the widget after a send
+ * that consumed one.
  */
 export const verifyTurnstile: TurnstileVerifier = async ({
   secret,
   token,
   remoteIp,
+  expectedAction,
+  allowedHostnames,
 }) => {
-  if (!token) return false;
+  if (!token || token.length > MAX_TOKEN_LENGTH) return false;
 
-  const body: Record<string, string> = { secret, response: token };
-  if (remoteIp) body.remoteip = remoteIp;
+  const body = new URLSearchParams({ secret, response: token });
+  if (remoteIp) body.set("remoteip", remoteIp);
 
+  let result: SiteverifyResult;
   try {
     const res = await fetch(SITEVERIFY_URL, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body,
+      signal: AbortSignal.timeout(SITEVERIFY_TIMEOUT_MS),
     });
     if (!res.ok) return false;
-    const result = (await res.json()) as SiteverifyResult;
-    return result.success === true;
+    result = (await res.json()) as SiteverifyResult;
   } catch {
     return false;
   }
+
+  if (result.success !== true) return false;
+  if (expectedAction !== undefined && result.action !== expectedAction) {
+    return false;
+  }
+  if (
+    allowedHostnames &&
+    allowedHostnames.length > 0 &&
+    !allowedHostnames.includes(result.hostname ?? "")
+  ) {
+    return false;
+  }
+  return true;
 };

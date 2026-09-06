@@ -18,6 +18,14 @@ export interface WorkerEnv {
    */
   TURNSTILE_SECRET_KEY: string;
   /**
+   * Comma-separated hostnames a Turnstile token may have been solved on. When
+   * set (production, in `wrangler.jsonc`), the gate also checks the token's
+   * `hostname` and `action`. Left unset where a real widget can't apply — the
+   * floating `localhost` port, the `*-dreamport-staging` preview sprawl — so
+   * those run on Cloudflare's test keys with just the `success` check.
+   */
+  TURNSTILE_HOSTNAMES?: string;
+  /**
    * How sign-in emails are delivered. `mock` in every environment today
    * (see `wrangler.jsonc`); unset is treated as `mock`.
    */
