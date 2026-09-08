@@ -232,12 +232,16 @@ fi
 # dropped at build time, so the login chunk shipped `siteKey: undefined` and
 # the widget could not render. Walk index.html -> its chunk -> the login
 # chunk and look for a real site key literal.
+#
+# index.html links its entry as `/assets/index-*.js`, but chunk-to-chunk
+# refs inside that entry are `assets/login-*.js` / `./login-*.js` (no leading
+# slash) — so match the basename and rebuild the `/assets/` path.
 BUNDLE_KEY=""
 INDEX_JS=$(curl -s "$BASE_URL/" | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -n1)
 if [[ -n "$INDEX_JS" ]]; then
-  LOGIN_JS=$(curl -s "${BASE_URL}${INDEX_JS}" | grep -oE '/assets/login-[A-Za-z0-9_-]+\.js' | head -n1)
+  LOGIN_JS=$(curl -s "${BASE_URL}${INDEX_JS}" | grep -oE 'login-[A-Za-z0-9_-]+\.js' | head -n1)
   if [[ -n "$LOGIN_JS" ]]; then
-    BUNDLE_KEY=$(curl -s "${BASE_URL}${LOGIN_JS}" \
+    BUNDLE_KEY=$(curl -s "${BASE_URL}/assets/${LOGIN_JS}" \
       | grep -oE '"(0x4[A-Za-z0-9_-]{15,}|[123]x0{10,}[A-Za-z0-9]{2})"' | head -n1)
   fi
 fi
