@@ -16,6 +16,14 @@ import { TEST_EMAILS } from "../test/emails";
  * `VITE_TURNSTILE_SITE_KEY` is Cloudflare's always-pass test key (`.env` /
  * CI job env), so the Turnstile widget on the email step auto-solves; the
  * helper just waits for the hidden response field to fill before submitting.
+ *
+ * Rate limiting (issue #24): locally there is no `cf-connecting-ip`, so every
+ * send-OTP call in the run shares one bucket of 3 / 60s, and nothing clears
+ * the limiter tables between specs. The green suite issues two sends (two
+ * distinct addresses), well under the limit. A genuine failure retried on CI
+ * (`retries: 2`) can push over it and 429 a later spec for an unrelated
+ * reason — if that becomes a problem, add a DEV-only reset hook like
+ * `/api/test/last-otp` and call it in `beforeEach`.
  */
 
 /** The most recent code the mock sender was handed for `email`. */

@@ -84,6 +84,39 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
       // Local dev must be reached over `http://localhost` (a secure context,
       // so browsers still store the cookie), not a bare LAN IP.
       useSecureCookies: true,
+      ipAddress: {
+        // Rate limiting (below) keys on the client IP. Cloudflare sets
+        // `cf-connecting-ip` to the real client address on every request;
+        // Better Auth defaults to `x-forwarded-for`, which is not what the
+        // edge populates here. When the header is absent (local dev, the
+        // test pool) Better Auth falls back to a single shared bucket.
+        ipAddressHeaders: ["cf-connecting-ip"],
+      },
+    },
+    // Availability control on the send-OTP path (issue #24, ADR-0007). This
+    // is the per-IP dimension; the per-email dimension is owned code in the
+    // Hono send route (`otp-send-throttle.ts`), since this limiter never sees
+    // the request body.
+    rateLimit: {
+      // `enabled` defaults to production-only via `NODE_ENV`, which Workers
+      // does not set — so without this the limiter is off everywhere.
+      enabled: true,
+      // Persist counters in D1 (the `rateLimit` table, migration 0002) so the
+      // limit holds across isolates and requests, not just within one.
+      storage: "database",
+      // The global default (10s / 100) stays generous — only the send path is
+      // deliberately tightened. 3 / 60s matches Better Auth's own built-in
+      // rule for this endpoint; pinning it here makes the intent explicit and
+      // survives an upstream default change.
+      customRules: {
+        "/email-otp/send-verification-otp": { window: 60, max: 3 },
+        // #24 is scoped to the send path. Turning the limiter on globally
+        // would otherwise pull Better Auth's default 3 / 10s `/sign-in*` rule
+        // onto the verify endpoint as a side effect; `false` opts that path
+        // out so verify-path behaviour is unchanged (a dedicated verify-path
+        // limit is a separate follow-up).
+        "/sign-in/email-otp": false,
+      },
     },
     plugins: [
       // `better-auth` is pinned exactly in package.json: 1.7.2 verifies a

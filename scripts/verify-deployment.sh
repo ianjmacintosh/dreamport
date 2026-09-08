@@ -196,8 +196,13 @@ fi
 #              real tokens, so this is broken)
 #   503        TURNSTILE_SECRET_KEY not set   TURNSTILE_SECRET_KEY not set
 #   404        send route not deployed        send route not deployed
+#   429        rate limited (issue #24) —     (unreached: the real secret
+#              gate + limiter both live,       rejects the dummy token at
+#              re-run after the window          the gate first)
 #
 # On staging a 200 also writes one mock-OTP row to dreamport-stage's D1.
+# 429 on staging just means this script (or other traffic) has already hit
+# the send-OTP limit for TEST_EMAIL within the window — the endpoint is fine.
 DUMMY_TOKEN="XXXX.DUMMY.TOKEN.XXXX"
 ROOT_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/" || echo 000)
 OTP_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/auth/email-otp/send-verification-otp" \
@@ -217,6 +222,8 @@ if [[ "$ROOT_STATUS" != "200" ]]; then
   record fail "Live smoke test" "GET $BASE_URL/ -> $ROOT_STATUS (expected 200)"
 elif [[ "$OTP_STATUS" == "$OTP_OK" ]]; then
   record pass "Live smoke test" "$BASE_URL up; send-OTP gate returned $OTP_STATUS for the dummy token (expected for $ENVIRONMENT)"
+elif [[ "$OTP_STATUS" == "429" ]]; then
+  record pass "Live smoke test" "$BASE_URL up; send-OTP path is rate limited (429, issue #24) — gate + limiter reachable; re-run after the window resets for a full-path check"
 elif [[ "$OTP_STATUS" == "503" ]]; then
   record fail "Live smoke test" "send-verification-otp -> 503: TURNSTILE_SECRET_KEY is not set on $WORKER"
 elif [[ "$ENVIRONMENT" == "production" && "$OTP_STATUS" == "200" ]]; then

@@ -43,12 +43,20 @@ const acceptTokenIfPresent: TurnstileVerifier = async ({ token }) =>
  */
 const app = createApp({ verifyTurnstile: acceptTokenIfPresent });
 
+/** A stable client IP for these requests (see `fetchWorker`). */
+const CLIENT_IP = "203.0.113.9";
+
 /**
- * Drive the Worker like a real client would. A `Host` header is set since
- * `auth.ts` grew a dynamic `baseURL` (see `ALLOWED_HOSTS` in
- * `trusted-origins.ts`) that resolves per request from the Host; a real
- * request always carries one (Cloudflare's edge and the Vite dev server both
- * set it), but a synthetic `Request` does not, so tests must.
+ * Drive the Worker like a real client would. Two headers a synthetic
+ * `Request` lacks but a real one always carries:
+ *
+ *  - `Host` — `auth.ts`'s dynamic `baseURL` (see `ALLOWED_HOSTS` in
+ *    `trusted-origins.ts`) resolves per request from it.
+ *  - `cf-connecting-ip` — since #24 the send path is rate limited per client
+ *    IP (`auth.ts` `rateLimit`); a fixed value keeps every request in this
+ *    file on one bucket, which `beforeEach` resets. That bucket is 3 sends /
+ *    60s: no single `it` here sends more than three codes, and a test that
+ *    needs to should clear the tables mid-way or vary this header.
  */
 async function fetchWorker(
   path: string,
@@ -56,6 +64,9 @@ async function fetchWorker(
 ): Promise<Response> {
   const headers = new Headers(init.headers);
   if (!headers.has("host")) headers.set("host", new URL(ORIGIN).host);
+  if (!headers.has("cf-connecting-ip")) {
+    headers.set("cf-connecting-ip", CLIENT_IP);
+  }
   return app.fetch(new Request(`${ORIGIN}${path}`, { ...init, headers }), env);
 }
 
@@ -139,8 +150,15 @@ function countUsers(email: string) {
     .first<{ n: number }>();
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   getMockSender().clear();
+  // Since #24 the send-OTP path is rate limited (per-IP via Better Auth's
+  // `rateLimit` table, per-email via `otpSendThrottle`). Storage is isolated
+  // per test file but not per `it`, and several cases here send a handful of
+  // codes; clearing both tables keeps each `it` starting from a full budget.
+  // The limiter itself is covered in `rate-limit.worker.test.ts`.
+  await env.DB.prepare('DELETE FROM "rateLimit"').run();
+  await env.DB.prepare('DELETE FROM "otpSendThrottle"').run();
 });
 
 describe("non-/api paths", () => {

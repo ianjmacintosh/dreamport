@@ -57,6 +57,24 @@ export const TEST_EMAILS = {
   /** Send while the Turnstile secret is unset; the gate fails closed (503). */
   turnstileUnconfigured: "delivered+turnstile-unconfigured@resend.dev",
 
+  // --- Seam 1: rate limiting on the send endpoint (#24) ---
+  /**
+   * Four interchangeable fillers for the per-IP / header tests: send to a
+   * different one each request so the per-email limiter is never what trips,
+   * leaving the per-IP rule as the only cause. Storage is cleared between
+   * tests, so they are safe to reuse across cases.
+   */
+  rlFillerA: "delivered+rl-filler-a@resend.dev",
+  rlFillerB: "delivered+rl-filler-b@resend.dev",
+  rlFillerC: "delivered+rl-filler-c@resend.dev",
+  rlFillerD: "delivered+rl-filler-d@resend.dev",
+  /** One target address, hit from many IPs, to exercise the per-email rule. */
+  rlPerEmail: "delivered+rl-per-email@resend.dev",
+  /** Sent to in case/space variants to prove both limiters normalise alike. */
+  rlNormalise: "delivered+rl-normalise@resend.dev",
+  /** A normal send + verify while the limiter is on; must be unaffected. */
+  rlHappyPath: "delivered+rl-happy-path@resend.dev",
+
   // --- Seam 1: /api/me ---
   /** Signs in, then reads its own email back from the session endpoint. */
   meOk: "delivered+me-ok@resend.dev",

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { createAuth } from "./auth";
 import { getMockSender } from "./email/sender";
 import type { WorkerEnv } from "./env";
+import { peekOtpSendBudget, recordOtpSend } from "./otp-send-throttle";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
 /**
@@ -57,8 +58,12 @@ export function createApp(deps: AppDeps = {}) {
    * and `hostname` are checked too; elsewhere (test keys on floating hosts)
    * only `success` is.
    *
-   * This is half of ADR-0005's mitigation (Turnstile on send); the per-IP
-   * and per-identifier rate rule on the verify path is #24.
+   * Once the token passes, two rate-limit dimensions guard availability on
+   * this path (issue #24, ADR-0007): the per-IP limit is Better Auth's own
+   * DB-backed limiter (configured in `auth.ts`), and the per-email limit is
+   * the `peek`/`record` pair below, since that limiter never sees the body.
+   * Neither closes ADR-0005's verify-path griefing vector — that is a
+   * separate follow-up.
    */
   app.post("/api/auth/email-otp/send-verification-otp", async (c) => {
     const secret = c.env.TURNSTILE_SECRET_KEY;
@@ -89,7 +94,44 @@ export function createApp(deps: AppDeps = {}) {
       );
     }
 
-    return createAuth(c.env).handler(c.req.raw);
+    // Per-email throttle (issue #24). Read the address from a *clone* of the
+    // request so the original body stream stays intact for Better Auth's
+    // handler. Normalise it the way Better Auth does (trim + lowercase) so
+    // both limiters key on the same string. A missing or unparseable email is
+    // left for the handler to reject (400) — there is nothing to key on.
+    let email = "";
+    try {
+      const body = (await c.req.raw.clone().json()) as { email?: unknown };
+      if (typeof body.email === "string") {
+        email = body.email.trim().toLowerCase();
+      }
+    } catch {
+      // Malformed JSON — fall through with no email; the handler 400s.
+    }
+
+    if (email) {
+      const budget = await peekOtpSendBudget(c.env.DB, email);
+      if (!budget.allowed) {
+        return c.json(
+          { error: "Too many requests. Please try again later." },
+          429,
+          { "Retry-After": String(budget.retryAfter) },
+        );
+      }
+    }
+
+    const res = await createAuth(c.env).handler(c.req.raw);
+
+    // Spend the per-email budget only for a send that actually issued a code.
+    // A request rejected downstream — Better Auth's per-IP limiter (429), a
+    // malformed body (400), a transient 5xx — must not count against the
+    // address, or a shared NAT could lock a real user out of the email
+    // dimension without ever receiving a code.
+    if (email && res.status === 200) {
+      await recordOtpSend(c.env.DB, email);
+    }
+
+    return res;
   });
 
   app.all("/api/auth/*", (c) => {

@@ -235,6 +235,10 @@ Migration files live in [`migrations/`](../migrations/) as numbered
 `0001_better_auth_core_schema.sql` is Better Auth's core schema, generated once
 for the pinned `better-auth` version and frozen; schema changes on an upgrade
 land as a new numbered migration (see [`migrations/README.md`](../migrations/README.md)).
+`0002_send_otp_rate_limiting.sql` adds the `rateLimit` and `otpSendThrottle`
+tables and **must be applied to staging and production with the issue #24
+deploy** — the send-OTP path reads them on every request once that code is
+live.
 
 Apply them per environment:
 
