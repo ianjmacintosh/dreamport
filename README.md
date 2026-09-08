@@ -190,11 +190,12 @@ environments, the three Cloudflare D1 databases, and the migration procedure.
   preview URL, or `npm run verify:staging -- --latest` to explicitly test
   whatever the newest version on the Worker happens to be (printed up front,
   since it may not be the version your most recent push produced). It checks
-  version bindings, the workers.dev/preview trigger, migrations, secrets, that
-  the send-OTP gate rejects a token-less request (403), and that a real
-  Turnstile site key is baked into the client bundle — reporting all in one
-  pass instead of discovering them one at a time. Needs `CLOUDFLARE_API_TOKEN`
-  set. All checks are read-only.
+  version bindings, the workers.dev/preview trigger, migrations, secrets, a
+  live send-OTP request through the Turnstile gate with a dummy token
+  (staging: expect 200 and one mock-OTP row written; production: expect 403,
+  since a real secret rejects a fake token), and that a real Turnstile site
+  key is baked into the client bundle — reporting all in one pass instead of
+  discovering them one at a time. Needs `CLOUDFLARE_API_TOKEN` set.
 - **Smoke-testing the deployed Turnstile flow in a real browser:** point
   Playwright at a **staging** preview URL —
   `E2E_BASE_URL=<preview-url> npm run test:e2e` — to run

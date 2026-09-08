@@ -24,10 +24,14 @@
 # Needs CLOUDFLARE_API_TOKEN set (same token wrangler already uses), scoped
 # for Workers Scripts (read) and D1 (read) at minimum.
 #
-# The live smoke test is read-only since #23: the send-OTP endpoint is gated
-# by Turnstile, so a token-less POST is rejected (403) before Better Auth
-# runs — no OTP row is written. Driving the real widget end to end needs a
-# browser; see `e2e/deployment-smoke.spec.ts` (opt-in, `E2E_BASE_URL`).
+# The live smoke test POSTs to the Turnstile-gated send-OTP endpoint with
+# Cloudflare's documented dummy token. On staging (always-pass test secret)
+# that returns 200 and drives the whole path — gate -> siteverify -> Better
+# Auth -> a mock-OTP row written to dreamport-stage's D1. On production (real
+# secret) the same request is correctly rejected (403); a 200 there would
+# mean production is running a test secret. Verifying the real production
+# secret end to end needs a real browser challenge — see
+# `e2e/deployment-smoke.spec.ts` (opt-in, `E2E_BASE_URL`; staging only).
 
 set -uo pipefail
 
@@ -182,24 +186,45 @@ else
 fi
 
 # ── 5. Live smoke test ──────────────────────────────────────────────────────
-# Since #23 a token-less POST to the send endpoint must be rejected with 403
-# (gate present, TURNSTILE_SECRET_KEY set). 503 = the secret is missing;
-# 200 = the gate isn't enforcing; 404 = the route didn't deploy.
+# POST the Turnstile-gated send endpoint with Cloudflare's dummy token. The
+# expected status is environment-specific:
+#
+#              staging (test secret)          production (real secret)
+#   200        healthy — full path works      RED FLAG: prod runs a test secret
+#   403        secret set but not the test    healthy — real secret rejects a
+#              secret (staging can't get                fake token
+#              real tokens, so this is broken)
+#   503        TURNSTILE_SECRET_KEY not set   TURNSTILE_SECRET_KEY not set
+#   404        send route not deployed        send route not deployed
+#
+# On staging a 200 also writes one mock-OTP row to dreamport-stage's D1.
+DUMMY_TOKEN="XXXX.DUMMY.TOKEN.XXXX"
 ROOT_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/" || echo 000)
 OTP_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/auth/email-otp/send-verification-otp" \
   -H "Content-Type: application/json" \
+  -H "x-turnstile-token: ${DUMMY_TOKEN}" \
   -d "{\"email\":\"${TEST_EMAIL}\",\"type\":\"sign-in\"}" || echo 000)
+
+if [[ "$ENVIRONMENT" == "staging" ]]; then
+  OTP_OK=200
+  OTP_403_MSG="secret is set but is not the always-pass test secret (staging can't obtain real tokens — see docs/deployment.md)"
+else
+  OTP_OK=403
+  OTP_403_MSG="" # 403 is the healthy production result
+fi
 
 if [[ "$ROOT_STATUS" != "200" ]]; then
   record fail "Live smoke test" "GET $BASE_URL/ -> $ROOT_STATUS (expected 200)"
+elif [[ "$OTP_STATUS" == "$OTP_OK" ]]; then
+  record pass "Live smoke test" "$BASE_URL up; send-OTP gate returned $OTP_STATUS for the dummy token (expected for $ENVIRONMENT)"
 elif [[ "$OTP_STATUS" == "503" ]]; then
   record fail "Live smoke test" "send-verification-otp -> 503: TURNSTILE_SECRET_KEY is not set on $WORKER"
-elif [[ "$OTP_STATUS" == "200" ]]; then
-  record fail "Live smoke test" "send-verification-otp -> 200 for a token-less request: the Turnstile gate is not enforcing"
-elif [[ "$OTP_STATUS" != "403" ]]; then
-  record fail "Live smoke test" "send-verification-otp -> $OTP_STATUS (expected 403 for a token-less request)"
+elif [[ "$ENVIRONMENT" == "production" && "$OTP_STATUS" == "200" ]]; then
+  record fail "Live smoke test" "send-verification-otp -> 200 for a dummy token: production is running a Turnstile TEST secret"
+elif [[ "$OTP_STATUS" == "403" ]]; then
+  record fail "Live smoke test" "send-verification-otp -> 403: ${OTP_403_MSG}"
 else
-  record pass "Live smoke test" "$BASE_URL up; the send-OTP gate rejects a token-less request (403)"
+  record fail "Live smoke test" "send-verification-otp -> $OTP_STATUS (expected $OTP_OK for $ENVIRONMENT)"
 fi
 
 # ── 6. Turnstile site key in the client bundle ──────────────────────────────
