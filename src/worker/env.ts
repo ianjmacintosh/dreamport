@@ -10,6 +10,22 @@ export interface WorkerEnv {
   /** Signing secret for Better Auth. A Cloudflare secret, never committed. */
   BETTER_AUTH_SECRET: string;
   /**
+   * Cloudflare Turnstile secret key, used server-side to verify the widget
+   * token on the send-OTP path (see `src/worker/turnstile.ts`). A Cloudflare
+   * secret, per environment, never committed. The gate fails closed when it
+   * is unset, so a deployed environment is not functional until it is set
+   * (see docs/deployment.md).
+   */
+  TURNSTILE_SECRET_KEY: string;
+  /**
+   * Comma-separated hostnames a Turnstile token may have been solved on. When
+   * set (production, in `wrangler.jsonc`), the gate also checks the token's
+   * `hostname` and `action`. Left unset where a real widget can't apply — the
+   * floating `localhost` port, the `*-dreamport-staging` preview sprawl — so
+   * those run on Cloudflare's test keys with just the `success` check.
+   */
+  TURNSTILE_HOSTNAMES?: string;
+  /**
    * How sign-in emails are delivered. `mock` in every environment today
    * (see `wrangler.jsonc`); unset is treated as `mock`.
    */

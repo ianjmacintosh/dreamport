@@ -20,20 +20,40 @@ Version.
 
 ## Build step
 
-Environment settings are defined in `wrangler.jsonc` and read at build time via the `CLOUDFLARE_ENV` environment variable.
+Environment settings are defined in `wrangler.jsonc` and read at build time
+via the `CLOUDFLARE_ENV` environment variable. It is **not** inferred from the
+branch — each Workers Builds project sets it inline in its own **Build
+command**, and that command is the whole of what each project needs from the
+dashboard:
 
-`CLOUDFLARE_ENV` is **not** inferred from the branch. Each Workers Builds
-project sets it inline in its own **Build command** —
-`dreamport` builds with `CLOUDFLARE_ENV=production npm run build`,
-`dreamport-staging` builds with `CLOUDFLARE_ENV=staging npm run build`.
+- `dreamport` — `CLOUDFLARE_ENV=production npm run build`
+- `dreamport-staging` — `CLOUDFLARE_ENV=staging npm run build`
 
-This is deliberately _not_ set via the dashboard's separate "Variables and
-secrets" panel. That panel proved unreliable for this project: a saved
-`CLOUDFLARE_ENV` Build variable silently stopped reaching the actual build
-process, with no error and no amount of re-saving or reconnecting Git fixing
-it. Baking the value directly into the Build command sidesteps that failure
-mode entirely, since it's then part of the literal shell command Cloudflare
-runs, not a separately-injected variable.
+`CLOUDFLARE_ENV` set this way is the one build input that has always reached
+the build reliably (it shows up verbatim in the Workers Builds log:
+`Executing user build command: CLOUDFLARE_ENV=staging npm run build`).
+Everything else that used to need a per-environment value is now keyed off it
+from inside the repo:
+
+- **`VITE_TURNSTILE_SITE_KEY`** (public Turnstile site key, baked into the
+  client bundle) — resolved in `vite.config.ts` from a committed
+  `CLOUDFLARE_ENV` → key map (`resolveTurnstileSiteKey`) and injected with
+  Vite `define`. `production` gets the real widget key, `staging`/`local` get
+  Cloudflare's always-pass test key. An explicit `VITE_TURNSTILE_SITE_KEY` in
+  the environment still overrides the map (the CI e2e workflow sets one);
+  `define` otherwise wins over any stray `.env`.
+- **Runtime vars / secrets** — `wrangler.jsonc` `env.<env>.vars` for
+  non-secrets (`EMAIL_MODE`, `TURNSTILE_HOSTNAMES`, the staging test
+  `TURNSTILE_SECRET_KEY`), `wrangler secret put --name <worker>` for real
+  secrets. See [What's not committed](#whats-not-committed).
+
+Nothing is set via the dashboard's "Variables and secrets" panels. The Build
+side of it silently stopped delivering a saved `VITE_TURNSTILE_SITE_KEY` (a
+build shipped `undefined` while the dashboard showed it set); the runtime side
+loses to `wrangler.jsonc` on every `wrangler deploy` by design, so a value set
+there disappears on the next build. Keeping build config in `vite.config.ts`
+and runtime config in `wrangler.jsonc` / `wrangler secret put` sidesteps both:
+the only thing left in the dashboard is the fixed one-line Build command.
 
 ## Environments
 
@@ -57,9 +77,10 @@ This command starts Vite with the Cloudflare plugin, using the `local` env setti
 The `dreamport-staging` Workers Builds project builds every branch pushed to
 this repo. Its "production branch" setting points at a branch that's never
 pushed to, so every build takes the version path (`wrangler versions
-upload`), not an automatic promote-to-live. Its Build command is fixed at
-`CLOUDFLARE_ENV=staging npm run build`. Every build uploads a preview version
-at `????????-dreamport-staging.bananasquad.workers.dev`.
+upload`), not an automatic promote-to-live. Its Build command is fixed
+(`CLOUDFLARE_ENV=staging npm run build` — see the [Build step](#build-step)).
+Every build uploads a preview version at
+`????????-dreamport-staging.bananasquad.workers.dev`.
 
 **The long-lived staging host is the bare
 `dreamport-staging.bananasquad.workers.dev`.** Whatever version is currently
@@ -96,9 +117,9 @@ the `workers.dev` host is staging.
 ### Production
 
 The `dreamport` Workers Builds project's production branch is `main`, its
-Build command is fixed at `CLOUDFLARE_ENV=production npm run build`, and
-non-production-branch builds are disabled on this project — feature
-branches build under `dreamport-staging` instead.
+Build command is fixed (`CLOUDFLARE_ENV=production npm run build` — see the
+[Build step](#build-step)), and non-production-branch builds are disabled on
+this project — feature branches build under `dreamport-staging` instead.
 
 When a change lands on `main`, Cloudflare builds and deploys it to `dreamport.ianjmacintosh.com`
 
@@ -120,6 +141,56 @@ environment's Workers Builds project — `wrangler secret put --name dreamport`
 or `--name dreamport-staging` (or the Cloudflare dashboard) — then change
 that env's `EMAIL_MODE` in `wrangler.jsonc`.
 
+## Turnstile (bot check on the send-OTP path)
+
+The `/login` email step renders a Cloudflare Turnstile widget (rendered with
+`action: "send-otp"`), and the Worker verifies its token server-side before
+Better Auth issues a code (#23). Three values:
+
+- **`VITE_TURNSTILE_SITE_KEY`** — the public site key, read at **build** time
+  via `import.meta.env` and baked into the client bundle. Resolved in
+  `vite.config.ts` from a committed `CLOUDFLARE_ENV` → key map
+  (`resolveTurnstileSiteKey`, unit-tested in `vite.config.test.ts`):
+  `production` → the real widget key, `staging`/`local` → Cloudflare's
+  always-pass test key. It's a public value, so committing the map is fine.
+  An explicit `VITE_TURNSTILE_SITE_KEY` in the environment still wins — the CI
+  e2e workflow sets one in its `env:` block; nothing else needs to.
+- **`TURNSTILE_SECRET_KEY`** — the secret key, read at **runtime** from
+  `c.env`. A per-project Cloudflare secret (see [What's not
+  committed](#whats-not-committed)). The send path **fails closed** (503, no
+  code issued) when it is unset.
+- **`TURNSTILE_HOSTNAMES`** — a comma-separated hostname allowlist, **not** a
+  secret. When set, the gate also requires the verified token's `hostname` to
+  be in the list and its `action` to be `send-otp`. It's pinned for
+  production in `wrangler.jsonc` (`env.production.vars`,
+  `dreamport.ianjmacintosh.com`) and left unset everywhere else.
+
+`dreamport` and `dreamport-staging` are separate projects with separate
+secret stores, so their keys are set independently:
+
+|                                                              | `dreamport` (prod)                 | `dreamport-staging`                                         |
+| ------------------------------------------------------------ | ---------------------------------- | ----------------------------------------------------------- |
+| `VITE_TURNSTILE_SITE_KEY` (build, from `vite.config.ts` map) | `0x4AAAAAAEqY4wvljJsO_dJb`         | `1x00000000000000000000AA`                                  |
+| `TURNSTILE_SECRET_KEY` (runtime)                             | real secret, `wrangler secret put` | `1x0000000000000000000000000000000AA` (in `wrangler.jsonc`) |
+| `TURNSTILE_HOSTNAMES`                                        | _(set in `wrangler.jsonc`)_        | _(unset — lenient)_                                         |
+
+The production widget is scoped to `ianjmacintosh.com` (Turnstile authorizes
+a hostname and all its subdomains, so `dreamport.ianjmacintosh.com` is
+covered; the gate still pins the exact host, which is tighter). It has **no**
+`workers.dev` hostname, and a widget can't be created without one — so the
+real widget simply won't render on staging or a preview URL. Staging
+therefore runs Cloudflare's always-pass test pair; `TURNSTILE_HOSTNAMES`
+stays unset there (lenient — `success` check only). The test secret still
+exercises the real `siteverify` HTTPS call, it just always answers success.
+Real-challenge behaviour is a production smoke-test concern.
+
+Cloudflare's always-fail pair (`2x00000000000000000000AB` /
+`2x0000000000000000000000000000000AA`) drives negative tests. The Vitest
+suites don't touch Cloudflare at all: `src/worker/index.worker.test.ts` stubs
+the verifier and `src/worker/turnstile.test.ts` stubs `fetch`. The Playwright
+suite runs against a local worker with the test pair injected, never a
+deployed environment.
+
 ## Deploying
 
 Environment is set at **build** time, not deploy time.
@@ -135,8 +206,10 @@ The specific build and deploy commands are managed per-project in the Cloudflare
 | Deploy command (production-branch pushes) | `npx wrangler deploy`                     | `npx wrangler deploy`                  |
 | Version command (other branches)          | _(disabled)_                              | `npx wrangler versions upload`         |
 
-There is no separate Build _variable_ for `CLOUDFLARE_ENV` — see
-[Build step](#build-step) for why it's baked into the command instead.
+`CLOUDFLARE_ENV` is set only in the Build command string, never as a separate
+dashboard Build _variable_; `VITE_TURNSTILE_SITE_KEY` isn't set in the
+dashboard at all (it comes from the `vite.config.ts` map). See
+[Build step](#build-step) for why.
 
 ## First-time setup
 
@@ -186,10 +259,10 @@ schema, so deployed code never reads a column that doesn't exist yet:
 
 1. Merge the migration and code change to `main`.
 2. **Staging:** `npm run migrate:staging`, then let a preview deploy run (or
-   `CLOUDFLARE_ENV=staging npm run build && npx wrangler versions upload`). Check
-   sign-in still works.
-3. **Production:** `npm run migrate:production`, then let the `main` deploy run (or
-   `CLOUDFLARE_ENV=production npm run build && npx wrangler deploy`).
+   run the project's Build command from the table above, then
+   `npx wrangler versions upload`). Check sign-in still works.
+3. **Production:** `npm run migrate:production`, then let the `main` deploy run
+   (or the Build command from the table above, then `npx wrangler deploy`).
 
 Roll forward, not back: fix a bad migration with another migration. D1 has no
 transactions (see [ADR-0002](adr/0002-better-auth-over-homegrown.md)), so a
@@ -208,9 +281,17 @@ Cloudflare / GitHub dashboards), never in `wrangler.jsonc` or the repo.
   project's `EMAIL_MODE` flips from `mock` to `resend` (see
   [#38](https://github.com/ianjmacintosh/dreamport/issues/38)). Not required
   today. `EMAIL_FROM` isn't secret but travels with the key.
-- **A Turnstile secret** — not yet, and not yet consumed by any code path
-  (ADR-0001, ADR-0005 plan it; nothing reads it today). Don't set it until
-  the Turnstile integration lands.
+- **`TURNSTILE_SECRET_KEY`** — required now (#23). The send-OTP path verifies
+  the Turnstile widget token against Cloudflare `siteverify` before issuing a
+  code, and **fails closed** (503, no code sent) when this is unset.
+  Production uses the real widget's secret, set with
+  `wrangler secret put TURNSTILE_SECRET_KEY --name dreamport` (never the
+  dashboard runtime-var panel — that value is wiped by the next `wrangler
+deploy`). Staging uses Cloudflare's always-pass test secret
+  `1x0000000000000000000000000000000AA`, which is a public value and so lives
+  in `wrangler.jsonc` (`env.staging.vars`) rather than as a secret. The public
+  `VITE_TURNSTILE_SITE_KEY` (from the `vite.config.ts` map) and the non-secret
+  `TURNSTILE_HOSTNAMES` are covered in [Turnstile](#turnstile-bot-check-on-the-send-otp-path).
 
 Because production and staging are separate Worker scripts, the same secret
 name can (and for `RESEND_API_KEY`, generally should) hold different values

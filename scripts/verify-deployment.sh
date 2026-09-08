@@ -24,10 +24,14 @@
 # Needs CLOUDFLARE_API_TOKEN set (same token wrangler already uses), scoped
 # for Workers Scripts (read) and D1 (read) at minimum.
 #
-# The live smoke test writes one real mock-OTP record for a fixed test
-# address into whichever environment's D1 database it targets. EMAIL_MODE is
-# `mock` in every environment today, so nothing is actually sent — but it is
-# a real write, not a read-only check, including against production.
+# The live smoke test POSTs to the Turnstile-gated send-OTP endpoint with
+# Cloudflare's documented dummy token. On staging (always-pass test secret)
+# that returns 200 and drives the whole path — gate -> siteverify -> Better
+# Auth -> a mock-OTP row written to dreamport-stage's D1. On production (real
+# secret) the same request is correctly rejected (403); a 200 there would
+# mean production is running a test secret. Verifying the real production
+# secret end to end needs a real browser challenge — see
+# `e2e/deployment-smoke.spec.ts` (opt-in, `E2E_BASE_URL`; staging only).
 
 set -uo pipefail
 
@@ -182,17 +186,69 @@ else
 fi
 
 # ── 5. Live smoke test ──────────────────────────────────────────────────────
+# POST the Turnstile-gated send endpoint with Cloudflare's dummy token. The
+# expected status is environment-specific:
+#
+#              staging (test secret)          production (real secret)
+#   200        healthy — full path works      RED FLAG: prod runs a test secret
+#   403        secret set but not the test    healthy — real secret rejects a
+#              secret (staging can't get                fake token
+#              real tokens, so this is broken)
+#   503        TURNSTILE_SECRET_KEY not set   TURNSTILE_SECRET_KEY not set
+#   404        send route not deployed        send route not deployed
+#
+# On staging a 200 also writes one mock-OTP row to dreamport-stage's D1.
+DUMMY_TOKEN="XXXX.DUMMY.TOKEN.XXXX"
 ROOT_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/" || echo 000)
 OTP_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/auth/email-otp/send-verification-otp" \
   -H "Content-Type: application/json" \
+  -H "x-turnstile-token: ${DUMMY_TOKEN}" \
   -d "{\"email\":\"${TEST_EMAIL}\",\"type\":\"sign-in\"}" || echo 000)
+
+if [[ "$ENVIRONMENT" == "staging" ]]; then
+  OTP_OK=200
+  OTP_403_MSG="secret is set but is not the always-pass test secret (staging can't obtain real tokens — see docs/deployment.md)"
+else
+  OTP_OK=403
+  OTP_403_MSG="" # 403 is the healthy production result
+fi
 
 if [[ "$ROOT_STATUS" != "200" ]]; then
   record fail "Live smoke test" "GET $BASE_URL/ -> $ROOT_STATUS (expected 200)"
-elif [[ "$OTP_STATUS" != "200" ]]; then
-  record fail "Live smoke test" "POST .../send-verification-otp -> $OTP_STATUS (expected 200)"
+elif [[ "$OTP_STATUS" == "$OTP_OK" ]]; then
+  record pass "Live smoke test" "$BASE_URL up; send-OTP gate returned $OTP_STATUS for the dummy token (expected for $ENVIRONMENT)"
+elif [[ "$OTP_STATUS" == "503" ]]; then
+  record fail "Live smoke test" "send-verification-otp -> 503: TURNSTILE_SECRET_KEY is not set on $WORKER"
+elif [[ "$ENVIRONMENT" == "production" && "$OTP_STATUS" == "200" ]]; then
+  record fail "Live smoke test" "send-verification-otp -> 200 for a dummy token: production is running a Turnstile TEST secret"
+elif [[ "$OTP_STATUS" == "403" ]]; then
+  record fail "Live smoke test" "send-verification-otp -> 403: ${OTP_403_MSG}"
 else
-  record pass "Live smoke test" "$BASE_URL responded correctly end to end"
+  record fail "Live smoke test" "send-verification-otp -> $OTP_STATUS (expected $OTP_OK for $ENVIRONMENT)"
+fi
+
+# ── 6. Turnstile site key in the client bundle ──────────────────────────────
+# The exact failure from the #23 staging rollout: VITE_TURNSTILE_SITE_KEY was
+# dropped at build time, so the login chunk shipped `siteKey: undefined` and
+# the widget could not render. Walk index.html -> its chunk -> the login
+# chunk and look for a real site key literal.
+#
+# index.html links its entry as `/assets/index-*.js`, but chunk-to-chunk
+# refs inside that entry are `assets/login-*.js` / `./login-*.js` (no leading
+# slash) — so match the basename and rebuild the `/assets/` path.
+BUNDLE_KEY=""
+INDEX_JS=$(curl -s "$BASE_URL/" | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -n1)
+if [[ -n "$INDEX_JS" ]]; then
+  LOGIN_JS=$(curl -s "${BASE_URL}${INDEX_JS}" | grep -oE 'login-[A-Za-z0-9_-]+\.js' | head -n1)
+  if [[ -n "$LOGIN_JS" ]]; then
+    BUNDLE_KEY=$(curl -s "${BASE_URL}/assets/${LOGIN_JS}" \
+      | grep -oE '"(0x4[A-Za-z0-9_-]{15,}|[123]x0{10,}[A-Za-z0-9]{2})"' | head -n1)
+  fi
+fi
+if [[ -z "$BUNDLE_KEY" ]]; then
+  record fail "Turnstile site key" "no VITE_TURNSTILE_SITE_KEY baked into the login bundle — the build variable was dropped (see docs/deployment.md, Build step)"
+else
+  record pass "Turnstile site key" "login bundle carries site key ${BUNDLE_KEY}"
 fi
 
 # ── Report ───────────────────────────────────────────────────────────────────
