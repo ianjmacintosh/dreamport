@@ -67,6 +67,30 @@ test("happy path: email, then code, then /app shows the signed-in email", async 
   await expect(page.getByText(`signed in as ${email}`)).toBeVisible();
 });
 
+test("the sign-in page presents a bot challenge on the email step", async ({
+  page,
+}) => {
+  await page.goto("/login");
+
+  // The widget container is always in the markup; what proves the challenge
+  // actually rendered is Cloudflare serving its challenge into a child frame.
+  // With `siteKey` undefined (VITE_TURNSTILE_SITE_KEY dropped from the build)
+  // the container mounts but no such frame ever appears.
+  await expect(page.locator("#cf-turnstile")).toBeVisible();
+  await expect
+    .poll(
+      () =>
+        page
+          .frames()
+          .some((f) => f.url().includes("challenges.cloudflare.com")),
+      {
+        message: "no Cloudflare Turnstile challenge frame attached to the page",
+        timeout: 15_000,
+      },
+    )
+    .toBe(true);
+});
+
 test("logged out: visiting /app with no session redirects to /login", async ({
   page,
 }) => {
