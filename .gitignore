@@ -32,10 +32,11 @@ src/routeTree.gen.ts
 .dev.vars*
 !.dev.vars.example
 
-# Vite env (VITE_* build vars). Real values are per-environment build
-# variables; local dev copies .env.example (see README).
+# Vite `.env` files. Not used by this project — the one build-time value
+# (VITE_TURNSTILE_SITE_KEY) is resolved from a committed per-CLOUDFLARE_ENV
+# map in vite.config.ts. Ignored so a stray one can't quietly shadow it.
 .env
-!.env.example
+.env.*
 
 # Playwright
 /test-results/
