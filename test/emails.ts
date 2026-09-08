@@ -72,6 +72,8 @@ export const TEST_EMAILS = {
   e2eHappyPath: "delivered+e2e-happy@resend.dev",
   /** Persistent session: sign in, navigate away and back, still signed in. */
   e2ePersistentSession: "delivered+e2e-persistent@resend.dev",
+  /** Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only. */
+  deploySmoke: "delivered+deploy-smoke@resend.dev",
 
   // --- Seam 2: sender unit tests ---
   /** Default recipient for the `OtpEmail` fixture in `sender.test.ts`. */

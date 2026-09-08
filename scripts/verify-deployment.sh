@@ -24,10 +24,10 @@
 # Needs CLOUDFLARE_API_TOKEN set (same token wrangler already uses), scoped
 # for Workers Scripts (read) and D1 (read) at minimum.
 #
-# The live smoke test writes one real mock-OTP record for a fixed test
-# address into whichever environment's D1 database it targets. EMAIL_MODE is
-# `mock` in every environment today, so nothing is actually sent — but it is
-# a real write, not a read-only check, including against production.
+# The live smoke test is read-only since #23: the send-OTP endpoint is gated
+# by Turnstile, so a token-less POST is rejected (403) before Better Auth
+# runs — no OTP row is written. Driving the real widget end to end needs a
+# browser; see `e2e/deployment-smoke.spec.ts` (opt-in, `E2E_BASE_URL`).
 
 set -uo pipefail
 
@@ -182,6 +182,9 @@ else
 fi
 
 # ── 5. Live smoke test ──────────────────────────────────────────────────────
+# Since #23 a token-less POST to the send endpoint must be rejected with 403
+# (gate present, TURNSTILE_SECRET_KEY set). 503 = the secret is missing;
+# 200 = the gate isn't enforcing; 404 = the route didn't deploy.
 ROOT_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/" || echo 000)
 OTP_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/auth/email-otp/send-verification-otp" \
   -H "Content-Type: application/json" \
@@ -189,10 +192,34 @@ OTP_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/auth/
 
 if [[ "$ROOT_STATUS" != "200" ]]; then
   record fail "Live smoke test" "GET $BASE_URL/ -> $ROOT_STATUS (expected 200)"
-elif [[ "$OTP_STATUS" != "200" ]]; then
-  record fail "Live smoke test" "POST .../send-verification-otp -> $OTP_STATUS (expected 200)"
+elif [[ "$OTP_STATUS" == "503" ]]; then
+  record fail "Live smoke test" "send-verification-otp -> 503: TURNSTILE_SECRET_KEY is not set on $WORKER"
+elif [[ "$OTP_STATUS" == "200" ]]; then
+  record fail "Live smoke test" "send-verification-otp -> 200 for a token-less request: the Turnstile gate is not enforcing"
+elif [[ "$OTP_STATUS" != "403" ]]; then
+  record fail "Live smoke test" "send-verification-otp -> $OTP_STATUS (expected 403 for a token-less request)"
 else
-  record pass "Live smoke test" "$BASE_URL responded correctly end to end"
+  record pass "Live smoke test" "$BASE_URL up; the send-OTP gate rejects a token-less request (403)"
+fi
+
+# ── 6. Turnstile site key in the client bundle ──────────────────────────────
+# The exact failure from the #23 staging rollout: VITE_TURNSTILE_SITE_KEY was
+# dropped at build time, so the login chunk shipped `siteKey: undefined` and
+# the widget could not render. Walk index.html -> its chunk -> the login
+# chunk and look for a real site key literal.
+BUNDLE_KEY=""
+INDEX_JS=$(curl -s "$BASE_URL/" | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -n1)
+if [[ -n "$INDEX_JS" ]]; then
+  LOGIN_JS=$(curl -s "${BASE_URL}${INDEX_JS}" | grep -oE '/assets/login-[A-Za-z0-9_-]+\.js' | head -n1)
+  if [[ -n "$LOGIN_JS" ]]; then
+    BUNDLE_KEY=$(curl -s "${BASE_URL}${LOGIN_JS}" \
+      | grep -oE '"(0x4[A-Za-z0-9_-]{15,}|[123]x0{10,}[A-Za-z0-9]{2})"' | head -n1)
+  fi
+fi
+if [[ -z "$BUNDLE_KEY" ]]; then
+  record fail "Turnstile site key" "no VITE_TURNSTILE_SITE_KEY baked into the login bundle — the build variable was dropped (see docs/deployment.md, Build step)"
+else
+  record pass "Turnstile site key" "login bundle carries site key ${BUNDLE_KEY}"
 fi
 
 # ── Report ───────────────────────────────────────────────────────────────────
