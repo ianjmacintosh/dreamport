@@ -113,8 +113,8 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
         // #24 is scoped to the send path. Turning the limiter on globally
         // would otherwise pull Better Auth's default 3 / 10s `/sign-in*` rule
         // onto the verify endpoint as a side effect; `false` opts that path
-        // out so verify-path behaviour is unchanged (a dedicated verify-path
-        // limit is a separate follow-up).
+        // out so verify-path behaviour is unchanged (the verify-path
+        // griefing mitigation is issue #46).
         "/sign-in/email-otp": false,
       },
     },

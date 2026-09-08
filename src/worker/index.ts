@@ -62,8 +62,8 @@ export function createApp(deps: AppDeps = {}) {
    * this path (issue #24, ADR-0007): the per-IP limit is Better Auth's own
    * DB-backed limiter (configured in `auth.ts`), and the per-email limit is
    * the `peek`/`record` pair below, since that limiter never sees the body.
-   * Neither closes ADR-0005's verify-path griefing vector — that is a
-   * separate follow-up.
+   * Neither closes ADR-0005's verify-path griefing vector — that is
+   * issue #46.
    */
   app.post("/api/auth/email-otp/send-verification-otp", async (c) => {
     const secret = c.env.TURNSTILE_SECRET_KEY;

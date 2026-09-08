@@ -58,8 +58,8 @@ also prunes rows whose window has elapsed, since — unlike Better Auth's
   the _verify_ endpoint; any limit loose enough for real users still lets it
   through, and an attacker rotating IPs is unaffected. #24 is an availability
   control on the _send_ path, nothing more. A dedicated verify-path
-  mitigation (a non-consuming cooldown, or forking the plugin) is a separate
-  open issue; ADR-0005 stays the standing accepted-risk record.
+  mitigation (a non-consuming cooldown, or forking the plugin) is issue #46;
+  ADR-0005 stays the standing accepted-risk record until then.
 - **Residual on the send path**: an attacker with many emails _and_ many IPs
   still gets volume through — each (IP, email) pair has its own budget. #38
   (live-email cutover) has to weigh that against real Resend quota before
