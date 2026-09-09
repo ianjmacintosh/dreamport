@@ -1,5 +1,20 @@
 ## Code Contribution
 
+Every issue gets its own branch, and starting that branch is part of
+picking up the issue — do it without being asked.
+
+- **Cut from the current `origin/main`**, not local `main`. Local `main`
+  lags (it isn't checked out or pulled during normal work), so branch with
+  `git fetch origin && git checkout -b <branch> origin/main`.
+- **Name it `<issue-number>-<short-kebab-slug>`** — e.g. issue #24
+  "rate limiting on send-OTP" becomes `24-rate-limit-send-otp`. The slug is
+  a few words describing the work, not the issue title verbatim. (Older
+  `feat/` `fix/` `chore/` branches predate this rule; don't copy them.)
+- **Don't leave the branch tracking `origin/main`.** `git checkout -b`
+  from a remote ref sets that as upstream, which points a later `git push`
+  at `main`. Run `git branch --unset-upstream` right after creating it so
+  the first push creates the matching `origin/<branch>`.
+
 Run `npm run format` to format all files using Prettier before commiting
 
 ## Testing

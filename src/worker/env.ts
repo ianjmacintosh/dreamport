@@ -30,6 +30,14 @@ export interface WorkerEnv {
    * (see `wrangler.jsonc`); unset is treated as `mock`.
    */
   EMAIL_MODE?: "mock" | "resend";
+  /**
+   * Max sign-in codes the send-OTP path will send app-wide in one UTC day —
+   * the guard for the shared Resend quota (issue #24, ADR-0007). A plain var,
+   * not a secret; unset, non-numeric, or ≤ 0 falls back to
+   * `DEFAULT_DAILY_CAP` (90). Raise it per environment in `wrangler.jsonc`
+   * once the Resend plan allows.
+   */
+  SEND_OTP_DAILY_CAP?: string;
   /** Resend API key. Required only when `EMAIL_MODE=resend`. A secret. */
   RESEND_API_KEY?: string;
   /** `From:` address for sign-in email. Required only when `EMAIL_MODE=resend`. */
