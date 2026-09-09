@@ -5,6 +5,7 @@ import { TEST_EMAILS } from "../../test/emails";
 import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 import { createApp } from "./index";
+import { PRODUCTION_HOST } from "./trusted-origins";
 import type { TurnstileVerifier } from "./turnstile";
 
 /**
@@ -358,10 +359,11 @@ describe("production host refuses mock email on the send-OTP path (#41)", () => 
   // unavailable) rather than open (codes generated but never delivered) until
   // #38 wires real Resend delivery. `env.EMAIL_MODE` in this pool is `mock`
   // (the `local` wrangler env), so these cases only vary the Host.
-  const PROD_HOST = "dreamport.ianjmacintosh.com";
 
   it("503s a send from the production Host, before any code is generated", async () => {
-    const res = await sendCode(TEST_EMAILS.prodHostGuard, { host: PROD_HOST });
+    const res = await sendCode(TEST_EMAILS.prodHostGuard, {
+      host: PRODUCTION_HOST,
+    });
 
     expect(res.status).toBe(503);
     expect(

@@ -1,67 +1,90 @@
 /**
- * The one production host. Kept here as the single source for the literal so
- * the send-OTP guard in `index.ts` (which refuses that host on anything but
- * real email delivery) and the origin lists below can't drift apart. The
- * guard compares it with `===`, never a suffix match — a `*-dreamport-…`
- * preview host must not be mistaken for production.
- * `scripts/verify-deployment.sh` hard-codes the same literal (it's bash).
+ * Every host this Worker recognises, grouped by the environment it belongs
+ * to. {@link TRUSTED_ORIGINS} (Better Auth callback / CSRF) and
+ * {@link ALLOWED_HOSTS} (dynamic `baseURL` resolution) are both composed from
+ * these groups, so a host — and whether it counts as production — is stated
+ * in exactly one place. Still plain data: no per-request logic, no function
+ * form (see `docs/adr/0003-trusted-origins-constant-array.md`, amended for
+ * the `ALLOWED_HOSTS` split in #22 and these role groups in #41).
  */
-export const PRODUCTION_HOST = "dreamport.ianjmacintosh.com";
+
+/**
+ * Production. One canonical host: the custom domain
+ * `dreamport.ianjmacintosh.com` is the only intended entry point, and the
+ * `dreamport` Worker's `workers.dev` subdomain is disabled (see
+ * `wrangler.jsonc`, `docs/deployment.md`).
+ */
+export const PRODUCTION_HOSTS = ["dreamport.ianjmacintosh.com"] as const;
+
+/**
+ * Staging. The long-lived `dreamport-staging` `workers.dev` host runs at 100%
+ * traffic so it can be observed — Cloudflare cannot tail preview URLs
+ * (Workers Logs, `wrangler tail`, and Logpush all exclude them), so a
+ * versioned-preview-only "staging" is not debuggable. The second entry is the
+ * `<commit-hash>-` per-branch preview wildcard; `*` is scoped to this
+ * account's `bananasquad` subdomain, never a bare `*` or `*.workers.dev`, so
+ * an unrelated Workers host is not recognised. All share the dreamport-stage
+ * D1 database. See `docs/deployment.md`.
+ */
+export const STAGING_HOSTS = [
+  "dreamport-staging.bananasquad.workers.dev",
+  "*-dreamport-staging.bananasquad.workers.dev",
+] as const;
+
+/**
+ * The canonical production host, for exact-match guards — e.g. the send-OTP
+ * path in `index.ts` refusing mock email delivery on production (issue #41),
+ * and `scripts/verify-deployment.sh` (which hard-codes the same literal; it's
+ * bash). Compared with `===`, never a suffix test: a `*-dreamport-staging`
+ * preview host must not read as production.
+ */
+export const PRODUCTION_HOST: string = PRODUCTION_HOSTS[0];
 
 /**
  * Which origins Better Auth will honour for sign-in callbacks and CSRF
- * checks.
+ * checks — `betterAuth({ trustedOrigins })`.
+ *
+ * Production and staging only, `https://`-qualified. Deliberately **not**
+ * localhost: an origin that passes `callbackURL` / CSRF is a trust decision,
+ * and the local-dev / test hosts below have no business making it.
  *
  * A plain array, not a function: Better Auth globs each entry against the
- * request origin, so one wildcard covers every branch preview without
- * listing it, and nothing here needs computing per request. See
+ * request origin, so the one staging wildcard covers every branch preview
+ * without listing it, and nothing here needs computing per request. See
  * `docs/adr/0003-trusted-origins-constant-array.md`.
  */
 export const TRUSTED_ORIGINS: string[] = [
-  // Production.
-  `https://${PRODUCTION_HOST}`,
-  // Long-lived staging. The `dreamport-staging` Workers Builds project
-  // deploys here (100% traffic) so it can be observed with `wrangler tail` —
-  // Cloudflare cannot tail preview URLs (Workers Logs, tail, and Logpush all
-  // exclude them), so a versioned-preview-only "staging" is not debuggable.
-  // See docs/deployment.md.
-  "https://dreamport-staging.bananasquad.workers.dev",
-  // Per-branch preview versions, still uploaded for every branch for visual
-  // review. `<commit-hash>-` prefixes the same host; the `*` stands in for
-  // it. Scoped to this account's `bananasquad` subdomain so an unrelated
-  // `*.workers.dev` host is not trusted. All share the dreamport-stage DB.
-  "https://*-dreamport-staging.bananasquad.workers.dev",
-];
+  ...PRODUCTION_HOSTS,
+  ...STAGING_HOSTS,
+].map((host) => `https://${host}`);
 
 /**
- * The same hosts as {@link TRUSTED_ORIGINS}, as bare host patterns (no
- * protocol) for Better Auth's dynamic `baseURL` config —
- * `betterAuth({ baseURL: { allowedHosts: ALLOWED_HOSTS } })` in `auth.ts`.
+ * Bare host patterns (no protocol) for Better Auth's dynamic `baseURL`
+ * config — `betterAuth({ baseURL: { allowedHosts: ALLOWED_HOSTS } })` in
+ * `auth.ts`.
  *
- * A *dynamic* config, not a plain string, because there is no one fixed URL
- * to hard-code: alongside the long-lived staging host, every branch also
- * gets a `<hash>-dreamport-staging.bananasquad.workers.dev` preview host,
- * and `local` dev's port floats unless pinned. Better Auth resolves the
- * actual `baseURL` per request from whichever pattern the request's Host
- * matches, the same way `TRUSTED_ORIGINS` already works.
+ * A *dynamic* config, not a fixed string, because there is no one URL to
+ * hard-code: alongside the long-lived staging host every branch also gets a
+ * `<hash>-dreamport-staging.bananasquad.workers.dev` preview host, and
+ * `local` dev's port floats unless pinned. Better Auth resolves the actual
+ * `baseURL` per request from whichever pattern the request's Host matches.
+ *
+ * It is the trusted set plus two hosts that must resolve a `baseURL` but must
+ * never count as a trusted origin: the floating-port local dev server, and
+ * the Seam 1 test harness's fictional host (`import.meta.env.DEV` is
+ * statically `false` under `vite build`, so it never reaches the stage/prod
+ * bundle).
  *
  * This closes a real gap, not just a warning: with no `baseURL` config at
- * all, Better Auth resolves it by trusting *whatever Host the request
- * itself claims to be reaching* — so `trustedOrigins` implicitly grows to
- * include that Host too. `allowedHosts` replaces that with an explicit
- * allowlist; a request whose Host matches none of these patterns fails
- * instead of self-trusting (see the "trusted origins" tests in
- * `index.worker.test.ts`).
+ * all, Better Auth resolves it by trusting *whatever Host the request itself
+ * claims to be reaching* — so `trustedOrigins` implicitly grows to include
+ * that Host too. `allowedHosts` replaces that with an explicit allowlist; a
+ * request whose Host matches none of these patterns fails instead of
+ * self-trusting (see the "trusted origins" tests in `index.worker.test.ts`).
  */
 export const ALLOWED_HOSTS: string[] = [
-  PRODUCTION_HOST,
-  "dreamport-staging.bananasquad.workers.dev",
-  "*-dreamport-staging.bananasquad.workers.dev",
-  // The Vite dev server's port floats (5173, bumped if that's busy) unless
-  // pinned, so every port is allowed rather than one.
+  ...PRODUCTION_HOSTS,
+  ...STAGING_HOSTS,
   "localhost:*",
-  // The seam-1 test harness (`index.worker.test.ts`) drives the Worker
-  // against this fictional host. `import.meta.env.DEV` is statically `false`
-  // under `vite build`, so it never reaches the stage/prod bundle.
   ...(import.meta.env.DEV ? ["dreamport.test"] : []),
 ];
