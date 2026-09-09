@@ -21,3 +21,8 @@ TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 # EMAIL_MODE=resend
 # RESEND_API_KEY=re_...
 # EMAIL_FROM=onboarding@resend.dev
+
+# App-wide cap on sign-in codes sent per UTC day — the Resend-quota guard
+# (issue #24 / ADR-0007). Unset ⇒ 90. Set a small value to exercise the cap
+# locally (the send path 429s once the day's count reaches it).
+# SEND_OTP_DAILY_CAP=5

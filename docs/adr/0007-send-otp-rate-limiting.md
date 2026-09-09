@@ -1,11 +1,13 @@
-# Send-OTP rate limiting is two mechanisms: Better Auth's limiter per IP, dreamport code per email
+# Send-OTP rate limiting is three limits: per IP, per email, and a global daily cap
 
 Issue #24 asks for the send-OTP endpoint to stay available under abuse, keyed
 on **both** client IP and target email. Better Auth 1.7.2's own rate limiter
-covers one of those dimensions but structurally cannot cover the other, so the
-feature is split.
+covers the per-IP dimension but structurally cannot cover per-email, and
+neither dimension protects the shared Resend send quota — an attacker who
+sprays one code each across many addresses trips no per-IP or per-email limit.
+So there are three limits, checked in that order (cheapest first).
 
-## The split
+## The three limits
 
 **Per IP — Better Auth's DB-backed limiter.** `auth.ts` sets `rateLimit: {
 enabled: true, storage: "database", customRules }`. `enabled` has to be
@@ -37,13 +39,29 @@ overshoot the limit by a request or two before the row locks. `recordOtpSend`
 also prunes rows whose window has elapsed, since — unlike Better Auth's
 `rateLimit` table — nothing else does.
 
+**Global daily cap — the Resend-quota guard.** One app-wide counter per UTC
+day in the owned `otpSendDaily` table (`day` PK, `count`). `peekDailySendCap`
+runs first in the route — before the body is even read — and 429s once the
+day's count reaches `SEND_OTP_DAILY_CAP` (`resolveDailyCap`, default
+`DEFAULT_DAILY_CAP` = **90**); `recordDailySend` bumps it, again only on a
+`200`, and prunes rows older than yesterday. Sized for Resend's free tier
+(100/day, 3000/month): 90/day ⇒ ≤ 2790/month, both under the ceiling with
+headroom for the check-then-write overshoot. Raise it per environment as a
+plain `wrangler.jsonc` var when the plan grows.
+
 ## Considered Options
 
-- **Reuse Better Auth's `rateLimit` table for the per-email counter too**,
-  writing rows with a `email-otp-send:<addr>` key from our own code. Rejected:
-  that table's row semantics are Better Auth's internal contract and could
-  shift on an upgrade. A separate owned table keeps our writes off a surface
-  we do not control.
+- **Reuse Better Auth's `rateLimit` table for the owned counters too**,
+  writing rows with our own keys. Rejected: that table's row semantics are
+  Better Auth's internal contract and could shift on an upgrade. Separate
+  owned tables keep our writes off a surface we do not control.
+- **Skip the global cap; tighten per-IP and per-email instead.** Rejected:
+  neither axis protects the quota. A per-IP limit strict enough to matter
+  (the quota is 100/day; one IP at 3/60s is 4,320/day) would break real use,
+  and per-email does nothing against a spray across many addresses. Only an
+  app-wide count works.
+- **A monthly cap as well as daily.** Unnecessary — a 90/day cap already
+  bounds the month at ≤ 2790, under Resend's 3000.
 - **`customRules` function form** — a `(request, rule) => ...` callback can
   inspect the request, but it can only return a `{ window, max }`; it cannot
   change the key Better Auth limits on, so it still buckets per IP.
@@ -60,10 +78,18 @@ also prunes rows whose window has elapsed, since — unlike Better Auth's
   control on the _send_ path, nothing more. A dedicated verify-path
   mitigation (a non-consuming cooldown, or forking the plugin) is issue #46;
   ADR-0005 stays the standing accepted-risk record until then.
-- **Residual on the send path**: an attacker with many emails _and_ many IPs
-  still gets volume through — each (IP, email) pair has its own budget. #38
-  (live-email cutover) has to weigh that against real Resend quota before
-  turning on real delivery.
+- **The global cap is a real availability ceiling, not just an attacker
+  control.** A genuine spike — dreamport gets posted somewhere, 90+ people
+  try to sign in the same UTC day — hits the cap and every further sign-in
+  429s until 00:00 UTC. Pre-launch (one user) that is remote; the cap is an
+  env var precisely so it can be raised ahead of a known spike or a plan
+  upgrade. It fails _closed_: the shared quota being exhausted would lock
+  everyone out too, and also cost money / bounce silently.
+- **Residual**: an attacker still burns the whole day's quota (90 sends)
+  cheaply once per day — griefing the sign-in path for everyone until
+  midnight, for the price of 90 Turnstile solves. #38 (live-email cutover)
+  should decide whether that is acceptable or whether it wants alerting /
+  a lower cap / a paid Resend tier with room to raise it.
 - Turning the limiter on globally would have pulled Better Auth's default
   `3 / 10s` `/sign-in*` rule onto the verify endpoint as a side effect.
   `customRules["/sign-in/email-otp"]: false` opts that path out, so verify
@@ -73,15 +99,18 @@ also prunes rows whose window has elapsed, since — unlike Better Auth's
   hits the `3 / 60s` send-path limit after three sign-ins in a minute, and
   the Playwright suite shares one budget across specs (a genuine failure plus
   CI retries can produce secondary 429s). `index.worker.test.ts` and
-  `rate-limit.worker.test.ts` clear both tables in `beforeEach` so their
+  `rate-limit.worker.test.ts` clear all three tables in `beforeEach` so their
   multi-send cases start from a full budget.
 - `scripts/verify-deployment.sh`'s live smoke test now treats a `429` from
   the send endpoint as healthy (gate + limiter both live), since re-running
-  it on staging can trip the limit for its fixed test address.
+  it on staging can trip the per-email or daily limit.
 - Migration `0002` must reach staging and production with this deploy — the
-  send path reads both tables on every request once the code is live (see
-  `docs/deployment.md`).
-- The 429 from the owned limiter carries `Retry-After` and an `{ error }`
-  body, matching this route's other responses. Better Auth's own 429 uses
-  `X-Retry-After` and a `{ message }` body; a client sees a 429 from either
-  and should back off regardless.
+  send path reads all three tables on every request once the code is live
+  (see `docs/deployment.md`). `0002` had not been applied anywhere when the
+  `otpSendDaily` table was added to it, so it was edited in place; a local
+  D1 that already ran the two-table version needs its `d1_migrations` row for
+  `0002` cleared and the migration re-applied.
+- The 429s carry `Retry-After` and an `{ error }` body, matching this route's
+  other responses. Better Auth's own 429 uses `X-Retry-After` and a
+  `{ message }` body; a client sees a 429 from any of the three and should
+  back off regardless.

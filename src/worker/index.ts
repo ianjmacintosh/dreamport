@@ -3,7 +3,13 @@ import { Hono } from "hono";
 import { createAuth } from "./auth";
 import { getMockSender } from "./email/sender";
 import type { WorkerEnv } from "./env";
-import { peekOtpSendBudget, recordOtpSend } from "./otp-send-throttle";
+import {
+  peekDailySendCap,
+  peekOtpSendBudget,
+  recordDailySend,
+  recordOtpSend,
+  resolveDailyCap,
+} from "./otp-send-throttle";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
 /**
@@ -58,11 +64,12 @@ export function createApp(deps: AppDeps = {}) {
    * and `hostname` are checked too; elsewhere (test keys on floating hosts)
    * only `success` is.
    *
-   * Once the token passes, two rate-limit dimensions guard availability on
-   * this path (issue #24, ADR-0007): the per-IP limit is Better Auth's own
-   * DB-backed limiter (configured in `auth.ts`), and the per-email limit is
-   * the `peek`/`record` pair below, since that limiter never sees the body.
-   * Neither closes ADR-0005's verify-path griefing vector — that is
+   * Once the token passes, three rate limits guard availability on this path
+   * (issue #24, ADR-0007): the per-IP limit is Better Auth's own DB-backed
+   * limiter (configured in `auth.ts`); the per-email limit and the global
+   * daily send cap (the guard for the shared Resend quota) are the
+   * `peek`/`record` pairs below, since that limiter never sees the body.
+   * None of them closes ADR-0005's verify-path griefing vector — that is
    * issue #46.
    */
   app.post("/api/auth/email-otp/send-verification-otp", async (c) => {
@@ -94,6 +101,20 @@ export function createApp(deps: AppDeps = {}) {
       );
     }
 
+    const tooManyRequests = (retryAfter: number) =>
+      c.json({ error: "Too many requests. Please try again later." }, 429, {
+        "Retry-After": String(retryAfter),
+      });
+
+    // Global daily cap first — the cheapest check, and the one protecting the
+    // shared Resend quota that neither the per-IP nor the per-email limit
+    // covers.
+    const daily = await peekDailySendCap(
+      c.env.DB,
+      resolveDailyCap(c.env.SEND_OTP_DAILY_CAP),
+    );
+    if (!daily.allowed) return tooManyRequests(daily.retryAfter);
+
     // Per-email throttle (issue #24). Read the address from a *clone* of the
     // request so the original body stream stays intact for Better Auth's
     // handler. Normalise it the way Better Auth does (trim + lowercase) so
@@ -111,24 +132,19 @@ export function createApp(deps: AppDeps = {}) {
 
     if (email) {
       const budget = await peekOtpSendBudget(c.env.DB, email);
-      if (!budget.allowed) {
-        return c.json(
-          { error: "Too many requests. Please try again later." },
-          429,
-          { "Retry-After": String(budget.retryAfter) },
-        );
-      }
+      if (!budget.allowed) return tooManyRequests(budget.retryAfter);
     }
 
     const res = await createAuth(c.env).handler(c.req.raw);
 
-    // Spend the per-email budget only for a send that actually issued a code.
-    // A request rejected downstream — Better Auth's per-IP limiter (429), a
-    // malformed body (400), a transient 5xx — must not count against the
-    // address, or a shared NAT could lock a real user out of the email
-    // dimension without ever receiving a code.
-    if (email && res.status === 200) {
-      await recordOtpSend(c.env.DB, email);
+    // Count a send only once a code actually went out. A request rejected
+    // downstream — Better Auth's per-IP limiter (429), a malformed body
+    // (400), a transient 5xx — must not spend the daily quota or the
+    // address's budget (a shared NAT could otherwise lock a real user out of
+    // the email dimension without ever receiving a code).
+    if (res.status === 200) {
+      await recordDailySend(c.env.DB);
+      if (email) await recordOtpSend(c.env.DB, email);
     }
 
     return res;

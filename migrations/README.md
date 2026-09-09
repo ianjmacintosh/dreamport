@@ -17,9 +17,9 @@ own: it stores codes in the existing `verification` table.
 `0002_send_otp_rate_limiting.sql` adds the send-OTP rate limiting (issue #24,
 [ADR-0007](../docs/adr/0007-send-otp-rate-limiting.md)): Better Auth's own
 `rateLimit` table (the shape its generator emits for `rateLimit.storage:
-"database"` — treat it as frozen like `0001`), and `otpSendThrottle`, a small
-dreamport-owned table for the per-email dimension Better Auth's limiter can't
-see.
+"database"` — treat it as frozen like `0001`), plus two small dreamport-owned
+tables — `otpSendThrottle` (per-email limit) and `otpSendDaily` (global
+per-UTC-day send cap) — for the dimensions Better Auth's limiter can't see.
 
 ## Conventions
 

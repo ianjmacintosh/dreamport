@@ -153,12 +153,14 @@ function countUsers(email: string) {
 beforeEach(async () => {
   getMockSender().clear();
   // Since #24 the send-OTP path is rate limited (per-IP via Better Auth's
-  // `rateLimit` table, per-email via `otpSendThrottle`). Storage is isolated
-  // per test file but not per `it`, and several cases here send a handful of
-  // codes; clearing both tables keeps each `it` starting from a full budget.
-  // The limiter itself is covered in `rate-limit.worker.test.ts`.
+  // `rateLimit` table, per-email via `otpSendThrottle`, a global daily cap
+  // via `otpSendDaily`). Storage is isolated per test file but not per `it`,
+  // and several cases here send a handful of codes; clearing all three keeps
+  // each `it` starting from a full budget. The limits themselves are covered
+  // in `rate-limit.worker.test.ts`.
   await env.DB.prepare('DELETE FROM "rateLimit"').run();
   await env.DB.prepare('DELETE FROM "otpSendThrottle"').run();
+  await env.DB.prepare('DELETE FROM "otpSendDaily"').run();
 });
 
 describe("non-/api paths", () => {

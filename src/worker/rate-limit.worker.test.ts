@@ -1,12 +1,16 @@
 import { env } from "cloudflare:workers";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { TEST_EMAILS } from "../../test/emails";
 import { getMockSender } from "./email/sender";
 import { createApp } from "./index";
 import {
+  DEFAULT_DAILY_CAP,
+  peekDailySendCap,
   peekOtpSendBudget,
+  recordDailySend,
   recordOtpSend,
+  resolveDailyCap,
   WINDOW_MS,
 } from "./otp-send-throttle";
 import type { TurnstileVerifier } from "./turnstile";
@@ -15,20 +19,22 @@ import type { TurnstileVerifier } from "./turnstile";
  * Seam 1 — rate limiting on the send-OTP path (issue #24).
  *
  * Its own `*.worker.test.ts` file, kept apart from `index.worker.test.ts`:
- * the limiter accumulates rows in D1 (`rateLimit`, `otpSendThrottle`) and each
- * test file gets its own isolated storage, so the counts built up here can't
- * perturb the assertions there. The `beforeEach` clears both tables so each
- * `it` starts from an empty budget (storage is isolated per file, not per
- * `it`).
+ * the limits accumulate rows in D1 (`rateLimit`, `otpSendThrottle`,
+ * `otpSendDaily`) and each test file gets its own isolated storage, so the
+ * counts built up here can't perturb the assertions there. The `beforeEach`
+ * clears all three tables so each `it` starts from an empty budget (storage
+ * is isolated per file, not per `it`).
  *
  * Turnstile is stubbed to always pass; the gate itself is covered in
  * `index.worker.test.ts` and `turnstile.test.ts`.
  *
- * Two dimensions, two mechanisms (see `docs/adr/0007-send-otp-rate-limiting.md`):
- *   - per client IP  — Better Auth's own DB-backed limiter, keyed on
+ * Three limits (see `docs/adr/0007-send-otp-rate-limiting.md`):
+ *   - per client IP    — Better Auth's own DB-backed limiter, keyed on
  *     `cf-connecting-ip` + path, tightened to 3 / 60s on the send path.
  *   - per target email — dreamport code in the Hono send route, 5 / 10min,
  *     because Better Auth's limiter never sees the request body.
+ *   - global daily cap — one app-wide count per UTC day, the guard for the
+ *     shared Resend quota; `SEND_OTP_DAILY_CAP`, default 90.
  */
 
 const ORIGIN = "https://dreamport.test";
@@ -90,10 +96,17 @@ const FILLERS = [
   TEST_EMAILS.rlFillerD,
 ];
 
+const originalDailyCap = env.SEND_OTP_DAILY_CAP;
+
 beforeEach(async () => {
   getMockSender().clear();
   await env.DB.prepare('DELETE FROM "rateLimit"').run();
   await env.DB.prepare('DELETE FROM "otpSendThrottle"').run();
+  await env.DB.prepare('DELETE FROM "otpSendDaily"').run();
+});
+
+afterEach(() => {
+  env.SEND_OTP_DAILY_CAP = originalDailyCap;
 });
 
 describe("per-IP limit on the send-OTP path", () => {
@@ -225,6 +238,74 @@ describe("per-email fixed window (peek / record)", () => {
     for (let i = 0; i < 20; i++) {
       expect((await peekOtpSendBudget(env.DB, email, now)).allowed).toBe(true);
     }
+  });
+});
+
+describe("global daily send cap (the Resend-quota guard)", () => {
+  it("429s once the app-wide daily count reaches the cap, regardless of IP or email", async () => {
+    env.SEND_OTP_DAILY_CAP = "3";
+
+    // Three sends, each a fresh email from a fresh IP — so neither the per-IP
+    // (3 / 60s) nor the per-email (5 / 10min) limit can be the cause.
+    for (let i = 0; i < 3; i++) {
+      expect(
+        (await send(FILLERS[i], { ip: `203.0.113.${10 + i}` })).status,
+      ).toBe(200);
+    }
+
+    // Fourth: still a fresh email and IP, but the day's budget is spent.
+    const blocked = await send(FILLERS[3], { ip: "203.0.113.20" });
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.has("retry-after")).toBe(true);
+  });
+
+  it("does not count a send the per-IP limiter rejected against the daily cap", async () => {
+    env.SEND_OTP_DAILY_CAP = "5";
+    const ip = "203.0.113.90";
+
+    // Spend this IP's per-IP bucket (3), then hammer it — the extra attempts
+    // 429 before a code is sent.
+    for (const filler of FILLERS.slice(0, 3)) {
+      expect((await send(filler, { ip })).status).toBe(200);
+    }
+    for (let i = 0; i < 10; i++) {
+      expect((await send(TEST_EMAILS.rlPerEmail, { ip })).status).toBe(429);
+    }
+
+    // Daily count is at 3, not 13: two more fresh-IP sends still pass, the
+    // third trips the cap.
+    expect((await send(FILLERS[3], { ip: "198.51.100.1" })).status).toBe(200);
+    expect(
+      (await send(TEST_EMAILS.rlHappyPath, { ip: "198.51.100.2" })).status,
+    ).toBe(200);
+    expect(
+      (await send(TEST_EMAILS.rlNormalise, { ip: "198.51.100.3" })).status,
+    ).toBe(429);
+  });
+
+  it("rolls over at UTC midnight (peek / record, injected clock)", async () => {
+    const cap = 2;
+    const dayA = Date.UTC(2026, 8, 9, 12, 0, 0); // 2026-09-09 12:00 UTC
+    const dayB = Date.UTC(2026, 8, 10, 0, 0, 0); // 2026-09-10 00:00 UTC
+
+    await recordDailySend(env.DB, dayA);
+    await recordDailySend(env.DB, dayA);
+    const spent = await peekDailySendCap(env.DB, cap, dayA + 1000);
+    expect(spent.allowed).toBe(false);
+    expect(spent.retryAfter).toBeGreaterThan(0);
+
+    // New UTC day → fresh budget.
+    expect((await peekDailySendCap(env.DB, cap, dayB)).allowed).toBe(true);
+  });
+
+  it("resolveDailyCap falls back to the default for anything not a positive integer", () => {
+    expect(resolveDailyCap(undefined)).toBe(DEFAULT_DAILY_CAP);
+    expect(resolveDailyCap("")).toBe(DEFAULT_DAILY_CAP);
+    expect(resolveDailyCap("abc")).toBe(DEFAULT_DAILY_CAP);
+    expect(resolveDailyCap("0")).toBe(DEFAULT_DAILY_CAP);
+    expect(resolveDailyCap("-5")).toBe(DEFAULT_DAILY_CAP);
+    expect(resolveDailyCap("12.5")).toBe(DEFAULT_DAILY_CAP);
+    expect(resolveDailyCap("150")).toBe(150);
   });
 });
 

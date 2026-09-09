@@ -235,10 +235,13 @@ Migration files live in [`migrations/`](../migrations/) as numbered
 `0001_better_auth_core_schema.sql` is Better Auth's core schema, generated once
 for the pinned `better-auth` version and frozen; schema changes on an upgrade
 land as a new numbered migration (see [`migrations/README.md`](../migrations/README.md)).
-`0002_send_otp_rate_limiting.sql` adds the `rateLimit` and `otpSendThrottle`
-tables and **must be applied to staging and production with the issue #24
-deploy** — the send-OTP path reads them on every request once that code is
-live.
+`0002_send_otp_rate_limiting.sql` adds the `rateLimit`, `otpSendThrottle`, and
+`otpSendDaily` tables and **must be applied to staging and production with the
+issue #24 deploy** — the send-OTP path reads them on every request once that
+code is live. That deploy also picks up the optional `SEND_OTP_DAILY_CAP` var
+(see [ADR-0007](adr/0007-send-otp-rate-limiting.md)); unset it defaults to 90
+sends/UTC-day app-wide, sized for Resend's free tier — raise it in
+`wrangler.jsonc` per environment when the plan grows.
 
 Apply them per environment:
 
