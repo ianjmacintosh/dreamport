@@ -219,6 +219,31 @@ the verifier and `src/worker/turnstile.test.ts` stubs `fetch`. The Playwright
 suite runs against a local worker with the test pair injected, never a
 deployed environment.
 
+## Observability (Workers Logs)
+
+Configured in `wrangler.jsonc`, not the dashboard — a value toggled in the
+dashboard is reverted on the next `wrangler deploy` / `wrangler versions
+upload` (that's the "settings are consistent across deployments" nag), the
+same reason runtime vars live in `wrangler.jsonc` (see [Build
+step](#build-step)).
+
+| Environment               | Workers Logs                    | Where                                                       |
+| ------------------------- | ------------------------------- | ----------------------------------------------------------- |
+| Production (`production`) | **off**                         | inherits the top-level `observability: { enabled: false }`  |
+| Staging (`staging`)       | **on**, `head_sampling_rate: 1` | `env.staging.observability` overrides the top-level default |
+| dev / local               | off                             | inherits the top-level default (local is Miniflare — moot)  |
+
+Staging is the observable environment: its long-lived host runs at 100%
+traffic, so `wrangler tail` and the dashboard Logs view work there —
+preview URLs can't be tailed (see [Staging](#staging)). `head_sampling_rate:
+1` keeps every request; staging traffic is low.
+
+Production stays off deliberately. Turning it on is coupled to log **access
+/ egress / retention** hardening — who can read them, Logpush destinations,
+retention window — tracked in
+[#42](https://github.com/ianjmacintosh/dreamport/issues/42). (Sign-in codes
+themselves are no longer logged — [#41](https://github.com/ianjmacintosh/dreamport/issues/41).)
+
 ## Deploying
 
 Environment is set at **build** time, not deploy time.
