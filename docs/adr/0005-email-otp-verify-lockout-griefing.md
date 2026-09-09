@@ -66,3 +66,35 @@ ADR) and note it on the PR.
   Turnstile on send is the practical ceiling short of forking the plugin.
 - If a future `better-auth` bump changes the exhausted-attempts behaviour
   (cooldown instead of delete), this ADR can be retired.
+
+## Revisited for #38 (live email cutover)
+
+Issue [#38](https://github.com/ianjmacintosh/dreamport/issues/38) turned on
+real Resend delivery for production (`EMAIL_MODE=resend` on
+`dreamport.ianjmacintosh.com`). #38's acceptance criteria require this ADR be
+resolved at cutover rather than carried forward on the "no real email yet"
+justification, which no longer holds.
+
+**Decision: re-accept the residual risk, unchanged in kind, for real users.**
+The per-identifier verify cooldown is tracked as its own ticket
+([#46](https://github.com/ianjmacintosh/dreamport/issues/46)) and is **not** a
+blocker for the cutover.
+
+Blast radius, restated for a live user base:
+
+- **Impact:** denial of login, not account takeover. The attacker never
+  authenticates and gains no access to the victim's account or data.
+- **Precondition:** the attacker must know the victim's exact sign-in address.
+- **Cost to sustain:** 3 HTTP requests per code cycle, indefinitely, per
+  targeted address. #24's send-path rate limiting (ADR-0007) and Turnstile on
+  send (#23) raise the cost of the _send_ side but, as ADR-0007 notes, do not
+  close this verify-path vector.
+- **Recovery:** immediate and automatic once the attacker stops — the victim
+  requests a fresh code and signs in normally. No operator action, no data
+  cleanup, no lingering lockout.
+- **Scope:** one address at a time. There is no amplification to other users
+  or an account-wide effect.
+
+This is a deliberate call to get production sign-in live now. #46 remains the
+fix; when it lands, this ADR moves from "accepted" to "resolved by #46" and
+ADR-0007's "does not fix ADR-0005" note is revisited alongside it.

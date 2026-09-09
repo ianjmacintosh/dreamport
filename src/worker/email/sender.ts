@@ -36,9 +36,16 @@ export interface EmailSenderEnv {
   EMAIL_MODE?: "mock" | "resend";
   /** Required when `EMAIL_MODE=resend`. */
   RESEND_API_KEY?: string;
-  /** `From:` address, required when `EMAIL_MODE=resend`. */
-  EMAIL_FROM?: string;
 }
+
+/**
+ * `From:` address on every Resend send. A fixed property of the one email we
+ * send — same category as {@link subjectFor} and {@link bodyFor} — not an env
+ * var: production is the only environment that sends real mail, and this
+ * address (a verified Resend sender on `dreamport.ianjmacintosh.com`) is not
+ * expected to change. If it ever does, it changes here, in a reviewed commit.
+ */
+export const EMAIL_FROM = "noreply@dreamport.ianjmacintosh.com";
 
 /**
  * No-network sender: keeps a short tail of recent sends in
@@ -76,8 +83,9 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 /**
  * Sends through the Resend HTTP API. Constructed only when `EMAIL_MODE=resend`
- * and both `RESEND_API_KEY` and `EMAIL_FROM` are present — the factory throws
- * otherwise, so this class can assume both are set.
+ * and `RESEND_API_KEY` is present — the factory throws otherwise. `from` is
+ * a constructor arg so tests can pass their own; production wiring passes
+ * {@link EMAIL_FROM}.
  */
 export class ResendEmailSender implements EmailSender {
   #apiKey: string;
@@ -139,9 +147,9 @@ export function getMockSender(): MockEmailSender {
  * Choose an {@link EmailSender} from the environment.
  *
  * - `EMAIL_MODE` unset or `mock` → the shared {@link MockEmailSender}.
- * - `EMAIL_MODE=resend` → {@link ResendEmailSender}, but only if both
- *   `RESEND_API_KEY` and `EMAIL_FROM` are set; a missing one throws here
- *   rather than silently falling back to mock.
+ * - `EMAIL_MODE=resend` → {@link ResendEmailSender} sending from
+ *   {@link EMAIL_FROM}, but only if `RESEND_API_KEY` is set; a missing key
+ *   throws here rather than silently falling back to mock.
  */
 export function createEmailSender(env: EmailSenderEnv): EmailSender {
   const mode = env.EMAIL_MODE ?? "mock";
@@ -151,14 +159,12 @@ export function createEmailSender(env: EmailSenderEnv): EmailSender {
   }
 
   if (mode === "resend") {
-    if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
-      throw new Error(
-        "EMAIL_MODE=resend requires RESEND_API_KEY and EMAIL_FROM to be set.",
-      );
+    if (!env.RESEND_API_KEY) {
+      throw new Error("EMAIL_MODE=resend requires RESEND_API_KEY to be set.");
     }
     return new ResendEmailSender({
       apiKey: env.RESEND_API_KEY,
-      from: env.EMAIL_FROM,
+      from: EMAIL_FROM,
     });
   }
 

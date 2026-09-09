@@ -22,6 +22,11 @@
     "EMAIL_MODE": "mock",
   },
 
+  // EMAIL_MODE: production is the only env that runs `resend` (see
+  // env.production.vars below). staging, dev, local, and every branch
+  // preview stay on `mock` permanently and by decision — turning `resend`
+  // on for any of them is a recorded choice, not a default (issue #38).
+
   // production/staging: two separate Cloudflare Workers Builds projects
   // ("dreamport" and "dreamport-staging"), both Git-connected to this repo,
   // differing by Worker name, D1 database, and (per-project dashboard
@@ -37,7 +42,15 @@
       // has no reason to be publicly reachable.
       "workers_dev": false,
       "vars": {
-        "EMAIL_MODE": "mock",
+        // Live Resend delivery (issue #38). Also needs the RESEND_API_KEY
+        // secret on the `dreamport` Workers Builds project (`wrangler secret
+        // put RESEND_API_KEY --env production`); createEmailSender throws on
+        // the first request without it. The From address is not config — it
+        // is the EMAIL_FROM constant in src/worker/email/sender.ts. Rollback
+        // to "mock" is this one line, but see docs/deployment.md "Production
+        // refuses mock email" — on this host it does not restore a working
+        // login.
+        "EMAIL_MODE": "resend",
         // Turnstile tokens for production must be solved on this host, and
         // carry the `send-otp` action (see src/worker/turnstile.ts). Not a
         // secret. Staging/local omit this and run on Cloudflare test keys.

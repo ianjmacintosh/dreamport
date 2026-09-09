@@ -1,23 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { TEST_EMAILS, TEST_FROM } from "../../../test/emails";
-import { ResendEmailSender } from "./sender";
+import { TEST_EMAILS } from "../../../test/emails";
+import { EMAIL_FROM, ResendEmailSender } from "./sender";
 
 /**
  * Manual, opt-in check that a real Resend send works end to end. Never gates
  * CI: with no `RESEND_API_KEY` in the environment the cases are skipped, so a
  * normal run just reports them pending.
  *
- * To run it for real:
+ * To run it for real, with a key whose Resend account has verified the
+ * {@link EMAIL_FROM} domain:
  *
  *   RESEND_API_KEY=re_... npx vitest run src/worker/email/sender.live.test.ts
  *
  * Sends to `delivered@resend.dev` — Resend's sink that always accepts and
- * never forwards — from `onboarding@resend.dev` (their shared test sender, no
- * domain verification needed).
+ * never forwards — from {@link EMAIL_FROM}, the real production sender, so a
+ * green run confirms the key, the verified domain, and DKIM all work.
  */
 const apiKey = process.env.RESEND_API_KEY;
-const from = process.env.EMAIL_FROM ?? TEST_FROM;
+const from = EMAIL_FROM;
 
 describe("ResendEmailSender (live)", () => {
   it.skipIf(!apiKey)(

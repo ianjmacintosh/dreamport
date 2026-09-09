@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TEST_EMAILS, TEST_FROM } from "../../../test/emails";
 import {
   createEmailSender,
+  EMAIL_FROM,
   getMockSender,
   MockEmailSender,
   ResendEmailSender,
@@ -74,7 +75,7 @@ describe("ResendEmailSender", () => {
 
     await new ResendEmailSender({
       apiKey: "re_test_key",
-      from: "noreply@mail.dreamport.ianjmacintosh.com",
+      from: TEST_FROM,
     }).sendOtp(signIn);
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -87,7 +88,7 @@ describe("ResendEmailSender", () => {
     expect(headers["Content-Type"]).toBe("application/json");
 
     const body = JSON.parse(init.body as string) as Record<string, string>;
-    expect(body.from).toBe("noreply@mail.dreamport.ianjmacintosh.com");
+    expect(body.from).toBe(TEST_FROM);
     expect(body.to).toBe(TEST_EMAILS.recruit);
     expect(body.subject).toMatch(/sign-in code/i);
     expect(body.text).toContain("418302");
@@ -116,31 +117,39 @@ describe("createEmailSender", () => {
     expect(createEmailSender({ EMAIL_MODE: "mock" })).toBe(getMockSender());
   });
 
-  it("returns a Resend sender when EMAIL_MODE=resend and both vars are set", () => {
+  it("returns a Resend sender when EMAIL_MODE=resend and RESEND_API_KEY is set", () => {
     const sender = createEmailSender({
       EMAIL_MODE: "resend",
       RESEND_API_KEY: "re_test_key",
-      EMAIL_FROM: "noreply@mail.dreamport.ianjmacintosh.com",
     });
 
     expect(sender).toBeInstanceOf(ResendEmailSender);
+  });
+
+  it("wires the Resend sender to send from EMAIL_FROM", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "re_123" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await createEmailSender({
+      EMAIL_MODE: "resend",
+      RESEND_API_KEY: "re_test_key",
+    }).sendOtp(signIn);
+
+    const body = JSON.parse(
+      (fetchSpy.mock.calls[0]![1] as RequestInit).body as string,
+    ) as Record<string, string>;
+    expect(body.from).toBe(EMAIL_FROM);
   });
 
   it("throws when EMAIL_MODE=resend but RESEND_API_KEY is missing", () => {
     expect(() =>
       createEmailSender({
         EMAIL_MODE: "resend",
-        EMAIL_FROM: TEST_FROM,
       }),
-    ).toThrow(/RESEND_API_KEY and EMAIL_FROM/);
-  });
-
-  it("throws when EMAIL_MODE=resend but EMAIL_FROM is missing", () => {
-    expect(() =>
-      createEmailSender({
-        EMAIL_MODE: "resend",
-        RESEND_API_KEY: "re_test_key",
-      }),
-    ).toThrow(/RESEND_API_KEY and EMAIL_FROM/);
+    ).toThrow(/RESEND_API_KEY/);
   });
 });
