@@ -49,6 +49,36 @@ day's count reaches `SEND_OTP_DAILY_CAP` (`resolveDailyCap`, default
 headroom for the check-then-write overshoot. Raise it per environment as a
 plain `wrangler.jsonc` var when the plan grows.
 
+## Evolving the global cap
+
+The daily period is fitted to the current constraint (the free tier's
+**100/day** is a hard daily limit). Only the cap is tier-specific, and it is
+built to move: its **value** is an env var (`SEND_OTP_DAILY_CAP`, no deploy to
+change), and its **period** lives in two isolated helpers in
+`otp-send-throttle.ts` — `utcDay(now)` (which bucket) and
+`secondsToNextUtcMidnight(now)` (when it resets). The `otpSendDaily` schema is
+`("day" text primary key, "count" integer)` — nothing about "day" is in the
+schema; the key is just a string that happens to be a date. The rest of the
+module (peek/record split, record-only-on-`200`, prune) is period-agnostic.
+
+**To a monthly cap** (e.g. a plan with no daily limit and 50k/month): swap
+`utcDay` for `slice(0, 7)` (`"2026-09"`) and `secondsToNextUtcMidnight` for
+"seconds to the 1st of next month UTC"; rename the table (`ALTER TABLE …
+RENAME TO …`, or a new table + drop the old — the counter is throwaway
+operational state, so losing it just resets the current period) and the env
+var; set the default with headroom under the ceiling. One file, one
+migration, a couple of test tweaks.
+
+**Caveat**: a fixed calendar-month bucket lets an attacker spend the whole
+budget on the 31st and again on the 1st. If that matters, keep the monthly
+bucket **and** add a loose daily one (say 5k/day) so no single day drains the
+month — a second key in the same table and a second `peek` call in the route.
+The structure already supports it; that is why the counter table is a bare
+`(key, count)`.
+
+Trigger to revisit: a Resend plan change, or #38 (live-email cutover) deciding
+the residual below is unacceptable.
+
 ## Considered Options
 
 - **Reuse Better Auth's `rateLimit` table for the owned counters too**,
@@ -60,8 +90,9 @@ plain `wrangler.jsonc` var when the plan grows.
   (the quota is 100/day; one IP at 3/60s is 4,320/day) would break real use,
   and per-email does nothing against a spray across many addresses. Only an
   app-wide count works.
-- **A monthly cap as well as daily.** Unnecessary — a 90/day cap already
-  bounds the month at ≤ 2790, under Resend's 3000.
+- **A monthly cap as well as daily.** Unnecessary for the free tier — a
+  90/day cap already bounds the month at ≤ 2790, under Resend's 3000. If a
+  future plan drops the daily limit, see _Evolving the global cap_ above.
 - **`customRules` function form** — a `(request, rule) => ...` callback can
   inspect the request, but it can only return a `{ window, max }`; it cannot
   change the key Better Auth limits on, so it still buckets per IP.
