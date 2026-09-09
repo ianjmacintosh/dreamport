@@ -81,7 +81,13 @@
         "head_sampling_rate": 1,
       },
       "vars": {
-        "EMAIL_MODE": "mock",
+        // TEMP — #38 staging dry-run. Reverted to "mock" before PR #52
+        // merges (staging stays mock permanently; the prod-only decision is
+        // recorded above EMAIL_MODE at the top of this file). This flip lets
+        // dreamport-staging build a preview that exercises the real Resend
+        // path before the production cutover. Needs RESEND_API_KEY set on the
+        // dreamport-staging Worker (dashboard, encrypted secret).
+        "EMAIL_MODE": "resend",
         // Cloudflare's always-pass Turnstile test secret. Not a real secret,
         // and staging can't use the real widget (scoped to ianjmacintosh.com,
         // not workers.dev — see docs/deployment.md), so it lives here rather
