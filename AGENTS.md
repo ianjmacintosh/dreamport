@@ -95,3 +95,21 @@ it now, or after the current task is verified.
 
 Example: "That's coming from `createAuth()` in `src/worker/auth.ts` —
 expected, since `baseURL` isn't set. Fix now, or after we verify the flow?"
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as GitHub issues in `ianjmacintosh/dreamport` (via the
+`gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles, each label string equal to its name
+(`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`,
+`wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See
+`docs/agents/domain.md`.
