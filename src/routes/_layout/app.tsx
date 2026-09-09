@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_layout/app")({
-  loader: async () => {
+  beforeLoad: async () => {
     const res = await fetch("/api/me").catch(() => null);
 
     // Client-side route guard — a UX affordance only. `/api/me` verifies the
@@ -9,6 +9,9 @@ export const Route = createFileRoute("/_layout/app")({
     // security boundary. Anything short of a clean 200 (no session, offline,
     // a transient error) bounces to `/login` rather than a dead-end error
     // screen; a proper retry/error state is deferred to #28.
+    //
+    // TanStack Router's authenticated-routes guide runs the check here in
+    // `beforeLoad` and threads the result through route `context`.
     if (!res || !res.ok) {
       throw redirect({ to: "/login" });
     }
@@ -21,6 +24,6 @@ export const Route = createFileRoute("/_layout/app")({
 
 /** The first authenticated page: it says who you are and nothing else. */
 function App() {
-  const { email } = Route.useLoaderData();
+  const { email } = Route.useRouteContext();
   return <p>signed in as {email}</p>;
 }

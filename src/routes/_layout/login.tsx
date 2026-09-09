@@ -5,6 +5,7 @@ import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import Button from "../../components/Button";
 import Link from "../../components/Link";
 import TextInput from "../../components/TextInput";
+import { authClient } from "../../utils/auth-client";
 
 export const Route = createFileRoute("/_layout/login")({
   component: Login,
@@ -28,40 +29,26 @@ if (!TURNSTILE_SITE_KEY) {
   );
 }
 
-const NETWORK_ERROR =
-  "Something went wrong. Check your connection and try again.";
 const TURNSTILE_INCOMPLETE = "Complete the challenge, then try again.";
 const TURNSTILE_UNAVAILABLE =
   "The challenge didn't load. Reload the page and try again.";
 const SIGNIN_UNAVAILABLE =
   "Sign-in is temporarily unavailable. Try again in a few minutes.";
-
-/** POST JSON, returning `null` if the request never reached the server. */
-async function postJson(
-  path: string,
-  body: unknown,
-  headers: Record<string, string> = {},
-): Promise<Response | null> {
-  try {
-    return await fetch(path, {
-      method: "POST",
-      headers: { "content-type": "application/json", ...headers },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    return null;
-  }
-}
+const SEND_FAILED = "We couldn't send a code. Check the address and try again.";
+const VERIFY_FAILED = "That code didn't work. Request a new one and try again.";
+const CONNECTION_FAILED =
+  "Something went wrong. Check your connection and try again.";
 
 /**
  * Passwordless sign-in: collect an email, send a one-time code to it, collect
  * the code, and on success let the browser follow the freshly-set session
  * cookie to `/app`.
  *
- * Talks straight to the Better Auth `emailOTP` endpoints under `/api/auth/*`.
- * The send-OTP call is gated by a Cloudflare Turnstile challenge (`@marsidev/
- * react-turnstile`): the widget token rides in the `x-turnstile-token` header
- * and the Worker verifies it server-side before any code is issued (#23).
+ * Both calls go through the Better Auth browser client (`authClient`), which
+ * returns a uniform `{ data, error }` result. The send-OTP call is gated by a
+ * Cloudflare Turnstile challenge (`@marsidev/react-turnstile`): the widget
+ * token rides in the `x-turnstile-token` header and the Worker verifies it
+ * server-side before any code is issued (#23).
  * Turnstile tokens are single-use, so the widget lives only on the email step
  * and is re-armed after a send that actually consumed the token (a 503 from
  * the gate hasn't — it rejects before verifying); "Request a new code"
@@ -101,31 +88,31 @@ function Login() {
     }
     sendingRef.current = true;
     try {
-      const res = await postJson(
-        "/api/auth/email-otp/send-verification-otp",
+      const { error } = await authClient.emailOtp.sendVerificationOtp(
         { email, type: "sign-in" },
-        { "x-turnstile-token": turnstileToken },
+        { headers: { "x-turnstile-token": turnstileToken } },
       );
 
-      if (!res) {
-        setError(NETWORK_ERROR);
-        rearmTurnstile();
-        return;
-      }
-      if (res.ok) {
+      if (!error) {
         setCode("");
         setStep("code"); // the widget unmounts with the email step
         return;
       }
-      if (res.status === 503) {
+      if (error.status === 503) {
         // The gate rejected before verifying, so the token is still good —
         // keep it and let the user retry once the backend is back.
         setError(SIGNIN_UNAVAILABLE);
         return;
       }
-      // Verification ran: the token is spent. Re-arm for a retry.
+      // Verification ran, or the token was rejected outright: it is spent.
       rearmTurnstile();
-      setError("We couldn't send a code. Check the address and try again.");
+      setError(SEND_FAILED);
+    } catch {
+      // The client throws only when the request never reached the server, so
+      // the token wasn't spent — but re-arm anyway for a clean fresh attempt,
+      // and blame the connection rather than the address.
+      rearmTurnstile();
+      setError(CONNECTION_FAILED);
     } finally {
       sendingRef.current = false;
     }
@@ -133,19 +120,18 @@ function Login() {
 
   async function verifyCode() {
     setError("");
-    const res = await postJson("/api/auth/sign-in/email-otp", {
-      email,
-      otp: code,
-    });
-    if (!res) {
-      setError(NETWORK_ERROR);
-      return;
+    try {
+      const { error } = await authClient.signIn.emailOtp({ email, otp: code });
+      if (error) {
+        setError(VERIFY_FAILED);
+        return;
+      }
+      navigate({ to: "/app" });
+    } catch {
+      // Thrown only when the request never reached the server — the code may
+      // still be good, so point at the connection, not the code.
+      setError(CONNECTION_FAILED);
     }
-    if (!res.ok) {
-      setError("That code didn't work. Request a new one and try again.");
-      return;
-    }
-    navigate({ to: "/app" });
   }
 
   return (
