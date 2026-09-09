@@ -4,6 +4,11 @@
   "compatibility_date": "2026-02-05",
   // nodejs_compat: Better Auth uses AsyncLocalStorage (ADR-0002).
   "compatibility_flags": ["nodejs_compat"],
+  // Workers Logs. Off by default; production log access / egress / retention
+  // is deferred to issue #42. staging overrides this to `enabled: true`
+  // below. wrangler.jsonc is the source of truth — a dashboard toggle is
+  // reverted on the next deploy (that's the "settings are consistent" nag).
+  "observability": { "enabled": false },
   // Gateway Worker: owns /api/*, forwards everything else to env.ASSETS unchanged.
   "main": "./src/worker/index.ts",
   "assets": {
@@ -12,7 +17,7 @@
     // true, not ["/api/*"], so all routing lives in the Worker and stays testable.
     "run_worker_first": true,
   },
-  // main/assets/compatibility_flags inherit into every env below; vars and bindings don't.
+  // main/assets/compatibility_flags/observability inherit into every env below; vars and bindings don't.
   "vars": {
     "EMAIL_MODE": "mock",
   },
@@ -53,6 +58,15 @@
       // TRUSTED_ORIGINS and docs/deployment.md).
       "workers_dev": true,
       "preview_urls": true,
+      // Workers Logs on: staging is the observable environment (its
+      // long-lived host runs at 100% traffic, so `wrangler tail` and the
+      // dashboard work — preview URLs can't be tailed). Overrides the
+      // top-level `enabled: false`. head_sampling_rate 1 = keep every
+      // request; staging traffic is low.
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+      },
       "vars": {
         "EMAIL_MODE": "mock",
         // Cloudflare's always-pass Turnstile test secret. Not a real secret,

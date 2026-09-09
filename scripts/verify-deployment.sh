@@ -139,6 +139,14 @@ else
   ACTUAL_DB_ID=$(jq -r '.resources.bindings[]? | select(.type=="d1") | .database_id // empty' <<<"$BINDINGS_JSON")
   HAS_SECRET=$(jq -r 'any(.resources.bindings[]?; .name=="BETTER_AUTH_SECRET" and .type=="secret_text")' <<<"$BINDINGS_JSON")
   HAS_EMAIL_MODE=$(jq -r 'any(.resources.bindings[]?; .name=="EMAIL_MODE")' <<<"$BINDINGS_JSON")
+  # Value, not just presence. A plain_text var binding carries its value as
+  # `.text` in current `wrangler versions view --json`; older/other shapes
+  # have used `.value`, so read whichever is a non-empty string.
+  # The runtime guard in src/worker/index.ts already 503s the send-OTP path on
+  # the production host unless this is `resend`; this is the detective backstop
+  # that catches a mock-wired production version at verify time instead of on a
+  # user's failed sign-in (issue #41).
+  EMAIL_MODE_VALUE=$(jq -r 'first(.resources.bindings[]? | select(.name=="EMAIL_MODE") | (.text // .value) | select(type == "string" and . != "")) // empty' <<<"$BINDINGS_JSON")
 
   if [[ -z "$ACTUAL_DB_ID" ]]; then
     record fail "Version bindings" "no D1 binding on latest version ($LATEST_VERSION_ID) — build likely selected the wrong CLOUDFLARE_ENV, or didn't rebuild at all"
@@ -148,8 +156,10 @@ else
     record fail "Version bindings" "BETTER_AUTH_SECRET missing from latest version's bindings"
   elif [[ "$HAS_EMAIL_MODE" != "true" ]]; then
     record fail "Version bindings" "EMAIL_MODE missing from latest version's bindings"
+  elif [[ "$ENVIRONMENT" == "production" && "$EMAIL_MODE_VALUE" != "resend" ]]; then
+    record fail "Version bindings" "EMAIL_MODE=${EMAIL_MODE_VALUE:-<unreadable>} on the deployed production version — production must run 'resend' (the mock sender delivers nothing, and the runtime guard 503s sign-in email here). Expected red until #38 wires real delivery; see issue #41."
   else
-    record pass "Version bindings" "DB ($DB), BETTER_AUTH_SECRET, EMAIL_MODE all present on version $LATEST_VERSION_ID"
+    record pass "Version bindings" "DB ($DB), BETTER_AUTH_SECRET all present; EMAIL_MODE=${EMAIL_MODE_VALUE:-mock} on version $LATEST_VERSION_ID"
   fi
 fi
 

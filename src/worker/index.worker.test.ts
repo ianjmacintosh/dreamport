@@ -5,6 +5,7 @@ import { TEST_EMAILS } from "../../test/emails";
 import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 import { createApp } from "./index";
+import { PRODUCTION_HOST } from "./trusted-origins";
 import type { TurnstileVerifier } from "./turnstile";
 
 /**
@@ -77,10 +78,15 @@ async function fetchWorker(
  */
 function sendCode(
   email: string,
-  { token = TURNSTILE_TOKEN }: { token?: string | null } = {},
+  {
+    token = TURNSTILE_TOKEN,
+    host,
+  }: { token?: string | null; host?: string } = {},
 ) {
   const headers: Record<string, string> = { ...json };
   if (token !== null) headers["x-turnstile-token"] = token;
+  // `fetchWorker` only sets a default Host when one isn't already present.
+  if (host) headers["host"] = host;
   return fetchWorker("/api/auth/email-otp/send-verification-otp", {
     method: "POST",
     headers,
@@ -341,6 +347,37 @@ describe("Turnstile gate on the send-OTP path (#23)", () => {
         (e) => e.to === TEST_EMAILS.turnstileUnconfigured,
       ),
     ).toBe(false);
+  });
+});
+
+describe("production host refuses mock email on the send-OTP path (#41)", () => {
+  // The mock sender delivers nothing, so the production host must never run
+  // it: a send whose `Host` is the production domain while the resolved
+  // `EMAIL_MODE` is anything but `resend` is refused (503) before Better Auth
+  // generates a code. Every deployed environment ships `EMAIL_MODE=mock`
+  // today, so this is what keeps a production deploy failing closed (login
+  // unavailable) rather than open (codes generated but never delivered) until
+  // #38 wires real Resend delivery. `env.EMAIL_MODE` in this pool is `mock`
+  // (the `local` wrangler env), so these cases only vary the Host.
+
+  it("503s a send from the production Host, before any code is generated", async () => {
+    const res = await sendCode(TEST_EMAILS.prodHostGuard, {
+      host: PRODUCTION_HOST,
+    });
+
+    expect(res.status).toBe(503);
+    expect(
+      getMockSender().sent.some((e) => e.to === TEST_EMAILS.prodHostGuard),
+    ).toBe(false);
+  });
+
+  it("does not fire for the staging Host running the same code and mode", async () => {
+    const res = await sendCode(TEST_EMAILS.prodHostStagingOk, {
+      host: "dreamport-staging.bananasquad.workers.dev",
+    });
+
+    expect(res.status).toBe(200);
+    expect(codeFor(TEST_EMAILS.prodHostStagingOk)).toMatch(/^\d{6}$/);
   });
 });
 

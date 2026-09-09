@@ -30,6 +30,13 @@ config key.
   only the wildcard's safety contract (scoped to this account, never a bare
   `*` or platform-wide `*.workers.dev`); the accept/reject behaviour is
   covered end-to-end in `src/worker/index.worker.test.ts`.
+  _(Amended: #22 added `ALLOWED_HOSTS` (bare host patterns for Better Auth's
+  dynamic `baseURL`; see [ADR-0006](0006-dynamic-base-url.md)). #41 factored
+  the per-environment host groups `PRODUCTION_HOSTS` / `STAGING_HOSTS` and the
+  single `PRODUCTION_HOST` — needed for an exact-match production guard on the
+  send-OTP path — out of the two arrays, which are now composed from the
+  groups. The file is the host-policy module: still plain data, no
+  per-request logic, no function form.)_
 - The preview wildcard is `https://*-dreamport.bananasquad.workers.dev`, not
   `https://*.workers.dev` — scoped to this account's `bananasquad` subdomain,
   so an unrelated Workers host cannot pass the origin / `callbackURL` check.

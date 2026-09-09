@@ -128,8 +128,17 @@ When a change lands on `main`, Cloudflare builds and deploys it to `dreamport.ia
 `EMAIL_MODE` (a `wrangler.jsonc` var, `mock` in every environment today)
 picks the email sender inside `createAuth`:
 
-- **`mock`** (also the default when the var is unset) — writes the 6-digit
-  code to the Worker console and to an in-memory record; sends nothing.
+- **`mock`** (also the default when the var is unset) — records the 6-digit
+  code in an in-memory buffer and sends nothing. It does **not** log the code
+  (issue #41): a one-time code is a bearer credential and Worker logs fan out
+  far wider than the auth DB. To read a code in a mock environment, query the
+  D1 `verification` table directly — same access boundary as the data:
+
+  ```bash
+  wrangler d1 execute dreamport-<db> --env <env> --remote \
+    --command "SELECT identifier, value, expiresAt FROM verification ORDER BY createdAt DESC LIMIT 5"
+  ```
+
 - **`resend`** — sends through the Resend API. It additionally requires the
   `RESEND_API_KEY` and `EMAIL_FROM` secrets; `createAuth` throws on the first
   request if either is missing, so there is no silent fallback to `mock`.
@@ -140,6 +149,25 @@ Flipping an environment to `resend` is: set the two secrets on that
 environment's Workers Builds project — `wrangler secret put --name dreamport`
 or `--name dreamport-staging` (or the Cloudflare dashboard) — then change
 that env's `EMAIL_MODE` in `wrangler.jsonc`.
+
+### Production refuses mock email
+
+The send-OTP path (`POST /api/auth/email-otp/send-verification-otp`) returns
+`503` on the production host `dreamport.ianjmacintosh.com` whenever the
+resolved `EMAIL_MODE` is anything but `resend` (`src/worker/index.ts`, issue
+#41). The mock sender delivers nothing, so this makes a mock-wired production
+**fail closed** — sign-in is unavailable and visibly broken — instead of
+failing open, taking sign-ins and dropping every code. Production sign-in is
+therefore intentionally non-functional until the `resend` cutover
+([#38](https://github.com/ianjmacintosh/dreamport/issues/38)).
+
+The guard is keyed on the exact request `Host`, so staging, the
+`*-dreamport-staging` preview URLs, and local dev keep running `mock`
+unaffected. `scripts/verify-deployment.sh` also fails the **Version bindings**
+check on a `verify:production` run while the deployed production version's
+`EMAIL_MODE` is not `resend` — the detective backstop for a dashboard
+override that the runtime guard would otherwise only surface on a user's
+failed sign-in.
 
 ## Turnstile (bot check on the send-OTP path)
 
@@ -190,6 +218,31 @@ suites don't touch Cloudflare at all: `src/worker/index.worker.test.ts` stubs
 the verifier and `src/worker/turnstile.test.ts` stubs `fetch`. The Playwright
 suite runs against a local worker with the test pair injected, never a
 deployed environment.
+
+## Observability (Workers Logs)
+
+Configured in `wrangler.jsonc`, not the dashboard — a value toggled in the
+dashboard is reverted on the next `wrangler deploy` / `wrangler versions
+upload` (that's the "settings are consistent across deployments" nag), the
+same reason runtime vars live in `wrangler.jsonc` (see [Build
+step](#build-step)).
+
+| Environment               | Workers Logs                    | Where                                                       |
+| ------------------------- | ------------------------------- | ----------------------------------------------------------- |
+| Production (`production`) | **off**                         | inherits the top-level `observability: { enabled: false }`  |
+| Staging (`staging`)       | **on**, `head_sampling_rate: 1` | `env.staging.observability` overrides the top-level default |
+| dev / local               | off                             | inherits the top-level default (local is Miniflare — moot)  |
+
+Staging is the observable environment: its long-lived host runs at 100%
+traffic, so `wrangler tail` and the dashboard Logs view work there —
+preview URLs can't be tailed (see [Staging](#staging)). `head_sampling_rate:
+1` keeps every request; staging traffic is low.
+
+Production stays off deliberately. Turning it on is coupled to log **access
+/ egress / retention** hardening — who can read them, Logpush destinations,
+retention window — tracked in
+[#42](https://github.com/ianjmacintosh/dreamport/issues/42). (Sign-in codes
+themselves are no longer logged — [#41](https://github.com/ianjmacintosh/dreamport/issues/41).)
 
 ## Deploying
 

@@ -57,6 +57,12 @@ export const TEST_EMAILS = {
   /** Send while the Turnstile secret is unset; the gate fails closed (503). */
   turnstileUnconfigured: "delivered+turnstile-unconfigured@resend.dev",
 
+  // --- Seam 1: production-host mock-email guard (#41) ---
+  /** Send from the production Host while on `mock`; refused (503) before a code. */
+  prodHostGuard: "delivered+prod-host-guard@resend.dev",
+  /** Same code and mode but a staging Host; the guard must not fire. */
+  prodHostStagingOk: "delivered+prod-host-staging-ok@resend.dev",
+
   // --- Seam 1: rate limiting on the send endpoint (#24) ---
   /**
    * Four interchangeable fillers for the per-IP / header tests: send to a

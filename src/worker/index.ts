@@ -10,6 +10,7 @@ import {
   recordOtpSend,
   resolveDailyCap,
 } from "./otp-send-throttle";
+import { PRODUCTION_HOST } from "./trusted-origins";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
 /**
@@ -98,6 +99,28 @@ export function createApp(deps: AppDeps = {}) {
       return c.json(
         { error: "Bot check failed. Reload the page and try again." },
         403,
+      );
+    }
+
+    // Fail closed on the production host unless real email delivery is wired
+    // up (issue #41). The mock sender records the code and sends nothing, so a
+    // production deploy still on `EMAIL_MODE=mock` — the var not yet flipped
+    // for #38, or a dashboard override — would take the sign-in and silently
+    // swallow every code. Making the send path unavailable keeps that
+    // misconfiguration visible (login stays broken) rather than handing out
+    // codes nobody receives. Placed after the bot check so a dummy-token
+    // probe still gets the gate's verdict (see `scripts/verify-deployment.sh`).
+    // Keyed on the request `Host` — the signal `ALLOWED_HOSTS` already
+    // resolves the auth `baseURL` from — by exact match: staging and
+    // `*-dreamport-staging` preview URLs run this same code on `mock` and must
+    // keep working.
+    if (
+      c.req.header("host") === PRODUCTION_HOST &&
+      (c.env.EMAIL_MODE ?? "mock") !== "resend"
+    ) {
+      return c.json(
+        { error: "Sign-in email is temporarily unavailable. Try again later." },
+        503,
       );
     }
 
