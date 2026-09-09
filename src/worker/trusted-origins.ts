@@ -1,4 +1,14 @@
 /**
+ * The one production host. Kept here as the single source for the literal so
+ * the send-OTP guard in `index.ts` (which refuses that host on anything but
+ * real email delivery) and the origin lists below can't drift apart. The
+ * guard compares it with `===`, never a suffix match — a `*-dreamport-…`
+ * preview host must not be mistaken for production.
+ * `scripts/verify-deployment.sh` hard-codes the same literal (it's bash).
+ */
+export const PRODUCTION_HOST = "dreamport.ianjmacintosh.com";
+
+/**
  * Which origins Better Auth will honour for sign-in callbacks and CSRF
  * checks.
  *
@@ -9,7 +19,7 @@
  */
 export const TRUSTED_ORIGINS: string[] = [
   // Production.
-  "https://dreamport.ianjmacintosh.com",
+  `https://${PRODUCTION_HOST}`,
   // Long-lived staging. The `dreamport-staging` Workers Builds project
   // deploys here (100% traffic) so it can be observed with `wrangler tail` —
   // Cloudflare cannot tail preview URLs (Workers Logs, tail, and Logpush all
@@ -44,7 +54,7 @@ export const TRUSTED_ORIGINS: string[] = [
  * `index.worker.test.ts`).
  */
 export const ALLOWED_HOSTS: string[] = [
-  "dreamport.ianjmacintosh.com",
+  PRODUCTION_HOST,
   "dreamport-staging.bananasquad.workers.dev",
   "*-dreamport-staging.bananasquad.workers.dev",
   // The Vite dev server's port floats (5173, bumped if that's busy) unless

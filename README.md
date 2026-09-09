@@ -146,10 +146,20 @@ disposable — regenerate it anytime (existing local sessions just stop
 validating). Nothing enforces a length, but treat it like a key: 32 random
 bytes, not a word.
 
-Sign-in email uses the `mock` sender by default (codes are written to the dev
-server console), so no Resend key is needed for local work. `staging` and
-`production` set `BETTER_AUTH_SECRET` with `wrangler secret put` instead — see
-[`docs/deployment.md`](docs/deployment.md).
+Sign-in email uses the `mock` sender by default — it records the code in
+memory and delivers nothing, so no Resend key is needed for local work. It
+does **not** print the code (a one-time code is a bearer credential; issue
+#41). The Playwright suite reads it back through the `import.meta.env.DEV`-only
+`/api/test/last-otp` hook; to grab one by hand, query the local D1
+`verification` table:
+
+```bash
+wrangler d1 execute dreamport-local --local \
+  --command "SELECT identifier, value, expiresAt FROM verification ORDER BY createdAt DESC LIMIT 5"
+```
+
+`staging` and `production` set `BETTER_AUTH_SECRET` with `wrangler secret put`
+instead — see [`docs/deployment.md`](docs/deployment.md).
 
 The session cookie is always `Secure`, so reach the dev server at
 `http://localhost:<port>` (browsers treat `localhost` as a secure context and

@@ -41,8 +41,12 @@ export interface EmailSenderEnv {
 }
 
 /**
- * No-network sender: logs the code and keeps a short tail of recent sends in
- * {@link MockEmailSender.sent}.
+ * No-network sender: keeps a short tail of recent sends in
+ * {@link MockEmailSender.sent} and delivers nothing. It does **not** log the
+ * code — a one-time code is a bearer credential, and Worker logs have a far
+ * wider blast radius than the auth DB (issue #41). To read a code in a mock
+ * environment, query the D1 `verification` table directly
+ * (`wrangler d1 execute`) — same access boundary as the data itself.
  *
  * `createEmailSender` returns one shared instance per Worker isolate (see
  * {@link getMockSender}), so a Seam 1 test can drive the Worker over HTTP and
@@ -60,11 +64,6 @@ export class MockEmailSender implements EmailSender {
   async sendOtp(email: OtpEmail): Promise<void> {
     this.sent.push({ ...email });
     if (this.sent.length > MockEmailSender.HISTORY) this.sent.shift();
-    // Matches spec user-story 28: the dev copies the code from the console
-    // instead of querying the database.
-    console.log(
-      `[email:mock] ${email.type} code for ${email.to}: ${email.otp}`,
-    );
   }
 
   /** Drop all recorded sends. For test setup between cases. */

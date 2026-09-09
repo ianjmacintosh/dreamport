@@ -35,12 +35,18 @@ describe("MockEmailSender", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("writes the code to the console so a dev can copy it", async () => {
+  it("never writes the code to the console (issue #41)", async () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     await new MockEmailSender().sendOtp(signIn);
 
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("418302"));
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(infoSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it("keeps recorded sends isolated per instance", async () => {

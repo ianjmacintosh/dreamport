@@ -67,6 +67,25 @@ footers, breakout grids — is managed with CSS Grid, not Flexbox.
 Flexbox is still fine for small component-internal alignment (e.g. a
 button centering its icon and label), which isn't structural layout.
 
+## Logging
+
+Never log a credential. Not in `console.*`, not in a thrown error's
+message, not in a structured log field. That means:
+
+- One-time sign-in codes (OTPs) and any token derived from one.
+- Session tokens, session cookies, and raw `Cookie` / `Authorization`
+  header values.
+- `BETTER_AUTH_SECRET`, `TURNSTILE_SECRET_KEY`, `RESEND_API_KEY`, and any
+  other API key or signing secret.
+- Full email bodies (a sign-in email _is_ a credential in an envelope).
+
+Log the identifier and the outcome instead — an email address or user id, a
+verification identifier, a status code, "sent" / "rejected (bad token)" —
+never the secret material itself. Worker logs fan out far wider and live far
+longer than the auth database (dashboard readers, `wrangler tail`, Logpush,
+SIEM, screenshots in tickets), so a credential in a log is a real exposure
+even when the database is locked down. See issue #41.
+
 ## Explaining Issues
 
 When the user flags a warning or unexpected output, lead the answer with the
