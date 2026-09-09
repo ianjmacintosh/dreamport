@@ -40,8 +40,6 @@ export interface WorkerEnv {
   SEND_OTP_DAILY_CAP?: string;
   /** Resend API key. Required only when `EMAIL_MODE=resend`. A secret. */
   RESEND_API_KEY?: string;
-  /** `From:` address for sign-in email. Required only when `EMAIL_MODE=resend`. */
-  EMAIL_FROM?: string;
   /** The static SPA assets (`wrangler.jsonc` `assets.binding`). */
   ASSETS: Fetcher;
 }

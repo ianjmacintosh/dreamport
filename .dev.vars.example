@@ -14,13 +14,16 @@ BETTER_AUTH_SECRET=dev-only-change-me-to-something-random-and-long
 # --name dreamport` (or `--name dreamport-staging`); see docs/deployment.md.
 TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 
-# How sign-in emails are delivered. Unset (or `mock`) prints the 6-digit code
-# to the dev-server console and sends nothing — the default for local work.
-# Set `resend` only to exercise the real Resend path; it then requires both
-# vars below and throws on first use if either is missing.
+# How sign-in emails are delivered. Unset (or `mock`) records the 6-digit code
+# in an in-memory buffer and sends nothing — the default for local work. It
+# does not log the code (issue #41); read it from the D1 `verification` table
+# (see docs/deployment.md). Set `resend` only to exercise the real Resend
+# path; it then requires RESEND_API_KEY and throws on first use without it.
+# The From address is not a var — it's the EMAIL_FROM constant in
+# src/worker/email/sender.ts, and a real send needs its domain verified in
+# the Resend account behind the key.
 # EMAIL_MODE=resend
 # RESEND_API_KEY=re_...
-# EMAIL_FROM=onboarding@resend.dev
 
 # App-wide cap on sign-in codes sent per UTC day — the Resend-quota guard
 # (issue #24 / ADR-0007). Unset ⇒ 90. Set a small value to exercise the cap
