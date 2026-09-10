@@ -8,6 +8,28 @@ import {
 import { TEST_EMAILS } from "../test/emails";
 
 /**
+ * Give every spec its own per-IP send-OTP bucket. Locally the browser sends no
+ * `cf-connecting-ip`, so without this every send in the run shares one 3 / 60s
+ * bucket (`auth.ts` `rateLimit`), and this file now issues more than three
+ * sign-ins across its specs — sequentially and across parallel workers. The
+ * route is scoped to the send-OTP call only: putting the header on every
+ * request (via `setExtraHTTPHeaders`) also rewrites the Turnstile widget's
+ * calls to `challenges.cloudflare.com` and the challenge never solves.
+ */
+let sendBucket = 0;
+test.beforeEach(async ({ page }, testInfo) => {
+  const octet = (testInfo.workerIndex * 40 + sendBucket++) % 256;
+  const ip = `203.0.113.${octet}`;
+  await page.route(
+    "**/api/auth/email-otp/send-verification-otp",
+    (route) =>
+      void route.continue({
+        headers: { ...route.request().headers(), "cf-connecting-ip": ip },
+      }),
+  );
+});
+
+/**
  * The sign-in flow end to end, against the local Worker booted by
  * `playwright.config.ts`'s `webServer`. `EMAIL_MODE=mock`, so the six-digit
  * code is read back through the `/api/test/last-otp` hook instead of an inbox.
@@ -17,13 +39,11 @@ import { TEST_EMAILS } from "../test/emails";
  * CI job env), so the Turnstile widget on the email step auto-solves; the
  * helper just waits for the hidden response field to fill before submitting.
  *
- * Rate limiting (issue #24): locally there is no `cf-connecting-ip`, so every
- * send-OTP call in the run shares one bucket of 3 / 60s, and nothing clears
- * the limiter tables between specs. The green suite issues two sends (two
- * distinct addresses), well under the limit. A genuine failure retried on CI
- * (`retries: 2`) can push over it and 429 a later spec for an unrelated
- * reason — if that becomes a problem, add a DEV-only reset hook like
- * `/api/test/last-otp` and call it in `beforeEach`.
+ * Rate limiting (issue #24): the `beforeEach` above gives each spec its own
+ * per-IP send-OTP bucket, so one spec's sends can't 429 another's — including
+ * on a CI retry (`retries: 2`). The per-email limiter is a non-issue here
+ * (every spec uses a distinct `@resend.dev` address) and the global daily cap
+ * (default 90) has ample headroom.
  */
 
 /** The most recent code the mock sender was handed for `email`. */
@@ -130,4 +150,47 @@ test("persistent session: a return visit to /app stays signed in", async ({
   await page.goto("/app");
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByText(`signed in as ${email}`)).toBeVisible();
+});
+
+test("sign out from /app returns to the homepage and forgets the session", async ({
+  page,
+  request,
+}) => {
+  await signIn(page, request, TEST_EMAILS.e2eSignOut);
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/localhost:\d+\/$/);
+
+  // A later /app visit has no session to fall back on.
+  await page.goto("/app");
+  await expect(page).toHaveURL(/\/login$/);
+});
+
+test("delete account from /app: confirm, follow the emailed link, session is gone", async ({
+  page,
+  request,
+}) => {
+  const email = TEST_EMAILS.e2eDeleteAccount;
+
+  await signIn(page, request, email);
+
+  await page.getByRole("button", { name: "Delete account" }).click();
+  await page.getByRole("button", { name: "Email me a deletion link" }).click();
+  await expect(page.getByText(/Check your email/)).toBeVisible();
+
+  // Read the confirmation link the mock sender was handed, the same way the
+  // code is read on the sign-in path.
+  const res = await request.get(
+    `/api/test/last-delete-link?email=${encodeURIComponent(email)}`,
+  );
+  expect(res.ok()).toBeTruthy();
+  const { url } = (await res.json()) as { url: string };
+
+  // The link must be opened in this same still-signed-in context.
+  await page.goto(url);
+  await expect(page).toHaveURL(/localhost:\d+\/$/);
+
+  // The account is gone: /app has nothing to authenticate.
+  await page.goto("/app");
+  await expect(page).toHaveURL(/\/login$/);
 });

@@ -14,6 +14,11 @@ CLI supports the pinned version, or from the upstream changelog).
 The `emailOTP` plugin (send & verify sign-in codes) needs no migration of its
 own: it stores codes in the existing `verification` table.
 
+Account deletion (`user.deleteUser`, issue #26) needs no migration either: the
+confirmation token is a row in the same `verification` table (identifier
+`delete-account-<token>`), and completing the deletion only removes rows from
+`user` / `session` / `account` — all already in `0001`.
+
 `0002_send_otp_rate_limiting.sql` adds the send-OTP rate limiting (issue #24,
 [ADR-0007](../docs/adr/0007-send-otp-rate-limiting.md)): Better Auth's own
 `rateLimit` table (the shape its generator emits for `rateLimit.storage:

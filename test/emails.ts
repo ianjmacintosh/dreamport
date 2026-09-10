@@ -81,6 +81,32 @@ export const TEST_EMAILS = {
   /** A normal send + verify while the limiter is on; must be unaffected. */
   rlHappyPath: "delivered+rl-happy-path@resend.dev",
 
+  // --- Seam 1: sign out (#26) ---
+  /** Signs in, signs out, then checks the old session cookie is dead. */
+  signOut: "delivered+sign-out@resend.dev",
+
+  // --- Seam 1: delete account (#26) ---
+  /** `/delete-user` with a valid session: 200, link recorded, User still present. */
+  deleteSendOk: "delivered+delete-send-ok@resend.dev",
+  /** Full happy path: request a link, follow the callback, User + session gone. */
+  deleteCallbackOk: "delivered+delete-callback-ok@resend.dev",
+  /** Deletes, then signs up again with the same address as a brand-new User. */
+  deleteThenReregister: "delivered+delete-then-reregister@resend.dev",
+  /** Callback with an unknown token (valid session): 404, User still present. */
+  deleteBadToken: "delivered+delete-bad-token@resend.dev",
+  /** Callback with a valid token but no session cookie: 404, User still present. */
+  deleteCallbackNoSession: "delivered+delete-callback-no-session@resend.dev",
+  /** After a completed deletion, the old cookie is refused by `/api/me`. */
+  deleteThenMe: "delivered+delete-then-me@resend.dev",
+  /** Daily send cap already spent: `/delete-user` 429s, no link recorded. */
+  deleteDailyCap: "delivered+delete-daily-cap@resend.dev",
+  /** 4th `/delete-user` inside 60s trips Better Auth's per-IP `customRules`. */
+  deleteRateLimit: "delivered+delete-rate-limit@resend.dev",
+
+  // --- Seam 1: /api/test/last-delete-link (mock-only test hook) ---
+  /** A link is sent, then read back through the test hook. */
+  lastDeleteLinkHook: "delivered+last-delete-link-hook@resend.dev",
+
   // --- Seam 1: /api/me ---
   /** Signs in, then reads its own email back from the session endpoint. */
   meOk: "delivered+me-ok@resend.dev",
@@ -96,6 +122,10 @@ export const TEST_EMAILS = {
   e2eHappyPath: "delivered+e2e-happy@resend.dev",
   /** Persistent session: sign in, navigate away and back, still signed in. */
   e2ePersistentSession: "delivered+e2e-persistent@resend.dev",
+  /** Sign out from `/app`: lands on `/`, a later `/app` visit bounces to `/login`. */
+  e2eSignOut: "delivered+e2e-sign-out@resend.dev",
+  /** Delete account happy path: request link, follow it, `/app` then bounces to `/login`. */
+  e2eDeleteAccount: "delivered+e2e-delete-account@resend.dev",
   /** Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only. */
   deploySmoke: "delivered+deploy-smoke@resend.dev",
 
@@ -104,6 +134,8 @@ export const TEST_EMAILS = {
   recruit: "delivered+recruit@resend.dev",
   /** Second recipient, for the "records each send" assertion. */
   second: "delivered+second@resend.dev",
+  /** Recipient for the `DeleteAccountEmail` fixture in `sender.test.ts`. */
+  deleteLinkRecipient: "delivered+delete-link-recipient@resend.dev",
 
   // --- Live (opt-in, never CI) ---
   /** Resend's sink: always accepts, never forwards. Only `sender.live.test.ts`. */

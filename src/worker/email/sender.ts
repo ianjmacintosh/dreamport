@@ -3,9 +3,11 @@
  * implementations. `createAuth` picks one with {@link createEmailSender},
  * driven by `EMAIL_MODE`; Seam 1 tests inject one directly instead.
  *
- * Only the OTP sign-in email exists today. The interface is deliberately
- * narrow — one method — so a third implementation (a different provider, a
- * queue) is a small, self-contained addition.
+ * Two outbound emails exist today: the OTP sign-in code and the
+ * account-deletion confirmation link (issue #26). The interface stays
+ * deliberately narrow — one method per email kind — so a third
+ * implementation (a different provider, a queue) is a small, self-contained
+ * addition.
  */
 
 /** The OTP-email kinds Better Auth's `emailOTP` plugin can ask us to send. */
@@ -25,9 +27,31 @@ export interface OtpEmail {
   type: OtpEmailType;
 }
 
+/**
+ * One outbound account-deletion confirmation email, as handed to us by Better
+ * Auth's `user.deleteUser.sendDeleteAccountVerification` hook (issue #26).
+ */
+export interface DeleteAccountEmail {
+  /** Recipient address (already lower-cased by Better Auth). */
+  to: string;
+  /**
+   * The one-time confirmation link — a GET URL to
+   * `/api/auth/delete-user/callback?token=…` that, opened in the same
+   * still-signed-in browser, completes the deletion. Expires in 24 hours.
+   */
+  url: string;
+}
+
 export interface EmailSender {
   /** Deliver a one-time code. Resolves when handed off; rejects on failure. */
   sendOtp(email: OtpEmail): Promise<void>;
+  /**
+   * Deliver an account-deletion confirmation link. Resolves when handed off;
+   * rejects on failure. Better Auth calls this instead of deleting straight
+   * away, so a real inbox check stands between "Delete account" and the row
+   * actually going away.
+   */
+  sendDeleteAccountVerification(email: DeleteAccountEmail): Promise<void>;
 }
 
 /** The subset of the Worker env the sender factory reads. */
@@ -65,17 +89,34 @@ export class MockEmailSender implements EmailSender {
   /** How many recent sends {@link MockEmailSender.sent} retains. */
   static readonly HISTORY = 50;
 
-  /** The most recent sends, oldest first, at most {@link MockEmailSender.HISTORY}. */
+  /** The most recent OTP sends, oldest first, at most {@link MockEmailSender.HISTORY}. */
   readonly sent: OtpEmail[] = [];
+
+  /**
+   * The most recent account-deletion links, oldest first, at most
+   * {@link MockEmailSender.HISTORY}. A separate array from {@link sent} so
+   * every existing OTP assertion keeps reading `sent` untouched.
+   */
+  readonly deleteLinksSent: DeleteAccountEmail[] = [];
 
   async sendOtp(email: OtpEmail): Promise<void> {
     this.sent.push({ ...email });
     if (this.sent.length > MockEmailSender.HISTORY) this.sent.shift();
   }
 
+  async sendDeleteAccountVerification(
+    email: DeleteAccountEmail,
+  ): Promise<void> {
+    this.deleteLinksSent.push({ ...email });
+    if (this.deleteLinksSent.length > MockEmailSender.HISTORY) {
+      this.deleteLinksSent.shift();
+    }
+  }
+
   /** Drop all recorded sends. For test setup between cases. */
   clear(): void {
     this.sent.length = 0;
+    this.deleteLinksSent.length = 0;
   }
 }
 
@@ -97,6 +138,36 @@ export class ResendEmailSender implements EmailSender {
   }
 
   async sendOtp({ to, otp, type }: OtpEmail): Promise<void> {
+    await this.#send({
+      to,
+      subject: subjectFor(type),
+      text: bodyFor(otp),
+      kind: `${type} email`,
+    });
+  }
+
+  async sendDeleteAccountVerification({
+    to,
+    url,
+  }: DeleteAccountEmail): Promise<void> {
+    await this.#send({
+      to,
+      subject: DELETE_ACCOUNT_SUBJECT,
+      text: deleteAccountBody(url),
+      kind: "account-deletion email",
+    });
+  }
+
+  /**
+   * One POST to Resend. `kind` names the email in the thrown error only — it
+   * has no effect on the request.
+   */
+  async #send(msg: {
+    to: string;
+    subject: string;
+    text: string;
+    kind: string;
+  }): Promise<void> {
     const res = await fetch(RESEND_ENDPOINT, {
       method: "POST",
       headers: {
@@ -105,16 +176,16 @@ export class ResendEmailSender implements EmailSender {
       },
       body: JSON.stringify({
         from: this.#from,
-        to,
-        subject: subjectFor(type),
-        text: bodyFor(otp),
+        to: msg.to,
+        subject: msg.subject,
+        text: msg.text,
       }),
     });
 
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
       throw new Error(
-        `Resend rejected the ${type} email (${res.status})${detail ? `: ${detail}` : ""}`,
+        `Resend rejected the ${msg.kind} (${res.status})${detail ? `: ${detail}` : ""}`,
       );
     }
   }
@@ -128,6 +199,18 @@ function subjectFor(type: OtpEmailType): string {
 
 function bodyFor(otp: string): string {
   return `Your Dreamport code is ${otp}. It expires in 60 minutes.`;
+}
+
+/** Subject line on the account-deletion confirmation email (issue #26). */
+export const DELETE_ACCOUNT_SUBJECT = "Confirm your Dreamport account deletion";
+
+function deleteAccountBody(url: string): string {
+  return (
+    `Click this link to permanently delete your Dreamport account and ` +
+    `everything in it: ${url}\n\n` +
+    `The link expires in 24 hours. If you didn't ask to delete your ` +
+    `account, ignore this email — nothing will happen.`
+  );
 }
 
 /**

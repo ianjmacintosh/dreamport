@@ -8,7 +8,9 @@ import { emailOTPClient } from "better-auth/client/plugins";
  *
  * The `emailOTPClient()` plugin is what teaches this client the
  * `emailOtp.sendVerificationOtp` / `signIn.emailOtp` actions used by
- * `/login`. Nothing else belongs in this file: it is wiring, not logic.
+ * `/login`. `authClient.signOut()` and `authClient.deleteUser()` (used by
+ * `/app`, issue #26) are core client methods — they need no plugin. Nothing
+ * else belongs in this file: it is wiring, not logic.
  */
 export const authClient = createAuthClient({
   plugins: [emailOTPClient()],

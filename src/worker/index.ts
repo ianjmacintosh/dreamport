@@ -134,7 +134,7 @@ export function createApp(deps: AppDeps = {}) {
     // covers.
     const daily = await peekDailySendCap(
       c.env.DB,
-      resolveDailyCap(c.env.SEND_OTP_DAILY_CAP),
+      resolveDailyCap(c.env.SEND_OTP_DAILY_CAP, c.env.EMAIL_MODE),
     );
     if (!daily.allowed) return tooManyRequests(daily.retryAfter);
 
@@ -168,6 +168,47 @@ export function createApp(deps: AppDeps = {}) {
     if (res.status === 200) {
       await recordDailySend(c.env.DB);
       if (email) await recordOtpSend(c.env.DB, email);
+    }
+
+    return res;
+  });
+
+  /**
+   * Account-deletion request path (issue #26). Registered before the
+   * `/api/auth/*` catch-all so this exact POST is metered against the global
+   * daily send cap — the guard for the shared Resend quota — the same way the
+   * send-OTP route is. The GET callback that completes the deletion stays on
+   * the catch-all: it sends no email.
+   *
+   * Only the daily cap is checked here, not the per-email budget: the delete
+   * target is always the authenticated caller, so there is no third-party
+   * address to flood. The per-IP/session dimension is Better Auth's own
+   * limiter (`rateLimit.customRules["/delete-user"]` in `auth.ts`).
+   *
+   * `sendDeleteAccountVerification` runs via Better Auth's
+   * `runInBackgroundOrAwait` — the same mechanism as `sendVerificationOTP`,
+   * which the Seam 1 suite already proves works in the workers pool.
+   */
+  app.post("/api/auth/delete-user", async (c) => {
+    const daily = await peekDailySendCap(
+      c.env.DB,
+      resolveDailyCap(c.env.SEND_OTP_DAILY_CAP, c.env.EMAIL_MODE),
+    );
+    if (!daily.allowed) {
+      return c.json(
+        { error: "Too many requests. Please try again later." },
+        429,
+        { "Retry-After": String(daily.retryAfter) },
+      );
+    }
+
+    const res = await createAuth(c.env).handler(c.req.raw);
+
+    // Count a send only once Better Auth returns 200 — the same rule the
+    // send-OTP route uses. A 401 (no session), 403 (origin/limiter), or 5xx
+    // must not spend the day's quota.
+    if (res.status === 200) {
+      await recordDailySend(c.env.DB);
     }
 
     return res;
@@ -234,6 +275,37 @@ export function createApp(deps: AppDeps = {}) {
       }
 
       return c.json({ otp: last.otp });
+    });
+
+    /**
+     * Test-only sibling of `/api/test/last-otp`: hand back the full callback
+     * URL from the last account-deletion link the mock sender was given for
+     * an email, so the Playwright delete spec can `page.goto(url)` instead of
+     * reading a real inbox. Behind the same two gates — `import.meta.env.DEV`
+     * (dropped from every deployed bundle by `vite build`) and
+     * `EMAIL_MODE=mock`.
+     */
+    app.get("/api/test/last-delete-link", (c) => {
+      if ((c.env.EMAIL_MODE ?? "mock") !== "mock") {
+        return c.json({ error: "Not found" }, 404);
+      }
+
+      const email = c.req.query("email");
+      if (!email) {
+        return c.json({ error: "email query param is required" }, 400);
+      }
+
+      const last = getMockSender()
+        .deleteLinksSent.filter((e) => e.to === email)
+        .at(-1);
+      if (!last) {
+        return c.json(
+          { error: "no delete link has been sent to that address" },
+          404,
+        );
+      }
+
+      return c.json({ url: last.url });
     });
   }
 

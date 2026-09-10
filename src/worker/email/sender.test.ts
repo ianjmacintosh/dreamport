@@ -3,10 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TEST_EMAILS, TEST_FROM } from "../../../test/emails";
 import {
   createEmailSender,
+  DELETE_ACCOUNT_SUBJECT,
   EMAIL_FROM,
   getMockSender,
   MockEmailSender,
   ResendEmailSender,
+  type DeleteAccountEmail,
   type OtpEmail,
 } from "./sender";
 
@@ -14,6 +16,11 @@ const signIn: OtpEmail = {
   to: TEST_EMAILS.recruit,
   otp: "418302",
   type: "sign-in",
+};
+
+const deleteLink: DeleteAccountEmail = {
+  to: TEST_EMAILS.deleteLinkRecipient,
+  url: "https://dreamport.test/api/auth/delete-user/callback?token=abc123&callbackURL=%2F",
 };
 
 afterEach(() => {
@@ -58,6 +65,30 @@ describe("MockEmailSender", () => {
 
     expect(a.sent).toHaveLength(1);
     expect(b.sent).toHaveLength(0);
+  });
+
+  it("records a deletion link in its own array, leaving `sent` untouched", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const sender = new MockEmailSender();
+
+    await sender.sendDeleteAccountVerification(deleteLink);
+
+    expect(sender.deleteLinksSent).toEqual([
+      { to: TEST_EMAILS.deleteLinkRecipient, url: deleteLink.url },
+    ]);
+    expect(sender.sent).toHaveLength(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("clear() drops recorded deletion links too", async () => {
+    const sender = new MockEmailSender();
+
+    await sender.sendOtp(signIn);
+    await sender.sendDeleteAccountVerification(deleteLink);
+    sender.clear();
+
+    expect(sender.sent).toHaveLength(0);
+    expect(sender.deleteLinksSent).toHaveLength(0);
   });
 });
 
@@ -105,6 +136,41 @@ describe("ResendEmailSender", () => {
         from: TEST_FROM,
       }).sendOtp(signIn),
     ).rejects.toThrow(/422/);
+  });
+
+  it("posts the deletion link with the confirmation subject and URL in the body", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(okResponse());
+
+    await new ResendEmailSender({
+      apiKey: "re_test_key",
+      from: TEST_FROM,
+    }).sendDeleteAccountVerification(deleteLink);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.resend.com/emails");
+
+    const body = JSON.parse(init.body as string) as Record<string, string>;
+    expect(body.from).toBe(TEST_FROM);
+    expect(body.to).toBe(TEST_EMAILS.deleteLinkRecipient);
+    expect(body.subject).toBe(DELETE_ACCOUNT_SUBJECT);
+    expect(body.text).toContain(deleteLink.url);
+    expect(body.text).toMatch(/24 hours/);
+  });
+
+  it("rejects when Resend rejects the deletion email", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("nope", { status: 500 }),
+    );
+
+    await expect(
+      new ResendEmailSender({
+        apiKey: "re_test_key",
+        from: TEST_FROM,
+      }).sendDeleteAccountVerification(deleteLink),
+    ).rejects.toThrow(/500/);
   });
 });
 

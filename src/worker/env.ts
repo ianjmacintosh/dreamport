@@ -26,15 +26,18 @@ export interface WorkerEnv {
    */
   TURNSTILE_HOSTNAMES?: string;
   /**
-   * How sign-in emails are delivered. `mock` in every environment today
-   * (see `wrangler.jsonc`); unset is treated as `mock`.
+   * How outbound email is delivered. `resend` in production (#38/#52);
+   * `mock` in staging and local (see `wrangler.jsonc`); unset is treated as
+   * `mock`.
    */
   EMAIL_MODE?: "mock" | "resend";
   /**
-   * Max sign-in codes the send-OTP path will send app-wide in one UTC day —
-   * the guard for the shared Resend quota (issue #24, ADR-0007). A plain var,
-   * not a secret; unset, non-numeric, or ≤ 0 falls back to
-   * `DEFAULT_DAILY_CAP` (90). Raise it per environment in `wrangler.jsonc`
+   * Max outbound emails the app will send app-wide in one UTC day — the guard
+   * for the shared Resend quota (issue #24, ADR-0007; extended to cover the
+   * account-deletion email in #26). A plain var, not a secret. A positive
+   * integer always wins; unset / non-numeric / ≤ 0 falls back to
+   * `DEFAULT_DAILY_CAP` (90) on `EMAIL_MODE=resend` and to uncapped on `mock`
+   * (no real quota to protect). Raise it per environment in `wrangler.jsonc`
    * once the Resend plan allows.
    */
   SEND_OTP_DAILY_CAP?: string;

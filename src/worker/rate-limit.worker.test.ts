@@ -298,14 +298,19 @@ describe("global daily send cap (the Resend-quota guard)", () => {
     expect((await peekDailySendCap(env.DB, cap, dayB)).allowed).toBe(true);
   });
 
-  it("resolveDailyCap falls back to the default for anything not a positive integer", () => {
-    expect(resolveDailyCap(undefined)).toBe(DEFAULT_DAILY_CAP);
-    expect(resolveDailyCap("")).toBe(DEFAULT_DAILY_CAP);
-    expect(resolveDailyCap("abc")).toBe(DEFAULT_DAILY_CAP);
-    expect(resolveDailyCap("0")).toBe(DEFAULT_DAILY_CAP);
-    expect(resolveDailyCap("-5")).toBe(DEFAULT_DAILY_CAP);
-    expect(resolveDailyCap("12.5")).toBe(DEFAULT_DAILY_CAP);
-    expect(resolveDailyCap("150")).toBe(150);
+  it("resolveDailyCap honours a positive integer regardless of mode", () => {
+    expect(resolveDailyCap("150", "resend")).toBe(150);
+    expect(resolveDailyCap("150", "mock")).toBe(150);
+    expect(resolveDailyCap("150", undefined)).toBe(150);
+  });
+
+  it("resolveDailyCap without an explicit cap: default on resend, uncapped otherwise", () => {
+    for (const raw of [undefined, "", "abc", "0", "-5", "12.5"]) {
+      expect(resolveDailyCap(raw, "resend")).toBe(DEFAULT_DAILY_CAP);
+      // A mock environment (and every unset one) protects no real quota.
+      expect(resolveDailyCap(raw, "mock")).toBe(Number.POSITIVE_INFINITY);
+      expect(resolveDailyCap(raw, undefined)).toBe(Number.POSITIVE_INFINITY);
+    }
   });
 });
 
