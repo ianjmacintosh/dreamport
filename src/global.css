@@ -197,16 +197,14 @@ p {
 }
 
 /* ── Primitives: header ───────────────────────────────────── */
-/* Same full-bleed 3-column breakout grid as .footer — the two 1fr tracks
-   bleed to the viewport edges, the middle track holds content at <main>'s
-   width and padding. Not sticky: present on every page of the layout,
-   not pinned on scroll. */
+/* Same 3-column breakout grid as .footer so the content column lines up
+   with <main>, but no background or border — the header sits on the page
+   background, not on its own band. Not sticky: present on every page of
+   the layout, not pinned on scroll. */
 
 .header {
   display: grid;
   grid-template-columns: 1fr var(--page-width) 1fr;
-  background-color: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
 }
 
 .header-content {
