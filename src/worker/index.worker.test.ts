@@ -662,6 +662,12 @@ describe("sign out (#26)", () => {
   });
 });
 
+// Better Auth's `/delete-user` + `/delete-user/callback` signal their happy
+// and refusal paths with a thrown `APIError` (302, 404). workerd's rejection
+// tracker flags the transient gap before the handler adopts it, even though
+// these tests assert the resulting HTTP response and pass. If a `better-auth`
+// bump makes these start failing the run with an "unhandled rejection" from
+// the workers pool, the allowlist is `onUnhandledError` in `vitest.config.ts`.
 describe("delete account (#26)", () => {
   const originalDailyCap = env.SEND_OTP_DAILY_CAP;
   afterEach(() => {

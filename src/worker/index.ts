@@ -134,7 +134,7 @@ export function createApp(deps: AppDeps = {}) {
     // covers.
     const daily = await peekDailySendCap(
       c.env.DB,
-      resolveDailyCap(c.env.SEND_OTP_DAILY_CAP),
+      resolveDailyCap(c.env.SEND_OTP_DAILY_CAP, c.env.EMAIL_MODE),
     );
     if (!daily.allowed) return tooManyRequests(daily.retryAfter);
 
@@ -192,7 +192,7 @@ export function createApp(deps: AppDeps = {}) {
   app.post("/api/auth/delete-user", async (c) => {
     const daily = await peekDailySendCap(
       c.env.DB,
-      resolveDailyCap(c.env.SEND_OTP_DAILY_CAP),
+      resolveDailyCap(c.env.SEND_OTP_DAILY_CAP, c.env.EMAIL_MODE),
     );
     if (!daily.allowed) {
       return c.json(
@@ -306,27 +306,6 @@ export function createApp(deps: AppDeps = {}) {
       }
 
       return c.json({ url: last.url });
-    });
-
-    /**
-     * Test-only: wipe the send-path rate-limit state. Locally there is no
-     * `cf-connecting-ip`, so every send-OTP call in a Playwright run shares
-     * one 3 / 60s bucket (see the note atop `login.spec.ts`), and that file
-     * now issues more than three sign-ins across its specs. The e2e suite
-     * calls this in `beforeEach`. Same two gates as the hooks above.
-     */
-    app.post("/api/test/reset-rate-limits", async (c) => {
-      if ((c.env.EMAIL_MODE ?? "mock") !== "mock") {
-        return c.json({ error: "Not found" }, 404);
-      }
-
-      await c.env.DB.batch([
-        c.env.DB.prepare('DELETE FROM "rateLimit"'),
-        c.env.DB.prepare('DELETE FROM "otpSendThrottle"'),
-        c.env.DB.prepare('DELETE FROM "otpSendDaily"'),
-      ]);
-
-      return c.json({ ok: true });
     });
   }
 

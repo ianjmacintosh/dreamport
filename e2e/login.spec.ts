@@ -8,17 +8,25 @@ import {
 import { TEST_EMAILS } from "../test/emails";
 
 /**
- * This file's specs issue more than three sign-ins between them, and locally
- * every send-OTP call shares one 3 / 60s rate-limit bucket (no
- * `cf-connecting-ip` header — see the note above `readCode`). Run them
- * serially and clear that bucket before each, so no spec 429s because of an
- * earlier one. The DEV-only reset hook is mounted beside `/api/test/last-otp`.
+ * Give every spec its own per-IP send-OTP bucket. Locally the browser sends no
+ * `cf-connecting-ip`, so without this every send in the run shares one 3 / 60s
+ * bucket (`auth.ts` `rateLimit`), and this file now issues more than three
+ * sign-ins across its specs — sequentially and across parallel workers. The
+ * route is scoped to the send-OTP call only: putting the header on every
+ * request (via `setExtraHTTPHeaders`) also rewrites the Turnstile widget's
+ * calls to `challenges.cloudflare.com` and the challenge never solves.
  */
-test.describe.configure({ mode: "serial" });
-
-test.beforeEach(async ({ request }) => {
-  const res = await request.post("/api/test/reset-rate-limits");
-  expect(res.ok()).toBeTruthy();
+let sendBucket = 0;
+test.beforeEach(async ({ page }, testInfo) => {
+  const octet = (testInfo.workerIndex * 40 + sendBucket++) % 256;
+  const ip = `203.0.113.${octet}`;
+  await page.route(
+    "**/api/auth/email-otp/send-verification-otp",
+    (route) =>
+      void route.continue({
+        headers: { ...route.request().headers(), "cf-connecting-ip": ip },
+      }),
+  );
 });
 
 /**
@@ -31,13 +39,11 @@ test.beforeEach(async ({ request }) => {
  * CI job env), so the Turnstile widget on the email step auto-solves; the
  * helper just waits for the hidden response field to fill before submitting.
  *
- * Rate limiting (issue #24): locally there is no `cf-connecting-ip`, so every
- * send-OTP call in the run shares one bucket of 3 / 60s, and nothing clears
- * the limiter tables between specs. The green suite issues two sends (two
- * distinct addresses), well under the limit. A genuine failure retried on CI
- * (`retries: 2`) can push over it and 429 a later spec for an unrelated
- * reason — if that becomes a problem, add a DEV-only reset hook like
- * `/api/test/last-otp` and call it in `beforeEach`.
+ * Rate limiting (issue #24): the `beforeEach` above gives each spec its own
+ * per-IP send-OTP bucket, so one spec's sends can't 429 another's — including
+ * on a CI retry (`retries: 2`). The per-email limiter is a non-issue here
+ * (every spec uses a distinct `@resend.dev` address) and the global daily cap
+ * (default 90) has ample headroom.
  */
 
 /** The most recent code the mock sender was handed for `email`. */
