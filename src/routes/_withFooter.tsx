@@ -1,5 +1,6 @@
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
 
+import Header from "../components/Header";
 import Footer from "../components/Footer";
 
 export const Route = createFileRoute("/_withFooter")({
@@ -7,8 +8,11 @@ export const Route = createFileRoute("/_withFooter")({
 });
 
 function WithFooterLayout() {
+  const { pathname } = useLocation();
+
   return (
     <>
+      <Header showWordmark={pathname !== "/"} />
       <main>
         <Outlet />
       </main>

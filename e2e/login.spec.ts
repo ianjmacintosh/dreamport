@@ -39,13 +39,20 @@ async function readCode(
   return otp;
 }
 
+/** Open `/login` the way a visitor does: from the homepage header link. */
+async function gotoLoginFromHomepage(page: Page): Promise<void> {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Log in" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+}
+
 /** Drive `/login` from the email step through to landing on `/app`. */
 async function signIn(
   page: Page,
   request: APIRequestContext,
   email: string,
 ): Promise<void> {
-  await page.goto("/login");
+  await gotoLoginFromHomepage(page);
   await page.getByLabel("Email address").fill(email);
 
   // Wait for Turnstile to auto-solve (always-pass test key) — the widget
@@ -78,7 +85,7 @@ test("happy path: email, then code, then /app shows the signed-in email", async 
 test("the sign-in page presents a bot challenge on the email step", async ({
   page,
 }) => {
-  await page.goto("/login");
+  await gotoLoginFromHomepage(page);
 
   // The widget container is always in the markup; what proves the challenge
   // actually rendered is Cloudflare serving its challenge into a child frame.
