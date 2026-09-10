@@ -25,6 +25,7 @@ export default defineConfig({
       const e = error as {
         name?: string;
         body?: { code?: string };
+        statusCode?: number;
         errorStack?: unknown;
       };
       const verifyErrorCodes = [
@@ -40,6 +41,24 @@ export default defineConfig({
         e.errorStack.includes("email-otp");
 
       if (isHandledEmailOtpRejection) return false;
+
+      // The account-deletion flow (issue #26) hits the same workerd quirk:
+      // Better Auth's `/delete-user` + `/delete-user/callback` use a thrown
+      // `APIError` for control flow — a 302 redirect on a completed deletion,
+      // a 404 when the browser is no longer signed in or the token is stale —
+      // and the tracker catches the transient gap before the outer handler
+      // adopts it. The "delete account" Seam 1 cases assert each outcome as a
+      // normal HTTP response. Scoped tight: only from `update-user.mjs` (where
+      // both routes live), only the 302/404 it raises by design. Like the
+      // clause above, this string-matches a compiled path inside `better-auth`
+      // — safe only because the version is pinned exactly (1.7.2, see
+      // `package.json` / ADR-0002); revisit on any bump.
+      const isHandledDeleteUserRejection =
+        typeof e.errorStack === "string" &&
+        e.errorStack.includes("routes/update-user.mjs") &&
+        (e.statusCode === 302 || e.statusCode === 404);
+
+      if (isHandledDeleteUserRejection) return false;
     },
   },
 });

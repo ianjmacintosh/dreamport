@@ -12,7 +12,10 @@ import type { WorkerEnv } from "./env";
  *  - **Global daily cap** — neither a per-IP nor a per-email limit protects
  *    the shared Resend send quota: an attacker sprays one code each across
  *    many addresses and trips neither. A single app-wide counter per UTC day
- *    is the only thing that does.
+ *    is the only thing that does. Since #26 this cap covers *every* outbound
+ *    email, not just OTPs — the account-deletion route in `index.ts` meters
+ *    against the same counter. The `SEND_OTP_*` names are now a slight
+ *    misnomer kept for continuity; renaming them is a separate tidy-up.
  *
  * Each is split into a read (`peek*`, before Better Auth's handler) and a
  * write (`record*`, only after a code actually went out) so a send that Better
@@ -150,6 +153,9 @@ export async function recordOtpSend(
  * under `cap`, **without** spending any. A `false` result should
  * short-circuit with a 429; `retryAfter` counts down to the next UTC
  * midnight, when the day's row rolls over.
+ *
+ * Shared across every outbound-email path (send-OTP and, since #26,
+ * account-deletion) — it is the one guard for the shared Resend quota.
  */
 export async function peekDailySendCap(
   db: WorkerEnv["DB"],

@@ -5,6 +5,7 @@ import { TEST_EMAILS } from "../../test/emails";
 import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 import { createApp } from "./index";
+import { recordDailySend } from "./otp-send-throttle";
 import { PRODUCTION_HOST } from "./trusted-origins";
 import type { TurnstileVerifier } from "./turnstile";
 
@@ -154,6 +155,54 @@ function countUsers(email: string) {
   return env.DB.prepare("SELECT COUNT(*) AS n FROM user WHERE email = ?")
     .bind(email)
     .first<{ n: number }>();
+}
+
+function userIdFor(email: string) {
+  return env.DB.prepare("SELECT id FROM user WHERE email = ?")
+    .bind(email)
+    .first<{ id: string }>();
+}
+
+function countSessions(userId: string) {
+  return env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM "session" WHERE "userId" = ?',
+  )
+    .bind(userId)
+    .first<{ n: number }>();
+}
+
+/** A trusted origin for the state-changing, cookie-bearing #26 requests. */
+const TRUSTED_ORIGIN = `https://${PRODUCTION_HOST}`;
+
+/** POST /api/auth/sign-out with a trusted Origin and the session cookie. */
+function signOut(cookie: string) {
+  return fetchWorker("/api/auth/sign-out", {
+    method: "POST",
+    headers: { origin: TRUSTED_ORIGIN, cookie },
+  });
+}
+
+/**
+ * POST /api/auth/delete-user — the "email me a confirmation link" step. Better
+ * Auth runs its origin check on this (state-changing + cookie-bearing), so it
+ * carries the same `origin` + `cookie` shape as `signOut`.
+ */
+function requestAccountDeletion(cookie: string) {
+  return fetchWorker("/api/auth/delete-user", {
+    method: "POST",
+    headers: { ...json, origin: TRUSTED_ORIGIN, cookie },
+    body: JSON.stringify({ callbackURL: "/" }),
+  });
+}
+
+/** Path + query of the last deletion link the mock sender was handed for `email`. */
+function deleteLinkPathFor(email: string): string {
+  const last = getMockSender()
+    .deleteLinksSent.filter((e) => e.to === email)
+    .at(-1);
+  if (!last) throw new Error(`no delete link was sent to ${email}`);
+  const u = new URL(last.url);
+  return u.pathname + u.search;
 }
 
 beforeEach(async () => {
@@ -507,6 +556,9 @@ describe("verify a sign-in code", () => {
       async sendOtp(email) {
         captured.push(email);
       },
+      async sendDeleteAccountVerification() {
+        throw new Error("not exercised by this test");
+      },
     };
 
     const auth = createAuth(env, { emailSender: spy });
@@ -586,6 +638,192 @@ describe("GET /api/test/last-otp (mock-only test hook)", () => {
 
   it("400s when the email query param is missing", async () => {
     const res = await fetchWorker("/api/test/last-otp");
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("sign out (#26)", () => {
+  it("clears the session cookie, and the old cookie no longer works", async () => {
+    const cookie = await signIn(TEST_EMAILS.signOut);
+
+    const res = await signOut(cookie);
+    expect(res.status).toBe(200);
+
+    const cleared = res.headers
+      .getSetCookie()
+      .find((c) => c.includes("session_token="));
+    expect(cleared).toBeDefined();
+    expect(cleared).toMatch(/;\s*Max-Age=0/i);
+
+    // The AC's "cookie no longer accepted": /app's guard calls /api/me.
+    const me = await fetchWorker("/api/me", { headers: { cookie } });
+    expect(me.status).toBe(401);
+  });
+});
+
+describe("delete account (#26)", () => {
+  const originalDailyCap = env.SEND_OTP_DAILY_CAP;
+  afterEach(() => {
+    env.SEND_OTP_DAILY_CAP = originalDailyCap;
+  });
+
+  it("emails a confirmation link and leaves the User in place until it is followed", async () => {
+    const cookie = await signIn(TEST_EMAILS.deleteSendOk);
+
+    const res = await requestAccountDeletion(cookie);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true });
+    const links = getMockSender().deleteLinksSent.filter(
+      (e) => e.to === TEST_EMAILS.deleteSendOk,
+    );
+    expect(links).toHaveLength(1);
+    expect(links[0].url).toContain("/api/auth/delete-user/callback?token=");
+    expect((await countUsers(TEST_EMAILS.deleteSendOk))?.n).toBe(1);
+  });
+
+  it("401s a deletion request with no session, and sends no link", async () => {
+    const res = await fetchWorker("/api/auth/delete-user", {
+      method: "POST",
+      headers: { ...json, origin: TRUSTED_ORIGIN },
+      body: JSON.stringify({ callbackURL: "/" }),
+    });
+
+    expect(res.status).toBe(401);
+    expect(getMockSender().deleteLinksSent).toHaveLength(0);
+  });
+
+  it("completes deletion when the emailed link is opened in the same session", async () => {
+    const cookie = await signIn(TEST_EMAILS.deleteCallbackOk);
+    const userId = (await userIdFor(TEST_EMAILS.deleteCallbackOk))!.id;
+    await requestAccountDeletion(cookie);
+
+    const res = await fetchWorker(
+      deleteLinkPathFor(TEST_EMAILS.deleteCallbackOk),
+      { headers: { cookie } },
+    );
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/");
+    expect(
+      res.headers.getSetCookie().some((c) => /;\s*Max-Age=0/i.test(c)),
+    ).toBe(true);
+    expect((await countUsers(TEST_EMAILS.deleteCallbackOk))?.n).toBe(0);
+    expect((await countSessions(userId))?.n).toBe(0);
+  });
+
+  it("lets the same address register again after deletion, as a brand-new User", async () => {
+    const cookie = await signIn(TEST_EMAILS.deleteThenReregister);
+    const firstId = (await userIdFor(TEST_EMAILS.deleteThenReregister))!.id;
+    await requestAccountDeletion(cookie);
+    await fetchWorker(deleteLinkPathFor(TEST_EMAILS.deleteThenReregister), {
+      headers: { cookie },
+    });
+    expect((await countUsers(TEST_EMAILS.deleteThenReregister))?.n).toBe(0);
+
+    // "cannot sign in without registering again" — registering again works,
+    // and it is a genuinely new User row, not the old one revived.
+    const newCookie = await signIn(TEST_EMAILS.deleteThenReregister);
+    const secondId = (await userIdFor(TEST_EMAILS.deleteThenReregister))!.id;
+    expect((await countUsers(TEST_EMAILS.deleteThenReregister))?.n).toBe(1);
+    expect(secondId).not.toBe(firstId);
+
+    const me = await fetchWorker("/api/me", { headers: { cookie: newCookie } });
+    expect(me.status).toBe(200);
+  });
+
+  it("404s the callback for an unknown token and keeps the User", async () => {
+    const cookie = await signIn(TEST_EMAILS.deleteBadToken);
+    await requestAccountDeletion(cookie);
+
+    const res = await fetchWorker(
+      "/api/auth/delete-user/callback?token=not-a-real-token&callbackURL=%2F",
+      { headers: { cookie } },
+    );
+
+    expect(res.status).toBe(404);
+    expect((await countUsers(TEST_EMAILS.deleteBadToken))?.n).toBe(1);
+  });
+
+  it("404s the callback when the browser is no longer signed in, and keeps the User", async () => {
+    const cookie = await signIn(TEST_EMAILS.deleteCallbackNoSession);
+    await requestAccountDeletion(cookie);
+    const path = deleteLinkPathFor(TEST_EMAILS.deleteCallbackNoSession);
+
+    const res = await fetchWorker(path); // no cookie
+
+    expect(res.status).toBe(404);
+    expect((await countUsers(TEST_EMAILS.deleteCallbackNoSession))?.n).toBe(1);
+  });
+
+  it("refuses the old session cookie at /api/me after a completed deletion", async () => {
+    const cookie = await signIn(TEST_EMAILS.deleteThenMe);
+    await requestAccountDeletion(cookie);
+    await fetchWorker(deleteLinkPathFor(TEST_EMAILS.deleteThenMe), {
+      headers: { cookie },
+    });
+
+    const res = await fetchWorker("/api/me", { headers: { cookie } });
+
+    expect(res.status).toBe(401);
+  });
+
+  it("429s a deletion request once the daily send cap is spent, sending nothing", async () => {
+    const cookie = await signIn(TEST_EMAILS.deleteDailyCap);
+    env.SEND_OTP_DAILY_CAP = "1";
+    await recordDailySend(env.DB);
+
+    const res = await requestAccountDeletion(cookie);
+
+    expect(res.status).toBe(429);
+    expect(res.headers.has("retry-after")).toBe(true);
+    expect(
+      getMockSender().deleteLinksSent.some(
+        (e) => e.to === TEST_EMAILS.deleteDailyCap,
+      ),
+    ).toBe(false);
+  });
+
+  it("429s the 4th deletion request in 60s from one client (per-IP customRule)", async () => {
+    const cookie = await signIn(TEST_EMAILS.deleteRateLimit);
+
+    for (let i = 0; i < 3; i++) {
+      expect((await requestAccountDeletion(cookie)).status).toBe(200);
+    }
+
+    expect((await requestAccountDeletion(cookie)).status).toBe(429);
+  });
+});
+
+describe("GET /api/test/last-delete-link (mock-only test hook)", () => {
+  it("returns the last deletion link handed to the mock sender for an email", async () => {
+    const cookie = await signIn(TEST_EMAILS.lastDeleteLinkHook);
+    await requestAccountDeletion(cookie);
+
+    const res = await fetchWorker(
+      `/api/test/last-delete-link?email=${encodeURIComponent(
+        TEST_EMAILS.lastDeleteLinkHook,
+      )}`,
+    );
+
+    expect(res.status).toBe(200);
+    const { url } = (await res.json()) as { url: string };
+    expect(url).toContain("/api/auth/delete-user/callback?token=");
+  });
+
+  it("404s when no link has been sent to that address", async () => {
+    const res = await fetchWorker(
+      `/api/test/last-delete-link?email=${encodeURIComponent(
+        TEST_EMAILS.neverSent,
+      )}`,
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it("400s when the email query param is missing", async () => {
+    const res = await fetchWorker("/api/test/last-delete-link");
 
     expect(res.status).toBe(400);
   });

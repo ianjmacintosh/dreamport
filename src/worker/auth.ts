@@ -75,6 +75,26 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
       expiresIn: 30 * DAY,
       updateAge: 1 * DAY,
     },
+    user: {
+      // Account deletion (issue #26). `enabled` turns on `/delete-user` and
+      // `/delete-user/callback`; supplying `sendDeleteAccountVerification`
+      // makes the first call email a confirmation link instead of deleting
+      // straight away. Better Auth 1.7.2 skips the session-freshness check on
+      // that branch (it `return`s before it), so a weeks-old rolling session
+      // still starts the flow; the callback then requires the same
+      // still-signed-in browser and a token bound to this user's id.
+      deleteUser: {
+        enabled: true,
+        sendDeleteAccountVerification: async ({ user, url }) => {
+          await emailSender.sendDeleteAccountVerification({
+            to: user.email,
+            url,
+          });
+        },
+        // No `beforeDelete` yet: the Private space is still empty. When
+        // Products exist, cascade-delete them here.
+      },
+    },
     advanced: {
       // The session cookie is always `Secure` (spec #18). Without this,
       // Better Auth only marks it `Secure` when it can prove the request
@@ -110,6 +130,10 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
       // survives an upstream default change.
       customRules: {
         "/email-otp/send-verification-otp": { window: 60, max: 3 },
+        // The account-deletion request path also sends an email (issue #26).
+        // 3 / 60s per IP/session, matching the send-OTP rule; the global
+        // daily Resend cap covers it too, in the Hono route in `index.ts`.
+        "/delete-user": { window: 60, max: 3 },
         // #24 is scoped to the send path. Turning the limiter on globally
         // would otherwise pull Better Auth's default 3 / 10s `/sign-in*` rule
         // onto the verify endpoint as a side effect; `false` opts that path
