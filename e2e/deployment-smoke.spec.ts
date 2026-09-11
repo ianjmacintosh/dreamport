@@ -19,11 +19,12 @@ import { TEST_EMAILS } from "../test/emails";
  * A real production Managed widget may serve an interactive challenge to
  * automation and hang — production stays a manual check.
  *
- * It can't finish sign-in (the `/api/test/last-otp` hook is `import.meta.env
- * .DEV`-only and stripped from deployed builds), so it stops once a code has
- * been sent. That's the whole Turnstile path: the widget rendered with a
- * real site key, solved a challenge, and the Worker verified the token
- * before Better Auth issued a code.
+ * It can't finish sign-in — `deploySmoke` (test/emails.ts) is deliberately
+ * not a `+e2e-test@` marker address, and that fixed-code path is itself
+ * `import.meta.env.DEV`-only and stripped from deployed builds regardless
+ * (#39) — so it stops once a code has been sent. That's the whole Turnstile
+ * path: the widget rendered with a real site key, solved a challenge, and
+ * the Worker verified the token before Better Auth issued a code.
  */
 
 const BASE_URL = process.env.E2E_BASE_URL;

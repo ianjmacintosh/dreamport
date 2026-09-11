@@ -237,11 +237,22 @@ export function createApp(deps: AppDeps = {}) {
   });
 
   /**
-   * Test-only: hand back the last code the mock sender was given for an
-   * email — the browser's equivalent of reading it off the dev console, so
-   * the Playwright specs never touch a real inbox.
+   * Test-only: hand back the full callback URL from the last account-
+   * deletion link the mock sender was given for an email, so the Playwright
+   * delete spec can `page.goto(url)` instead of reading a real inbox.
    *
-   * Two independent gates, because leaking a valid sign-in code for an
+   * The `/api/test/last-otp` route this used to sit beside is gone (#39):
+   * every login spec now signs in through the `+e2e-test@` fixed-code
+   * marker (see `auth.ts` `generateOTP`) instead of reading a code back
+   * through a hook. This route has no such alternative — Better Auth 1.7.2
+   * hardcodes the deletion callback token's generation (`update-user.mjs`),
+   * with no `generateOTP`-equivalent hook to make it predictable for a
+   * marker address, so there's nothing to swap it for (the same
+   * "no matching hook" situation `docs/adr/0009` documents for session
+   * tokens, which is also a fixed Better Auth internal with no exposed
+   * override).
+   *
+   * Two independent gates, because leaking a valid deletion link for an
    * arbitrary address is account takeover:
    *
    * 1. `import.meta.env.DEV` is statically `true` only under `vite dev`
@@ -252,39 +263,8 @@ export function createApp(deps: AppDeps = {}) {
    *    `EMAIL_MODE=mock`.
    * 2. `EMAIL_MODE` (unset ⇒ mock, matching `createEmailSender`) keeps it
    *    inert in a dev server wired to a real sender.
-   *
-   * The mock sender is one shared instance per isolate, so this reads
-   * exactly what `/api/auth/*` just generated.
    */
   if (import.meta.env.DEV) {
-    app.get("/api/test/last-otp", (c) => {
-      if ((c.env.EMAIL_MODE ?? "mock") !== "mock") {
-        return c.json({ error: "Not found" }, 404);
-      }
-
-      const email = c.req.query("email");
-      if (!email) {
-        return c.json({ error: "email query param is required" }, 400);
-      }
-
-      const last = getMockSender()
-        .sent.filter((e) => e.to === email)
-        .at(-1);
-      if (!last) {
-        return c.json({ error: "no code has been sent to that address" }, 404);
-      }
-
-      return c.json({ otp: last.otp });
-    });
-
-    /**
-     * Test-only sibling of `/api/test/last-otp`: hand back the full callback
-     * URL from the last account-deletion link the mock sender was given for
-     * an email, so the Playwright delete spec can `page.goto(url)` instead of
-     * reading a real inbox. Behind the same two gates — `import.meta.env.DEV`
-     * (dropped from every deployed bundle by `vite build`) and
-     * `EMAIL_MODE=mock`.
-     */
     app.get("/api/test/last-delete-link", (c) => {
       if ((c.env.EMAIL_MODE ?? "mock") !== "mock") {
         return c.json({ error: "Not found" }, 404);

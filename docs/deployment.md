@@ -131,13 +131,17 @@ everywhere else) picks the email sender inside `createAuth`:
 - **`mock`** (also the default when the var is unset) — records the 6-digit
   code in an in-memory buffer and sends nothing. It does **not** log the code
   (issue #41): a one-time code is a bearer credential and Worker logs fan out
-  far wider than the auth DB. To read a code in a mock environment, query the
-  D1 `verification` table directly — same access boundary as the data:
-
-  ```bash
-  wrangler d1 execute dreamport-<db> --env <env> --remote \
-    --command "SELECT identifier, value, expiresAt FROM verification ORDER BY createdAt DESC LIMIT 5"
-  ```
+  far wider than the auth DB. The code is also hashed before it reaches D1
+  (`storeOTP: "hashed"`, issue #39, `docs/adr/0009`), so querying the
+  `verification` table no longer recovers a usable code either — there is no
+  supported way to read one back for a deployed `mock` environment (staging
+  included). `src/worker/auth.ts`'s `generateOTP` fixed-code marker
+  (`+e2e-test@`) doesn't help here: it's `import.meta.env.DEV`-only and
+  compiled out of every deployed bundle, deliberately, since `staging` is a
+  public `*.workers.dev` URL (see `docs/adr/0009` for why). Sign-in against a
+  deployed `mock` environment by hand isn't a supported workflow — drive it
+  locally instead (see the root `README.md`), or through
+  `deployment-smoke.spec.ts`, which only exercises the send step.
 
 - **`resend`** — sends through the Resend API. It additionally requires the
   `RESEND_API_KEY` secret; `createAuth` throws on the first request if it is

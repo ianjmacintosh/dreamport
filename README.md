@@ -149,14 +149,16 @@ bytes, not a word.
 Sign-in email uses the `mock` sender by default — it records the code in
 memory and delivers nothing, so no Resend key is needed for local work. It
 does **not** print the code (a one-time code is a bearer credential; issue
-#41). The Playwright suite reads it back through the `import.meta.env.DEV`-only
-`/api/test/last-otp` hook; to grab one by hand, query the local D1
-`verification` table:
+#41), and the code is hashed before it ever reaches D1 (`storeOTP: "hashed"`,
+issue #39), so querying the `verification` table by hand no longer yields a
+usable code either — there's no supported way to recover one for an
+arbitrary address.
 
-```bash
-wrangler d1 execute dreamport-local --local \
-  --command "SELECT identifier, value, expiresAt FROM verification ORDER BY createdAt DESC LIMIT 5"
-```
+To sign in locally (or in the Playwright suite) without a real inbox, use an
+address whose local part contains the marker `+e2e-test@` (e.g.
+`you+e2e-test@example.com`) — `generateOTP` in `src/worker/auth.ts` returns
+the fixed code `000000` for it. That hook is `import.meta.env.DEV`-only, so
+it never ships in a deployed bundle (see `docs/adr/0009`).
 
 `staging` and `production` set `BETTER_AUTH_SECRET` with `wrangler secret put`
 instead — see [`docs/deployment.md`](docs/deployment.md).

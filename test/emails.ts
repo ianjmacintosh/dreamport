@@ -106,27 +106,34 @@ export const TEST_EMAILS = {
   // --- Seam 1: /api/test/last-delete-link (mock-only test hook) ---
   /** A link is sent, then read back through the test hook. */
   lastDeleteLinkHook: "delivered+last-delete-link-hook@resend.dev",
+  /** Never had anything sent to it; asserts the hook 404s rather than inventing one. */
+  neverSent: "delivered+never-sent@resend.dev",
 
   // --- Seam 1: /api/me ---
   /** Signs in, then reads its own email back from the session endpoint. */
   meOk: "delivered+me-ok@resend.dev",
 
-  // --- Seam 1: /api/test/last-otp (mock-only test hook) ---
-  /** A code is sent, then read back through the test hook. */
-  lastOtpHook: "delivered+last-otp-hook@resend.dev",
-  /** Never sent a code; asserts the hook 404s rather than inventing one. */
-  neverSent: "delivered+never-sent@resend.dev",
-
   // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
+  // Every address below carries the `+e2e-test@` marker (issue #39): the
+  // `+<scenario>` label sits ahead of it, so e.g. "e2e-happy" tags the
+  // scenario and Better Auth still sees the trailing "+e2e-test@" that
+  // `generateOTP` matches on. Playwright types the fixed code "000000"
+  // straight in — no `/api/test/last-otp` hook to read it back from.
   /** Happy path: email step -> code step -> lands on /app. */
-  e2eHappyPath: "delivered+e2e-happy@resend.dev",
+  e2eHappyPath: "delivered+e2e-happy+e2e-test@resend.dev",
   /** Persistent session: sign in, navigate away and back, still signed in. */
-  e2ePersistentSession: "delivered+e2e-persistent@resend.dev",
+  e2ePersistentSession: "delivered+e2e-persistent+e2e-test@resend.dev",
   /** Sign out from `/app`: lands on `/`, a later `/app` visit bounces to `/login`. */
-  e2eSignOut: "delivered+e2e-sign-out@resend.dev",
+  e2eSignOut: "delivered+e2e-sign-out+e2e-test@resend.dev",
   /** Delete account happy path: request link, follow it, `/app` then bounces to `/login`. */
-  e2eDeleteAccount: "delivered+e2e-delete-account@resend.dev",
-  /** Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only. */
+  e2eDeleteAccount: "delivered+e2e-delete-account+e2e-test@resend.dev",
+  /**
+   * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
+   * against a real deployed environment. Deliberately NOT a `+e2e-test@`
+   * marker address: that spec's whole point is proving mock email delivery
+   * is fenced out of a deployed environment (`EMAIL_MODE` there is never
+   * `mock`), so the fixed code must stay unreachable there too.
+   */
   deploySmoke: "delivered+deploy-smoke@resend.dev",
 
   // --- Seam 2: sender unit tests ---

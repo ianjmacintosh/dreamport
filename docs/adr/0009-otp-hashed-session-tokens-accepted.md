@@ -16,9 +16,9 @@ reasoning, which this ADR does not repeat.
 2. **Session tokens: accept and document.** No code change to how
    `session.token` is stored.
 3. **A `generateOTP` hook** returns a fixed test code for a reserved
-   test-email marker, gated to non-production, so E2E tests can sign in
-   without a real inbox — without weakening how OTPs are stored for real
-   users.
+   test-email marker, stripped from every deployed bundle at build time, so
+   E2E tests can sign in without a real inbox — without weakening how OTPs
+   are stored for real users.
 4. **D1-side access hardening** (scoping, audit logging) is a complementary,
    not-yet-built mitigation, tracked separately as
    [#56](https://github.com/ianjmacintosh/dreamport/issues/56).
@@ -74,12 +74,23 @@ storage format.
 
 Implementation: `generateOTP` returns the fixed code `"000000"` when the
 email's local part contains the marker `+e2e-test@` **and**
-`env.EMAIL_MODE !== "resend"`. The `EMAIL_MODE` check reuses the signal that
-already hard-guards production (issue #41's fail-closed check requires
-production to run `EMAIL_MODE=resend`), so the fixed code is off in
-production by construction — never a separate flag to keep in sync. It
-applies to all four OTP types, not just sign-in, so E2E coverage isn't
-limited to the login flow alone.
+`env.EMAIL_MODE !== "resend"` — but the whole hook is also wrapped in
+`import.meta.env.DEV`, the same build-time flag that gates the
+`/api/test/last-delete-link` test hook (and gated the old `/api/test/last-otp`
+hook, now removed — every login spec moved to this fixed-code marker
+instead). That third gate is load-bearing, not redundant: `wrangler.jsonc`
+sets
+`EMAIL_MODE: "mock"` for `staging` too (only `production` runs `resend`),
+and `staging` is `workers_dev: true` — a publicly reachable `*.workers.dev`
+URL. `EMAIL_MODE !== "resend"` alone would have made the fixed code a live,
+unauthenticated sign-in for any `+e2e-test@` address on that public
+deployment. `import.meta.env.DEV` is `true` only under `vite dev` (local
+`npm run dev`, the Playwright webServer) and the vitest pool; `vite build`
+replaces it with `false`, so `generateOTP` compiles out of every deployed
+bundle — staging included — regardless of `EMAIL_MODE`. The `EMAIL_MODE`
+check stays too, as defense in depth for a `vite dev` server someone points
+at a real `RESEND_API_KEY`. It applies to all four OTP types, not just
+sign-in, so E2E coverage isn't limited to the login flow alone.
 
 ## Considered Options — session tokens
 
@@ -131,7 +142,9 @@ limited to the login flow alone.
   per-code, D1-read-access-dependent cost, not the bulk one `"encrypted"`
   would have carried.
 - E2E tests can sign in through any `+e2e-test@` address without a real
-  inbox, but only where `EMAIL_MODE !== "resend"` — never in production.
+  inbox, but only in a `vite dev` server or the vitest pool — the
+  `import.meta.env.DEV` gate strips this out of every deployed bundle,
+  staging included, not just production.
 - D1-side access hardening (scoping, audit logging) is tracked separately
   as #56 and not implemented here.
 - **Revisit trigger:** a Better Auth version bump that adds a supported

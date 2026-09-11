@@ -613,36 +613,6 @@ describe("GET /api/me", () => {
   });
 });
 
-describe("GET /api/test/last-otp (mock-only test hook)", () => {
-  // Mounted only when EMAIL_MODE=mock (the `local` test env sets it). It is
-  // the browser's stand-in for the dev console: Playwright reads the code the
-  // mock sender was handed instead of a real inbox.
-  it("returns the most recent code handed to the mock sender for an email", async () => {
-    await sendCode(TEST_EMAILS.lastOtpHook);
-
-    const res = await fetchWorker(
-      `/api/test/last-otp?email=${encodeURIComponent(TEST_EMAILS.lastOtpHook)}`,
-    );
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ otp: codeFor(TEST_EMAILS.lastOtpHook) });
-  });
-
-  it("404s when no code has been sent to that email", async () => {
-    const res = await fetchWorker(
-      `/api/test/last-otp?email=${encodeURIComponent(TEST_EMAILS.neverSent)}`,
-    );
-
-    expect(res.status).toBe(404);
-  });
-
-  it("400s when the email query param is missing", async () => {
-    const res = await fetchWorker("/api/test/last-otp");
-
-    expect(res.status).toBe(400);
-  });
-});
-
 describe("sign out (#26)", () => {
   it("clears the session cookie, and the old cookie no longer works", async () => {
     const cookie = await signIn(TEST_EMAILS.signOut);
