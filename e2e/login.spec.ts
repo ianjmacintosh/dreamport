@@ -102,6 +102,32 @@ test("happy path: email, then code, then /app shows the signed-in email", async 
   await expect(page.getByText(`signed in as ${email}`)).toBeVisible();
 });
 
+test("a +e2e-test@ address signs in with the fixed code, no hook lookup needed", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eTestFixedCode;
+
+  await gotoLoginFromHomepage(page);
+  await page.getByLabel("Email address").fill(email);
+
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
+    /.+/,
+    { timeout: 15_000 },
+  );
+  await page.getByRole("button", { name: "Send code" }).click();
+
+  // Unlike `signIn` above, the code is typed straight in rather than read
+  // back through `/api/test/last-otp` — this is the point of the fixed code
+  // (issue #39, docs/adr/0009): an external E2E tool with no server access
+  // can still log in a `+e2e-test@` address deterministically.
+  await expect(page.getByLabel("Six-digit code")).toBeVisible();
+  await page.getByLabel("Six-digit code").fill("000000");
+  await page.getByRole("button", { name: "Verify and sign in" }).click();
+
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByText(`signed in as ${email}`)).toBeVisible();
+});
+
 test("the sign-in page presents a bot challenge on the email step", async ({
   page,
 }) => {

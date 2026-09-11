@@ -137,6 +137,12 @@ export const TEST_EMAILS = {
   /** Recipient for the `DeleteAccountEmail` fixture in `sender.test.ts`. */
   deleteLinkRecipient: "delivered+delete-link-recipient@resend.dev",
 
+  // --- Seam 1: fixed E2E-test OTP code (#39) ---
+  /** `+e2e-test@` marker, `EMAIL_MODE=mock`: the fixed code `000000` verifies. */
+  e2eTestFixedCode: "delivered+e2e-test@resend.dev",
+  /** No `+e2e-test@` marker: gets a real random code, not the fixed one. */
+  e2eTestNoMarker: "delivered+not-e2e-test@resend.dev",
+
   // --- Live (opt-in, never CI) ---
   /** Resend's sink: always accepts, never forwards. Only `sender.live.test.ts`. */
   liveSink: "delivered@resend.dev",

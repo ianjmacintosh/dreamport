@@ -156,6 +156,29 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
         // the address becomes a User when a code is verified, not before
         // (see docs/adr/0004-email-otp-no-pending-user.md).
         disableSignUp: false,
+        // Hash the code at rest in `verification.value` rather than storing
+        // it plain (issue #39, docs/adr/0009). No migration: that column is
+        // already a generic `value text`, so this just changes what string
+        // lands in it. No rollout handling either — an OTP mid-flight at
+        // deploy time (sent plain, checked against the new hashed compare)
+        // just fails to verify, bounded by the 60-minute TTL above, and
+        // self-heals the moment the user requests a fresh code.
+        storeOTP: "hashed",
+        // A fixed code for Playwright/E2E logins, so specs don't have to read
+        // the mock sender to find one (issue #39, docs/adr/0009). Gated two
+        // ways: never off `resend` (so this can't leak into production no
+        // matter what a test address looks like), and only for addresses
+        // carrying the `+e2e-test@` marker. Applies to all four OTP types —
+        // sign-in, email-verification, forget-password, change-email — since
+        // none of them are special-cased on `type`. Falls through to Better
+        // Auth's own random generator (a falsy return) otherwise; the
+        // returned code still goes through `storeOTP`/`verifyStoredOTP` like
+        // any other, so attempts/expiry/single-use all still apply.
+        generateOTP: ({ email }) => {
+          if ((env.EMAIL_MODE ?? "mock") === "resend") return undefined;
+          if (!email.toLowerCase().includes("+e2e-test@")) return undefined;
+          return "000000";
+        },
         async sendVerificationOTP({ email, otp, type }) {
           await emailSender.sendOtp({ to: email, otp, type });
         },
