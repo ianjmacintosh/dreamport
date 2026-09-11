@@ -22,6 +22,52 @@ export interface AuthDeps {
 }
 
 /**
+ * Builds the `generateOTP` callback for the `emailOTP` plugin below: a fixed
+ * test-login code (`"000000"`) for any `+e2e-test@` address, so Playwright
+ * specs can sign in without a real inbox (issue #39, docs/adr/0009).
+ *
+ * The return type is deliberately a plain function, never
+ * `((...) => ...) | undefined` — Better Auth's `email-otp` routes call
+ * `opts.generateOTP(...)` unconditionally, with no `?.` guard, so
+ * `generateOTP` itself must never be `undefined` or every OTP send (sign-in
+ * included) throws instead of just skipping the fixed code. That's exactly
+ * what shipped in #61: `generateOTP: import.meta.env.DEV ? fn : undefined`
+ * made the whole property `undefined` in a real production build, and no
+ * test caught it because `import.meta.env.DEV` is a build-time constant —
+ * always `true` in the Vitest and Playwright pools, so the crashing branch
+ * is structurally unreachable by any test that isn't itself an alternate
+ * build. Extracting this as its own function (always returning a function,
+ * enforced by the signature) and gating *inside* it with `TEST_LOGIN_ENABLED`
+ * — a runtime var, not a build-time flag — makes the "off" behavior directly
+ * testable with a plain unit test instead.
+ *
+ * `env.TEST_LOGIN_ENABLED` is `"true"` only in `wrangler.jsonc`'s `local` and
+ * `dev` envs, absent (falsy) everywhere else — `staging` included, since it's
+ * `workers_dev: true` (a public *.workers.dev URL). `EMAIL_MODE=mock` alone
+ * isn't a sufficient gate on its own: `staging` runs it too. `EMAIL_MODE`
+ * still gets checked as well, as defense in depth for a `vite dev` server
+ * someone points at a real `RESEND_API_KEY`.
+ *
+ * Applies to all four OTP types — sign-in, email-verification,
+ * forget-password, change-email — since callers never special-case on
+ * `type`. Falls through to Better Auth's own random generator on a falsy
+ * return; the returned code still goes through `storeOTP`/`verifyStoredOTP`
+ * like any other, so attempts/expiry/single-use all still apply. Exported
+ * for direct unit testing (`auth.test.ts`), independent of `createAuth`'s D1
+ * and Better Auth wiring.
+ */
+export function buildTestLoginOTP(
+  env: WorkerEnv,
+): (data: { email: string }) => string | undefined {
+  return ({ email }) => {
+    if (env.TEST_LOGIN_ENABLED !== "true") return undefined;
+    if ((env.EMAIL_MODE ?? "mock") === "resend") return undefined;
+    if (!email.toLowerCase().includes("+e2e-test@")) return undefined;
+    return "000000";
+  };
+}
+
+/**
  * Build the auth object (the bundle of functions `betterAuth()` returns) for
  * each request.
  *
@@ -164,43 +210,9 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
         // just fails to verify, bounded by the 60-minute TTL above, and
         // self-heals the moment the user requests a fresh code.
         storeOTP: "hashed",
-        // A fixed code for Playwright/E2E logins, so specs don't have to read
-        // the mock sender to find one (issue #39, docs/adr/0009). Gated three
-        // ways, because this is a hardcoded credential for any address that
-        // matches:
-        //
-        // 1. `import.meta.env.DEV` is statically `true` only under `vite dev`
-        //    (local `npm run dev`, the Playwright webServer) and the vitest
-        //    pool; `vite build` replaces it with `false`. This has to stay an
-        //    `if` *inside* the function, not a ternary on the `generateOTP`
-        //    property itself — Better Auth's routes call `opts.generateOTP(...)`
-        //    unconditionally, with no `?.` guard, so a production build where
-        //    the property itself is `undefined` throws on every OTP send
-        //    (sign-in included) instead of just skipping the fixed code.
-        //    `vite build` still dead-code-eliminates the `false` branch below,
-        //    so the deployed bundle keeps a real function that always falls
-        //    through, not the fixed code. `EMAIL_MODE=mock` alone isn't
-        //    enough: `wrangler.jsonc` sets it for `staging` too, and that env
-        //    is `workers_dev: true` (a public *.workers.dev URL) — without
-        //    this gate, anyone could sign in as an arbitrary `+e2e-test@`
-        //    address there. Only `production` runs `resend`.
-        // 2. `EMAIL_MODE` (unset ⇒ mock) stays inert in a dev server wired to
-        //    a real sender, matching the `/api/test/last-otp` hook's old
-        //    reasoning.
-        // 3. Only for addresses carrying the `+e2e-test@` marker.
-        //
-        // Applies to all four OTP types — sign-in, email-verification,
-        // forget-password, change-email — since none of them are
-        // special-cased on `type`. Falls through to Better Auth's own random
-        // generator (a falsy return) otherwise; the returned code still goes
-        // through `storeOTP`/`verifyStoredOTP` like any other, so
-        // attempts/expiry/single-use all still apply.
-        generateOTP: ({ email }) => {
-          if (!import.meta.env.DEV) return undefined;
-          if ((env.EMAIL_MODE ?? "mock") === "resend") return undefined;
-          if (!email.toLowerCase().includes("+e2e-test@")) return undefined;
-          return "000000";
-        },
+        // See `buildTestLoginOTP` above for the fixed-test-code mechanism and
+        // why it's built as its own function rather than inlined here.
+        generateOTP: buildTestLoginOTP(env),
         async sendVerificationOTP({ email, otp, type }) {
           await emailSender.sendOtp({ to: email, otp, type });
         },

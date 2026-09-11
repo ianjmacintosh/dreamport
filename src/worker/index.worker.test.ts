@@ -856,6 +856,40 @@ describe("fixed E2E-test OTP code (#39)", () => {
     expect(captured[0].otp).not.toBe("000000");
     expect(captured[0].otp).toMatch(/^\d{6}$/);
   });
+
+  // The bug #61 shipped and #62 hotfixed: `staging` runs `EMAIL_MODE=mock`
+  // too (it's not just a production-only setting), so `EMAIL_MODE` alone
+  // can't be what keeps the fixed code off a public deployment —
+  // `TEST_LOGIN_ENABLED` is the var that actually does that job, and it's
+  // absent from `staging`'s `wrangler.jsonc` vars. This constructs exactly
+  // that shape (mock email, no `TEST_LOGIN_ENABLED`) and drives it through
+  // a real `createAuth` + `sendVerificationOTP` call, the same way the
+  // `EMAIL_MODE=resend` case above does — proof this is testable at all,
+  // which the old `import.meta.env.DEV` gate never was.
+  it("is inert when TEST_LOGIN_ENABLED is unset, even with EMAIL_MODE=mock", async () => {
+    const captured: OtpEmail[] = [];
+    const spy: EmailSender = {
+      async sendOtp(email) {
+        captured.push(email);
+      },
+      async sendDeleteAccountVerification() {
+        throw new Error("not exercised by this test");
+      },
+    };
+
+    const stagingShaped = { ...env, TEST_LOGIN_ENABLED: undefined };
+    const auth = createAuth(stagingShaped, { emailSender: spy });
+    const res = await auth.api.sendVerificationOTP({
+      body: { email: TEST_EMAILS.e2eTestFixedCode, type: "sign-in" },
+      headers: { host: new URL(ORIGIN).host },
+      asResponse: true,
+    });
+
+    expect(res.status).toBe(200);
+    expect(captured).toHaveLength(1);
+    expect(captured[0].otp).not.toBe("000000");
+    expect(captured[0].otp).toMatch(/^\d{6}$/);
+  });
 });
 
 describe("trusted origins (via Better Auth's origin check)", () => {

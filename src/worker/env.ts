@@ -32,6 +32,17 @@ export interface WorkerEnv {
    */
   EMAIL_MODE?: "mock" | "resend";
   /**
+   * Enables `generateOTP`'s fixed test-login code for `+e2e-test@` addresses
+   * (issue #39, docs/adr/0009) — `"true"` only in `wrangler.jsonc`'s `local`
+   * and `dev` envs, absent (falsy) everywhere else, `staging` included. A
+   * runtime var rather than an `import.meta.env.DEV` build-time flag,
+   * specifically so the gate itself stays testable with a plain unit test
+   * instead of requiring a real alternate build to exercise the "off"
+   * branch — see `docs/adr/0009`'s hotfix note for why that distinction
+   * matters.
+   */
+  TEST_LOGIN_ENABLED?: string;
+  /**
    * Max outbound emails the app will send app-wide in one UTC day — the guard
    * for the shared Resend quota (issue #24, ADR-0007; extended to cover the
    * account-deletion email in #26). A plain var, not a secret. A positive

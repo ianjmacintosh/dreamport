@@ -16,9 +16,9 @@ reasoning, which this ADR does not repeat.
 2. **Session tokens: accept and document.** No code change to how
    `session.token` is stored.
 3. **A `generateOTP` hook** returns a fixed test code for a reserved
-   test-email marker, stripped from every deployed bundle at build time, so
-   E2E tests can sign in without a real inbox — without weakening how OTPs
-   are stored for real users.
+   test-email marker, gated by a runtime env var (`TEST_LOGIN_ENABLED`) set
+   only in local/dev `wrangler.jsonc` envs, so E2E tests can sign in without
+   a real inbox — without weakening how OTPs are stored for real users.
 4. **D1-side access hardening** (scoping, audit logging) is a complementary,
    not-yet-built mitigation, tracked separately as
    [#56](https://github.com/ianjmacintosh/dreamport/issues/56).
@@ -72,25 +72,60 @@ test code is hashed at rest exactly like a real one and exercises the real
 send → store → verify round trip end to end. No bypass, no second
 storage format.
 
-Implementation: `generateOTP` returns the fixed code `"000000"` when the
-email's local part contains the marker `+e2e-test@` **and**
-`env.EMAIL_MODE !== "resend"` — but the whole hook is also wrapped in
-`import.meta.env.DEV`, the same build-time flag that gates the
-`/api/test/last-delete-link` test hook (and gated the old `/api/test/last-otp`
-hook, now removed — every login spec moved to this fixed-code marker
-instead). That third gate is load-bearing, not redundant: `wrangler.jsonc`
-sets
-`EMAIL_MODE: "mock"` for `staging` too (only `production` runs `resend`),
-and `staging` is `workers_dev: true` — a publicly reachable `*.workers.dev`
-URL. `EMAIL_MODE !== "resend"` alone would have made the fixed code a live,
-unauthenticated sign-in for any `+e2e-test@` address on that public
-deployment. `import.meta.env.DEV` is `true` only under `vite dev` (local
-`npm run dev`, the Playwright webServer) and the vitest pool; `vite build`
-replaces it with `false`, so `generateOTP` compiles out of every deployed
-bundle — staging included — regardless of `EMAIL_MODE`. The `EMAIL_MODE`
-check stays too, as defense in depth for a `vite dev` server someone points
-at a real `RESEND_API_KEY`. It applies to all four OTP types, not just
+Implementation (`buildTestLoginOTP` in `src/worker/auth.ts`): `generateOTP`
+returns the fixed code `"000000"` when the email's local part contains the
+marker `+e2e-test@`, **and** `env.TEST_LOGIN_ENABLED === "true"`, **and**
+`env.EMAIL_MODE !== "resend"`. It applies to all four OTP types, not just
 sign-in, so E2E coverage isn't limited to the login flow alone.
+
+**Two outages taught the shape of this gate; both are worth keeping visible.**
+
+_First pass (shipped in #61):_ gated on `env.EMAIL_MODE !== "resend"` alone.
+Wrong, because `wrangler.jsonc` sets `EMAIL_MODE: "mock"` for `staging` too
+(only `production` runs `resend`), and `staging` is `workers_dev: true` — a
+publicly reachable `*.workers.dev` URL. That gate alone would have made the
+fixed code a live, unauthenticated sign-in for any `+e2e-test@` address on a
+public deployment.
+
+_Second pass (still in #61, before merge):_ fixed the above by wrapping the
+whole hook in `import.meta.env.DEV` — `true` only under `vite dev` (local
+`npm run dev`, the Playwright webServer) and the vitest pool, `false` under
+`vite build` — as a ternary around the `generateOTP` property itself:
+`generateOTP: import.meta.env.DEV ? fn : undefined`. This is where it broke
+production: Better Auth's `email-otp` routes call `opts.generateOTP(...)`
+unconditionally, with **no `?.` guard**, so a build where the property
+itself was `undefined` threw `TypeError: opts.generateOTP is not a function`
+on every OTP send — sign-in included, not just the fixed-code path. Nothing
+in Vitest or Playwright caught it, because `import.meta.env.DEV` is a
+build-time constant that is `true` in both test pools unconditionally — the
+crashing branch is structurally unreachable by any test that isn't itself an
+alternate `vite build`. #62 hotfixed it by moving the check inside the
+function body instead of around the property.
+
+_Current design (this ADR, post-hotfix redesign):_ the hotfix was correct
+but still relied on a build-time flag for the actual on/off decision, which
+is untestable by anything short of doing a real production build (as #62's
+own verification had to). Replaced `import.meta.env.DEV` with
+`TEST_LOGIN_ENABLED`, an ordinary runtime var: `"true"` in `wrangler.jsonc`'s
+`local` and `dev` envs, absent (falsy) everywhere else, `staging` included —
+the same mechanism `EMAIL_MODE` already uses, and precedent this codebase
+already trusts. The generator itself is now `buildTestLoginOTP(env)`, a
+named function whose return type is a plain function (never
+`fn | undefined`), so the property-could-be-undefined defect class is ruled
+out by the type signature, not just by care. Because the gate is a runtime
+read now, `src/worker/auth.test.ts` exercises the "off" (staging/production-
+shaped) behavior directly with a plain unit test — something no test could
+do while the gate was a build-time constant. `EMAIL_MODE` still gets checked
+too, as defense in depth for a `vite dev` server someone points at a real
+`RESEND_API_KEY`.
+
+The general lesson, not just this one bug: build-time flags
+(`import.meta.env.DEV`) are fine for gating whether a whole route is
+_mounted_ (`/api/test/last-delete-link` still uses one — a missing route
+just 404s, a safe, well-tested "off" state) but wrong for gating a _config
+value handed to a library that calls it unconditionally_ — there, the "off"
+state is an untested, unvalidated value, and it's exactly the branch every
+test pool always skips.
 
 ## Considered Options — session tokens
 
@@ -142,9 +177,8 @@ sign-in, so E2E coverage isn't limited to the login flow alone.
   per-code, D1-read-access-dependent cost, not the bulk one `"encrypted"`
   would have carried.
 - E2E tests can sign in through any `+e2e-test@` address without a real
-  inbox, but only in a `vite dev` server or the vitest pool — the
-  `import.meta.env.DEV` gate strips this out of every deployed bundle,
-  staging included, not just production.
+  inbox, but only where `TEST_LOGIN_ENABLED=true` — `wrangler.jsonc`'s
+  `local` and `dev` envs, never `staging` or `production`.
 - D1-side access hardening (scoping, audit logging) is tracked separately
   as #56 and not implemented here.
 - **Revisit trigger:** a Better Auth version bump that adds a supported
@@ -166,3 +200,8 @@ sign-in, so E2E coverage isn't limited to the login flow alone.
   both this issue and ADR-0005
 - [#41](https://github.com/ianjmacintosh/dreamport/issues/41) — the
   fail-closed `EMAIL_MODE` guard this ADR's test-login gate reuses
+- [#61](https://github.com/ianjmacintosh/dreamport/pull/61) /
+  [#62](https://github.com/ianjmacintosh/dreamport/pull/62) — the PR that
+  shipped this ADR's first two test-login gate designs, and the hotfix PR
+  that patched the second; see "The test-login mechanism" above for what
+  each one got wrong and why
