@@ -171,13 +171,19 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
         //
         // 1. `import.meta.env.DEV` is statically `true` only under `vite dev`
         //    (local `npm run dev`, the Playwright webServer) and the vitest
-        //    pool. `vite build` replaces it with `false`, so this branch is
-        //    dead-code-eliminated from every deployed bundle — staging
-        //    included. `EMAIL_MODE=mock` alone isn't enough: `wrangler.jsonc`
-        //    sets it for `staging` too, and that env is `workers_dev: true`
-        //    (a public *.workers.dev URL) — without this gate, anyone could
-        //    sign in as an arbitrary `+e2e-test@` address there. Only
-        //    `production` runs `resend`.
+        //    pool; `vite build` replaces it with `false`. This has to stay an
+        //    `if` *inside* the function, not a ternary on the `generateOTP`
+        //    property itself — Better Auth's routes call `opts.generateOTP(...)`
+        //    unconditionally, with no `?.` guard, so a production build where
+        //    the property itself is `undefined` throws on every OTP send
+        //    (sign-in included) instead of just skipping the fixed code.
+        //    `vite build` still dead-code-eliminates the `false` branch below,
+        //    so the deployed bundle keeps a real function that always falls
+        //    through, not the fixed code. `EMAIL_MODE=mock` alone isn't
+        //    enough: `wrangler.jsonc` sets it for `staging` too, and that env
+        //    is `workers_dev: true` (a public *.workers.dev URL) — without
+        //    this gate, anyone could sign in as an arbitrary `+e2e-test@`
+        //    address there. Only `production` runs `resend`.
         // 2. `EMAIL_MODE` (unset ⇒ mock) stays inert in a dev server wired to
         //    a real sender, matching the `/api/test/last-otp` hook's old
         //    reasoning.
@@ -189,15 +195,12 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
         // generator (a falsy return) otherwise; the returned code still goes
         // through `storeOTP`/`verifyStoredOTP` like any other, so
         // attempts/expiry/single-use all still apply.
-        generateOTP: import.meta.env.DEV
-          ? ({ email }) => {
-              if ((env.EMAIL_MODE ?? "mock") === "resend") return undefined;
-              if (!email.toLowerCase().includes("+e2e-test@")) {
-                return undefined;
-              }
-              return "000000";
-            }
-          : undefined,
+        generateOTP: ({ email }) => {
+          if (!import.meta.env.DEV) return undefined;
+          if ((env.EMAIL_MODE ?? "mock") === "resend") return undefined;
+          if (!email.toLowerCase().includes("+e2e-test@")) return undefined;
+          return "000000";
+        },
         async sendVerificationOTP({ email, otp, type }) {
           await emailSender.sendOtp({ to: email, otp, type });
         },
