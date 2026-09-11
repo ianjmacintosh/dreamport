@@ -4,9 +4,11 @@ import { defineConfig, devices } from "@playwright/test";
  * `E2E_BASE_URL` switches the run from the local Worker to a deployed
  * environment: the base URL points there, the local `webServer` and D1
  * migration setup are skipped, and only `deployment-smoke.spec.ts` runs (the
- * `/login`+`/app` specs need the DEV-only `/api/test/last-otp` hook, which
- * deployed builds don't have). Unset, everything is as before and the smoke
- * spec is skipped.
+ * `/login`+`/app` specs' delete-account case needs the DEV-only
+ * `/api/test/last-delete-link` hook, which deployed builds don't have — sign-
+ * in itself no longer needs a hook there, since #39 moved it to the
+ * `+e2e-test@` fixed-code marker). Unset, everything is as before and the
+ * smoke spec is skipped.
  */
 const DEPLOYED_TARGET = process.env.E2E_BASE_URL;
 
@@ -59,7 +61,7 @@ export default defineConfig({
    * the run. `e2e:server` first applies the D1 migrations to the local
    * database, then starts the dev server on a fixed port. `EMAIL_MODE` is
    * `mock` for the `local` env (wrangler.jsonc), so no real email is sent and
-   * the `/api/test/last-otp` hook is mounted.
+   * the `/api/test/last-delete-link` hook is mounted.
    */
   webServer: DEPLOYED_TARGET
     ? undefined

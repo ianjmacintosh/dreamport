@@ -613,36 +613,6 @@ describe("GET /api/me", () => {
   });
 });
 
-describe("GET /api/test/last-otp (mock-only test hook)", () => {
-  // Mounted only when EMAIL_MODE=mock (the `local` test env sets it). It is
-  // the browser's stand-in for the dev console: Playwright reads the code the
-  // mock sender was handed instead of a real inbox.
-  it("returns the most recent code handed to the mock sender for an email", async () => {
-    await sendCode(TEST_EMAILS.lastOtpHook);
-
-    const res = await fetchWorker(
-      `/api/test/last-otp?email=${encodeURIComponent(TEST_EMAILS.lastOtpHook)}`,
-    );
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ otp: codeFor(TEST_EMAILS.lastOtpHook) });
-  });
-
-  it("404s when no code has been sent to that email", async () => {
-    const res = await fetchWorker(
-      `/api/test/last-otp?email=${encodeURIComponent(TEST_EMAILS.neverSent)}`,
-    );
-
-    expect(res.status).toBe(404);
-  });
-
-  it("400s when the email query param is missing", async () => {
-    const res = await fetchWorker("/api/test/last-otp");
-
-    expect(res.status).toBe(400);
-  });
-});
-
 describe("sign out (#26)", () => {
   it("clears the session cookie, and the old cookie no longer works", async () => {
     const cookie = await signIn(TEST_EMAILS.signOut);
@@ -832,6 +802,59 @@ describe("GET /api/test/last-delete-link (mock-only test hook)", () => {
     const res = await fetchWorker("/api/test/last-delete-link");
 
     expect(res.status).toBe(400);
+  });
+});
+
+describe("fixed E2E-test OTP code (#39)", () => {
+  // Marker-carrying address, `EMAIL_MODE=mock` (this pool's setting): the
+  // code is the fixed "000000" and a real sign-in completes with it.
+  it("verifies with the fixed code for a +e2e-test@ address", async () => {
+    await sendCode(TEST_EMAILS.e2eTestFixedCode);
+
+    expect(codeFor(TEST_EMAILS.e2eTestFixedCode)).toBe("000000");
+
+    const res = await verifyCode(TEST_EMAILS.e2eTestFixedCode, "000000");
+    expect(res.status).toBe(200);
+  });
+
+  // Same mode, no marker: falls through to Better Auth's own generator.
+  it("still gets a random code for an address without the marker", async () => {
+    await sendCode(TEST_EMAILS.e2eTestNoMarker);
+
+    expect(codeFor(TEST_EMAILS.e2eTestNoMarker)).toMatch(/^\d{6}$/);
+  });
+
+  // The production-safety guarantee: even a marker address never gets the
+  // fixed code once `EMAIL_MODE=resend`, regardless of what the address
+  // looks like. Driven through `auth.api.*` directly with an injected
+  // sender (as the "bypassing EMAIL_MODE" case above does) so this needs no
+  // real Resend call — only `generateOTP`'s own `env.EMAIL_MODE` read is
+  // under test here.
+  it("is inert when EMAIL_MODE=resend, even for a marker address", async () => {
+    const captured: OtpEmail[] = [];
+    const spy: EmailSender = {
+      async sendOtp(email) {
+        captured.push(email);
+      },
+      async sendDeleteAccountVerification() {
+        throw new Error("not exercised by this test");
+      },
+    };
+
+    const auth = createAuth(
+      { ...env, EMAIL_MODE: "resend" },
+      { emailSender: spy },
+    );
+    const res = await auth.api.sendVerificationOTP({
+      body: { email: TEST_EMAILS.e2eTestFixedCode, type: "sign-in" },
+      headers: { host: new URL(ORIGIN).host },
+      asResponse: true,
+    });
+
+    expect(res.status).toBe(200);
+    expect(captured).toHaveLength(1);
+    expect(captured[0].otp).not.toBe("000000");
+    expect(captured[0].otp).toMatch(/^\d{6}$/);
   });
 });
 
