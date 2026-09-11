@@ -136,12 +136,13 @@ everywhere else) picks the email sender inside `createAuth`:
   `verification` table no longer recovers a usable code either — there is no
   supported way to read one back for a deployed `mock` environment (staging
   included). `src/worker/auth.ts`'s `generateOTP` fixed-code marker
-  (`+e2e-test@`) doesn't help here: it's `import.meta.env.DEV`-only and
-  compiled out of every deployed bundle, deliberately, since `staging` is a
-  public `*.workers.dev` URL (see `docs/adr/0009` for why). Sign-in against a
-  deployed `mock` environment by hand isn't a supported workflow — drive it
-  locally instead (see the root `README.md`), or through
-  `deployment-smoke.spec.ts`, which only exercises the send step.
+  (`+e2e-test@`) doesn't help here: it's gated on `TEST_LOGIN_ENABLED`,
+  which `wrangler.jsonc` only sets `"true"` for `local`/`dev`, deliberately
+  never for `staging` (a public `*.workers.dev` URL) or `production` (see
+  `docs/adr/0009` for why). Sign-in against a deployed `mock` environment by
+  hand isn't a supported workflow — drive it locally instead (see the root
+  `README.md`), or through `deployment-smoke.spec.ts`, which only exercises
+  the send step.
 
 - **`resend`** — sends through the Resend API. It additionally requires the
   `RESEND_API_KEY` secret; `createAuth` throws on the first request if it is

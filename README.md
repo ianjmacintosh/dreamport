@@ -157,8 +157,9 @@ arbitrary address.
 To sign in locally (or in the Playwright suite) without a real inbox, use an
 address whose local part contains the marker `+e2e-test@` (e.g.
 `you+e2e-test@example.com`) — `generateOTP` in `src/worker/auth.ts` returns
-the fixed code `000000` for it. That hook is `import.meta.env.DEV`-only, so
-it never ships in a deployed bundle (see `docs/adr/0009`).
+the fixed code `000000` for it. That's gated on `TEST_LOGIN_ENABLED`, a var
+`wrangler.jsonc` only sets `"true"` for the `local` and `dev` envs — never
+`staging` or `production` (see `docs/adr/0009`).
 
 `staging` and `production` set `BETTER_AUTH_SECRET` with `wrangler secret put`
 instead — see [`docs/deployment.md`](docs/deployment.md).

@@ -101,6 +101,8 @@
       "name": "dreamport-localhost",
       "vars": {
         "EMAIL_MODE": "mock",
+        // See "local" below — same purpose, same reasoning.
+        "TEST_LOGIN_ENABLED": "true",
       },
       "d1_databases": [
         {
@@ -115,6 +117,15 @@
       "name": "dreamport-localhost",
       "vars": {
         "EMAIL_MODE": "mock",
+        // Enables `generateOTP`'s fixed test-login code (`+e2e-test@`,
+        // issue #39, docs/adr/0009) — a runtime var, not a build-time flag
+        // like `import.meta.env.DEV`, specifically so its own gating logic
+        // stays exercisable by an ordinary unit test instead of requiring a
+        // real alternate build to prove the "off" branch behaves. Absent
+        // (falsy) from every other env below by omission, not `"false"` —
+        // `staging` included, since it's `workers_dev: true` (a public
+        // *.workers.dev URL) and must never carry this.
+        "TEST_LOGIN_ENABLED": "true",
       },
       "d1_databases": [
         {
