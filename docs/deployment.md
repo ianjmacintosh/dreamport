@@ -283,17 +283,49 @@ Environment is set at **build** time, not deploy time.
 
 The specific build and deploy commands are managed per-project in the Cloudflare web UI:
 
-| Setting                                   | `dreamport` (production)                  | `dreamport-staging` (staging)          |
-| ----------------------------------------- | ----------------------------------------- | -------------------------------------- |
-| Build command                             | `CLOUDFLARE_ENV=production npm run build` | `CLOUDFLARE_ENV=staging npm run build` |
-| Production branch                         | `main`                                    | (never pushed to)                      |
-| Deploy command (production-branch pushes) | `npx wrangler deploy`                     | `npx wrangler deploy`                  |
-| Version command (other branches)          | _(disabled)_                              | `npx wrangler versions upload`         |
+| Setting                                   | `dreamport` (production)                          | `dreamport-staging` (staging)          |
+| ----------------------------------------- | ------------------------------------------------- | -------------------------------------- |
+| Build command                             | `CLOUDFLARE_ENV=production npm run build`         | `CLOUDFLARE_ENV=staging npm run build` |
+| Production branch                         | `main`                                            | (never pushed to)                      |
+| Deploy command (production-branch pushes) | `npm run smoke:send-email && npx wrangler deploy` | `npx wrangler deploy`                  |
+| Version command (other branches)          | _(disabled)_                                      | `npx wrangler versions upload`         |
 
 `CLOUDFLARE_ENV` is set only in the Build command string, never as a separate
 dashboard Build _variable_; `VITE_TURNSTILE_SITE_KEY` isn't set in the
 dashboard at all (it comes from the `vite.config.ts` map). See
 [Build step](#build-step) for why.
+
+### Real-send smoke test (production deploy gate)
+
+`dreamport`'s Deploy command (the table above) runs `npm run
+smoke:send-email` before `wrangler deploy`. That script
+(`scripts/smoke-send-email.sh`) makes one real POST to the Resend API,
+addressed to Resend's documented safe sink `delivered@resend.dev`, and exits
+non-zero on anything but a 2xx response. `&&` is load-bearing: a failed send
+stops `wrangler deploy` from ever running, so a broken email path fails the
+deploy instead of shipping silently (ADR-0010).
+
+This runs once per production deploy, not per PR or staging build —
+`dreamport-staging`'s Version command is untouched — because
+`delivered@resend.dev` sends still count against the account's shared send
+quota (confirmed against Resend's own docs:
+[`docs/research-resend-test-address-quota.md`](research-resend-test-address-quota.md)),
+and ADR-0007's quota threat model treats that quota as shared across every
+environment. It's a real-endpoint complement to, not a replacement for, the
+MSW-stubbed Vitest coverage of `ResendEmailSender` — MSW never leaves the
+process, so it can't prove the real Resend endpoint, auth, and payload shape
+actually work.
+
+It needs `RESEND_API_KEY` in the Deploy command's environment. This is a
+**Build-time secret** on the `dreamport` Workers Builds project (Settings →
+Build → Environment variables, added as type Secret), provisioned via the
+dashboard like every other credential here (no CLI secret writes — see
+[What's not committed](#whats-not-committed)). It is deliberately a separate
+credential from the **runtime** `RESEND_API_KEY` secret the deployed Worker
+reads at request time (`wrangler secret put` / the runtime "Variables and
+Secrets" panel) — the same key value works for both, but Build environment
+variables and runtime secrets are different Cloudflare stores and are set up
+as two separate steps.
 
 ## First-time setup
 

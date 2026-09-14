@@ -20,7 +20,8 @@
     "migrate:staging": "wrangler d1 migrations apply dreamport-stage --env staging --remote",
     "migrate:production": "wrangler d1 migrations apply dreamport-prod --env production --remote",
     "verify:staging": "scripts/verify-deployment.sh staging",
-    "verify:production": "scripts/verify-deployment.sh production"
+    "verify:production": "scripts/verify-deployment.sh production",
+    "smoke:send-email": "scripts/smoke-send-email.sh"
   },
   "dependencies": {
     "@fontsource-variable/nunito": "^5.3.0",
