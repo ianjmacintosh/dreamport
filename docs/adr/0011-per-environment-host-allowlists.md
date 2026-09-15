@@ -25,8 +25,8 @@ Production's list carries only its own host — no staging hosts, no
 `localhost`. Staging's carries its own persistent host plus the per-branch
 preview wildcard. Local carries `localhost`. Still plain constant arrays,
 each still just data with no per-request computation — this amends
-ADR-0003's holding about *scope* (one list vs. one list per environment), not
-its holding about *shape* (constant array vs. function), which stands
+ADR-0003's holding about _scope_ (one list vs. one list per environment), not
+its holding about _shape_ (constant array vs. function), which stands
 unchanged. ADR-0003 itself already carries a running "Amended" note for
 `ALLOWED_HOSTS` (#22) and the `PRODUCTION_HOSTS`/`STAGING_HOSTS` groups (#41);
 this decision is recorded there too, the same way.
@@ -54,7 +54,7 @@ diff.
 
 - **Move the lists into `wrangler.jsonc` vars instead of code constants.**
   Rejected once the actual requirement was clarified: the value already
-  *does* need to differ per environment (that's the point of this whole
+  _does_ need to differ per environment (that's the point of this whole
   decision), and per-environment vars are the natural way to express
   environment-specific config — but the specific list content is still most
   usefully expressed as typed, documented, unit-tested source (matching how
