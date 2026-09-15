@@ -37,6 +37,11 @@ config key.
   send-OTP path — out of the two arrays, which are now composed from the
   groups. The file is the host-policy module: still plain data, no
   per-request logic, no function form.)_
+  _(Amended by [ADR-0011](0011-per-environment-host-allowlists.md), #63:
+  `TRUSTED_ORIGINS`/`ALLOWED_HOSTS` stop being one array shared by every
+  environment's build — each environment now gets its own list. The
+  constant-array shape this ADR decided stands unchanged; only the
+  shared-across-environments scope changes.)_
 - The preview wildcard is `https://*-dreamport.bananasquad.workers.dev`, not
   `https://*.workers.dev` — scoped to this account's `bananasquad` subdomain,
   so an unrelated Workers host cannot pass the origin / `callbackURL` check.

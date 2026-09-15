@@ -77,6 +77,13 @@ returns the fixed code `"000000"` when the email's local part contains the
 marker `+e2e-test@`, **and** `env.TEST_LOGIN_ENABLED === "true"`, **and**
 `env.EMAIL_MODE !== "resend"`. It applies to all four OTP types, not just
 sign-in, so E2E coverage isn't limited to the login flow alone.
+_(Amended by [ADR-0010](0010-email-delivery-keyed-on-resend-api-key-presence.md),
+#63: `EMAIL_MODE` is retired, and the `EMAIL_MODE !== "resend"` clause is
+dropped rather than translated — `TEST_LOGIN_ENABLED` becomes the sole,
+independent gate. Staging deliberately pairs `TEST_LOGIN_ENABLED=true` with a
+real `RESEND_API_KEY`, the exact "dev server pointed at a real key" scenario
+this clause used to guard against — by design there now, not by accident, so
+the guard no longer needs to defend against it.)_
 
 **Two outages taught the shape of this gate; both are worth keeping visible.**
 
