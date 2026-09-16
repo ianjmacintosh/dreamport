@@ -13,6 +13,7 @@ import {
 import {
   CURRENT_ENVIRONMENT_HOSTS,
   IS_PRODUCTION_ENVIRONMENT,
+  matchesHostPattern,
   PRODUCTION_HOST,
 } from "./trusted-origins";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
@@ -120,10 +121,14 @@ export function createApp(deps: AppDeps = {}) {
     // codes nobody receives. Placed after the bot check so a dummy-token
     // probe still gets the gate's verdict (see `scripts/verify-deployment.sh`).
     // Keyed on the request `Host` — the signal `ALLOWED_HOSTS` already
-    // resolves the auth `baseURL` from — by exact match: staging and
+    // resolves the auth `baseURL` from — by case-insensitive exact match
+    // (host names are case-insensitive per RFC 9110, #60): staging and
     // `*-dreamport-staging` preview URLs run this same code with no
     // `RESEND_API_KEY` and must keep working.
-    if (c.req.header("host") === PRODUCTION_HOST && !c.env.RESEND_API_KEY) {
+    if (
+      matchesHostPattern(c.req.header("host") ?? "", PRODUCTION_HOST) &&
+      !c.env.RESEND_API_KEY
+    ) {
       return c.json(
         { error: "Sign-in email is temporarily unavailable. Try again later." },
         503,
