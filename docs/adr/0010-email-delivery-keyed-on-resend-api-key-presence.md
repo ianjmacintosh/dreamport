@@ -36,9 +36,10 @@ intercept the outbound `fetch` to Resend's API. This exercises the real
 error handling — that `mock` never touched, at zero quota cost and with no
 real key required.
 
-**A real-send smoke test gates the production deploy**, once per deploy
+~~**A real-send smoke test gates the production deploy**, once per deploy
 rather than per PR — satisfies "at least once before shipping" at a cost
-Resend's quota can absorb (well under the 100/day, 3000/month free tier).
+Resend's quota can absorb (well under the 100/day, 3000/month free tier).~~
+**Reversed — see the #67 amendment below.**
 
 **Production's fail-closed 503 guard on the send-OTP path is re-keyed**, from
 `EMAIL_MODE !== "resend"` to `RESEND_API_KEY` absent, on the exact
@@ -100,6 +101,35 @@ not an accident, so the guard no longer needs to defend against it.
 - `buildTestLoginOTP`'s implementation needs updating alongside this: its
   guard condition changes from checking `EMAIL_MODE` to dropping that clause
   entirely (see Decision above) — not just a docs change.
+
+## Amended: the production-deploy smoke test (#67) is canceled
+
+#67 (the smoke test decided above) was implemented in PR #73 and then
+canceled before merging, for three compounding reasons surfaced in review:
+
+1. **Turnstile makes the actual goal unreachable.** The send-OTP path
+   requires passing a real Turnstile challenge in production. No automated
+   deploy-time script can do that — Turnstile exists specifically to block
+   scripted verification — so this could never prove "a real user can
+   complete the login flow," only a narrower slice of it.
+2. **The implementation didn't even test our own code.** PR #73's script
+   posted directly to Resend's API via `curl`, never invoking our
+   `ResendEmailSender`. Even setting aside (1), it would only ever have
+   proven Resend's uptime with our key, not that our own integration code
+   works — closer to monitoring another organization's service than testing
+   ours.
+3. **The premise doesn't survive contact with the incident that motivated
+   it.** #39, the incident #63 traces back to, was a build-mode divergence
+   in OTP generation (`import.meta.env.DEV`), never a Resend-send-path bug.
+   A send-path smoke test — even a correctly-implemented one, even without
+   the Turnstile wall — would never have caught it.
+
+No replacement mechanism is adopted. What remains from this ADR's original
+"at least once before shipping" goal: staging's real key (#70) gives a human
+a way to exercise the real send path manually, and the fail-closed 503 guard
+still catches a missing key at request time — neither is gated to run
+automatically before every production deploy, and that gap is accepted
+rather than closed.
 
 ## Related
 
