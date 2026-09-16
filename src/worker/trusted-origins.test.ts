@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   ALLOWED_HOSTS,
   allowedHostsForEnvironment,
+  hostnameInList,
+  matchesHostPattern,
   PRODUCTION_HOSTS,
   STAGING_HOSTS,
   trustedOriginsForEnvironment,
@@ -137,5 +139,67 @@ describe("allowedHostsForEnvironment", () => {
     expect(
       allowedHostsForEnvironment("production", { dev: true }),
     ).not.toContain("dreamport.test");
+  });
+});
+
+// #69's Turnstile hostname check (and #60's production-host guard, should it
+// adopt this) both depend on this matching wildcard-aware and
+// case-insensitively rather than by exact `Array.includes`.
+describe("matchesHostPattern", () => {
+  it("matches an exact, case-insensitive pattern", () => {
+    expect(
+      matchesHostPattern("Dreamport.Example.COM", "dreamport.example.com"),
+    ).toBe(true);
+    expect(
+      matchesHostPattern("evil.example.com", "dreamport.example.com"),
+    ).toBe(false);
+  });
+
+  it("matches a wildcard pattern like STAGING_HOSTS's preview entry", () => {
+    const pattern = "*-dreamport-staging.bananasquad.workers.dev";
+    expect(
+      matchesHostPattern(
+        "a1b2c3-dreamport-staging.bananasquad.workers.dev",
+        pattern,
+      ),
+    ).toBe(true);
+    // Case-insensitive even with a wildcard.
+    expect(
+      matchesHostPattern(
+        "A1B2C3-Dreamport-Staging.Bananasquad.Workers.Dev",
+        pattern,
+      ),
+    ).toBe(true);
+    // Never broadened past the literal parts around the wildcard.
+    expect(
+      matchesHostPattern("a1b2c3-dreamport.someoneelse.workers.dev", pattern),
+    ).toBe(false);
+  });
+
+  it("does not let a pattern's literal characters act as regex metacharacters", () => {
+    // A stray "." in a pattern must match a literal dot, not "any character".
+    expect(
+      matchesHostPattern("dreamportXexample.com", "dreamport.example.com"),
+    ).toBe(false);
+  });
+});
+
+describe("hostnameInList", () => {
+  it("matches against any pattern in the list", () => {
+    expect(
+      hostnameInList("dreamport-staging.bananasquad.workers.dev", [
+        ...STAGING_HOSTS,
+      ]),
+    ).toBe(true);
+    expect(
+      hostnameInList("a1b2c3-dreamport-staging.bananasquad.workers.dev", [
+        ...STAGING_HOSTS,
+      ]),
+    ).toBe(true);
+    expect(hostnameInList(PRODUCTION_HOSTS[0], [...STAGING_HOSTS])).toBe(false);
+  });
+
+  it("matches nothing against an empty list", () => {
+    expect(hostnameInList("anything.example.com", [])).toBe(false);
   });
 });

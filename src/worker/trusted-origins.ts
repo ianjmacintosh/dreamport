@@ -45,6 +45,31 @@ export const STAGING_HOSTS = [
 export const PRODUCTION_HOST: string = PRODUCTION_HOSTS[0];
 
 /**
+ * Whether `hostname` matches `pattern`, case-insensitively — host names are
+ * case-insensitive per RFC 9110 (issue #60) — and wildcard-aware: a `*` in
+ * `pattern` matches any run of characters, the same shape
+ * {@link STAGING_HOSTS}'s preview entry already uses. Exported so more than
+ * one hostname comparison in this codebase can share one implementation —
+ * #69's Turnstile check is the first caller; #60's production-host guard in
+ * `index.ts` is a candidate to adopt it too.
+ */
+export function matchesHostPattern(hostname: string, pattern: string): boolean {
+  const regexSource = pattern
+    .split("*")
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join(".*");
+  return new RegExp(`^${regexSource}$`, "i").test(hostname);
+}
+
+/** Whether `hostname` matches any pattern in `patterns` (see {@link matchesHostPattern}). */
+export function hostnameInList(
+  hostname: string,
+  patterns: readonly string[],
+): boolean {
+  return patterns.some((pattern) => matchesHostPattern(hostname, pattern));
+}
+
+/**
  * The bare hosts one Workers build should recognize as its own, selected by
  * `CLOUDFLARE_ENV` (see `vite.config.ts`, `docs/deployment.md`). A pure
  * function of the environment name, not the baked `CURRENT_ENVIRONMENT_HOSTS`
@@ -155,6 +180,20 @@ const CLOUDFLARE_ENV = import.meta.env.CLOUDFLARE_ENV;
  */
 export const CURRENT_ENVIRONMENT_HOSTS: readonly string[] =
   hostsForEnvironment(CLOUDFLARE_ENV);
+
+/**
+ * Whether *this build's* `CLOUDFLARE_ENV` is `production`.
+ *
+ * {@link CURRENT_ENVIRONMENT_HOSTS} is non-empty in staging too (#68), so it
+ * can no longer stand in for "is this a real, production Turnstile widget"
+ * the way an empty/non-empty `TURNSTILE_HOSTNAMES` used to (#69). This is
+ * the direct replacement signal: production's widget is real and its
+ * `siteverify` response carries a stable `hostname`/`action` worth checking;
+ * staging and local run Cloudflare's test-key pair, whose response doesn't,
+ * so they stay lenient regardless of how many hosts their own list carries.
+ */
+export const IS_PRODUCTION_ENVIRONMENT: boolean =
+  CLOUDFLARE_ENV === "production";
 
 /** This build's `TRUSTED_ORIGINS` — see {@link trustedOriginsForEnvironment}. */
 export const TRUSTED_ORIGINS: string[] =

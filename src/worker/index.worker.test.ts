@@ -6,7 +6,11 @@ import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 import { createApp } from "./index";
 import { recordDailySend } from "./otp-send-throttle";
-import { PRODUCTION_HOST } from "./trusted-origins";
+import {
+  PRODUCTION_HOST,
+  PRODUCTION_HOSTS,
+  STAGING_HOSTS,
+} from "./trusted-origins";
 import type { TurnstileVerifier } from "./turnstile";
 
 /**
@@ -278,11 +282,9 @@ describe("Turnstile gate on the send-OTP path (#23)", () => {
   // secret is unset. Verification itself is stubbed here (the real
   // `verifyTurnstile` is covered in `turnstile.test.ts`).
   const originalSecret = env.TURNSTILE_SECRET_KEY;
-  const originalHostnames = env.TURNSTILE_HOSTNAMES;
 
   afterEach(() => {
     env.TURNSTILE_SECRET_KEY = originalSecret;
-    env.TURNSTILE_HOSTNAMES = originalHostnames;
   });
 
   /** POST the send-OTP endpoint against a Worker built with `verifier`. */
@@ -314,14 +316,28 @@ describe("Turnstile gate on the send-OTP path (#23)", () => {
     expect(codeFor(TEST_EMAILS.turnstilePass)).toMatch(/^\d{6}$/);
   });
 
-  /** Capture the options the gate hands the verifier for one send. */
-  async function optionsSeenBySend(headerOverrides: Record<string, string>) {
+  /**
+   * Capture the options the gate hands the verifier for one send.
+   * `appDepsOverrides` stands in for `AppDeps`'s `turnstileHosts` /
+   * `isProductionEnvironment` — this test pool's own build is `local`-shaped
+   * (see `trusted-origins.test.ts`), so exercising production's or
+   * staging's shape means overriding what `createApp` would otherwise
+   * default to, not toggling a runtime var (#69 retired
+   * `TURNSTILE_HOSTNAMES`, the var that used to let these tests do that).
+   */
+  async function optionsSeenBySend(
+    headerOverrides: Record<string, string>,
+    appDepsOverrides: {
+      turnstileHosts?: readonly string[];
+      isProductionEnvironment?: boolean;
+    } = {},
+  ) {
     let seen: Parameters<TurnstileVerifier>[0] | undefined;
     const spy: TurnstileVerifier = async (opts) => {
       seen = opts;
       return true;
     };
-    await createApp({ verifyTurnstile: spy }).fetch(
+    await createApp({ verifyTurnstile: spy, ...appDepsOverrides }).fetch(
       new Request(`${ORIGIN}/api/auth/email-otp/send-verification-otp`, {
         method: "POST",
         headers: new Headers({
@@ -348,25 +364,36 @@ describe("Turnstile gate on the send-OTP path (#23)", () => {
     expect(seen).toMatchObject({ token: "tok-123", remoteIp: "203.0.113.7" });
   });
 
-  it("does not pin action or hostname when TURNSTILE_HOSTNAMES is unset", async () => {
-    env.TURNSTILE_HOSTNAMES = undefined;
-
+  it("does not pin action or hostname in this build's own (non-production) shape", async () => {
     const seen = await optionsSeenBySend({ "x-turnstile-token": "t" });
 
     expect(seen?.expectedAction).toBeUndefined();
     expect(seen?.allowedHostnames).toEqual([]);
   });
 
-  it("pins the send-otp action and the configured hostnames when set", async () => {
-    env.TURNSTILE_HOSTNAMES = " dreamport.example.com , preview.example.com ";
+  // The exact gotcha #69 had to avoid: `CURRENT_ENVIRONMENT_HOSTS` is
+  // non-empty for staging too (#68), so hostname-list emptiness can't be
+  // what decides strict/lenient any more — only `IS_PRODUCTION_ENVIRONMENT`
+  // does. This proves staging's own non-empty host list does not flip the
+  // gate to strict on its own.
+  it("stays lenient with a non-empty (staging-shaped) host list, since isProductionEnvironment is false", async () => {
+    const seen = await optionsSeenBySend(
+      { "x-turnstile-token": "t" },
+      { turnstileHosts: STAGING_HOSTS, isProductionEnvironment: false },
+    );
 
-    const seen = await optionsSeenBySend({ "x-turnstile-token": "t" });
+    expect(seen?.expectedAction).toBeUndefined();
+    expect(seen?.allowedHostnames).toEqual([]);
+  });
+
+  it("pins the send-otp action and this build's environment hosts when isProductionEnvironment is true", async () => {
+    const seen = await optionsSeenBySend(
+      { "x-turnstile-token": "t" },
+      { turnstileHosts: PRODUCTION_HOSTS, isProductionEnvironment: true },
+    );
 
     expect(seen?.expectedAction).toBe("send-otp");
-    expect(seen?.allowedHostnames).toEqual([
-      "dreamport.example.com",
-      "preview.example.com",
-    ]);
+    expect(seen?.allowedHostnames).toEqual(PRODUCTION_HOSTS);
   });
 
   it("rejects a send with no Turnstile token, before any code is issued", async () => {

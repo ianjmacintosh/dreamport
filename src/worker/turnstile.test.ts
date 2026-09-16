@@ -162,5 +162,68 @@ describe("verifyTurnstile", () => {
         true,
       );
     });
+
+    // #69: the allowlist is now this environment's own trusted-host
+    // patterns (e.g. `STAGING_HOSTS`'s `*-dreamport-staging....` entry),
+    // matched wildcard-aware rather than by exact `Array.includes`.
+    it("matches a wildcard pattern against the hostname it covers", async () => {
+      stubFetch({
+        body: {
+          success: true,
+          hostname: "a1b2c3-dreamport-staging.bananasquad.workers.dev",
+        },
+      });
+
+      expect(
+        await verifyTurnstile({
+          ...base,
+          allowedHostnames: ["*-dreamport-staging.bananasquad.workers.dev"],
+        }),
+      ).toBe(true);
+    });
+
+    it("fails a wildcard pattern for a hostname outside this account's subdomain", async () => {
+      stubFetch({
+        body: {
+          success: true,
+          hostname: "a1b2c3-dreamport.someoneelse.workers.dev",
+        },
+      });
+
+      expect(
+        await verifyTurnstile({
+          ...base,
+          allowedHostnames: ["*-dreamport-staging.bananasquad.workers.dev"],
+        }),
+      ).toBe(false);
+    });
+
+    // Host names are case-insensitive per RFC 9110 (see issue #60).
+    it("matches regardless of case, for both an exact and a wildcard pattern", async () => {
+      stubFetch({
+        body: { success: true, hostname: "Dreamport.Example.COM" },
+      });
+
+      expect(
+        await verifyTurnstile({
+          ...base,
+          allowedHostnames: ["dreamport.example.com"],
+        }),
+      ).toBe(true);
+
+      stubFetch({
+        body: {
+          success: true,
+          hostname: "A1B2C3-Dreamport-Staging.Bananasquad.Workers.Dev",
+        },
+      });
+
+      expect(
+        await verifyTurnstile({
+          ...base,
+          allowedHostnames: ["*-dreamport-staging.bananasquad.workers.dev"],
+        }),
+      ).toBe(true);
+    });
   });
 });
