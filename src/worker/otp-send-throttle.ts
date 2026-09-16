@@ -16,11 +16,11 @@ import type { WorkerEnv } from "./env";
  *    email, not just OTPs — the account-deletion route in `index.ts` meters
  *    against the same counter. The `SEND_OTP_*` names are now a slight
  *    misnomer kept for continuity; renaming them is a separate tidy-up.
- *    It guards a real quota, so it only bites where one exists: on
- *    `EMAIL_MODE=mock` (and every unset env) with no explicit
- *    `SEND_OTP_DAILY_CAP` the cap is `Infinity` (see {@link resolveDailyCap}).
- *    The counter is still written on mock — it just never blocks — so the
- *    "record only on a real send" wiring stays exercised.
+ *    It guards a real quota, so it only bites where one exists: with no
+ *    `RESEND_API_KEY` set and no explicit `SEND_OTP_DAILY_CAP` the cap is
+ *    `Infinity` (see {@link resolveDailyCap}). The counter is still written
+ *    on mock — it just never blocks — so the "record only on a real send"
+ *    wiring stays exercised.
  *
  * Each is split into a read (`peek*`, before Better Auth's handler) and a
  * write (`record*`, only after a code actually went out) so a send that Better
@@ -76,21 +76,21 @@ function secondsToNextUtcMidnight(now: number): number {
  * Resolve the configured global daily cap. `SEND_OTP_DAILY_CAP` is a plain env
  * var (string); a positive integer there always wins.
  *
- * With none set, the fallback depends on `mode` (the resolved `EMAIL_MODE`):
- * the cap exists only to protect the shared Resend quota, and a mock send
- * consumes none of it, so `mock` — and every unset environment, matching
- * `createEmailSender` — is uncapped (`Infinity`). `resend` gets
+ * With none set, the fallback depends on `resendApiKey` presence — the same
+ * fact `createEmailSender` reads: the cap exists only to protect the shared
+ * Resend quota, and a mock send consumes none of it, so no key (and every
+ * unset environment) is uncapped (`Infinity`), while a real key gets
  * {@link DEFAULT_DAILY_CAP}. This is what keeps local dev and the e2e run from
  * tripping the cap without needing a reset hook, while a real deploy still has
  * a safe default.
  */
 export function resolveDailyCap(
   raw: string | undefined,
-  mode: string | undefined,
+  resendApiKey: string | undefined,
 ): number {
   const n = Number(raw);
   if (Number.isInteger(n) && n > 0) return n;
-  return mode === "resend" ? DEFAULT_DAILY_CAP : Number.POSITIVE_INFINITY;
+  return resendApiKey ? DEFAULT_DAILY_CAP : Number.POSITIVE_INFINITY;
 }
 
 /**

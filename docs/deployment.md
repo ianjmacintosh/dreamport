@@ -53,8 +53,8 @@ from inside the repo:
   [ADR-0003](adr/0003-trusted-origins-constant-array.md), which is why one
   build no longer trusts every environment's hosts the way it used to).
 - **Runtime vars / secrets** — `wrangler.jsonc` `env.<env>.vars` for
-  non-secrets (`EMAIL_MODE`, the staging test `TURNSTILE_SECRET_KEY`),
-  `wrangler secret put --name <worker>` for real secrets. See [What's not
+  non-secrets (the staging test `TURNSTILE_SECRET_KEY`), `wrangler secret put
+--name <worker>` for real secrets. See [What's not
   committed](#whats-not-committed).
 
 Nothing is set via the dashboard's "Variables and secrets" panels. The Build
@@ -67,12 +67,12 @@ the only thing left in the dashboard is the fixed one-line Build command.
 
 ## Environments
 
-| Environment                 | Workers Builds project | D1 database                   | Domain                                               | `EMAIL_MODE` |
-| --------------------------- | ---------------------- | ----------------------------- | ---------------------------------------------------- | ------------ |
-| Production (`production`)   | `dreamport`            | `dreamport-prod`              | `dreamport.ianjmacintosh.com`                        | `resend`     |
-| Staging (`staging`)         | `dreamport-staging`    | `dreamport-stage`             | `????????-dreamport-staging.bananasquad.workers.dev` | `mock`       |
-| **TBD**: Remote dev (`dev`) | —                      | `dreamport-dev`               | `localhost`                                          | `mock`       |
-| Local dev (`local`)         | —                      | `dreamport-local` (Miniflare) | `localhost`                                          | `mock`       |
+| Environment                 | Workers Builds project | D1 database                   | Domain                                               | `RESEND_API_KEY` |
+| --------------------------- | ---------------------- | ----------------------------- | ---------------------------------------------------- | ---------------- |
+| Production (`production`)   | `dreamport`            | `dreamport-prod`              | `dreamport.ianjmacintosh.com`                        | set (real sends) |
+| Staging (`staging`)         | `dreamport-staging`    | `dreamport-stage`             | `????????-dreamport-staging.bananasquad.workers.dev` | unset (mock)     |
+| **TBD**: Remote dev (`dev`) | —                      | `dreamport-dev`               | `localhost`                                          | unset (mock)     |
+| Local dev (`local`)         | —                      | `dreamport-local` (Miniflare) | `localhost`                                          | unset (mock)     |
 
 ### Dev (Local)
 
@@ -143,49 +143,45 @@ host only — no staging host, no `localhost` (issue #63,
 
 ## Sign-in email
 
-`EMAIL_MODE` (a `wrangler.jsonc` var — `resend` in production, `mock`
-everywhere else) picks the email sender inside `createAuth`:
+`RESEND_API_KEY`'s presence — not a separate mode flag — picks the email
+sender inside `createAuth` (`createEmailSender`, issue #66,
+[ADR-0010](adr/0010-email-delivery-keyed-on-resend-api-key-presence.md)):
 
-- **`mock`** (also the default when the var is unset) — records the 6-digit
-  code in an in-memory buffer and sends nothing. It does **not** log the code
-  (issue #41): a one-time code is a bearer credential and Worker logs fan out
-  far wider than the auth DB. The code is also hashed before it reaches D1
-  (`storeOTP: "hashed"`, issue #39, `docs/adr/0009`), so querying the
-  `verification` table no longer recovers a usable code either — there is no
-  supported way to read one back for a deployed `mock` environment (staging
-  included). `src/worker/auth.ts`'s `generateOTP` fixed-code marker
-  (`+e2e-test@`) doesn't help here: it's gated on `TEST_LOGIN_ENABLED`,
-  which `wrangler.jsonc` only sets `"true"` for `local`/`dev`, deliberately
-  never for `staging` (a public `*.workers.dev` URL) or `production` (see
-  `docs/adr/0009` for why). Sign-in against a deployed `mock` environment by
-  hand isn't a supported workflow — drive it locally instead (see the root
-  `README.md`), or through `deployment-smoke.spec.ts`, which only exercises
-  the send step.
+- **Absent** — the default for every environment without the secret set —
+  records the 6-digit code in an in-memory buffer and sends nothing. It does
+  **not** log the code (issue #41): a one-time code is a bearer credential and
+  Worker logs fan out far wider than the auth DB. The code is also hashed
+  before it reaches D1 (`storeOTP: "hashed"`, issue #39, `docs/adr/0009`), so
+  querying the `verification` table no longer recovers a usable code either —
+  there is no supported way to read one back for a deployed mock-sender
+  environment (staging included). `src/worker/auth.ts`'s `generateOTP`
+  fixed-code marker (`+e2e-test@`) doesn't help here: it's gated on
+  `TEST_LOGIN_ENABLED`, which `wrangler.jsonc` only sets `"true"` for
+  `local`/`dev` today (see `docs/adr/0009` for why). Sign-in against a
+  deployed mock-sender environment by hand isn't a supported workflow — drive
+  it locally instead (see the root `README.md`), or through
+  `deployment-smoke.spec.ts`, which only exercises the send step.
 
-- **`resend`** — sends through the Resend API. It additionally requires the
-  `RESEND_API_KEY` secret; `createAuth` throws on the first request if it is
-  missing, so there is no silent fallback to `mock`. The `From:` address is
-  not config — it is the `EMAIL_FROM` constant in
+- **Present** — sends through the Resend API via `ResendEmailSender`. The
+  `From:` address is not config — it is the `EMAIL_FROM` constant in
   `src/worker/email/sender.ts` (a fixed property of the one email we send,
   like its subject and body).
 
-**Production runs `resend` (issue #38).** `EMAIL_MODE: "resend"` is in
-`env.production.vars`; `RESEND_API_KEY` is a secret on the `dreamport`
-Workers Builds project (`wrangler secret put RESEND_API_KEY --env
-production`). The sender domain `dreamport.ianjmacintosh.com` (the
+**Production has a real key (issue #38).** `RESEND_API_KEY` is a secret on
+the `dreamport` Workers Builds project (`wrangler secret put RESEND_API_KEY
+--env production`). The sender domain `dreamport.ianjmacintosh.com` (the
 `EMAIL_FROM` constant sends from `noreply@` on it) has live SPF/DKIM records
 and is verified in Resend.
 
-**Every other environment stays `mock`, permanently and by decision** —
-staging, `dev`, `local`, and every branch preview. That keeps preview and PR
-testing off real sends and off the Resend quota (consistent with the #24
-daily cap). Turning `resend` on for one of them would be a deliberate,
-recorded decision — see the comment above `EMAIL_MODE` in `wrangler.jsonc`.
+**Staging, `dev`, `local`, and every branch preview stay on the mock sender**
+by having no key — today by circumstance for staging (issue #70 tracks
+provisioning its real key), permanently by decision for `dev`/`local`/preview
+builds, to keep preview and PR testing off real sends and off the Resend
+quota (consistent with the #24 daily cap).
 
-Flipping an environment to `resend` is: set the `RESEND_API_KEY` secret on
-that environment's Workers Builds project, then set that env's `EMAIL_MODE`
-in `wrangler.jsonc`. Every `resend` environment sends from the same
-`EMAIL_FROM` constant.
+Giving an environment a real key is: set the `RESEND_API_KEY` secret on that
+environment's Workers Builds project. Every environment with a key sends from
+the same `EMAIL_FROM` constant.
 
 Set the secret with `wrangler secret put RESEND_API_KEY --env <env>` if your
 token has `Workers Scripts:Edit`. If CLI secret writes are denied, add it in
@@ -197,24 +193,25 @@ dashboard-set encrypted secret survives subsequent Workers Builds deploys.
 ### Production refuses mock email
 
 The send-OTP path (`POST /api/auth/email-otp/send-verification-otp`) returns
-`503` on the production host `dreamport.ianjmacintosh.com` whenever the
-resolved `EMAIL_MODE` is anything but `resend` (`src/worker/index.ts`, issue
-#41). The mock sender delivers nothing, so this makes a mock-wired production
-**fail closed** — sign-in is unavailable and visibly broken — instead of
-failing open, taking sign-ins and dropping every code.
+`503` on the production host `dreamport.ianjmacintosh.com` whenever
+`RESEND_API_KEY` is absent (`src/worker/index.ts`, issue #41). The mock
+sender delivers nothing, so this makes a key-less production **fail closed**
+— sign-in is unavailable and visibly broken — instead of failing open, taking
+sign-ins and dropping every code.
 
-Production now runs `resend` (issue #38), so the guard passes in normal
+Production now has a real key (issue #38), so the guard passes in normal
 operation. It stays as a backstop: if a dashboard override or a bad rollback
-leaves the deployed version on `mock`, sign-in fails closed rather than
-silently swallowing codes. Reverting `EMAIL_MODE` to `mock` is a one-line
-rollback that needs no other change — but on this host it returns sign-in to
-this fail-closed 503, it does **not** restore a working mock login.
+removes the secret, sign-in fails closed rather than silently swallowing
+codes. Removing the secret is a one-step rollback that needs no code change —
+but on this host it returns sign-in to this fail-closed 503, it does **not**
+restore a working mock login.
 
 The guard is keyed on the exact request `Host`, so staging, the
-`*-dreamport-staging` preview URLs, and local dev keep running `mock`
-unaffected. `scripts/verify-deployment.sh` also fails the **Version bindings**
-check on a `verify:production` run while the deployed production version's
-`EMAIL_MODE` is not `resend` — the detective backstop for a dashboard
+`*-dreamport-staging` preview URLs, and local dev — none of which currently
+carry a key — keep running the mock sender unaffected.
+`scripts/verify-deployment.sh` also fails the **Version bindings** check on a
+`verify:production` run while the deployed production version has no
+`RESEND_API_KEY` secret bound — the detective backstop for a dashboard
 override that the runtime guard would otherwise only surface on a user's
 failed sign-in.
 
@@ -390,13 +387,15 @@ Cloudflare / GitHub dashboards), never in `wrangler.jsonc` or the repo.
 - **`BETTER_AUTH_SECRET`** — required now. `createAuth()` throws on every
   request without it, so a freshly created project (e.g. `dreamport-staging`)
   isn't functional until this is set, even after a successful build.
-- **`RESEND_API_KEY`** — required on `dreamport` (production): its
-  `EMAIL_MODE` is `resend` (issue #38), and `createAuth` throws on the first
-  request without it. Set it via `wrangler secret put` or, if CLI secret
+- **`RESEND_API_KEY`** — required on `dreamport` (production, issue #38): its
+  presence is what picks the real `ResendEmailSender` over the mock one
+  (`createEmailSender`, issue #66); the production fail-closed guard 503s
+  sign-in without it. Set it via `wrangler secret put` or, if CLI secret
   writes are denied, as an encrypted dashboard secret — see [Sign-in
-  email](#sign-in-email). Not needed on `dreamport-staging` or dev/local —
-  they stay on `mock`. There is no `EMAIL_FROM` secret or var — the `From:`
-  address is the `EMAIL_FROM` constant in `src/worker/email/sender.ts`.
+  email](#sign-in-email). Not currently set on `dreamport-staging` or
+  dev/local — they stay on the mock sender (issue #70 tracks provisioning
+  staging's). There is no `EMAIL_FROM` secret or var — the `From:` address is
+  the `EMAIL_FROM` constant in `src/worker/email/sender.ts`.
 - **`TURNSTILE_SECRET_KEY`** — required now (#23). The send-OTP path verifies
   the Turnstile widget token against Cloudflare `siteverify` before issuing a
   code, and **fails closed** (503, no code sent) when this is unset.

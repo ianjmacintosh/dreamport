@@ -43,7 +43,7 @@ export default defineConfig(async () => {
     test: {
       name: "workers",
       include: ["src/**/*.worker.test.ts"],
-      setupFiles: ["./test/apply-migrations.ts"],
+      setupFiles: ["./test/apply-migrations.ts", "./test/msw-network.ts"],
     },
   };
 });

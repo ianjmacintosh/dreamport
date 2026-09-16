@@ -18,14 +18,13 @@
     "run_worker_first": true,
   },
   // main/assets/compatibility_flags/observability inherit into every env below; vars and bindings don't.
-  "vars": {
-    "EMAIL_MODE": "mock",
-  },
 
-  // EMAIL_MODE: production is the only env that runs `resend` (see
-  // env.production.vars below). staging, dev, local, and every branch
-  // preview stay on `mock` permanently and by decision — turning `resend`
-  // on for any of them is a recorded choice, not a default (issue #38).
+  // Email delivery: the `RESEND_API_KEY` secret's presence, not a var here,
+  // decides the sender (#66, docs/adr/0010) — production is the only env
+  // that has one (see `wrangler secret put`, docs/deployment.md). staging,
+  // dev, local, and every branch preview stay on the mock sender by having
+  // no key, permanently and by decision — setting one for any of them is a
+  // recorded choice, not a default.
 
   // production/staging: two separate Cloudflare Workers Builds projects
   // ("dreamport" and "dreamport-staging"), both Git-connected to this repo,
@@ -41,17 +40,14 @@
       // entry point; the workers.dev subdomain isn't in TRUSTED_ORIGINS and
       // has no reason to be publicly reachable.
       "workers_dev": false,
-      "vars": {
-        // Live Resend delivery (issue #38). Also needs the RESEND_API_KEY
-        // secret on the `dreamport` Workers Builds project (`wrangler secret
-        // put RESEND_API_KEY --env production`); createEmailSender throws on
-        // the first request without it. The From address is not config — it
-        // is the EMAIL_FROM constant in src/worker/email/sender.ts. Rollback
-        // to "mock" is this one line, but see docs/deployment.md "Production
-        // refuses mock email" — on this host it does not restore a working
-        // login.
-        "EMAIL_MODE": "resend",
-      },
+      // Live Resend delivery (issue #38) comes from the RESEND_API_KEY secret
+      // on the `dreamport` Workers Builds project (`wrangler secret put
+      // RESEND_API_KEY --env production`); createEmailSender falls back to
+      // the mock sender without it. The From address is not config — it is
+      // the EMAIL_FROM constant in src/worker/email/sender.ts. Removing the
+      // secret is the rollback, but see docs/deployment.md "Production
+      // refuses mock email" — on this host it does not restore a working
+      // login.
       "d1_databases": [
         {
           "binding": "DB",
@@ -77,7 +73,6 @@
         "head_sampling_rate": 1,
       },
       "vars": {
-        "EMAIL_MODE": "mock",
         // Cloudflare's always-pass Turnstile test secret. Not a real secret,
         // and staging can't use the real widget (scoped to ianjmacintosh.com,
         // not workers.dev — see docs/deployment.md), so it lives here rather
@@ -96,7 +91,6 @@
     "dev": {
       "name": "dreamport-localhost",
       "vars": {
-        "EMAIL_MODE": "mock",
         // See "local" below — same purpose, same reasoning.
         "TEST_LOGIN_ENABLED": "true",
       },
@@ -112,7 +106,6 @@
     "local": {
       "name": "dreamport-localhost",
       "vars": {
-        "EMAIL_MODE": "mock",
         // Enables `generateOTP`'s fixed test-login code (`+e2e-test@`,
         // issue #39, docs/adr/0009) — a runtime var, not a build-time flag
         // like `import.meta.env.DEV`, specifically so its own gating logic

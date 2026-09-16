@@ -18,12 +18,6 @@ export interface WorkerEnv {
    */
   TURNSTILE_SECRET_KEY: string;
   /**
-   * How outbound email is delivered. `resend` in production (#38/#52);
-   * `mock` in staging and local (see `wrangler.jsonc`); unset is treated as
-   * `mock`.
-   */
-  EMAIL_MODE?: "mock" | "resend";
-  /**
    * Enables `generateOTP`'s fixed test-login code for `+e2e-test@` addresses
    * (issue #39, docs/adr/0009) — `"true"` only in `wrangler.jsonc`'s `local`
    * and `dev` envs, absent (falsy) everywhere else, `staging` included. A
@@ -39,12 +33,16 @@ export interface WorkerEnv {
    * for the shared Resend quota (issue #24, ADR-0007; extended to cover the
    * account-deletion email in #26). A plain var, not a secret. A positive
    * integer always wins; unset / non-numeric / ≤ 0 falls back to
-   * `DEFAULT_DAILY_CAP` (90) on `EMAIL_MODE=resend` and to uncapped on `mock`
-   * (no real quota to protect). Raise it per environment in `wrangler.jsonc`
-   * once the Resend plan allows.
+   * `DEFAULT_DAILY_CAP` (90) when `RESEND_API_KEY` is present and to
+   * uncapped when it's absent (no real quota to protect). Raise it per
+   * environment in `wrangler.jsonc` once the Resend plan allows.
    */
   SEND_OTP_DAILY_CAP?: string;
-  /** Resend API key. Required only when `EMAIL_MODE=resend`. A secret. */
+  /**
+   * Resend API key. Its presence, not a separate mode flag, decides the
+   * email sender (#66, docs/adr/0010): present → `ResendEmailSender`,
+   * absent → `MockEmailSender` (see `createEmailSender`). A secret.
+   */
   RESEND_API_KEY?: string;
   /** The static SPA assets (`wrangler.jsonc` `assets.binding`). */
   ASSETS: Fetcher;

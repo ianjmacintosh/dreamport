@@ -1,7 +1,8 @@
 /**
  * The email-sender interface the auth layer depends on, plus its two
  * implementations. `createAuth` picks one with {@link createEmailSender},
- * driven by `EMAIL_MODE`; Seam 1 tests inject one directly instead.
+ * driven by `RESEND_API_KEY` presence (#66, docs/adr/0010); Seam 1 tests
+ * inject one directly instead.
  *
  * Two outbound emails exist today: the OTP sign-in code and the
  * account-deletion confirmation link (issue #26). The interface stays
@@ -56,9 +57,7 @@ export interface EmailSender {
 
 /** The subset of the Worker env the sender factory reads. */
 export interface EmailSenderEnv {
-  /** `mock` (or unset) uses {@link MockEmailSender}; `resend` uses Resend. */
-  EMAIL_MODE?: "mock" | "resend";
-  /** Required when `EMAIL_MODE=resend`. */
+  /** Present → {@link ResendEmailSender}; absent → {@link MockEmailSender}. */
   RESEND_API_KEY?: string;
 }
 
@@ -123,10 +122,9 @@ export class MockEmailSender implements EmailSender {
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 /**
- * Sends through the Resend HTTP API. Constructed only when `EMAIL_MODE=resend`
- * and `RESEND_API_KEY` is present — the factory throws otherwise. `from` is
- * a constructor arg so tests can pass their own; production wiring passes
- * {@link EMAIL_FROM}.
+ * Sends through the Resend HTTP API. Constructed only when `RESEND_API_KEY`
+ * is present (see {@link createEmailSender}). `from` is a constructor arg so
+ * tests can pass their own; production wiring passes {@link EMAIL_FROM}.
  */
 export class ResendEmailSender implements EmailSender {
   #apiKey: string;
@@ -227,29 +225,18 @@ export function getMockSender(): MockEmailSender {
 }
 
 /**
- * Choose an {@link EmailSender} from the environment.
- *
- * - `EMAIL_MODE` unset or `mock` → the shared {@link MockEmailSender}.
- * - `EMAIL_MODE=resend` → {@link ResendEmailSender} sending from
- *   {@link EMAIL_FROM}, but only if `RESEND_API_KEY` is set; a missing key
- *   throws here rather than silently falling back to mock.
+ * Choose an {@link EmailSender} from the environment: `RESEND_API_KEY`
+ * present → {@link ResendEmailSender} sending from {@link EMAIL_FROM}; absent
+ * → the shared {@link MockEmailSender} (#66, docs/adr/0010). One fact, not
+ * two knobs that could disagree.
  */
 export function createEmailSender(env: EmailSenderEnv): EmailSender {
-  const mode = env.EMAIL_MODE ?? "mock";
-
-  if (mode === "mock") {
-    return getMockSender();
-  }
-
-  if (mode === "resend") {
-    if (!env.RESEND_API_KEY) {
-      throw new Error("EMAIL_MODE=resend requires RESEND_API_KEY to be set.");
-    }
+  if (env.RESEND_API_KEY) {
     return new ResendEmailSender({
       apiKey: env.RESEND_API_KEY,
       from: EMAIL_FROM,
     });
   }
 
-  throw new Error(`Unknown EMAIL_MODE: ${String(mode)}`);
+  return getMockSender();
 }
