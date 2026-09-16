@@ -42,6 +42,16 @@ from inside the repo:
   Cloudflare's always-pass test key. An explicit `VITE_TURNSTILE_SITE_KEY` in
   the environment still overrides the map (the CI e2e workflow sets one);
   `define` otherwise wins over any stray `.env`.
+- **`TRUSTED_ORIGINS` / `ALLOWED_HOSTS`** (`src/worker/trusted-origins.ts`) —
+  same pattern as the Turnstile key: `CLOUDFLARE_ENV` is also injected as
+  `import.meta.env.CLOUDFLARE_ENV` for the worker bundle, and
+  `hostsForEnvironment` picks that one environment's own host group from it.
+  `production` and `staging` each get only their own hosts; anything else
+  (`local`, an unbuilt `dev`, or an unrecognized value) gets none of its own,
+  falling back to `localhost` (issue #63,
+  [ADR-0011](adr/0011-per-environment-host-allowlists.md) — this amends
+  [ADR-0003](adr/0003-trusted-origins-constant-array.md), which is why one
+  build no longer trusts every environment's hosts the way it used to).
 - **Runtime vars / secrets** — `wrangler.jsonc` `env.<env>.vars` for
   non-secrets (`EMAIL_MODE`, `TURNSTILE_HOSTNAMES`, the staging test
   `TURNSTILE_SECRET_KEY`), `wrangler secret put --name <worker>` for real
@@ -106,10 +116,14 @@ feature branches keep uploading previews to promote manually.
 Everything — the staging host and every preview — shares the
 `dreamport-stage` D1 database.
 
-`TRUSTED_ORIGINS` / `ALLOWED_HOSTS` (in `src/worker/trusted-origins.ts`) trust
-production, the bare `dreamport-staging.bananasquad.workers.dev` staging host,
-and any `*-dreamport-staging.bananasquad.workers.dev` preview (scoped to this
-account, not every `*.workers.dev` host). The auth spec
+`TRUSTED_ORIGINS` / `ALLOWED_HOSTS` (in `src/worker/trusted-origins.ts`) are
+resolved once per build from that build's own `CLOUDFLARE_ENV` — **not**
+shared across every environment (issue #63,
+[ADR-0011](adr/0011-per-environment-host-allowlists.md)). Staging's build
+trusts only its own hosts: the bare `dreamport-staging.bananasquad.workers.dev`
+staging host, and any `*-dreamport-staging.bananasquad.workers.dev` preview
+(scoped to this account, not every `*.workers.dev` host) — never production's
+hostname, and never `localhost`. The auth spec
 ([#18](https://github.com/ianjmacintosh/dreamport/issues/18)) named a stable
 `staging.dreamport.ianjmacintosh.com`; that specific hostname does not exist —
 the `workers.dev` host is staging.
@@ -122,6 +136,10 @@ Build command is fixed (`CLOUDFLARE_ENV=production npm run build` — see the
 this project — feature branches build under `dreamport-staging` instead.
 
 When a change lands on `main`, Cloudflare builds and deploys it to `dreamport.ianjmacintosh.com`
+
+Production's build resolves `TRUSTED_ORIGINS` / `ALLOWED_HOSTS` to its own
+host only — no staging host, no `localhost` (issue #63,
+[ADR-0011](adr/0011-per-environment-host-allowlists.md)).
 
 ## Sign-in email
 

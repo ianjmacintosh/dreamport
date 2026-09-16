@@ -43,6 +43,17 @@ export default defineConfig({
     "import.meta.env.VITE_TURNSTILE_SITE_KEY": JSON.stringify(
       resolveTurnstileSiteKey(process.env),
     ),
+    // Bakes the same `CLOUDFLARE_ENV` the Build command sets (see
+    // docs/deployment.md) into the worker bundle too, so
+    // `src/worker/trusted-origins.ts` can select its per-environment host
+    // list at build time instead of the whole-repo shared list it used to
+    // ship (issue #63, docs/adr/0011). Unlike `VITE_TURNSTILE_SITE_KEY`,
+    // there's no local/staging default to fall back to here — an
+    // unrecognized or missing value is meant to fall through to
+    // `hostsForEnvironment`'s `local`-shaped default, not a specific env.
+    "import.meta.env.CLOUDFLARE_ENV": JSON.stringify(
+      process.env.CLOUDFLARE_ENV ?? null,
+    ),
   },
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
