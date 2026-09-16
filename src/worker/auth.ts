@@ -41,15 +41,20 @@ export interface AuthDeps {
  * — a runtime var, not a build-time flag — makes the "off" behavior directly
  * testable with a plain unit test instead.
  *
- * `env.TEST_LOGIN_ENABLED` is `"true"` only in `wrangler.jsonc`'s `local` and
- * `dev` envs, absent (falsy) everywhere else. It is the sole condition now
- * (#66, docs/adr/0010): `RESEND_API_KEY` presence is no longer checked here
- * at all. ADR-0010 accepts this for every env that sets
+ * `env.TEST_LOGIN_ENABLED` is `"true"` in `wrangler.jsonc`'s `local`, `dev`,
+ * and `staging` envs (#70), absent (falsy) in `production`. It is the sole
+ * condition now (#66, docs/adr/0010): `RESEND_API_KEY` presence is no longer
+ * checked here at all. ADR-0010 accepts this for every env that sets
  * `TEST_LOGIN_ENABLED` — staging deliberately carries a real key alongside
  * it (once #70 provisions it), and `local`/`dev` are permanently keyless by
  * the same decision that keeps them off Resend entirely (see
  * `docs/deployment.md`) — so there is no env where this guard's removal
- * newly exposes the fixed code to a real send.
+ * newly exposes the fixed code to a real send. Staging is `workers_dev:
+ * true` (a public *.workers.dev URL, not gated by any secret), so this fixed
+ * code is a public, permanent sign-in bypass there for any `+e2e-test@`
+ * address — accepted the same way `docs/deployment.md`'s Turnstile section
+ * accepts the always-pass test widget key on staging: real bot/credential
+ * protection is a production-only property.
  *
  * Applies to all four OTP types — sign-in, email-verification,
  * forget-password, change-email — since callers never special-case on
