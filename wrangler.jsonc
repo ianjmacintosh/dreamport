@@ -51,10 +51,6 @@
         // refuses mock email" — on this host it does not restore a working
         // login.
         "EMAIL_MODE": "resend",
-        // Turnstile tokens for production must be solved on this host, and
-        // carry the `send-otp` action (see src/worker/turnstile.ts). Not a
-        // secret. Staging/local omit this and run on Cloudflare test keys.
-        "TURNSTILE_HOSTNAMES": "dreamport.ianjmacintosh.com",
       },
       "d1_databases": [
         {

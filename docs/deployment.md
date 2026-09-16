@@ -53,9 +53,9 @@ from inside the repo:
   [ADR-0003](adr/0003-trusted-origins-constant-array.md), which is why one
   build no longer trusts every environment's hosts the way it used to).
 - **Runtime vars / secrets** — `wrangler.jsonc` `env.<env>.vars` for
-  non-secrets (`EMAIL_MODE`, `TURNSTILE_HOSTNAMES`, the staging test
-  `TURNSTILE_SECRET_KEY`), `wrangler secret put --name <worker>` for real
-  secrets. See [What's not committed](#whats-not-committed).
+  non-secrets (`EMAIL_MODE`, the staging test `TURNSTILE_SECRET_KEY`),
+  `wrangler secret put --name <worker>` for real secrets. See [What's not
+  committed](#whats-not-committed).
 
 Nothing is set via the dashboard's "Variables and secrets" panels. The Build
 side of it silently stopped delivering a saved `VITE_TURNSTILE_SITE_KEY` (a
@@ -236,11 +236,14 @@ Better Auth issues a code (#23). Three values:
   `c.env`. A per-project Cloudflare secret (see [What's not
   committed](#whats-not-committed)). The send path **fails closed** (503, no
   code issued) when it is unset.
-- **`TURNSTILE_HOSTNAMES`** — a comma-separated hostname allowlist, **not** a
-  secret. When set, the gate also requires the verified token's `hostname` to
-  be in the list and its `action` to be `send-otp`. It's pinned for
-  production in `wrangler.jsonc` (`env.production.vars`,
-  `dreamport.ianjmacintosh.com`) and left unset everywhere else.
+- **Hostname/action check** — not a var at all since #69: the gate checks the
+  verified token's `hostname` against `CURRENT_ENVIRONMENT_HOSTS`
+  (`src/worker/trusted-origins.ts`, the same per-environment list
+  `TRUSTED_ORIGINS`/`ALLOWED_HOSTS` resolve from, #68) and its `action`
+  against `send-otp` — but only when `IS_PRODUCTION_ENVIRONMENT` is true
+  (this build's `CLOUDFLARE_ENV` is `production`). Staging and local stay
+  lenient (`success` check only) regardless of how many hosts their own list
+  carries, since only production runs the real widget — see below.
 
 `dreamport` and `dreamport-staging` are separate projects with separate
 secret stores, so their keys are set independently:
@@ -249,17 +252,18 @@ secret stores, so their keys are set independently:
 | ------------------------------------------------------------ | ---------------------------------- | ----------------------------------------------------------- |
 | `VITE_TURNSTILE_SITE_KEY` (build, from `vite.config.ts` map) | `0x4AAAAAAEqY4wvljJsO_dJb`         | `1x00000000000000000000AA`                                  |
 | `TURNSTILE_SECRET_KEY` (runtime)                             | real secret, `wrangler secret put` | `1x0000000000000000000000000000000AA` (in `wrangler.jsonc`) |
-| `TURNSTILE_HOSTNAMES`                                        | _(set in `wrangler.jsonc`)_        | _(unset — lenient)_                                         |
+| Hostname/action check                                        | strict (production hosts only)     | lenient (`success` check only)                              |
 
 The production widget is scoped to `ianjmacintosh.com` (Turnstile authorizes
 a hostname and all its subdomains, so `dreamport.ianjmacintosh.com` is
 covered; the gate still pins the exact host, which is tighter). It has **no**
 `workers.dev` hostname, and a widget can't be created without one — so the
 real widget simply won't render on staging or a preview URL. Staging
-therefore runs Cloudflare's always-pass test pair; `TURNSTILE_HOSTNAMES`
-stays unset there (lenient — `success` check only). The test secret still
-exercises the real `siteverify` HTTPS call, it just always answers success.
-Real-challenge behaviour is a production smoke-test concern.
+therefore runs Cloudflare's always-pass test pair, whose `siteverify`
+response doesn't carry a stable `hostname`/`action`, so the gate stays
+lenient there. The test secret still exercises the real `siteverify` HTTPS
+call, it just always answers success. Real-challenge behaviour is a
+production smoke-test concern.
 
 Cloudflare's always-fail pair (`2x00000000000000000000AB` /
 `2x0000000000000000000000000000000AA`) drives negative tests. The Vitest
@@ -402,8 +406,9 @@ Cloudflare / GitHub dashboards), never in `wrangler.jsonc` or the repo.
 deploy`). Staging uses Cloudflare's always-pass test secret
   `1x0000000000000000000000000000000AA`, which is a public value and so lives
   in `wrangler.jsonc` (`env.staging.vars`) rather than as a secret. The public
-  `VITE_TURNSTILE_SITE_KEY` (from the `vite.config.ts` map) and the non-secret
-  `TURNSTILE_HOSTNAMES` are covered in [Turnstile](#turnstile-bot-check-on-the-send-otp-path).
+  `VITE_TURNSTILE_SITE_KEY` (from the `vite.config.ts` map) and the
+  hostname/action check are covered in
+  [Turnstile](#turnstile-bot-check-on-the-send-otp-path).
 
 Because production and staging are separate Worker scripts, the same secret
 name can (and for `RESEND_API_KEY`, generally should) hold different values

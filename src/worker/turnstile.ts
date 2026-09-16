@@ -1,3 +1,5 @@
+import { hostnameInList } from "./trusted-origins";
+
 /**
  * Cloudflare Turnstile server-side verification for the send-OTP path.
  *
@@ -47,15 +49,18 @@ export interface VerifyTurnstileOptions {
    * If set, the `action` the token must have been minted for. Lets a token
    * issued for one form on the site not be replayed against this endpoint.
    * Omitted on test-key environments, whose responses don't carry a stable
-   * action (see `TURNSTILE_HOSTNAMES` in `src/worker/index.ts`).
+   * action (see `IS_PRODUCTION_ENVIRONMENT` in `src/worker/index.ts`).
    */
   expectedAction?: string;
   /**
-   * If non-empty, the set of hostnames the challenge may have been solved
-   * on. Binds a token to the origin that produced it. Empty on test-key
-   * environments (localhost, previews) where the hostname isn't fixed.
+   * If non-empty, the hostname patterns the challenge may have been solved
+   * on — this environment's own trusted hosts (`CURRENT_ENVIRONMENT_HOSTS`
+   * from `src/worker/trusted-origins.ts`, #68/#69), matched wildcard-aware
+   * and case-insensitively (see {@link hostnameInList}). Binds a token to an
+   * origin this deployment actually serves. Empty on test-key environments
+   * (staging, local) where the response's `hostname` isn't real.
    */
-  allowedHostnames?: string[];
+  allowedHostnames?: readonly string[];
 }
 
 /**
@@ -109,7 +114,7 @@ export const verifyTurnstile: TurnstileVerifier = async ({
   if (
     allowedHostnames &&
     allowedHostnames.length > 0 &&
-    !allowedHostnames.includes(result.hostname ?? "")
+    !hostnameInList(result.hostname ?? "", allowedHostnames)
   ) {
     return false;
   }

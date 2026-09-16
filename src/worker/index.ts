@@ -10,26 +10,37 @@ import {
   recordOtpSend,
   resolveDailyCap,
 } from "./otp-send-throttle";
-import { PRODUCTION_HOST } from "./trusted-origins";
+import {
+  CURRENT_ENVIRONMENT_HOSTS,
+  IS_PRODUCTION_ENVIRONMENT,
+  PRODUCTION_HOST,
+} from "./trusted-origins";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
 /**
  * The `action` the `/login` Turnstile widget is rendered with (see
  * `data-action` / `options.action` in `src/routes/_layout/login.tsx`). The
  * gate checks the verified token was minted for this action — but only in
- * environments that also pin `TURNSTILE_HOSTNAMES` (real widget, real
- * domain); test keys don't echo a stable action.
+ * environments running the real widget (`IS_PRODUCTION_ENVIRONMENT`); test
+ * keys don't echo a stable action.
  */
 const TURNSTILE_ACTION = "send-otp";
 
 /**
  * Overrides for {@link createApp}. `verifyTurnstile` lets the Seam 1 tests
  * drive the send-OTP gate with a stub instead of a live call to Cloudflare's
- * `siteverify` endpoint (mirrors `AuthDeps.emailSender`). The Worker itself
- * never passes this.
+ * `siteverify` endpoint (mirrors `AuthDeps.emailSender`). `turnstileHosts`
+ * and `isProductionEnvironment` default to `CURRENT_ENVIRONMENT_HOSTS` and
+ * `IS_PRODUCTION_ENVIRONMENT` (this build's own resolved shape) — overriding
+ * them lets a test exercise another environment's shape (e.g. production's
+ * strict hostname match, or staging's non-empty-but-lenient one, #69) without
+ * a separate build per environment. The Worker itself never passes any of
+ * these.
  */
 export interface AppDeps {
   verifyTurnstile?: TurnstileVerifier;
+  turnstileHosts?: readonly string[];
+  isProductionEnvironment?: boolean;
 }
 
 /**
@@ -46,6 +57,9 @@ export interface AppDeps {
  */
 export function createApp(deps: AppDeps = {}) {
   const verifyTurnstileToken = deps.verifyTurnstile ?? verifyTurnstile;
+  const turnstileHosts = deps.turnstileHosts ?? CURRENT_ENVIRONMENT_HOSTS;
+  const turnstileStrict =
+    deps.isProductionEnvironment ?? IS_PRODUCTION_ENVIRONMENT;
   const app = new Hono<{ Bindings: WorkerEnv }>();
 
   /**
@@ -61,9 +75,10 @@ export function createApp(deps: AppDeps = {}) {
    * `TURNSTILE_SECRET_KEY` the send path is unavailable rather than
    * unguarded.
    *
-   * Where `TURNSTILE_HOSTNAMES` is pinned (production), the token's `action`
-   * and `hostname` are checked too; elsewhere (test keys on floating hosts)
-   * only `success` is.
+   * In production, the token's `action` and `hostname` are checked too
+   * (`hostname` against this build's own `CURRENT_ENVIRONMENT_HOSTS`,
+   * wildcard-aware and case-insensitive — #68/#69); elsewhere (staging,
+   * local — Cloudflare's test-key pair) only `success` is.
    *
    * Once the token passes, three rate limits guard availability on this path
    * (issue #24, ADR-0007): the per-IP limit is Better Auth's own DB-backed
@@ -82,18 +97,12 @@ export function createApp(deps: AppDeps = {}) {
       );
     }
 
-    const allowedHostnames = (c.env.TURNSTILE_HOSTNAMES ?? "")
-      .split(",")
-      .map((h) => h.trim())
-      .filter(Boolean);
-    const strict = allowedHostnames.length > 0;
-
     const ok = await verifyTurnstileToken({
       secret,
       token: c.req.header("x-turnstile-token") ?? null,
       remoteIp: c.req.header("cf-connecting-ip") ?? null,
-      expectedAction: strict ? TURNSTILE_ACTION : undefined,
-      allowedHostnames,
+      expectedAction: turnstileStrict ? TURNSTILE_ACTION : undefined,
+      allowedHostnames: turnstileStrict ? turnstileHosts : [],
     });
     if (!ok) {
       return c.json(
