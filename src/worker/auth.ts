@@ -13,9 +13,9 @@ const DAY = 24 * 60 * MINUTE;
 
 /**
  * Overrides for {@link createAuth}. `emailSender` lets a test drive the auth
- * object with a spy sender directly, without going through `EMAIL_MODE` or the
- * shared mock (see `src/worker/index.worker.test.ts`, "uses an injected email
- * sender"). The Worker itself never passes this.
+ * object with a spy sender directly, without going through `RESEND_API_KEY` or
+ * the shared mock (see `src/worker/index.worker.test.ts`, "uses an injected
+ * email sender"). The Worker itself never passes this.
  */
 export interface AuthDeps {
   emailSender?: EmailSender;
@@ -42,11 +42,14 @@ export interface AuthDeps {
  * testable with a plain unit test instead.
  *
  * `env.TEST_LOGIN_ENABLED` is `"true"` only in `wrangler.jsonc`'s `local` and
- * `dev` envs, absent (falsy) everywhere else — `staging` included, since it's
- * `workers_dev: true` (a public *.workers.dev URL). `EMAIL_MODE=mock` alone
- * isn't a sufficient gate on its own: `staging` runs it too. `EMAIL_MODE`
- * still gets checked as well, as defense in depth for a `vite dev` server
- * someone points at a real `RESEND_API_KEY`.
+ * `dev` envs, absent (falsy) everywhere else. It is the sole condition now
+ * (#66, docs/adr/0010): `RESEND_API_KEY` presence is no longer checked here
+ * at all. ADR-0010 accepts this for every env that sets
+ * `TEST_LOGIN_ENABLED` — staging deliberately carries a real key alongside
+ * it (once #70 provisions it), and `local`/`dev` are permanently keyless by
+ * the same decision that keeps them off Resend entirely (see
+ * `docs/deployment.md`) — so there is no env where this guard's removal
+ * newly exposes the fixed code to a real send.
  *
  * Applies to all four OTP types — sign-in, email-verification,
  * forget-password, change-email — since callers never special-case on
@@ -61,7 +64,6 @@ export function buildTestLoginOTP(
 ): (data: { email: string }) => string | undefined {
   return ({ email }) => {
     if (env.TEST_LOGIN_ENABLED !== "true") return undefined;
-    if ((env.EMAIL_MODE ?? "mock") === "resend") return undefined;
     if (!email.toLowerCase().includes("+e2e-test@")) return undefined;
     return "000000";
   };
@@ -99,9 +101,8 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
     dialect: new D1Dialect({ database: env.DB }),
   });
 
-  // An injected sender wins (see AuthDeps); otherwise `EMAIL_MODE` picks the
-  // implementation, and `createEmailSender` throws if `resend` is only
-  // half-configured.
+  // An injected sender wins (see AuthDeps); otherwise `RESEND_API_KEY`
+  // presence picks the implementation (see `createEmailSender`).
   const emailSender = deps.emailSender ?? createEmailSender(env);
 
   return betterAuth({

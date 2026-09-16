@@ -59,8 +59,8 @@ export default defineConfig({
   /*
    * Boot the local Worker (Vite + the Cloudflare plugin's Miniflare) before
    * the run. `e2e:server` first applies the D1 migrations to the local
-   * database, then starts the dev server on a fixed port. `EMAIL_MODE` is
-   * `mock` for the `local` env (wrangler.jsonc), so no real email is sent and
+   * database, then starts the dev server on a fixed port. No `RESEND_API_KEY`
+   * is set for the `local` env (wrangler.jsonc), so no real email is sent and
    * the `/api/test/last-delete-link` hook is mounted.
    */
   webServer: DEPLOYED_TARGET

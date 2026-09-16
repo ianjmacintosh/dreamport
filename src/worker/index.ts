@@ -113,20 +113,17 @@ export function createApp(deps: AppDeps = {}) {
 
     // Fail closed on the production host unless real email delivery is wired
     // up (issue #41). The mock sender records the code and sends nothing, so a
-    // production deploy still on `EMAIL_MODE=mock` — the var not yet flipped
-    // for #38, or a dashboard override — would take the sign-in and silently
+    // production deploy with no `RESEND_API_KEY` — not yet set for #38, or a
+    // dashboard override removing it — would take the sign-in and silently
     // swallow every code. Making the send path unavailable keeps that
     // misconfiguration visible (login stays broken) rather than handing out
     // codes nobody receives. Placed after the bot check so a dummy-token
     // probe still gets the gate's verdict (see `scripts/verify-deployment.sh`).
     // Keyed on the request `Host` — the signal `ALLOWED_HOSTS` already
     // resolves the auth `baseURL` from — by exact match: staging and
-    // `*-dreamport-staging` preview URLs run this same code on `mock` and must
-    // keep working.
-    if (
-      c.req.header("host") === PRODUCTION_HOST &&
-      (c.env.EMAIL_MODE ?? "mock") !== "resend"
-    ) {
+    // `*-dreamport-staging` preview URLs run this same code with no
+    // `RESEND_API_KEY` and must keep working.
+    if (c.req.header("host") === PRODUCTION_HOST && !c.env.RESEND_API_KEY) {
       return c.json(
         { error: "Sign-in email is temporarily unavailable. Try again later." },
         503,
@@ -143,7 +140,7 @@ export function createApp(deps: AppDeps = {}) {
     // covers.
     const daily = await peekDailySendCap(
       c.env.DB,
-      resolveDailyCap(c.env.SEND_OTP_DAILY_CAP, c.env.EMAIL_MODE),
+      resolveDailyCap(c.env.SEND_OTP_DAILY_CAP, c.env.RESEND_API_KEY),
     );
     if (!daily.allowed) return tooManyRequests(daily.retryAfter);
 
@@ -201,7 +198,7 @@ export function createApp(deps: AppDeps = {}) {
   app.post("/api/auth/delete-user", async (c) => {
     const daily = await peekDailySendCap(
       c.env.DB,
-      resolveDailyCap(c.env.SEND_OTP_DAILY_CAP, c.env.EMAIL_MODE),
+      resolveDailyCap(c.env.SEND_OTP_DAILY_CAP, c.env.RESEND_API_KEY),
     );
     if (!daily.allowed) {
       return c.json(
@@ -268,14 +265,13 @@ export function createApp(deps: AppDeps = {}) {
    *    (local `npm run dev`, the Playwright webServer) and the vitest pool.
    *    `vite build` replaces it with `false`, so this route is dropped from
    *    the staging and production bundles entirely and can never be served
-   *    there — even though every deployed environment currently runs
-   *    `EMAIL_MODE=mock`.
-   * 2. `EMAIL_MODE` (unset ⇒ mock, matching `createEmailSender`) keeps it
-   *    inert in a dev server wired to a real sender.
+   *    there — even though staging currently has no `RESEND_API_KEY` either.
+   * 2. `RESEND_API_KEY` presence (absent ⇒ mock, matching `createEmailSender`)
+   *    keeps it inert in a dev server wired to a real sender.
    */
   if (import.meta.env.DEV) {
     app.get("/api/test/last-delete-link", (c) => {
-      if ((c.env.EMAIL_MODE ?? "mock") !== "mock") {
+      if (c.env.RESEND_API_KEY) {
         return c.json({ error: "Not found" }, 404);
       }
 

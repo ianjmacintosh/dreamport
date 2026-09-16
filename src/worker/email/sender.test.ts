@@ -175,19 +175,12 @@ describe("ResendEmailSender", () => {
 });
 
 describe("createEmailSender", () => {
-  it("returns the shared mock sender when EMAIL_MODE is unset", () => {
+  it("returns the shared mock sender when RESEND_API_KEY is unset", () => {
     expect(createEmailSender({})).toBe(getMockSender());
   });
 
-  it("returns the shared mock sender when EMAIL_MODE=mock", () => {
-    expect(createEmailSender({ EMAIL_MODE: "mock" })).toBe(getMockSender());
-  });
-
-  it("returns a Resend sender when EMAIL_MODE=resend and RESEND_API_KEY is set", () => {
-    const sender = createEmailSender({
-      EMAIL_MODE: "resend",
-      RESEND_API_KEY: "re_test_key",
-    });
+  it("returns a Resend sender when RESEND_API_KEY is set", () => {
+    const sender = createEmailSender({ RESEND_API_KEY: "re_test_key" });
 
     expect(sender).toBeInstanceOf(ResendEmailSender);
   });
@@ -200,22 +193,11 @@ describe("createEmailSender", () => {
       }),
     );
 
-    await createEmailSender({
-      EMAIL_MODE: "resend",
-      RESEND_API_KEY: "re_test_key",
-    }).sendOtp(signIn);
+    await createEmailSender({ RESEND_API_KEY: "re_test_key" }).sendOtp(signIn);
 
     const body = JSON.parse(
       (fetchSpy.mock.calls[0]![1] as RequestInit).body as string,
     ) as Record<string, string>;
     expect(body.from).toBe(EMAIL_FROM);
-  });
-
-  it("throws when EMAIL_MODE=resend but RESEND_API_KEY is missing", () => {
-    expect(() =>
-      createEmailSender({
-        EMAIL_MODE: "resend",
-      }),
-    ).toThrow(/RESEND_API_KEY/);
   });
 });

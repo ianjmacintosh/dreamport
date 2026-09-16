@@ -138,15 +138,14 @@ else
   EXPECTED_DB_ID=$(npx wrangler d1 info "$DB" --json 2>/dev/null | jq -r '.uuid // empty')
   ACTUAL_DB_ID=$(jq -r '.resources.bindings[]? | select(.type=="d1") | .database_id // empty' <<<"$BINDINGS_JSON")
   HAS_SECRET=$(jq -r 'any(.resources.bindings[]?; .name=="BETTER_AUTH_SECRET" and .type=="secret_text")' <<<"$BINDINGS_JSON")
-  HAS_EMAIL_MODE=$(jq -r 'any(.resources.bindings[]?; .name=="EMAIL_MODE")' <<<"$BINDINGS_JSON")
-  # Value, not just presence. A plain_text var binding carries its value as
-  # `.text` in current `wrangler versions view --json`; older/other shapes
-  # have used `.value`, so read whichever is a non-empty string.
+  # Presence only, never the value — same shape as the BETTER_AUTH_SECRET
+  # check above. Only production requires this binding: staging has no real
+  # RESEND_API_KEY yet (issue #70), so it stays on the mock sender by design.
   # The runtime guard in src/worker/index.ts already 503s the send-OTP path on
-  # the production host unless this is `resend`; this is the detective backstop
-  # that catches a mock-wired production version at verify time instead of on a
-  # user's failed sign-in (issue #41).
-  EMAIL_MODE_VALUE=$(jq -r 'first(.resources.bindings[]? | select(.name=="EMAIL_MODE") | (.text // .value) | select(type == "string" and . != "")) // empty' <<<"$BINDINGS_JSON")
+  # the production host without this secret; this is the detective backstop
+  # that catches a key-less production version at verify time instead of on a
+  # user's failed sign-in (issue #41, #66).
+  HAS_RESEND_KEY=$(jq -r 'any(.resources.bindings[]?; .name=="RESEND_API_KEY" and .type=="secret_text")' <<<"$BINDINGS_JSON")
 
   if [[ -z "$ACTUAL_DB_ID" ]]; then
     record fail "Version bindings" "no D1 binding on latest version ($LATEST_VERSION_ID) — build likely selected the wrong CLOUDFLARE_ENV, or didn't rebuild at all"
@@ -154,12 +153,10 @@ else
     record fail "Version bindings" "D1 binding points at $ACTUAL_DB_ID, expected $DB ($EXPECTED_DB_ID)"
   elif [[ "$HAS_SECRET" != "true" ]]; then
     record fail "Version bindings" "BETTER_AUTH_SECRET missing from latest version's bindings"
-  elif [[ "$HAS_EMAIL_MODE" != "true" ]]; then
-    record fail "Version bindings" "EMAIL_MODE missing from latest version's bindings"
-  elif [[ "$ENVIRONMENT" == "production" && "$EMAIL_MODE_VALUE" != "resend" ]]; then
-    record fail "Version bindings" "EMAIL_MODE=${EMAIL_MODE_VALUE:-<unreadable>} on the deployed production version — production must run 'resend' (the mock sender delivers nothing, and the runtime guard 503s sign-in email here). Expected red until #38 wires real delivery; see issue #41."
+  elif [[ "$ENVIRONMENT" == "production" && "$HAS_RESEND_KEY" != "true" ]]; then
+    record fail "Version bindings" "RESEND_API_KEY missing from latest version's bindings — production requires it (the mock sender delivers nothing, and the runtime guard 503s sign-in email here). Expected red until #38 wires real delivery; see issue #41."
   else
-    record pass "Version bindings" "DB ($DB), BETTER_AUTH_SECRET all present; EMAIL_MODE=${EMAIL_MODE_VALUE:-mock} on version $LATEST_VERSION_ID"
+    record pass "Version bindings" "DB ($DB), BETTER_AUTH_SECRET all present$([[ "$ENVIRONMENT" == "production" ]] && echo "; RESEND_API_KEY bound") on version $LATEST_VERSION_ID"
   fi
 fi
 

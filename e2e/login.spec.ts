@@ -32,9 +32,10 @@ test.beforeEach(async ({ page }, testInfo) => {
 
 /**
  * The sign-in flow end to end, against the local Worker booted by
- * `playwright.config.ts`'s `webServer`. `EMAIL_MODE=mock`, so a `+e2e-test@`
- * address always gets the fixed code "000000" (see the file-header note
- * above), typed straight in with no server round trip to read it back.
+ * `playwright.config.ts`'s `webServer`. No `RESEND_API_KEY` is set locally,
+ * so a `+e2e-test@` address always gets the fixed code "000000" (see the
+ * file-header note above), typed straight in with no server round trip to
+ * read it back.
  *
  * `VITE_TURNSTILE_SITE_KEY` is Cloudflare's always-pass test key (`.env` /
  * CI job env), so the Turnstile widget on the email step auto-solves; the

@@ -1,7 +1,9 @@
 import { env } from "cloudflare:workers";
+import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { TEST_EMAILS } from "../../test/emails";
+import { network } from "../../test/msw-network";
 import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 import { createApp } from "./index";
@@ -435,13 +437,13 @@ describe("Turnstile gate on the send-OTP path (#23)", () => {
 
 describe("production host refuses mock email on the send-OTP path (#41)", () => {
   // The mock sender delivers nothing, so the production host must never run
-  // it: a send whose `Host` is the production domain while the resolved
-  // `EMAIL_MODE` is anything but `resend` is refused (503) before Better Auth
-  // generates a code. Every deployed environment ships `EMAIL_MODE=mock`
-  // today, so this is what keeps a production deploy failing closed (login
-  // unavailable) rather than open (codes generated but never delivered) until
-  // #38 wires real Resend delivery. `env.EMAIL_MODE` in this pool is `mock`
-  // (the `local` wrangler env), so these cases only vary the Host.
+  // it: a send whose `Host` is the production domain while `RESEND_API_KEY`
+  // is absent is refused (503) before Better Auth generates a code. No
+  // deployed environment carries a key today outside production, so this is
+  // what keeps a production deploy failing closed (login unavailable) rather
+  // than open (codes generated but never delivered) until #38 wires real
+  // Resend delivery. `env.RESEND_API_KEY` is unset in this pool (the `local`
+  // wrangler env), so these cases only vary the Host.
   //
   // The guard itself (`index.ts`) compares the request `Host` against
   // `PRODUCTION_HOST` by exact `===`, independent of `ALLOWED_HOSTS` — see
@@ -469,6 +471,41 @@ describe("production host refuses mock email on the send-OTP path (#41)", () => 
 
     expect(res.status).toBe(200);
     expect(codeFor(TEST_EMAILS.prodHostStagingOk)).toMatch(/^\d{6}$/);
+  });
+});
+
+describe("real ResendEmailSender send path, MSW-stubbed (#66)", () => {
+  // Every other case in this file drives the send-OTP route with no
+  // RESEND_API_KEY set, so `createEmailSender` always picks the mock sender
+  // and `ResendEmailSender`'s request-construction/response-parsing code
+  // never runs here. This proves that path end to end — through the real
+  // HTTP boundary, `createAuth`, and `createEmailSender` — by setting a
+  // (fake) key and letting `test/msw-network.ts` intercept the outbound
+  // `fetch` to Resend inside workerd instead of hitting the real API. No
+  // real network call, no real key. See docs/adr/0010.
+  afterEach(() => {
+    delete env.RESEND_API_KEY;
+  });
+
+  it("posts to the real Resend endpoint with the documented shape and completes the send", async () => {
+    env.RESEND_API_KEY = "re_test_key";
+    let capturedBody: Record<string, string> | undefined;
+    let capturedAuth: string | null = null;
+    network.use(
+      http.post("https://api.resend.com/emails", async ({ request }) => {
+        capturedAuth = request.headers.get("authorization");
+        capturedBody = (await request.json()) as Record<string, string>;
+        return HttpResponse.json({ id: "re_test_123" });
+      }),
+    );
+
+    const res = await sendCode(TEST_EMAILS.resendPathMsw);
+
+    expect(res.status).toBe(200);
+    expect(capturedAuth).toBe("Bearer re_test_key");
+    expect(capturedBody?.to).toBe(TEST_EMAILS.resendPathMsw);
+    expect(capturedBody?.subject).toMatch(/sign-in code/i);
+    expect(capturedBody?.text).toMatch(/^Your Dreamport code is \d{6}\./);
   });
 });
 
@@ -592,7 +629,7 @@ describe("verify a sign-in code", () => {
     expect(known.status).toBe(400);
   });
 
-  it("uses an injected email sender, bypassing EMAIL_MODE", async () => {
+  it("uses an injected email sender, bypassing RESEND_API_KEY", async () => {
     const captured: OtpEmail[] = [];
     const spy: EmailSender = {
       async sendOtp(email) {
@@ -848,7 +885,7 @@ describe("GET /api/test/last-delete-link (mock-only test hook)", () => {
 });
 
 describe("fixed E2E-test OTP code (#39)", () => {
-  // Marker-carrying address, `EMAIL_MODE=mock` (this pool's setting): the
+  // Marker-carrying address, no RESEND_API_KEY set (this pool's setting): the
   // code is the fixed "000000" and a real sign-in completes with it.
   it("verifies with the fixed code for a +e2e-test@ address", async () => {
     await sendCode(TEST_EMAILS.e2eTestFixedCode);
@@ -859,20 +896,21 @@ describe("fixed E2E-test OTP code (#39)", () => {
     expect(res.status).toBe(200);
   });
 
-  // Same mode, no marker: falls through to Better Auth's own generator.
+  // Same setting, no marker: falls through to Better Auth's own generator.
   it("still gets a random code for an address without the marker", async () => {
     await sendCode(TEST_EMAILS.e2eTestNoMarker);
 
     expect(codeFor(TEST_EMAILS.e2eTestNoMarker)).toMatch(/^\d{6}$/);
   });
 
-  // The production-safety guarantee: even a marker address never gets the
-  // fixed code once `EMAIL_MODE=resend`, regardless of what the address
-  // looks like. Driven through `auth.api.*` directly with an injected
-  // sender (as the "bypassing EMAIL_MODE" case above does) so this needs no
-  // real Resend call — only `generateOTP`'s own `env.EMAIL_MODE` read is
-  // under test here.
-  it("is inert when EMAIL_MODE=resend, even for a marker address", async () => {
+  // #66 / docs/adr/0010: staging deliberately carries a real RESEND_API_KEY
+  // at the same time TEST_LOGIN_ENABLED may be on there — the combination
+  // the old EMAIL_MODE-keyed clause used to block is now the intended
+  // design, so `generateOTP` still hands out the fixed code here. Driven
+  // through `auth.api.*` directly with an injected sender (as the
+  // "bypassing RESEND_API_KEY" case above does) so this needs no real
+  // Resend call.
+  it("still returns the fixed code for a marker address with RESEND_API_KEY set", async () => {
     const captured: OtpEmail[] = [];
     const spy: EmailSender = {
       async sendOtp(email) {
@@ -884,7 +922,7 @@ describe("fixed E2E-test OTP code (#39)", () => {
     };
 
     const auth = createAuth(
-      { ...env, EMAIL_MODE: "resend" },
+      { ...env, TEST_LOGIN_ENABLED: "true", RESEND_API_KEY: "re_test_key" },
       { emailSender: spy },
     );
     const res = await auth.api.sendVerificationOTP({
@@ -895,20 +933,18 @@ describe("fixed E2E-test OTP code (#39)", () => {
 
     expect(res.status).toBe(200);
     expect(captured).toHaveLength(1);
-    expect(captured[0].otp).not.toBe("000000");
-    expect(captured[0].otp).toMatch(/^\d{6}$/);
+    expect(captured[0].otp).toBe("000000");
   });
 
-  // The bug #61 shipped and #62 hotfixed: `staging` runs `EMAIL_MODE=mock`
-  // too (it's not just a production-only setting), so `EMAIL_MODE` alone
-  // can't be what keeps the fixed code off a public deployment —
-  // `TEST_LOGIN_ENABLED` is the var that actually does that job, and it's
-  // absent from `staging`'s `wrangler.jsonc` vars. This constructs exactly
-  // that shape (mock email, no `TEST_LOGIN_ENABLED`) and drives it through
-  // a real `createAuth` + `sendVerificationOTP` call, the same way the
-  // `EMAIL_MODE=resend` case above does — proof this is testable at all,
-  // which the old `import.meta.env.DEV` gate never was.
-  it("is inert when TEST_LOGIN_ENABLED is unset, even with EMAIL_MODE=mock", async () => {
+  // The bug #61 shipped and #62 hotfixed: a real Resend key alone can't be
+  // what keeps the fixed code off a public deployment (staging may carry one
+  // per ADR-0010) — `TEST_LOGIN_ENABLED` is the sole var that does that job,
+  // and it's absent from `staging`'s `wrangler.jsonc` vars. This constructs
+  // exactly that shape (no `TEST_LOGIN_ENABLED`) and drives it through a
+  // real `createAuth` + `sendVerificationOTP` call, the same way the case
+  // above does — proof this is testable at all, which the old
+  // `import.meta.env.DEV` gate never was.
+  it("is inert when TEST_LOGIN_ENABLED is unset", async () => {
     const captured: OtpEmail[] = [];
     const spy: EmailSender = {
       async sendOtp(email) {

@@ -44,7 +44,7 @@ export const TEST_EMAILS = {
   knownVerify: "delivered+known-verify@resend.dev",
   /** Never seen before, paired with `knownVerify`. */
   unknownVerify: "delivered+unknown-verify@resend.dev",
-  /** Drives `createAuth` with an injected spy sender, bypassing EMAIL_MODE. */
+  /** Drives `createAuth` with an injected spy sender, bypassing RESEND_API_KEY. */
   injectedSender: "delivered+injected@resend.dev",
 
   // --- Seam 1: Turnstile gate on the send endpoint (#23) ---
@@ -130,9 +130,9 @@ export const TEST_EMAILS = {
   /**
    * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
    * against a real deployed environment. Deliberately NOT a `+e2e-test@`
-   * marker address: that spec's whole point is proving mock email delivery
-   * is fenced out of a deployed environment (`EMAIL_MODE` there is never
-   * `mock`), so the fixed code must stay unreachable there too.
+   * marker address: that spec's whole point is proving `TEST_LOGIN_ENABLED`
+   * is what fences the fixed code out of a deployed environment, not the
+   * sender in use — so the fixed code must stay unreachable there too.
    */
   deploySmoke: "delivered+deploy-smoke@resend.dev",
 
@@ -145,10 +145,14 @@ export const TEST_EMAILS = {
   deleteLinkRecipient: "delivered+delete-link-recipient@resend.dev",
 
   // --- Seam 1: fixed E2E-test OTP code (#39) ---
-  /** `+e2e-test@` marker, `EMAIL_MODE=mock`: the fixed code `000000` verifies. */
+  /** `+e2e-test@` marker, `TEST_LOGIN_ENABLED=true`: the fixed code `000000` verifies. */
   e2eTestFixedCode: "delivered+e2e-test@resend.dev",
   /** No `+e2e-test@` marker: gets a real random code, not the fixed one. */
   e2eTestNoMarker: "delivered+not-e2e-test@resend.dev",
+
+  // --- Seam 1: real ResendEmailSender path, MSW-stubbed (#66) ---
+  /** Send with RESEND_API_KEY set and MSW stubbing Resend's response. */
+  resendPathMsw: "delivered+resend-path-msw@resend.dev",
 
   // --- Live (opt-in, never CI) ---
   /** Resend's sink: always accepts, never forwards. Only `sender.live.test.ts`. */

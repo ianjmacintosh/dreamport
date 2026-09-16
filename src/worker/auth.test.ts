@@ -8,7 +8,7 @@ import type { WorkerEnv } from "./env";
 // only needs to reach the guard, so a bare env is enough.
 describe("createAuth", () => {
   it("throws when BETTER_AUTH_SECRET is missing rather than using a default", () => {
-    const env = { EMAIL_MODE: "mock" } as unknown as WorkerEnv;
+    const env = {} as unknown as WorkerEnv;
 
     expect(() => createAuth(env)).toThrow(/BETTER_AUTH_SECRET is not set/);
   });
@@ -36,7 +36,10 @@ describe("buildTestLoginOTP", () => {
     const envs: WorkerEnv[] = [
       {} as WorkerEnv,
       { TEST_LOGIN_ENABLED: "true" } as WorkerEnv,
-      { TEST_LOGIN_ENABLED: "true", EMAIL_MODE: "resend" } as WorkerEnv,
+      {
+        TEST_LOGIN_ENABLED: "true",
+        RESEND_API_KEY: "re_test_key",
+      } as WorkerEnv,
     ];
 
     for (const env of envs) {
@@ -45,37 +48,35 @@ describe("buildTestLoginOTP", () => {
   });
 
   it("returns undefined when TEST_LOGIN_ENABLED is unset — the staging/production shape", () => {
-    const env = { EMAIL_MODE: "mock" } as unknown as WorkerEnv;
+    const env = {} as unknown as WorkerEnv;
 
     expect(buildTestLoginOTP(env)({ email })).toBeUndefined();
   });
 
   it("returns the fixed code for a +e2e-test@ address when enabled", () => {
-    const env = {
-      TEST_LOGIN_ENABLED: "true",
-      EMAIL_MODE: "mock",
-    } as unknown as WorkerEnv;
+    const env = { TEST_LOGIN_ENABLED: "true" } as unknown as WorkerEnv;
 
     expect(buildTestLoginOTP(env)({ email })).toBe("000000");
   });
 
   it("returns undefined for an address without the marker, even when enabled", () => {
-    const env = {
-      TEST_LOGIN_ENABLED: "true",
-      EMAIL_MODE: "mock",
-    } as unknown as WorkerEnv;
+    const env = { TEST_LOGIN_ENABLED: "true" } as unknown as WorkerEnv;
 
     expect(
       buildTestLoginOTP(env)({ email: "delivered+plain@resend.dev" }),
     ).toBeUndefined();
   });
 
-  it("stays inert under EMAIL_MODE=resend even when enabled — defense in depth", () => {
+  it("still returns the fixed code with a real RESEND_API_KEY set — staging's shape (#66)", () => {
+    // ADR-0010: staging deliberately carries a real RESEND_API_KEY at the
+    // same time TEST_LOGIN_ENABLED may be on there. TEST_LOGIN_ENABLED is
+    // now the sole, independent condition — this is the combination the old
+    // EMAIL_MODE-keyed clause used to block, and is now the intended design.
     const env = {
       TEST_LOGIN_ENABLED: "true",
-      EMAIL_MODE: "resend",
+      RESEND_API_KEY: "re_test_key",
     } as unknown as WorkerEnv;
 
-    expect(buildTestLoginOTP(env)({ email })).toBeUndefined();
+    expect(buildTestLoginOTP(env)({ email })).toBe("000000");
   });
 });
