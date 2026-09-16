@@ -206,18 +206,18 @@ secret put` in this repo, so this step is manual, via the dashboard:
    (the running staging host and every preview version); no code change is
    needed to pick it up, since sender selection is already keyed on the
    secret's presence (issue #66).
-4. Confirm with `npm run verify:staging` — its **Live smoke test** check
-   hits the deployed send-OTP gate. Its **Version bindings** check does
-   _not_ yet assert `RESEND_API_KEY` presence for staging the way it does
-   for production (`scripts/verify-deployment.sh` only requires the binding
-   when `ENVIRONMENT == production`) — confirming staging's key is actually
-   bound today means reading the **Live smoke test** result plus a manual
-   check, or an actual test send, until that script is extended to cover
-   staging too. The same script also has no check, for any environment, that
-   `TEST_LOGIN_ENABLED` is `"true"` only where it's supposed to be — a future
-   `wrangler.jsonc` edit could widen the fixed-test-code sign-in bypass
-   (`src/worker/auth.ts`'s `buildTestLoginOTP`) onto production with nothing
-   catching it at verify time.
+4. Confirm with `npm run verify:staging` — its **Version bindings** check
+   now asserts `RESEND_API_KEY` presence on staging the same way it always
+   has for production, and stays red until the dashboard secret above lands.
+   (The **Live smoke test** check doesn't inspect `RESEND_API_KEY` at all —
+   it hits the Turnstile-gated send-OTP endpoint, and expects 200 on staging
+   whether the sender behind it is real or mock, so it passes either way and
+   proves nothing about the key on its own.) **Version bindings** also
+   asserts `TEST_LOGIN_ENABLED`'s value per environment — `"true"` on
+   staging, absent on production — so a future `wrangler.jsonc` edit that
+   widens the fixed-test-code sign-in bypass (`src/worker/auth.ts`'s
+   `buildTestLoginOTP`) onto production fails `verify:production` instead of
+   going unnoticed.
 
 ### Production refuses mock email
 
