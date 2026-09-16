@@ -37,10 +37,11 @@ export const STAGING_HOSTS = [
 
 /**
  * The canonical production host, for exact-match guards — e.g. the send-OTP
- * path in `index.ts` refusing mock email delivery on production (issue #41),
- * and `scripts/verify-deployment.sh` (which hard-codes the same literal; it's
- * bash). Compared with `===`, never a suffix test: a `*-dreamport-staging`
- * preview host must not read as production.
+ * path in `index.ts` refusing mock email delivery on production (issue #41,
+ * matched case-insensitively via {@link matchesHostPattern} since #60), and
+ * `scripts/verify-deployment.sh` (which hard-codes the same literal; it's
+ * bash, compared with `===`). Exact on value, never a suffix test: a
+ * `*-dreamport-staging` preview host must not read as production.
  */
 export const PRODUCTION_HOST: string = PRODUCTION_HOSTS[0];
 
@@ -50,8 +51,8 @@ export const PRODUCTION_HOST: string = PRODUCTION_HOSTS[0];
  * `pattern` matches any run of characters, the same shape
  * {@link STAGING_HOSTS}'s preview entry already uses. Exported so more than
  * one hostname comparison in this codebase can share one implementation —
- * #69's Turnstile check is the first caller; #60's production-host guard in
- * `index.ts` is a candidate to adopt it too.
+ * #69's Turnstile check was the first caller; #60's production-host guard in
+ * `index.ts` adopted it too.
  */
 export function matchesHostPattern(hostname: string, pattern: string): boolean {
   const regexSource = pattern

@@ -446,14 +446,14 @@ describe("production host refuses mock email on the send-OTP path (#41)", () => 
   // wrangler env), so these cases only vary the Host.
   //
   // The guard itself (`index.ts`) compares the request `Host` against
-  // `PRODUCTION_HOST` by exact `===`, independent of `ALLOWED_HOSTS` — see
-  // that guard's own comment. It used to be exercisable against a real
-  // staging Host in the same build; #63 / docs/adr/0011 means this build's
-  // `ALLOWED_HOSTS` no longer resolves a `baseURL` for staging at all (see
-  // "dynamic baseURL" above), so the "doesn't fire" case below uses this
-  // build's own DEV-only host instead — same property (exact match, not a
-  // prefix/substring test), a host this build can actually complete the
-  // request for.
+  // `PRODUCTION_HOST` case-insensitively via `matchesHostPattern` (#60),
+  // independent of `ALLOWED_HOSTS` — see that guard's own comment. It used
+  // to be exercisable against a real staging Host in the same build; #63 /
+  // docs/adr/0011 means this build's `ALLOWED_HOSTS` no longer resolves a
+  // `baseURL` for staging at all (see "dynamic baseURL" above), so the
+  // "doesn't fire" case below uses this build's own DEV-only host instead —
+  // same property (exact match on value, not a prefix/substring test), a
+  // host this build can actually complete the request for.
 
   it("503s a send from the production Host, before any code is generated", async () => {
     const res = await sendCode(TEST_EMAILS.prodHostGuard, {
@@ -471,6 +471,23 @@ describe("production host refuses mock email on the send-OTP path (#41)", () => 
 
     expect(res.status).toBe(200);
     expect(codeFor(TEST_EMAILS.prodHostStagingOk)).toMatch(/^\d{6}$/);
+  });
+
+  it("503s a send whose Host is a mixed-case spelling of the production host (#60)", async () => {
+    // Host names are case-insensitive per RFC 9110; a mixed-case Host must
+    // still read as production, not slip past the guard as an unrecognised
+    // one.
+    const mixedCaseHost = PRODUCTION_HOST.toUpperCase();
+    expect(mixedCaseHost).not.toBe(PRODUCTION_HOST);
+
+    const res = await sendCode(TEST_EMAILS.prodHostMixedCase, {
+      host: mixedCaseHost,
+    });
+
+    expect(res.status).toBe(503);
+    expect(
+      getMockSender().sent.some((e) => e.to === TEST_EMAILS.prodHostMixedCase),
+    ).toBe(false);
   });
 });
 

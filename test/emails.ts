@@ -62,6 +62,8 @@ export const TEST_EMAILS = {
   prodHostGuard: "delivered+prod-host-guard@resend.dev",
   /** Same code and mode but a staging Host; the guard must not fire. */
   prodHostStagingOk: "delivered+prod-host-staging-ok@resend.dev",
+  /** Send from a mixed-case spelling of the production Host; still refused (#60). */
+  prodHostMixedCase: "delivered+prod-host-mixed-case@resend.dev",
 
   // --- Seam 1: rate limiting on the send endpoint (#24) ---
   /**
