@@ -171,8 +171,15 @@ function countSessions(userId: string) {
     .first<{ n: number }>();
 }
 
-/** A trusted origin for the state-changing, cookie-bearing #26 requests. */
-const TRUSTED_ORIGIN = `https://${PRODUCTION_HOST}`;
+/**
+ * A trusted origin for the state-changing, cookie-bearing #26 requests. Not
+ * `PRODUCTION_HOST` (#63 / docs/adr/0011 stopped this build's
+ * `TRUSTED_ORIGINS` from carrying every environment's hosts) — `ORIGIN`
+ * itself, self-trusted via `fetchWorker`'s matching default Host, keeps
+ * these tests about sign-out/delete-user, not about which origins this
+ * particular build's environment happens to trust.
+ */
+const TRUSTED_ORIGIN = ORIGIN;
 
 /** POST /api/auth/sign-out with a trusted Origin and the session cookie. */
 function signOut(cookie: string) {
@@ -408,6 +415,16 @@ describe("production host refuses mock email on the send-OTP path (#41)", () => 
   // unavailable) rather than open (codes generated but never delivered) until
   // #38 wires real Resend delivery. `env.EMAIL_MODE` in this pool is `mock`
   // (the `local` wrangler env), so these cases only vary the Host.
+  //
+  // The guard itself (`index.ts`) compares the request `Host` against
+  // `PRODUCTION_HOST` by exact `===`, independent of `ALLOWED_HOSTS` — see
+  // that guard's own comment. It used to be exercisable against a real
+  // staging Host in the same build; #63 / docs/adr/0011 means this build's
+  // `ALLOWED_HOSTS` no longer resolves a `baseURL` for staging at all (see
+  // "dynamic baseURL" above), so the "doesn't fire" case below uses this
+  // build's own DEV-only host instead — same property (exact match, not a
+  // prefix/substring test), a host this build can actually complete the
+  // request for.
 
   it("503s a send from the production Host, before any code is generated", async () => {
     const res = await sendCode(TEST_EMAILS.prodHostGuard, {
@@ -420,10 +437,8 @@ describe("production host refuses mock email on the send-OTP path (#41)", () => 
     ).toBe(false);
   });
 
-  it("does not fire for the staging Host running the same code and mode", async () => {
-    const res = await sendCode(TEST_EMAILS.prodHostStagingOk, {
-      host: "dreamport-staging.bananasquad.workers.dev",
-    });
+  it("does not fire for a non-production Host running the same code and mode", async () => {
+    const res = await sendCode(TEST_EMAILS.prodHostStagingOk);
 
     expect(res.status).toBe(200);
     expect(codeFor(TEST_EMAILS.prodHostStagingOk)).toMatch(/^\d{6}$/);
@@ -902,20 +917,39 @@ describe("trusted origins (via Better Auth's origin check)", () => {
       headers: { origin, cookie: "better-auth.session_token=unsigned" },
     });
 
-  it("accepts the production origin", async () => {
+  // #63 / docs/adr/0011: `TRUSTED_ORIGINS` is now resolved once per build
+  // from that build's own `CLOUDFLARE_ENV`, not shared across every
+  // environment — this pool's build is `local`-shaped (`CLOUDFLARE_ENV`
+  // unset, see `trusted-origins.ts`'s `hostsForEnvironment`), so it carries
+  // no production or staging hosts at all. What production's and staging's
+  // own builds each resolve to is covered directly, for every environment,
+  // by the pure-function tests in `trusted-origins.test.ts`
+  // (`trustedOriginsForEnvironment`) — these prove the *consequence* end to
+  // end: this build rejects every other environment's origin, the exact gap
+  // ADR-0011 closed.
+
+  it("accepts a self-trusted origin matching this build's resolved baseURL", async () => {
+    // No environment-scoped host is trusted here (see above) — this passes
+    // via Better Auth's baseURL self-trust instead: the request's Host
+    // resolves to this same origin (see `fetchWorker`'s default Host, the
+    // DEV-only `dreamport.test` pattern in `ALLOWED_HOSTS`).
+    expect((await signOutFrom(ORIGIN)).status).toBe(200);
+  });
+
+  it("rejects the production origin — this build carries no environment-scoped hosts", async () => {
     expect(
       (await signOutFrom("https://dreamport.ianjmacintosh.com")).status,
-    ).toBe(200);
+    ).toBe(403);
   });
 
-  it("accepts the long-lived staging origin (bare host, no version prefix)", async () => {
+  it("rejects the long-lived staging origin, for the same reason", async () => {
     const origin = "https://dreamport-staging.bananasquad.workers.dev";
-    expect((await signOutFrom(origin)).status).toBe(200);
+    expect((await signOutFrom(origin)).status).toBe(403);
   });
 
-  it("accepts a branch-preview origin on this account's subdomain", async () => {
+  it("rejects a branch-preview origin, for the same reason", async () => {
     const origin = "https://a1b2c3-dreamport-staging.bananasquad.workers.dev";
-    expect((await signOutFrom(origin)).status).toBe(200);
+    expect((await signOutFrom(origin)).status).toBe(403);
   });
 
   it("rejects a workers.dev host outside this account's subdomain", async () => {
@@ -948,20 +982,30 @@ describe("dynamic baseURL (ALLOWED_HOSTS)", () => {
     expect(await res.json()).toEqual({ ok: true });
   });
 
-  it("resolves for the long-lived staging Host (bare, no version prefix)", async () => {
-    const res = await fetchAs("dreamport-staging.bananasquad.workers.dev");
+  // #63 / docs/adr/0011: same split as the trusted-origins block above —
+  // this build's `ALLOWED_HOSTS` carries no production or staging hosts, so
+  // neither resolves a `baseURL` here even though each is exactly what its
+  // own build resolves (see `allowedHostsForEnvironment` in
+  // `trusted-origins.test.ts`).
 
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
+  it("fails to resolve the production Host — this build carries no environment-scoped hosts", async () => {
+    const res = await fetchAs(PRODUCTION_HOST);
+
+    expect(res.status).toBe(500);
   });
 
-  it("resolves for a branch-preview Host, matching the staging wildcard", async () => {
+  it("fails to resolve the long-lived staging Host, for the same reason", async () => {
+    const res = await fetchAs("dreamport-staging.bananasquad.workers.dev");
+
+    expect(res.status).toBe(500);
+  });
+
+  it("fails to resolve a branch-preview Host, for the same reason", async () => {
     const res = await fetchAs(
       "a1b2c3d4-dreamport-staging.bananasquad.workers.dev",
     );
 
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
+    expect(res.status).toBe(500);
   });
 
   it("fails rather than self-trusting a Host matching no allowed pattern", async () => {
