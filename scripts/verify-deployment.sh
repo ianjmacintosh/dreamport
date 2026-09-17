@@ -103,30 +103,23 @@ fi
 
 # ── Which version, and which URL, are we actually testing? ─────────────────
 # Resolved and printed up front, before any checks run, so it's never an
-# implicit/hidden detail — see the incident this script came out of.
+# implicit/hidden detail — see the incident this script came out of. Staging
+# needs an explicit preview URL or --latest (checked above); there is no
+# bare-staging default here the way there is in scripts/e2e.sh, deliberately.
 LATEST_VERSION_JSON=$(npx wrangler versions list --name "$WORKER" --json 2>/dev/null || true)
 LATEST_VERSION_ID=$(jq -r 'sort_by(.number) | last | .id // empty' <<<"$LATEST_VERSION_JSON")
 
+source "$(dirname "${BASH_SOURCE[0]}")/lib/resolve-deployed-url.sh"
+
+BASE_URL=$(resolve_deployed_url "$ENVIRONMENT" "$URL_ARG" "$LATEST_VERSION_ID") || exit 2
 if [[ "$ENVIRONMENT" == "production" ]]; then
-  BASE_URL="https://dreamport.ianjmacintosh.com"
   echo "Testing production at: $BASE_URL"
 elif [[ "$URL_ARG" == "--latest" ]]; then
-  if [[ -z "$LATEST_VERSION_ID" ]]; then
-    echo "No versions found for $WORKER — can't resolve --latest." >&2
-    exit 2
-  fi
-  BASE_URL="https://${LATEST_VERSION_ID:0:8}-dreamport-staging.bananasquad.workers.dev"
-  echo "--latest resolved to version $LATEST_VERSION_ID: $BASE_URL"
-  echo "(this may not be the version your most recent push produced — pass the exact preview URL to be sure)"
+  echo "Testing: $BASE_URL"
+elif [[ "$BASE_URL" != "$URL_ARG" ]]; then
+  echo "Testing: $BASE_URL (trimmed from $URL_ARG)"
 else
-  # Accept a full page URL (address-bar paste) and reduce it to scheme+host,
-  # so ".../login" doesn't turn the smoke test into a POST to a nonsense path.
-  BASE_URL=$(sed -E 's#^(https?://[^/]+).*#\1#' <<<"$URL_ARG")
-  if [[ "$BASE_URL" != "$URL_ARG" ]]; then
-    echo "Testing: $BASE_URL (trimmed from $URL_ARG)"
-  else
-    echo "Testing: $BASE_URL"
-  fi
+  echo "Testing: $BASE_URL"
 fi
 echo
 

@@ -206,7 +206,9 @@ secret put` in this repo, so this step is manual, via the dashboard:
    (the running staging host and every preview version); no code change is
    needed to pick it up, since sender selection is already keyed on the
    secret's presence (issue #66).
-4. Confirm with `npm run verify:staging` — its **Version bindings** check
+4. Confirm with `npm run verify:staging -- --latest` (or `-- <preview-url>`
+   for an exact version — `verify:staging` always needs one or the other,
+   there is no bare default). Its **Version bindings** check
    now asserts `RESEND_API_KEY` presence on staging the same way it always
    has for production, and stays red until the dashboard secret above lands.
    (The **Live smoke test** check doesn't inspect `RESEND_API_KEY` at all —
@@ -218,6 +220,14 @@ secret put` in this repo, so this step is manual, via the dashboard:
    widens the fixed-test-code sign-in bypass (`src/worker/auth.ts`'s
    `buildTestLoginOTP`) onto production fails `verify:production` instead of
    going unnoticed.
+5. For the strongest available confirmation that a send actually goes
+   through Resend, not just that the key is bound: `npm run test:e2e --
+staging` runs `deployment-smoke.spec.ts` against the long-lived staging
+   host (`scripts/e2e.sh`, issue #70) — it drives a real browser through the
+   Turnstile widget and Better Auth, which calls `ResendEmailSender` with the
+   real key. It can't confirm delivery to a real inbox (see that spec's
+   header comment for exactly what it does and doesn't prove) — for that,
+   sign in by hand with your own address.
 
 ### Production refuses mock email
 

@@ -20,11 +20,12 @@
   // main/assets/compatibility_flags/observability inherit into every env below; vars and bindings don't.
 
   // Email delivery: the `RESEND_API_KEY` secret's presence, not a var here,
-  // decides the sender (#66, docs/adr/0010) — production is the only env
-  // that has one (see `wrangler secret put`, docs/deployment.md). staging,
-  // dev, local, and every branch preview stay on the mock sender by having
-  // no key, permanently and by decision — setting one for any of them is a
-  // recorded choice, not a default.
+  // decides the sender (#66, docs/adr/0010) — production has one (see
+  // `wrangler secret put`, docs/deployment.md), and staging is getting one
+  // too (issue #70, dashboard-provisioned). dev, local, and every branch
+  // preview stay on the mock sender by having no key, permanently and by
+  // decision — setting one for any of them is a recorded choice, not a
+  // default.
 
   // production/staging: two separate Cloudflare Workers Builds projects
   // ("dreamport" and "dreamport-staging"), both Git-connected to this repo,
