@@ -67,12 +67,12 @@ the only thing left in the dashboard is the fixed one-line Build command.
 
 ## Environments
 
-| Environment                 | Workers Builds project | D1 database                   | Domain                                               | `RESEND_API_KEY`    |
-| --------------------------- | ---------------------- | ----------------------------- | ---------------------------------------------------- | ------------------- |
-| Production (`production`)   | `dreamport`            | `dreamport-prod`              | `dreamport.ianjmacintosh.com`                        | set (real sends)    |
-| Staging (`staging`)         | `dreamport-staging`    | `dreamport-stage`             | `????????-dreamport-staging.bananasquad.workers.dev` | set (real sends)    |
-| **TBD**: Remote dev (`dev`) | —                      | `dreamport-dev`               | `localhost`                                          | unset (mock)        |
-| Local dev (`local`)         | —                      | `dreamport-local` (Miniflare) | `localhost`                                          | unset (mock)        |
+| Environment                 | Workers Builds project | D1 database                   | Domain                                               | `RESEND_API_KEY` |
+| --------------------------- | ---------------------- | ----------------------------- | ---------------------------------------------------- | ---------------- |
+| Production (`production`)   | `dreamport`            | `dreamport-prod`              | `dreamport.ianjmacintosh.com`                        | set (real sends) |
+| Staging (`staging`)         | `dreamport-staging`    | `dreamport-stage`             | `????????-dreamport-staging.bananasquad.workers.dev` | set (real sends) |
+| **TBD**: Remote dev (`dev`) | —                      | `dreamport-dev`               | `localhost`                                          | unset (mock)     |
+| Local dev (`local`)         | —                      | `dreamport-local` (Miniflare) | `localhost`                                          | unset (mock)     |
 
 ### Dev (Local)
 

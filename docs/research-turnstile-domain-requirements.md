@@ -59,7 +59,7 @@ This directly contradicts the un-cited claim in ADR-0011 / `docs/deployment.md` 
 
   > "Cloudflare recommends that sitekeys used in production do not allow local domains (`localhost` or `127.0.0.1`)."
 
-  This is phrased as a recommendation, not a hard platform restriction — the same page implies a real widget's Hostname Management list *can* be configured to include `localhost` if you choose to, it's just advised against for a production key. Cloudflare's dummy keys (`1x00000000000000000000AA` etc.) exist specifically so real widgets don't need `localhost` in their Domains list at all.
+  This is phrased as a recommendation, not a hard platform restriction — the same page implies a real widget's Hostname Management list _can_ be configured to include `localhost` if you choose to, it's just advised against for a production key. Cloudflare's dummy keys (`1x00000000000000000000AA` etc.) exist specifically so real widgets don't need `localhost` in their Domains list at all.
 
 **Conclusion:** `localhost` is explicitly documented as working with Cloudflare's dummy test sitekeys on any domain (exactly what dreamport already does for `staging`/`local` per `docs/deployment.md`). For a real widget, Cloudflare's documented position is a recommendation against including local domains, not a stated inability to do so.
 
@@ -95,14 +95,14 @@ The only documented constraint that could bear on `dreamport-staging.bananasquad
 
 ## Summary table
 
-| Question | Answer | Status |
-|---|---|---|
-| Must Domains be a Cloudflare-owned/managed DNS zone? | **No** — plain FQDN list, format-checked only; "select from existing zones" is an optional convenience, not a requirement | Explicit (docs describe the format rule and the zone-picker as optional; API example uses a bare IP and an arbitrary domain) |
-| Is `localhost` documented as valid? | **Yes, for dummy/test keys**, on any domain; for real keys Cloudflare *recommends against* it (not "prohibits") | Explicit quote, both directions |
-| Restriction against `*.workers.dev` subdomains? | **None found; term never appears in the docs** | Absence confirmed across every relevant page |
-| Does `siteverify` enforce hostname against the Domains list server-side? | **No** — `hostname` is informational; no matching error code exists in the documented `siteverify` error-codes enum; docs show the caller writing that check themselves | Explicit (response schema + error-codes enum + example code) |
-| Is Domains-list enforcement purely advisory (dashboard-only)? | **No** — it's enforced client-side, at widget render (error `110200`, "Domain not authorized") | Explicit (error-codes page) |
-| Documented limitation specific to `workers.dev`? | **None found** | Absence confirmed |
+| Question                                                                 | Answer                                                                                                                                                                  | Status                                                                                                                       |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Must Domains be a Cloudflare-owned/managed DNS zone?                     | **No** — plain FQDN list, format-checked only; "select from existing zones" is an optional convenience, not a requirement                                               | Explicit (docs describe the format rule and the zone-picker as optional; API example uses a bare IP and an arbitrary domain) |
+| Is `localhost` documented as valid?                                      | **Yes, for dummy/test keys**, on any domain; for real keys Cloudflare _recommends against_ it (not "prohibits")                                                         | Explicit quote, both directions                                                                                              |
+| Restriction against `*.workers.dev` subdomains?                          | **None found; term never appears in the docs**                                                                                                                          | Absence confirmed across every relevant page                                                                                 |
+| Does `siteverify` enforce hostname against the Domains list server-side? | **No** — `hostname` is informational; no matching error code exists in the documented `siteverify` error-codes enum; docs show the caller writing that check themselves | Explicit (response schema + error-codes enum + example code)                                                                 |
+| Is Domains-list enforcement purely advisory (dashboard-only)?            | **No** — it's enforced client-side, at widget render (error `110200`, "Domain not authorized")                                                                          | Explicit (error-codes page)                                                                                                  |
+| Documented limitation specific to `workers.dev`?                         | **None found**                                                                                                                                                          | Absence confirmed                                                                                                            |
 
 ## Confidence level
 
