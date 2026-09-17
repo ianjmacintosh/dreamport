@@ -67,12 +67,12 @@ the only thing left in the dashboard is the fixed one-line Build command.
 
 ## Environments
 
-| Environment                 | Workers Builds project | D1 database                   | Domain                                               | `RESEND_API_KEY`    |
-| --------------------------- | ---------------------- | ----------------------------- | ---------------------------------------------------- | ------------------- |
-| Production (`production`)   | `dreamport`            | `dreamport-prod`              | `dreamport.ianjmacintosh.com`                        | set (real sends)    |
-| Staging (`staging`)         | `dreamport-staging`    | `dreamport-stage`             | `????????-dreamport-staging.bananasquad.workers.dev` | pending (issue #70) |
-| **TBD**: Remote dev (`dev`) | —                      | `dreamport-dev`               | `localhost`                                          | unset (mock)        |
-| Local dev (`local`)         | —                      | `dreamport-local` (Miniflare) | `localhost`                                          | unset (mock)        |
+| Environment                 | Workers Builds project | D1 database                   | Domain                                               | `RESEND_API_KEY` |
+| --------------------------- | ---------------------- | ----------------------------- | ---------------------------------------------------- | ---------------- |
+| Production (`production`)   | `dreamport`            | `dreamport-prod`              | `dreamport.ianjmacintosh.com`                        | set (real sends) |
+| Staging (`staging`)         | `dreamport-staging`    | `dreamport-stage`             | `????????-dreamport-staging.bananasquad.workers.dev` | set (real sends) |
+| **TBD**: Remote dev (`dev`) | —                      | `dreamport-dev`               | `localhost`                                          | unset (mock)     |
+| Local dev (`local`)         | —                      | `dreamport-local` (Miniflare) | `localhost`                                          | unset (mock)     |
 
 ### Dev (Local)
 
@@ -292,14 +292,27 @@ secret stores, so their keys are set independently:
 
 The production widget is scoped to `ianjmacintosh.com` (Turnstile authorizes
 a hostname and all its subdomains, so `dreamport.ianjmacintosh.com` is
-covered; the gate still pins the exact host, which is tighter). It has **no**
-`workers.dev` hostname, and a widget can't be created without one — so the
-real widget simply won't render on staging or a preview URL. Staging
-therefore runs Cloudflare's always-pass test pair, whose `siteverify`
+covered; the gate still pins the exact host, which is tighter). Staging
+currently runs Cloudflare's always-pass test pair instead, whose `siteverify`
 response doesn't carry a stable `hostname`/`action`, so the gate stays
 lenient there. The test secret still exercises the real `siteverify` HTTPS
-call, it just always answers success. Real-challenge behaviour is a
-production smoke-test concern.
+call, it just always answers success.
+
+**Correction (2026-09-17):** this section previously claimed a widget
+"can't be created" without a real `workers.dev` hostname and that a real
+widget "simply won't render" on staging. That was an uncited, unverified
+assumption — checked against Cloudflare's own Turnstile documentation
+(`docs/research-turnstile-domain-requirements.md`) and found false. The
+Domains field is a declarative, format-checked FQDN list, not a
+zone-ownership check (Cloudflare's own API examples list a bare IP and an
+arbitrary third-party domain as valid entries; `localhost` is explicitly
+documented as usable with real keys). Nothing in Cloudflare's docs mentions
+`workers.dev` at all, in either direction. A real widget scoped to
+`dreamport-staging.bananasquad.workers.dev` specifically is achievable — the
+Domains field just doesn't support wildcards, so it can't also cover the
+ever-changing per-branch preview hosts, and free tier caps the field at 10
+domains. Tracked as a real (not-yet-decided) follow-up in a separate issue,
+not implemented by this correction.
 
 Cloudflare's always-fail pair (`2x00000000000000000000AB` /
 `2x0000000000000000000000000000000AA`) drives negative tests. The Vitest
