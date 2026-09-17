@@ -67,12 +67,12 @@ the only thing left in the dashboard is the fixed one-line Build command.
 
 ## Environments
 
-| Environment                 | Workers Builds project | D1 database                   | Domain                                               | `RESEND_API_KEY` |
-| --------------------------- | ---------------------- | ----------------------------- | ---------------------------------------------------- | ---------------- |
-| Production (`production`)   | `dreamport`            | `dreamport-prod`              | `dreamport.ianjmacintosh.com`                        | set (real sends) |
-| Staging (`staging`)         | `dreamport-staging`    | `dreamport-stage`             | `????????-dreamport-staging.bananasquad.workers.dev` | unset (mock)     |
-| **TBD**: Remote dev (`dev`) | —                      | `dreamport-dev`               | `localhost`                                          | unset (mock)     |
-| Local dev (`local`)         | —                      | `dreamport-local` (Miniflare) | `localhost`                                          | unset (mock)     |
+| Environment                 | Workers Builds project | D1 database                   | Domain                                               | `RESEND_API_KEY`    |
+| --------------------------- | ---------------------- | ----------------------------- | ---------------------------------------------------- | ------------------- |
+| Production (`production`)   | `dreamport`            | `dreamport-prod`              | `dreamport.ianjmacintosh.com`                        | set (real sends)    |
+| Staging (`staging`)         | `dreamport-staging`    | `dreamport-stage`             | `????????-dreamport-staging.bananasquad.workers.dev` | pending (issue #70) |
+| **TBD**: Remote dev (`dev`) | —                      | `dreamport-dev`               | `localhost`                                          | unset (mock)        |
+| Local dev (`local`)         | —                      | `dreamport-local` (Miniflare) | `localhost`                                          | unset (mock)        |
 
 ### Dev (Local)
 
@@ -154,13 +154,13 @@ sender inside `createAuth` (`createEmailSender`, issue #66,
   before it reaches D1 (`storeOTP: "hashed"`, issue #39, `docs/adr/0009`), so
   querying the `verification` table no longer recovers a usable code either —
   there is no supported way to read one back for a deployed mock-sender
-  environment (staging included). `src/worker/auth.ts`'s `generateOTP`
-  fixed-code marker (`+e2e-test@`) doesn't help here: it's gated on
-  `TEST_LOGIN_ENABLED`, which `wrangler.jsonc` only sets `"true"` for
-  `local`/`dev` today (see `docs/adr/0009` for why). Sign-in against a
-  deployed mock-sender environment by hand isn't a supported workflow — drive
-  it locally instead (see the root `README.md`), or through
-  `deployment-smoke.spec.ts`, which only exercises the send step.
+  environment. `src/worker/auth.ts`'s `generateOTP` fixed-code marker
+  (`+e2e-test@`) is the escape hatch: it's gated on `TEST_LOGIN_ENABLED`,
+  which `wrangler.jsonc` sets `"true"` for `local`/`dev`/`staging` (issue #70;
+  see `docs/adr/0009` for why) — never production. Sign-in against production
+  by hand isn't a supported workflow — drive it locally instead (see the root
+  `README.md`), or through `deployment-smoke.spec.ts`, which only exercises
+  the send step.
 
 - **Present** — sends through the Resend API via `ResendEmailSender`. The
   `From:` address is not config — it is the `EMAIL_FROM` constant in
@@ -173,11 +173,16 @@ the `dreamport` Workers Builds project (`wrangler secret put RESEND_API_KEY
 `EMAIL_FROM` constant sends from `noreply@` on it) has live SPF/DKIM records
 and is verified in Resend.
 
-**Staging, `dev`, `local`, and every branch preview stay on the mock sender**
-by having no key — today by circumstance for staging (issue #70 tracks
-provisioning its real key), permanently by decision for `dev`/`local`/preview
-builds, to keep preview and PR testing off real sends and off the Resend
-quota (consistent with the #24 daily cap).
+**Staging is getting a real key (issue #70)**, provisioned via the Cloudflare
+dashboard on `dreamport-staging` as an encrypted secret — see "Giving an
+environment a real key" just below; no agent runs `wrangler secret put` for
+this, per the standing constraint from issue #38. Until that dashboard step
+lands, staging stays on the mock sender like every other key-less
+environment.
+
+**`dev`, `local`, and every branch preview stay on the mock sender**
+permanently, by decision, to keep preview and PR testing off real sends and
+off the Resend quota (consistent with the #24 daily cap).
 
 Giving an environment a real key is: set the `RESEND_API_KEY` secret on that
 environment's Workers Builds project. Every environment with a key sends from
@@ -189,6 +194,40 @@ the Cloudflare dashboard instead: Workers & Pages → the project → Settings �
 Variables and Secrets → Add, **Type: Secret (encrypted)** — not a
 plaintext var, which `wrangler.jsonc` overwrites on the next build. A
 dashboard-set encrypted secret survives subsequent Workers Builds deploys.
+
+**Runbook: provisioning staging's key (issue #70).** No agent runs `wrangler
+secret put` in this repo, so this step is manual, via the dashboard:
+
+1. Workers & Pages → `dreamport-staging` → Settings → Variables and Secrets →
+   Add.
+2. Name: `RESEND_API_KEY`. Type: **Secret (encrypted)** — not a plaintext
+   var. Value: a real Resend API key.
+3. Save. The secret takes effect on the next deploy to `dreamport-staging`
+   (the running staging host and every preview version); no code change is
+   needed to pick it up, since sender selection is already keyed on the
+   secret's presence (issue #66).
+4. Confirm with `npm run verify:staging -- --latest` (or `-- <preview-url>`
+   for an exact version — `verify:staging` always needs one or the other,
+   there is no bare default). Its **Version bindings** check
+   now asserts `RESEND_API_KEY` presence on staging the same way it always
+   has for production, and stays red until the dashboard secret above lands.
+   (The **Live smoke test** check doesn't inspect `RESEND_API_KEY` at all —
+   it hits the Turnstile-gated send-OTP endpoint, and expects 200 on staging
+   whether the sender behind it is real or mock, so it passes either way and
+   proves nothing about the key on its own.) **Version bindings** also
+   asserts `TEST_LOGIN_ENABLED`'s value per environment — `"true"` on
+   staging, absent on production — so a future `wrangler.jsonc` edit that
+   widens the fixed-test-code sign-in bypass (`src/worker/auth.ts`'s
+   `buildTestLoginOTP`) onto production fails `verify:production` instead of
+   going unnoticed.
+5. For the strongest available confirmation that a send actually goes
+   through Resend, not just that the key is bound: `npm run test:e2e --
+staging` runs `deployment-smoke.spec.ts` against the long-lived staging
+   host (`scripts/e2e.sh`, issue #70) — it drives a real browser through the
+   Turnstile widget and Better Auth, which calls `ResendEmailSender` with the
+   real key. It can't confirm delivery to a real inbox (see that spec's
+   header comment for exactly what it does and doesn't prove) — for that,
+   sign in by hand with your own address.
 
 ### Production refuses mock email
 

@@ -103,30 +103,23 @@ fi
 
 # ── Which version, and which URL, are we actually testing? ─────────────────
 # Resolved and printed up front, before any checks run, so it's never an
-# implicit/hidden detail — see the incident this script came out of.
+# implicit/hidden detail — see the incident this script came out of. Staging
+# needs an explicit preview URL or --latest (checked above); there is no
+# bare-staging default here the way there is in scripts/e2e.sh, deliberately.
 LATEST_VERSION_JSON=$(npx wrangler versions list --name "$WORKER" --json 2>/dev/null || true)
 LATEST_VERSION_ID=$(jq -r 'sort_by(.number) | last | .id // empty' <<<"$LATEST_VERSION_JSON")
 
+source "$(dirname "${BASH_SOURCE[0]}")/lib/resolve-deployed-url.sh"
+
+BASE_URL=$(resolve_deployed_url "$ENVIRONMENT" "$URL_ARG" "$LATEST_VERSION_ID") || exit 2
 if [[ "$ENVIRONMENT" == "production" ]]; then
-  BASE_URL="https://dreamport.ianjmacintosh.com"
   echo "Testing production at: $BASE_URL"
 elif [[ "$URL_ARG" == "--latest" ]]; then
-  if [[ -z "$LATEST_VERSION_ID" ]]; then
-    echo "No versions found for $WORKER — can't resolve --latest." >&2
-    exit 2
-  fi
-  BASE_URL="https://${LATEST_VERSION_ID:0:8}-dreamport-staging.bananasquad.workers.dev"
-  echo "--latest resolved to version $LATEST_VERSION_ID: $BASE_URL"
-  echo "(this may not be the version your most recent push produced — pass the exact preview URL to be sure)"
+  echo "Testing: $BASE_URL"
+elif [[ "$BASE_URL" != "$URL_ARG" ]]; then
+  echo "Testing: $BASE_URL (trimmed from $URL_ARG)"
 else
-  # Accept a full page URL (address-bar paste) and reduce it to scheme+host,
-  # so ".../login" doesn't turn the smoke test into a POST to a nonsense path.
-  BASE_URL=$(sed -E 's#^(https?://[^/]+).*#\1#' <<<"$URL_ARG")
-  if [[ "$BASE_URL" != "$URL_ARG" ]]; then
-    echo "Testing: $BASE_URL (trimmed from $URL_ARG)"
-  else
-    echo "Testing: $BASE_URL"
-  fi
+  echo "Testing: $BASE_URL"
 fi
 echo
 
@@ -139,13 +132,21 @@ else
   ACTUAL_DB_ID=$(jq -r '.resources.bindings[]? | select(.type=="d1") | .database_id // empty' <<<"$BINDINGS_JSON")
   HAS_SECRET=$(jq -r 'any(.resources.bindings[]?; .name=="BETTER_AUTH_SECRET" and .type=="secret_text")' <<<"$BINDINGS_JSON")
   # Presence only, never the value — same shape as the BETTER_AUTH_SECRET
-  # check above. Only production requires this binding: staging has no real
-  # RESEND_API_KEY yet (issue #70), so it stays on the mock sender by design.
-  # The runtime guard in src/worker/index.ts already 503s the send-OTP path on
-  # the production host without this secret; this is the detective backstop
-  # that catches a key-less production version at verify time instead of on a
-  # user's failed sign-in (issue #41, #66).
+  # check above. Both environments require this binding now: production has
+  # had a real key since #38, and staging is getting one too (issue #70) so
+  # manual testing against the deployed staging host exercises real email
+  # delivery. The runtime guard in src/worker/index.ts already 503s the
+  # send-OTP path on the production host without this secret; this is the
+  # detective backstop that catches a key-less version at verify time instead
+  # of on a user's failed sign-in (issue #41, #66, #70).
   HAS_RESEND_KEY=$(jq -r 'any(.resources.bindings[]?; .name=="RESEND_API_KEY" and .type=="secret_text")' <<<"$BINDINGS_JSON")
+  # TEST_LOGIN_ENABLED is a plain_text var, not a secret, so its value (not
+  # just presence) is readable here — and worth reading, since the whole
+  # point of this check is to catch it drifting to the wrong environment.
+  # Expected "true" on staging (issue #70) and absent/falsy on production —
+  # "true" on production would make `buildTestLoginOTP`'s fixed test code
+  # (src/worker/auth.ts) a public, unauthenticated sign-in bypass there.
+  TEST_LOGIN_VALUE=$(jq -r '.resources.bindings[]? | select(.name=="TEST_LOGIN_ENABLED") | .text // empty' <<<"$BINDINGS_JSON")
 
   if [[ -z "$ACTUAL_DB_ID" ]]; then
     record fail "Version bindings" "no D1 binding on latest version ($LATEST_VERSION_ID) — build likely selected the wrong CLOUDFLARE_ENV, or didn't rebuild at all"
@@ -153,10 +154,14 @@ else
     record fail "Version bindings" "D1 binding points at $ACTUAL_DB_ID, expected $DB ($EXPECTED_DB_ID)"
   elif [[ "$HAS_SECRET" != "true" ]]; then
     record fail "Version bindings" "BETTER_AUTH_SECRET missing from latest version's bindings"
-  elif [[ "$ENVIRONMENT" == "production" && "$HAS_RESEND_KEY" != "true" ]]; then
-    record fail "Version bindings" "RESEND_API_KEY missing from latest version's bindings — production requires it (the mock sender delivers nothing, and the runtime guard 503s sign-in email here). Expected red until #38 wires real delivery; see issue #41."
+  elif [[ "$HAS_RESEND_KEY" != "true" ]]; then
+    record fail "Version bindings" "RESEND_API_KEY missing from latest version's bindings — $ENVIRONMENT requires it (the mock sender delivers nothing, and the runtime guard 503s sign-in email on production without it). See issue #70 for staging's provisioning runbook."
+  elif [[ "$ENVIRONMENT" == "production" && "$TEST_LOGIN_VALUE" == "true" ]]; then
+    record fail "Version bindings" "TEST_LOGIN_ENABLED is \"true\" on production — this is a public, unauthenticated sign-in bypass (buildTestLoginOTP's fixed code in src/worker/auth.ts) and must never be set here. Check wrangler.jsonc's env.production.vars."
+  elif [[ "$ENVIRONMENT" == "staging" && "$TEST_LOGIN_VALUE" != "true" ]]; then
+    record fail "Version bindings" "TEST_LOGIN_ENABLED is not \"true\" on staging (got: ${TEST_LOGIN_VALUE:-<absent>}) — expected \"true\" so manual testing can use the fixed test-login code (issue #70). Check wrangler.jsonc's env.staging.vars."
   else
-    record pass "Version bindings" "DB ($DB), BETTER_AUTH_SECRET all present$([[ "$ENVIRONMENT" == "production" ]] && echo "; RESEND_API_KEY bound") on version $LATEST_VERSION_ID"
+    record pass "Version bindings" "DB ($DB), BETTER_AUTH_SECRET, RESEND_API_KEY all present; TEST_LOGIN_ENABLED=$([[ "$ENVIRONMENT" == "staging" ]] && echo "\"true\"" || echo "unset") as expected, on version $LATEST_VERSION_ID"
   fi
 fi
 

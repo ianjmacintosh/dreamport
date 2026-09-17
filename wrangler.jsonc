@@ -20,11 +20,12 @@
   // main/assets/compatibility_flags/observability inherit into every env below; vars and bindings don't.
 
   // Email delivery: the `RESEND_API_KEY` secret's presence, not a var here,
-  // decides the sender (#66, docs/adr/0010) — production is the only env
-  // that has one (see `wrangler secret put`, docs/deployment.md). staging,
-  // dev, local, and every branch preview stay on the mock sender by having
-  // no key, permanently and by decision — setting one for any of them is a
-  // recorded choice, not a default.
+  // decides the sender (#66, docs/adr/0010) — production has one (see
+  // `wrangler secret put`, docs/deployment.md), and staging is getting one
+  // too (issue #70, dashboard-provisioned). dev, local, and every branch
+  // preview stay on the mock sender by having no key, permanently and by
+  // decision — setting one for any of them is a recorded choice, not a
+  // default.
 
   // production/staging: two separate Cloudflare Workers Builds projects
   // ("dreamport" and "dreamport-staging"), both Git-connected to this repo,
@@ -79,6 +80,8 @@
         // than in the dashboard, which keeps dropping it on save. Production's
         // real secret is set out-of-band with `wrangler secret put`.
         "TURNSTILE_SECRET_KEY": "1x0000000000000000000000000000000AA",
+        // See "local" below — same purpose, same reasoning (issue #70).
+        "TEST_LOGIN_ENABLED": "true",
       },
       "d1_databases": [
         {
@@ -112,8 +115,10 @@
         // stays exercisable by an ordinary unit test instead of requiring a
         // real alternate build to prove the "off" branch behaves. Absent
         // (falsy) from every other env below by omission, not `"false"` —
-        // `staging` included, since it's `workers_dev: true` (a public
-        // *.workers.dev URL) and must never carry this.
+        // production included, which must never carry this. Staging carries
+        // it too (issue #70): it's `workers_dev: true` (a public *.workers.dev
+        // URL), but manual testing there needs the fixed test-login code same
+        // as dev/local, and it's not reachable without knowing the URL.
         "TEST_LOGIN_ENABLED": "true",
       },
       "d1_databases": [

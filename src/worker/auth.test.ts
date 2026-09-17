@@ -19,8 +19,8 @@ describe("createAuth", () => {
  * docs/adr/0009) — no D1, no Better Auth, no build step. This is exactly the
  * layer that `import.meta.env.DEV`-gating couldn't be tested at: swapping
  * that build-time flag for the runtime `TEST_LOGIN_ENABLED` var lets these
- * cases construct the "off" (staging/production-shaped) env directly and
- * assert its behavior, something no test could do before #61's hotfix (see
+ * cases construct the "off" (production-shaped) env directly and assert its
+ * behavior, something no test could do before #61's hotfix (see
  * the round trip through `createAuth` in `index.worker.test.ts` for the
  * "it actually verifies" coverage — this file only checks the callback
  * itself).
@@ -47,7 +47,7 @@ describe("buildTestLoginOTP", () => {
     }
   });
 
-  it("returns undefined when TEST_LOGIN_ENABLED is unset — the staging/production shape", () => {
+  it("returns undefined when TEST_LOGIN_ENABLED is unset — the production shape (issue #70)", () => {
     const env = {} as unknown as WorkerEnv;
 
     expect(buildTestLoginOTP(env)({ email })).toBeUndefined();

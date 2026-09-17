@@ -9,15 +9,19 @@ import { TEST_EMAILS } from "../test/emails";
  * `TURNSTILE_SECRET_KEY` unset, mismatched key pair).
  *
  * Opt-in: set `E2E_BASE_URL` to the target. `playwright.config.ts` then runs
- * *only* this spec, against that URL, with no local `webServer`:
+ * *only* this spec, against that URL, with no local `webServer`. Easiest via
+ * `scripts/e2e.sh` (issue #70), which resolves the URL and sets the var:
  *
- *   E2E_BASE_URL=https://xxxxxxxx-dreamport-staging.bananasquad.workers.dev \
- *     npm run test:e2e
+ *   npm run test:e2e -- staging                  # the long-lived staging host
+ *   npm run test:e2e -- staging --latest
+ *   npm run test:e2e -- staging <preview-url>
  *
  * Point it at **staging**, not production: staging runs Cloudflare's
  * always-pass test keys so the widget auto-solves for a plain headless load.
  * A real production Managed widget may serve an interactive challenge to
- * automation and hang — production stays a manual check.
+ * automation and hang — production stays a manual check (`scripts/e2e.sh`
+ * accepts `production` as an argument, but this spec's own warning still
+ * applies; nothing about that argument makes it safe to automate).
  *
  * It can't finish sign-in — `deploySmoke` (test/emails.ts) is deliberately
  * not a `+e2e-test@` marker address, and that fixed-code path is itself
