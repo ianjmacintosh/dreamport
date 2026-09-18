@@ -71,6 +71,51 @@ export function hostnameInList(
 }
 
 /**
+ * Whether `originHeader` (a request's `Origin` header) can be trusted for a
+ * state-changing, session-cookie-bearing request to this Host — the same
+ * origin-check shape Better Auth grants its own routes for free
+ * (`auth.handler`'s `trustedOrigins` + dynamic-`baseURL` self-trust, see
+ * `auth.ts`), for the handful of dreamport-owned routes that sit outside
+ * `auth.handler` and so don't get that check automatically (issue #88's
+ * `/api/products`; see `index.ts`).
+ *
+ * Trusted iff the origin's host either matches `requestHost` (self-trust —
+ * the same origin `ALLOWED_HOSTS` already resolves this request's own
+ * `baseURL` from) or is in `trustedOrigins` (this build's `TRUSTED_ORIGINS`,
+ * wildcard-aware via {@link hostnameInList}). No `Origin` header at all is
+ * refused, not trusted — unlike Better Auth's own check, which falls back to
+ * `Referer` and only runs when a cookie is present; every caller here is
+ * this app's own same-origin `fetch`, which always sends one.
+ */
+export function isTrustedRequestOrigin(
+  originHeader: string | null,
+  requestHost: string,
+  trustedOrigins: readonly string[] = TRUSTED_ORIGINS,
+): boolean {
+  if (!originHeader) return false;
+
+  let originHost: string;
+  try {
+    originHost = new URL(originHeader).host;
+  } catch {
+    return false;
+  }
+
+  // Literal, case-insensitive equality — not matchesHostPattern(originHost,
+  // requestHost). requestHost comes straight off the request's own Host
+  // header, so treating it as the wildcard *pattern* argument would let a
+  // Host header containing "*" turn self-trust into "matches anything".
+  // matchesHostPattern's `pattern` side must only ever be a fixed, trusted
+  // value (the callers elsewhere in this file all pass one).
+  if (originHost.toLowerCase() === requestHost.toLowerCase()) return true;
+
+  const trustedHosts = trustedOrigins.map((origin) =>
+    origin.replace(/^https?:\/\//, ""),
+  );
+  return hostnameInList(originHost, trustedHosts);
+}
+
+/**
  * The bare hosts one Workers build should recognize as its own, selected by
  * `CLOUDFLARE_ENV` (see `vite.config.ts`, `docs/deployment.md`). A pure
  * function of the environment name, not the baked `CURRENT_ENVIRONMENT_HOSTS`

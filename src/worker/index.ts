@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 
 import { createAuth } from "./auth";
 import { getMockSender } from "./email/sender";
@@ -13,9 +13,15 @@ import {
 import {
   CURRENT_ENVIRONMENT_HOSTS,
   IS_PRODUCTION_ENVIRONMENT,
+  isTrustedRequestOrigin,
   matchesHostPattern,
   PRODUCTION_HOST,
 } from "./trusted-origins";
+import {
+  createProduct,
+  listProducts,
+  PRODUCT_NAME_MAX_LENGTH,
+} from "./products";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
 /**
@@ -26,6 +32,17 @@ import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
  * keys don't echo a stable action.
  */
 const TURNSTILE_ACTION = "send-otp";
+
+/**
+ * The caller's session for this request, or `null` with no valid session
+ * cookie — verified against the database, never trusted from the client.
+ * Shared by every route below that gates on being signed in (`/api/me`,
+ * `/api/products`), so a change to how that check works needs editing in
+ * one place.
+ */
+function currentSession(c: Context<{ Bindings: WorkerEnv }>) {
+  return createAuth(c.env).api.getSession({ headers: c.req.raw.headers });
+}
 
 /**
  * Overrides for {@link createApp}. `verifyTurnstile` lets the Seam 1 tests
@@ -237,14 +254,71 @@ export function createApp(deps: AppDeps = {}) {
    * email. 401 with no valid session.
    */
   app.get("/api/me", async (c) => {
-    const auth = createAuth(c.env);
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    const session = await currentSession(c);
 
     if (!session) {
       return c.json({ error: "Not signed in" }, 401);
     }
 
     return c.json({ email: session.user.email });
+  });
+
+  /**
+   * Products v1 slice 1 (issue #88): a signed-in User's own flat list.
+   * Session-gated the same way `/api/me` is — verified against the database
+   * here, not trusted from the client — and every query is scoped to
+   * `session.user.id`, so a User can only ever see or create their own rows.
+   */
+  app.get("/api/products", async (c) => {
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const products = await listProducts(c.env.DB, session.user.id);
+    return c.json({ products });
+  });
+
+  app.post("/api/products", async (c) => {
+    // This route creates rows, but sits outside `auth.handler`, so it gets
+    // none of Better Auth's own origin/CSRF check for free the way
+    // send-OTP, sign-out, and delete-user do (each of those either calls the
+    // handler directly or, on the two routes registered ahead of it above,
+    // still ends by calling into it). Same self-trust-or-TRUSTED_ORIGINS
+    // shape as that check — see `isTrustedRequestOrigin`.
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const body = await c.req.json().catch(() => null);
+    const name =
+      body && typeof body === "object" && typeof body.name === "string"
+        ? body.name.trim()
+        : "";
+    if (!name) {
+      return c.json({ error: "name is required" }, 400);
+    }
+    if (name.length > PRODUCT_NAME_MAX_LENGTH) {
+      return c.json(
+        {
+          error: `name must be ${PRODUCT_NAME_MAX_LENGTH} characters or fewer`,
+        },
+        400,
+      );
+    }
+
+    const product = await createProduct(c.env.DB, session.user.id, name);
+    return c.json({ product }, 201);
   });
 
   /**
