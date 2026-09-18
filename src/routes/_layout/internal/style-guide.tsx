@@ -278,14 +278,21 @@ function StyleGuide() {
         <div className="sg-button-row">
           <Button variant="primary">Primary</Button>
           <Button variant="secondary">Secondary</Button>
+          <Button variant="primary" disabled>
+            Disabled
+          </Button>
         </div>
         <Snippet
-          code={`<Button variant="primary">Primary</Button>\n<Button variant="secondary">Secondary</Button>`}
+          code={`<Button variant="primary">Primary</Button>\n<Button variant="secondary">Secondary</Button>\n<Button disabled>Disabled</Button>`}
         />
         <p className="sg-note">
           Use the <code>&lt;Button&gt;</code> component with a{" "}
           <code>variant</code> of <code>primary</code> or <code>secondary</code>{" "}
-          — never style a raw <code>&lt;button&gt;</code> directly.
+          — never style a raw <code>&lt;button&gt;</code> directly. Hover shows
+          the same outline as keyboard focus, not a color swap. A{" "}
+          <code>disabled</code> button uses the body-text color as its own
+          background regardless of variant — muted and clearly inert, distinct
+          from either variant's normal look.
         </p>
       </Section>
 

@@ -134,8 +134,11 @@ a.button {
 
 /* Hover uses the same outline treatment as :focus-visible below, rather
    than a background/border swap — one hover affordance for both variants,
-   consistent with how focus already reads. */
-.button:hover {
+   consistent with how focus already reads. `:not(:disabled)` because a
+   disabled button still matches CSS :hover while the pointer sits over it,
+   even though it can't be interacted with — the disabled style below is
+   the only affordance it should show. */
+.button:not(:disabled):hover {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
@@ -157,6 +160,19 @@ a.button {
   background-color: transparent;
   border-color: var(--color-border);
   color: var(--color-text-primary);
+}
+
+/* A disabled button (e.g. the send-code button before Turnstile resolves,
+   #28) uses the body-text color as its own background — muted and clearly
+   inert next to either variant's normal accent/outline treatment, and
+   distinct from both without inventing a new color. `--color-accent-text`
+   (cream) keeps the label readable against that darker background, the
+   same pairing `.button--primary` already uses the other way round. */
+.button:disabled {
+  background-color: var(--color-text-primary);
+  border-color: transparent;
+  color: var(--color-accent-text);
+  cursor: not-allowed;
 }
 
 /* ── Primitives: narrow single-column form layout ─────────── */
