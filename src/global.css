@@ -178,12 +178,15 @@ a.button {
   gap: var(--space-3);
 }
 
-/* Reserves the Turnstile widget's footprint (Cloudflare's default widget
-   is ~65px tall) before it loads, so the challenge popping in doesn't
-   shift the submit button down mid-interaction. Plain empty box — no
-   placeholder background or skeleton, since nothing else here needs one. */
+/* Reserves the Turnstile widget's footprint before it loads, so the
+   challenge popping in doesn't shift the submit button down mid-
+   interaction. Fixed height, not min-height — Cloudflare's own widget
+   sizing still wiggles the box by a few px within a min-height once it
+   renders, and there's nothing else in here that needs to grow past 70px.
+   Plain empty box — no placeholder background or skeleton, since nothing
+   else here needs one. */
 .turnstile-container {
-  min-height: 65px;
+  height: 70px;
   margin-bottom: var(--space-4);
 }
 
