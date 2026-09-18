@@ -122,7 +122,25 @@ p {
   transition:
     background-color 0.15s,
     border-color 0.15s,
-    color 0.15s;
+    color 0.15s,
+    outline-color 0.15s;
+}
+
+/* .button also renders on <a> (via Link, e.g. the header's "Log in") —
+   an anchor gets a browser-default underline that a <button> never has. */
+a.button {
+  text-decoration: none;
+}
+
+/* Hover uses the same outline treatment as :focus-visible below, rather
+   than a background/border swap — one hover affordance for both variants,
+   consistent with how focus already reads. `:not(:disabled)` because a
+   disabled button still matches CSS :hover while the pointer sits over it,
+   even though it can't be interacted with — the disabled style below is
+   the only affordance it should show. */
+.button:not(:disabled):hover {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 
 .button--primary {
@@ -131,7 +149,11 @@ p {
 }
 
 .button--primary:hover {
-  background-color: var(--color-accent-hover);
+  /* Locks the hover text color against the global `a:hover` rule, which
+     would otherwise outrank this on an <a>-rendered button and paint the
+     text cyan (#50) — background no longer changes on hover, but the
+     color still needs pinning to the button's own token. */
+  color: var(--color-accent-text);
 }
 
 .button--secondary {
@@ -140,9 +162,89 @@ p {
   color: var(--color-text-primary);
 }
 
-.button--secondary:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+/* A disabled button (e.g. the send-code button before Turnstile resolves,
+   #28) uses the body-text color as its own background — muted and clearly
+   inert next to either variant's normal accent/outline treatment, and
+   distinct from both without inventing a new color. `--color-accent-text`
+   (cream) keeps the label readable against that darker background, the
+   same pairing `.button--primary` already uses the other way round. */
+.button:disabled {
+  background-color: var(--color-text-primary);
+  border-color: transparent;
+  color: var(--color-accent-text);
+  cursor: not-allowed;
+}
+
+/* ── Primitives: narrow single-column form layout ─────────── */
+/* Centred column for short forms (e.g. sign-in) — CSS Grid per AGENTS.md's
+   rule that structural layout is Grid, not Flexbox. The grid's own `gap`
+   is the form's vertical rhythm, so it also covers spacing between
+   adjacent controls (e.g. paired buttons) without a one-off margin. */
+.form-shell {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 26rem;
+  margin: 0 auto;
+}
+
+/* Two or more related actions presented side by side (e.g. "Verify and
+   sign in" / "Request a new code") — Grid so the gap between them comes
+   from the spacing scale rather than relying on inline-flex's incidental
+   whitespace. */
+.button-group {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-3);
+}
+
+/* A labelled field paired with its own action button, side by side (e.g. the
+   email field + "Send code") instead of stacked. Two explicit rows — the
+   label alone, then the input beside the button — so the button's own top
+   and bottom edges land flush with the input's, not with the label-plus-
+   input stack as a whole. `.input-group` (TextInput's own wrapper) is set to
+   `display: contents` so its children (the label, the input) place directly
+   into this grid instead of as one combined item; the input's own
+   margin-bottom is turned off here since `.field-row` carries that spacing
+   itself, once, below the whole row instead of under just the input. */
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "label  ."
+    "input  button";
+  column-gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.field-row .input-group {
+  display: contents;
+}
+
+.field-row .input-label {
+  grid-area: label;
+}
+
+.field-row .input {
+  grid-area: input;
+  margin-bottom: 0;
+}
+
+.field-row > .button {
+  grid-area: button;
+  align-self: stretch;
+}
+
+/* Reserves the Turnstile widget's footprint before it loads, so the
+   challenge popping in doesn't shift the submit button down mid-
+   interaction. Fixed height, not min-height — Cloudflare's own widget
+   sizing still wiggles the box by a few px within a min-height once it
+   renders, and there's nothing else in here that needs to grow past 70px.
+   Plain empty box — no placeholder background or skeleton, since nothing
+   else here needs one. */
+.turnstile-container {
+  height: 70px;
+  margin-bottom: var(--space-4);
 }
 
 /* ── Primitives: text inputs ──────────────────────────────── */

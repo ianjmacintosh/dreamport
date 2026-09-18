@@ -110,6 +110,28 @@ test("the sign-in page presents a bot challenge on the email step", async ({
     .toBe(true);
 });
 
+test("the send-code button stays disabled, with a status label, until the challenge resolves", async ({
+  page,
+}) => {
+  await gotoLoginFromHomepage(page);
+
+  // Right after the page loads, Turnstile hasn't resolved yet — this window
+  // exists even with the always-pass test key, since it still round-trips
+  // through the widget's script.
+  const button = page.getByRole("button", {
+    name: "Verifying you're human…",
+  });
+  await expect(button).toBeVisible();
+  await expect(button).toBeDisabled();
+
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
+    /.+/,
+    { timeout: 15_000 },
+  );
+
+  await expect(page.getByRole("button", { name: "Send code" })).toBeEnabled();
+});
+
 test("logged out: visiting /app with no session redirects to /login", async ({
   page,
 }) => {
@@ -146,6 +168,75 @@ test("sign out from /app returns to the homepage and forgets the session", async
   // A later /app visit has no session to fall back on.
   await page.goto("/app");
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test("advancing to the code step moves focus to the code field", async ({
+  page,
+}) => {
+  await gotoLoginFromHomepage(page);
+  await page.getByLabel("Email address").fill(TEST_EMAILS.e2eFocusStepChange);
+
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
+    /.+/,
+    { timeout: 15_000 },
+  );
+  await page.getByRole("button", { name: "Send code" }).click();
+
+  await expect(page.getByLabel("Six-digit code")).toBeFocused();
+});
+
+test("a failed verification moves focus to the error text", async ({
+  page,
+}) => {
+  await gotoLoginFromHomepage(page);
+  await page.getByLabel("Email address").fill(TEST_EMAILS.e2eFocusOnError);
+
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
+    /.+/,
+    { timeout: 15_000 },
+  );
+  await page.getByRole("button", { name: "Send code" }).click();
+
+  await expect(page.getByLabel("Six-digit code")).toBeVisible();
+  // The fixed test code is "000000" — anything else is wrong.
+  await page.getByLabel("Six-digit code").fill("111111");
+  await page.getByRole("button", { name: "Verify and sign in" }).click();
+
+  const alert = page.getByRole("alert");
+  await expect(alert).toBeVisible();
+  await expect(alert).toBeFocused();
+});
+
+test("the send-code button disables and relabels while the request is in flight", async ({
+  page,
+}) => {
+  await gotoLoginFromHomepage(page);
+  await page.getByLabel("Email address").fill(TEST_EMAILS.e2eNoDoubleSubmit);
+
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
+    /.+/,
+    { timeout: 15_000 },
+  );
+
+  // Slow the send down so the pending state has a real window to observe —
+  // the local mock sender otherwise resolves before assertions can run.
+  // `route.fallback()` hands off to the `beforeEach` handler above so the
+  // per-test IP header still gets applied.
+  await page.route(
+    "**/api/auth/email-otp/send-verification-otp",
+    async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await route.fallback();
+    },
+  );
+
+  const sendButton = page.getByRole("button", { name: "Send code" });
+  await sendButton.click();
+
+  await expect(page.getByRole("button", { name: "Sending…" })).toBeDisabled();
+  await expect(page.getByLabel("Six-digit code")).toBeVisible({
+    timeout: 10_000,
+  });
 });
 
 test("delete account from /app: confirm, follow the emailed link, session is gone", async ({

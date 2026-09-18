@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
@@ -39,6 +39,10 @@ const VERIFY_FAILED = "That code didn't work. Request a new one and try again.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
+/** id of the shared inline error text, referenced by whichever field it
+ * currently describes via `aria-describedby`. */
+const ERROR_ID = "login-error";
+
 /**
  * Passwordless sign-in: collect an email, send a one-time code to it, collect
  * the code, and on success let the browser follow the freshly-set session
@@ -54,10 +58,22 @@ const CONNECTION_FAILED =
  * the gate hasn't — it rejects before verifying); "Request a new code"
  * returns to the email step for a fresh challenge.
  *
- * Composed only from `TextInput` / `Button` / `Link` / a heading plus the
- * Turnstile widget, with a bare line of error text — the error banner, narrow
- * centred layout, and button loading/disabled states are left to the
- * design-system pass (#28).
+ * Composed from `TextInput` / `Button` / `Link` / a heading, laid out in the
+ * `.form-shell` narrow-column primitive, plus the Turnstile widget in a
+ * `.turnstile-container` that reserves its footprint up front. The inline
+ * error text is tied to the active field via `aria-describedby` and takes
+ * focus on failure; the code field takes focus when the form advances to it
+ * (#28).
+ *
+ * The email step's submit button sits beside the email field (`.field-row`)
+ * rather than below the widget, and stays disabled — with a label explaining
+ * why — until Turnstile actually resolves: "Verifying you're human…" while
+ * the challenge is still loading, "Send code" once a token exists. That's a
+ * native `disabled`, the same mechanism already used for the in-flight
+ * pending state, not `aria-disabled` — the label itself carries the reason,
+ * so there's nothing an `aria-describedby` would add, and it avoids a second
+ * disabling convention on top of the one this page already has (see
+ * docs/adr/0012).
  */
 function Login() {
   const navigate = useNavigate();
@@ -66,12 +82,33 @@ function Login() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const turnstileRef = useRef<TurnstileInstance | undefined>(undefined);
-  // Guards against a double submit (Enter + click) sending the single-use
-  // token twice; the second request would fail siteverify. Not a visual
-  // disabled state — that is #28.
-  const sendingRef = useRef(false);
+  // Guards both submit handlers against a double submit (Enter + click):
+  // sendCode's token is single-use (a second request would fail siteverify),
+  // and verifyCode's otp is single-use server-side too. `isSubmitting` drives
+  // the visual disabled state — this ref guards reentry synchronously, before
+  // that state update has committed.
+  const submittingRef = useRef(false);
+  const codeInputRef = useRef<HTMLInputElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  // Move focus to the code field as soon as the form advances to it.
+  useEffect(() => {
+    if (step === "code") {
+      codeInputRef.current?.focus();
+    }
+  }, [step]);
+
+  // Move focus to the error text whenever a submission fails. `error` is
+  // always cleared to "" before a new attempt (see sendCode/verifyCode), so
+  // this fires even when two attempts fail with the same message.
+  useEffect(() => {
+    if (error) {
+      errorRef.current?.focus();
+    }
+  }, [error]);
 
   /** Drop the current token and make the widget fetch a fresh one. */
   function rearmTurnstile() {
@@ -80,13 +117,14 @@ function Login() {
   }
 
   async function sendCode() {
-    if (sendingRef.current) return;
+    if (submittingRef.current) return;
     setError("");
     if (!turnstileToken) {
       setError(TURNSTILE_INCOMPLETE);
       return;
     }
-    sendingRef.current = true;
+    submittingRef.current = true;
+    setIsSubmitting(true);
     try {
       const { error } = await authClient.emailOtp.sendVerificationOtp(
         { email, type: "sign-in" },
@@ -114,12 +152,16 @@ function Login() {
       rearmTurnstile();
       setError(CONNECTION_FAILED);
     } finally {
-      sendingRef.current = false;
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   }
 
   async function verifyCode() {
+    if (submittingRef.current) return;
     setError("");
+    submittingRef.current = true;
+    setIsSubmitting(true);
     try {
       const { error } = await authClient.signIn.emailOtp({ email, otp: code });
       if (error) {
@@ -131,11 +173,14 @@ function Login() {
       // Thrown only when the request never reached the server — the code may
       // still be good, so point at the connection, not the code.
       setError(CONNECTION_FAILED);
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   }
 
   return (
-    <>
+    <div className="form-shell">
       <h1>Sign in</h1>
 
       {step === "email" ? (
@@ -145,30 +190,41 @@ function Login() {
             void sendCode();
           }}
         >
-          <TextInput
-            id="email"
-            label="Email address"
-            type="email"
-            name="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <Turnstile
-            ref={turnstileRef}
-            siteKey={TURNSTILE_SITE_KEY}
-            // Server checks this matches (`TURNSTILE_ACTION` in the Worker),
-            // so a token minted elsewhere on the site can't be replayed here.
-            options={{ action: "send-otp" }}
-            onSuccess={(token) => setTurnstileToken(token)}
-            onExpire={() => setTurnstileToken("")}
-            onError={() => {
-              setTurnstileToken("");
-              setError(TURNSTILE_UNAVAILABLE);
-            }}
-          />
-          <Button type="submit">Send code</Button>
+          <div className="field-row">
+            <TextInput
+              id="email"
+              label="Email address"
+              type="email"
+              name="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              aria-describedby={error ? ERROR_ID : undefined}
+              required
+            />
+            <Button type="submit" disabled={isSubmitting || !turnstileToken}>
+              {isSubmitting
+                ? "Sending…"
+                : turnstileToken
+                  ? "Send code"
+                  : "Verifying you're human…"}
+            </Button>
+          </div>
+          <div className="turnstile-container">
+            <Turnstile
+              ref={turnstileRef}
+              siteKey={TURNSTILE_SITE_KEY}
+              // Server checks this matches (`TURNSTILE_ACTION` in the Worker),
+              // so a token minted elsewhere on the site can't be replayed here.
+              options={{ action: "send-otp" }}
+              onSuccess={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken("")}
+              onError={() => {
+                setTurnstileToken("");
+                setError(TURNSTILE_UNAVAILABLE);
+              }}
+            />
+          </div>
         </form>
       ) : (
         <form
@@ -179,33 +235,44 @@ function Login() {
         >
           <p>We sent a six-digit code to {email}.</p>
           <TextInput
+            ref={codeInputRef}
             id="code"
             label="Six-digit code"
             inputMode="numeric"
             autoComplete="one-time-code"
             value={code}
             onChange={(e) => setCode(e.target.value)}
+            aria-describedby={error ? ERROR_ID : undefined}
             required
           />
-          <Button type="submit">Verify and sign in</Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => {
-              setError("");
-              setStep("email");
-            }}
-          >
-            Request a new code
-          </Button>
+          <div className="button-group">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Verifying…" : "Verify and sign in"}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isSubmitting}
+              onClick={() => {
+                setError("");
+                setStep("email");
+              }}
+            >
+              Request a new code
+            </Button>
+          </div>
         </form>
       )}
 
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p role="alert" id={ERROR_ID} tabIndex={-1} ref={errorRef}>
+          {error}
+        </p>
+      )}
 
       <p>
         <Link href="/">Back to home</Link>
       </p>
-    </>
+    </div>
   );
 }

@@ -122,7 +122,11 @@ function StyleGuide() {
         <a href="#body-text">Body text</a>
         <a href="#links">Links</a>
         <a href="#buttons">Buttons</a>
+        <a href="#button-group">Button group</a>
         <a href="#text-inputs">Text inputs</a>
+        <a href="#field-row">Field with action</a>
+        <a href="#turnstile-container">Turnstile container</a>
+        <a href="#form-shell">Form shell</a>
         <a href="#spacing">Spacing</a>
       </nav>
 
@@ -274,14 +278,40 @@ function StyleGuide() {
         <div className="sg-button-row">
           <Button variant="primary">Primary</Button>
           <Button variant="secondary">Secondary</Button>
+          <Button variant="primary" disabled>
+            Disabled
+          </Button>
         </div>
         <Snippet
-          code={`<Button variant="primary">Primary</Button>\n<Button variant="secondary">Secondary</Button>`}
+          code={`<Button variant="primary">Primary</Button>\n<Button variant="secondary">Secondary</Button>\n<Button disabled>Disabled</Button>`}
         />
         <p className="sg-note">
           Use the <code>&lt;Button&gt;</code> component with a{" "}
           <code>variant</code> of <code>primary</code> or <code>secondary</code>{" "}
-          — never style a raw <code>&lt;button&gt;</code> directly.
+          — never style a raw <code>&lt;button&gt;</code> directly. Hover shows
+          the same outline as keyboard focus, not a color swap. A{" "}
+          <code>disabled</code> button uses the body-text color as its own
+          background regardless of variant — muted and clearly inert, distinct
+          from either variant's normal look.
+        </p>
+      </Section>
+
+      <Section id="button-group" label="Button group">
+        <div className="sg-button-group-demo">
+          <div className="button-group">
+            <Button variant="primary">Verify and sign in</Button>
+            <Button variant="secondary">Request a new code</Button>
+          </div>
+        </div>
+        <Snippet
+          code={`<div className="button-group">\n  <Button variant="primary">Verify and sign in</Button>\n  <Button variant="secondary">Request a new code</Button>\n</div>`}
+        />
+        <p className="sg-note">
+          Use <code>.button-group</code> for two or more related actions
+          presented side by side (e.g. "Verify and sign in" / "Request a new
+          code") — the gap between them comes from the spacing scale via Grid,
+          not inline-flex's incidental whitespace. For a single button attached
+          to a single field, use <code>.field-row</code> below instead.
         </p>
       </Section>
 
@@ -302,6 +332,66 @@ function StyleGuide() {
           Use the <code>&lt;TextInput&gt;</code> component — it pairs an{" "}
           <code>.input</code> with an accessible <code>.input-label</code> and
           optional <code>.input-helper</code> text.
+        </p>
+      </Section>
+
+      <Section id="field-row" label="Field with action">
+        <div className="sg-field-row-demo">
+          <div className="field-row">
+            <TextInput id="sg-field-row-input" label="Email address" />
+            <Button variant="primary">Send code</Button>
+          </div>
+        </div>
+        <Snippet
+          code={`<div className="field-row">\n  <TextInput id="email" label="Email address" />\n  <Button>Send code</Button>\n</div>`}
+        />
+        <p className="sg-note">
+          Use <code>.field-row</code> whenever a labelled field has exactly one
+          action attached to it (e.g. an email field + "Send code"), instead of
+          stacking the button below. Its button sits flush with the input&apos;s
+          own top and bottom edges, not the label — verified pixel-for-pixel,
+          not eyeballed (docs/adr/0012). It's for a single field with a single
+          action — for two or more buttons with no field attached, use{" "}
+          <code>.button-group</code> above instead.
+        </p>
+      </Section>
+
+      <Section id="turnstile-container" label="Turnstile container">
+        <div className="sg-turnstile-demo">
+          <div className="turnstile-container" />
+        </div>
+        <Snippet
+          code={`<div className="turnstile-container">\n  <Turnstile ... />\n</div>`}
+        />
+        <p className="sg-note">
+          Wraps the Cloudflare Turnstile widget to reserve its footprint before
+          it loads, so the challenge popping in doesn't shift a submit button
+          below it. Fixed height, not <code>min-height</code> — Cloudflare's own
+          widget sizing still wiggles within a min-height once it renders. Plain
+          empty box in production — no placeholder background or skeleton; the
+          dashed outline here exists only to make the reserved space visible in
+          this demo.
+        </p>
+      </Section>
+
+      <Section id="form-shell" label="Form shell">
+        <div className="sg-form-shell-demo">
+          <div className="form-shell">
+            <h2>Sign in</h2>
+            <p>Narrow, centred column for short forms.</p>
+          </div>
+        </div>
+        <Snippet
+          code={`<div className="form-shell">\n  <h1>Sign in</h1>\n  <form>...</form>\n</div>`}
+        />
+        <p className="sg-note">
+          Centres a short form (e.g. sign-in) in a narrow column, per
+          AGENTS.md's rule that structural page layout is Grid, not Flexbox. The
+          grid's own <code>gap</code> is the form's vertical rhythm — it covers
+          spacing between top-level blocks (a heading, a{" "}
+          <code>&lt;form&gt;</code>, error text) without page-local margins. The
+          dashed outline here exists only to make the column&apos;s bounds
+          visible in this demo.
         </p>
       </Section>
 
