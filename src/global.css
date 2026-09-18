@@ -179,15 +179,40 @@ a.button {
 }
 
 /* A labelled field paired with its own action button, side by side (e.g. the
-   email field + "Send code") instead of stacked — Grid so the gap comes from
-   the spacing scale. `align-items: end` lines the button up with the input's
-   own bottom edge rather than the field's label, since the field is a
-   label-plus-input stack and the button is not. */
+   email field + "Send code") instead of stacked. Two explicit rows — the
+   label alone, then the input beside the button — so the button's own top
+   and bottom edges land flush with the input's, not with the label-plus-
+   input stack as a whole. `.input-group` (TextInput's own wrapper) is set to
+   `display: contents` so its children (the label, the input) place directly
+   into this grid instead of as one combined item; the input's own
+   margin-bottom is turned off here since `.field-row` carries that spacing
+   itself, once, below the whole row instead of under just the input. */
 .field-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  align-items: end;
-  gap: var(--space-3);
+  grid-template-areas:
+    "label  ."
+    "input  button";
+  column-gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.field-row .input-group {
+  display: contents;
+}
+
+.field-row .input-label {
+  grid-area: label;
+}
+
+.field-row .input {
+  grid-area: input;
+  margin-bottom: 0;
+}
+
+.field-row > .button {
+  grid-area: button;
+  align-self: stretch;
 }
 
 /* Reserves the Turnstile widget's footprint before it loads, so the
