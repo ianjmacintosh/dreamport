@@ -123,6 +123,7 @@ function StyleGuide() {
         <a href="#links">Links</a>
         <a href="#buttons">Buttons</a>
         <a href="#text-inputs">Text inputs</a>
+        <a href="#field-row">Field with action</a>
         <a href="#spacing">Spacing</a>
       </nav>
 
@@ -302,6 +303,28 @@ function StyleGuide() {
           Use the <code>&lt;TextInput&gt;</code> component — it pairs an{" "}
           <code>.input</code> with an accessible <code>.input-label</code> and
           optional <code>.input-helper</code> text.
+        </p>
+      </Section>
+
+      <Section id="field-row" label="Field with action">
+        <div className="sg-field-row-demo">
+          <div className="field-row">
+            <TextInput id="sg-field-row-input" label="Email address" />
+            <Button variant="primary">Send code</Button>
+          </div>
+        </div>
+        <Snippet
+          code={`<div className="field-row">\n  <TextInput id="email" label="Email address" />\n  <Button>Send code</Button>\n</div>`}
+        />
+        <p className="sg-note">
+          Use <code>.field-row</code> whenever a labelled field has exactly one
+          action attached to it (e.g. an email field + "Send code"), instead of
+          stacking the button below. Its button sits flush with the input&apos;s
+          own top and bottom edges, not the label — verified pixel-for-pixel,
+          not eyeballed (docs/adr/0012). It's for a single field with a single
+          action; two-or-more buttons attached to one field, or a button with no
+          adjacent field, are a different shape — don't reuse this class for
+          those.
         </p>
       </Section>
 

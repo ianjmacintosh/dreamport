@@ -172,6 +172,13 @@
   margin-bottom: var(--space-3);
 }
 
+/* ── Field with action ── */
+
+.sg-field-row-demo {
+  max-width: 320px;
+  margin-bottom: var(--space-3);
+}
+
 /* ── Spacing ── */
 
 .sg-spacing-list {
