@@ -162,6 +162,12 @@
   margin-bottom: var(--space-3);
 }
 
+/* ── Button group ── */
+
+.sg-button-group-demo {
+  margin-bottom: var(--space-3);
+}
+
 /* ── Text inputs ── */
 
 .sg-input-row {

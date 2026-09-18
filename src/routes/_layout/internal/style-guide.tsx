@@ -290,9 +290,11 @@ function StyleGuide() {
       </Section>
 
       <Section id="button-group" label="Button group">
-        <div className="button-group">
-          <Button variant="primary">Verify and sign in</Button>
-          <Button variant="secondary">Request a new code</Button>
+        <div className="sg-button-group-demo">
+          <div className="button-group">
+            <Button variant="primary">Verify and sign in</Button>
+            <Button variant="secondary">Request a new code</Button>
+          </div>
         </div>
         <Snippet
           code={`<div className="button-group">\n  <Button variant="primary">Verify and sign in</Button>\n  <Button variant="secondary">Request a new code</Button>\n</div>`}
