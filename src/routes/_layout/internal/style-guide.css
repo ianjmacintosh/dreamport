@@ -179,6 +179,26 @@
   margin-bottom: var(--space-3);
 }
 
+/* ── Turnstile container ── */
+/* .turnstile-container itself is a plain, borderless box in production —
+   this outline exists only so the demo shows the space it reserves. */
+
+.sg-turnstile-demo {
+  width: 300px;
+  border: 1px dashed var(--color-border);
+  margin-bottom: var(--space-3);
+}
+
+/* ── Form shell ── */
+/* Same deal: .form-shell has no border of its own — this outline exists
+   only so the demo shows the narrow column's bounds. */
+
+.sg-form-shell-demo {
+  border: 1px dashed var(--color-border);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
 /* ── Spacing ── */
 
 .sg-spacing-list {

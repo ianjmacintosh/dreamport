@@ -122,8 +122,11 @@ function StyleGuide() {
         <a href="#body-text">Body text</a>
         <a href="#links">Links</a>
         <a href="#buttons">Buttons</a>
+        <a href="#button-group">Button group</a>
         <a href="#text-inputs">Text inputs</a>
         <a href="#field-row">Field with action</a>
+        <a href="#turnstile-container">Turnstile container</a>
+        <a href="#form-shell">Form shell</a>
         <a href="#spacing">Spacing</a>
       </nav>
 
@@ -286,6 +289,23 @@ function StyleGuide() {
         </p>
       </Section>
 
+      <Section id="button-group" label="Button group">
+        <div className="button-group">
+          <Button variant="primary">Verify and sign in</Button>
+          <Button variant="secondary">Request a new code</Button>
+        </div>
+        <Snippet
+          code={`<div className="button-group">\n  <Button variant="primary">Verify and sign in</Button>\n  <Button variant="secondary">Request a new code</Button>\n</div>`}
+        />
+        <p className="sg-note">
+          Use <code>.button-group</code> for two or more related actions
+          presented side by side (e.g. "Verify and sign in" / "Request a new
+          code") — the gap between them comes from the spacing scale via Grid,
+          not inline-flex's incidental whitespace. For a single button attached
+          to a single field, use <code>.field-row</code> below instead.
+        </p>
+      </Section>
+
       <Section id="text-inputs" label="Text inputs">
         <div className="sg-input-row">
           <TextInput id="sg-name" label="Name" />
@@ -322,9 +342,47 @@ function StyleGuide() {
           stacking the button below. Its button sits flush with the input&apos;s
           own top and bottom edges, not the label — verified pixel-for-pixel,
           not eyeballed (docs/adr/0012). It's for a single field with a single
-          action; two-or-more buttons attached to one field, or a button with no
-          adjacent field, are a different shape — don't reuse this class for
-          those.
+          action — for two or more buttons with no field attached, use{" "}
+          <code>.button-group</code> above instead.
+        </p>
+      </Section>
+
+      <Section id="turnstile-container" label="Turnstile container">
+        <div className="sg-turnstile-demo">
+          <div className="turnstile-container" />
+        </div>
+        <Snippet
+          code={`<div className="turnstile-container">\n  <Turnstile ... />\n</div>`}
+        />
+        <p className="sg-note">
+          Wraps the Cloudflare Turnstile widget to reserve its footprint before
+          it loads, so the challenge popping in doesn't shift a submit button
+          below it. Fixed height, not <code>min-height</code> — Cloudflare's own
+          widget sizing still wiggles within a min-height once it renders. Plain
+          empty box in production — no placeholder background or skeleton; the
+          dashed outline here exists only to make the reserved space visible in
+          this demo.
+        </p>
+      </Section>
+
+      <Section id="form-shell" label="Form shell">
+        <div className="sg-form-shell-demo">
+          <div className="form-shell">
+            <h2>Sign in</h2>
+            <p>Narrow, centred column for short forms.</p>
+          </div>
+        </div>
+        <Snippet
+          code={`<div className="form-shell">\n  <h1>Sign in</h1>\n  <form>...</form>\n</div>`}
+        />
+        <p className="sg-note">
+          Centres a short form (e.g. sign-in) in a narrow column, per
+          AGENTS.md's rule that structural page layout is Grid, not Flexbox. The
+          grid's own <code>gap</code> is the form's vertical rhythm — it covers
+          spacing between top-level blocks (a heading, a{" "}
+          <code>&lt;form&gt;</code>, error text) without page-local margins. The
+          dashed outline here exists only to make the column&apos;s bounds
+          visible in this demo.
         </p>
       </Section>
 
