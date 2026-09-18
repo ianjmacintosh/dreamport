@@ -178,6 +178,18 @@ a.button {
   gap: var(--space-3);
 }
 
+/* A labelled field paired with its own action button, side by side (e.g. the
+   email field + "Send code") instead of stacked — Grid so the gap comes from
+   the spacing scale. `align-items: end` lines the button up with the input's
+   own bottom edge rather than the field's label, since the field is a
+   label-plus-input stack and the button is not. */
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: var(--space-3);
+}
+
 /* Reserves the Turnstile widget's footprint before it loads, so the
    challenge popping in doesn't shift the submit button down mid-
    interaction. Fixed height, not min-height — Cloudflare's own widget

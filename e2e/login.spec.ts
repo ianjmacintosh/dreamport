@@ -110,6 +110,28 @@ test("the sign-in page presents a bot challenge on the email step", async ({
     .toBe(true);
 });
 
+test("the send-code button stays disabled, with a status label, until the challenge resolves", async ({
+  page,
+}) => {
+  await gotoLoginFromHomepage(page);
+
+  // Right after the page loads, Turnstile hasn't resolved yet — this window
+  // exists even with the always-pass test key, since it still round-trips
+  // through the widget's script.
+  const button = page.getByRole("button", {
+    name: "Verifying you're human…",
+  });
+  await expect(button).toBeVisible();
+  await expect(button).toBeDisabled();
+
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
+    /.+/,
+    { timeout: 15_000 },
+  );
+
+  await expect(page.getByRole("button", { name: "Send code" })).toBeEnabled();
+});
+
 test("logged out: visiting /app with no session redirects to /login", async ({
   page,
 }) => {

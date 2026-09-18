@@ -64,6 +64,16 @@ const ERROR_ID = "login-error";
  * error text is tied to the active field via `aria-describedby` and takes
  * focus on failure; the code field takes focus when the form advances to it
  * (#28).
+ *
+ * The email step's submit button sits beside the email field (`.field-row`)
+ * rather than below the widget, and stays disabled — with a label explaining
+ * why — until Turnstile actually resolves: "Verifying you're human…" while
+ * the challenge is still loading, "Send code" once a token exists. That's a
+ * native `disabled`, the same mechanism already used for the in-flight
+ * pending state, not `aria-disabled` — the label itself carries the reason,
+ * so there's nothing an `aria-describedby` would add, and it avoids a second
+ * disabling convention on top of the one this page already has (see
+ * docs/adr/0012).
  */
 function Login() {
   const navigate = useNavigate();
@@ -180,17 +190,26 @@ function Login() {
             void sendCode();
           }}
         >
-          <TextInput
-            id="email"
-            label="Email address"
-            type="email"
-            name="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            aria-describedby={error ? ERROR_ID : undefined}
-            required
-          />
+          <div className="field-row">
+            <TextInput
+              id="email"
+              label="Email address"
+              type="email"
+              name="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              aria-describedby={error ? ERROR_ID : undefined}
+              required
+            />
+            <Button type="submit" disabled={isSubmitting || !turnstileToken}>
+              {isSubmitting
+                ? "Sending…"
+                : turnstileToken
+                  ? "Send code"
+                  : "Verifying you're human…"}
+            </Button>
+          </div>
           <div className="turnstile-container">
             <Turnstile
               ref={turnstileRef}
@@ -206,9 +225,6 @@ function Login() {
               }}
             />
           </div>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Sending…" : "Send code"}
-          </Button>
         </form>
       ) : (
         <form
