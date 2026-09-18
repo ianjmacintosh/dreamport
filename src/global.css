@@ -125,6 +125,12 @@ p {
     color 0.15s;
 }
 
+/* .button also renders on <a> (via Link, e.g. the header's "Log in") —
+   an anchor gets a browser-default underline that a <button> never has. */
+a.button {
+  text-decoration: none;
+}
+
 .button--primary {
   background-color: var(--color-accent);
   color: var(--color-accent-text);
@@ -132,6 +138,10 @@ p {
 
 .button--primary:hover {
   background-color: var(--color-accent-hover);
+  /* Locks the hover text color against the global `a:hover` rule, which
+     would otherwise outrank this on an <a>-rendered button and paint the
+     text the same cyan as the hover background (#50). */
+  color: var(--color-accent-text);
 }
 
 .button--secondary {
@@ -143,6 +153,38 @@ p {
 .button--secondary:hover {
   border-color: var(--color-accent);
   color: var(--color-accent);
+}
+
+/* ── Primitives: narrow single-column form layout ─────────── */
+/* Centred column for short forms (e.g. sign-in) — CSS Grid per AGENTS.md's
+   rule that structural layout is Grid, not Flexbox. The grid's own `gap`
+   is the form's vertical rhythm, so it also covers spacing between
+   adjacent controls (e.g. paired buttons) without a one-off margin. */
+.form-shell {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 26rem;
+  margin: 0 auto;
+}
+
+/* Two or more related actions presented side by side (e.g. "Verify and
+   sign in" / "Request a new code") — Grid so the gap between them comes
+   from the spacing scale rather than relying on inline-flex's incidental
+   whitespace. */
+.button-group {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-3);
+}
+
+/* Reserves the Turnstile widget's footprint (Cloudflare's default widget
+   is ~65px tall) before it loads, so the challenge popping in doesn't
+   shift the submit button down mid-interaction. Plain empty box — no
+   placeholder background or skeleton, since nothing else here needs one. */
+.turnstile-container {
+  min-height: 65px;
+  margin-bottom: var(--space-4);
 }
 
 /* ── Primitives: text inputs ──────────────────────────────── */

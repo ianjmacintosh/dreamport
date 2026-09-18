@@ -129,6 +129,12 @@ export const TEST_EMAILS = {
   e2eSignOut: "delivered+e2e-sign-out+e2e-test@resend.dev",
   /** Delete account happy path: request link, follow it, `/app` then bounces to `/login`. */
   e2eDeleteAccount: "delivered+e2e-delete-account+e2e-test@resend.dev",
+  /** Design-system pass (#28): advancing to the code step moves focus there. */
+  e2eFocusStepChange: "delivered+e2e-focus-step-change+e2e-test@resend.dev",
+  /** Design-system pass (#28): a failed verification moves focus to the error text. */
+  e2eFocusOnError: "delivered+e2e-focus-on-error+e2e-test@resend.dev",
+  /** Design-system pass (#28): the send-code button disables during the request. */
+  e2eNoDoubleSubmit: "delivered+e2e-no-double-submit+e2e-test@resend.dev",
   /**
    * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
    * against a real deployed environment. Deliberately NOT a `+e2e-test@`
