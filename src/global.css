@@ -122,7 +122,8 @@ p {
   transition:
     background-color 0.15s,
     border-color 0.15s,
-    color 0.15s;
+    color 0.15s,
+    outline-color 0.15s;
 }
 
 /* .button also renders on <a> (via Link, e.g. the header's "Log in") —
@@ -131,16 +132,24 @@ a.button {
   text-decoration: none;
 }
 
+/* Hover uses the same outline treatment as :focus-visible below, rather
+   than a background/border swap — one hover affordance for both variants,
+   consistent with how focus already reads. */
+.button:hover {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
 .button--primary {
   background-color: var(--color-accent);
   color: var(--color-accent-text);
 }
 
 .button--primary:hover {
-  background-color: var(--color-accent-hover);
   /* Locks the hover text color against the global `a:hover` rule, which
      would otherwise outrank this on an <a>-rendered button and paint the
-     text the same cyan as the hover background (#50). */
+     text cyan (#50) — background no longer changes on hover, but the
+     color still needs pinning to the button's own token. */
   color: var(--color-accent-text);
 }
 
@@ -148,11 +157,6 @@ a.button {
   background-color: transparent;
   border-color: var(--color-border);
   color: var(--color-text-primary);
-}
-
-.button--secondary:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
 }
 
 /* ── Primitives: narrow single-column form layout ─────────── */
