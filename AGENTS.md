@@ -17,6 +17,20 @@ picking up the issue — do it without being asked.
 
 Run `npm run format` to format all files using Prettier before commiting
 
+## Dev Server Process Hygiene
+
+A dev server is very likely already running on port 5173 outside your
+session — check before starting another one (a plain request to that port
+is enough). `npm run dev` has no `--strictPort`, so a redundant instance
+can silently shift to a different port instead of erroring, making it easy
+not to notice you've now got two.
+
+If you do start a server yourself for the task at hand, capture the exact
+PID at launch and stop only that PID when you're done. Never clean up with
+a name-pattern kill (`pkill -f vite`, `pkill -f wrangler`, `killall node`,
+etc.) — that kills every matching process on the machine, including one a
+human started that has nothing to do with your task.
+
 ## Testing
 
 Tests must only send email to an address defined in `TEST_EMAILS`
