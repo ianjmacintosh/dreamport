@@ -63,6 +63,27 @@ const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
 /**
+ * Plain `fetch` never times out on its own — if the server accepts the TCP
+ * connection but then goes away without closing it (observed with a Ctrl-C
+ * dev-server shutdown, unlike a hard kill which refuses the connection
+ * outright), the request hangs forever: no error, no way for the caller's
+ * `catch` to ever run. This aborts the request after `timeoutMs` so
+ * `addProduct`/`deleteProduct` always land in their `catch` block instead of
+ * leaving the UI stuck with no feedback.
+ */
+function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs = 10_000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(input, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timeout),
+  );
+}
+
+/**
  * The first authenticated page: it says who you are, and holds the
  * signed-in User's flat list of Products — add one (#88), see them all,
  * delete one (#89). Account-lifecycle actions (sign out, delete account)
@@ -91,7 +112,7 @@ function App() {
   async function addProduct() {
     setError("");
     try {
-      const res = await fetch("/api/products", {
+      const res = await fetchWithTimeout("/api/products", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: productName }),
@@ -113,7 +134,9 @@ function App() {
   async function deleteProduct(id: string) {
     setError("");
     try {
-      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      const res = await fetchWithTimeout(`/api/products/${id}`, {
+        method: "DELETE",
+      });
       if (!res.ok) {
         setError(DELETE_PRODUCT_FAILED);
         return;
