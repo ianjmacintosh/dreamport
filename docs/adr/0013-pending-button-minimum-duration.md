@@ -19,7 +19,7 @@ minimum duration (400ms), timed from the moment the request starts, not
 from when it resolves.** `withMinimumDuration` wraps the async work and
 waits out the rest of that floor before resolving. Critically, any UI
 change that would remove the pending element itself (e.g. filtering a
-Product out of the list) has to happen *after* `withMinimumDuration`
+Product out of the list) has to happen _after_ `withMinimumDuration`
 resolves, not inside the timed callback — doing it inside would unmount the
 row before the wait it's supposed to be honoring ever ran.
 
@@ -35,7 +35,7 @@ feels wrong in either direction.
   indistinguishable-from-a-glitch flicker.
 - **A minimum duration enforced only on the visual state (disable the
   button for 400ms) while letting data changes (e.g. removing the row)
-  happen immediately.** Rejected for delete specifically: the button *is*
+  happen immediately.** Rejected for delete specifically: the button _is_
   part of the row being removed, so decoupling "how long the button looks
   disabled" from "when the row disappears" doesn't help — the row taking
   the button with it is the actual flicker.

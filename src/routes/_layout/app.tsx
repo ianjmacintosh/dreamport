@@ -57,8 +57,7 @@ export const Route = createFileRoute("/_layout/app")({
 });
 
 const ADD_PRODUCT_FAILED = "We couldn't add that. Try again in a moment.";
-const DELETE_PRODUCT_FAILED =
-  "We couldn't delete that. Try again in a moment.";
+const DELETE_PRODUCT_FAILED = "We couldn't delete that. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
