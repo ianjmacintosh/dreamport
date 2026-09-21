@@ -19,6 +19,7 @@ import {
 } from "./trusted-origins";
 import {
   createProduct,
+  deleteProduct,
   listProducts,
   PRODUCT_NAME_MAX_LENGTH,
 } from "./products";
@@ -319,6 +320,41 @@ export function createApp(deps: AppDeps = {}) {
 
     const product = await createProduct(c.env.DB, session.user.id, name);
     return c.json({ product }, 201);
+  });
+
+  /**
+   * Products v1 slice 2 (issue #89): delete one of the signed-in User's own
+   * Products. Same origin check as POST above (this route sits outside
+   * `auth.handler` the same way) and the same session gate as the other
+   * three routes. `deleteProduct` scopes by both id and userId, so zero rows
+   * changed means either the id doesn't exist or isn't this User's — the
+   * response never distinguishes the two, so it's always 404, never 403.
+   */
+  app.delete("/api/products/:id", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const deleted = await deleteProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("id"),
+    );
+    if (!deleted) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json({}, 200);
   });
 
   /**

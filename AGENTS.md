@@ -15,7 +15,13 @@ picking up the issue — do it without being asked.
   at `main`. Run `git branch --unset-upstream` right after creating it so
   the first push creates the matching `origin/<branch>`.
 
-Run `npm run format` to format all files using Prettier before commiting
+**Before every commit, run `npm run format`.** CI's Static Analysis workflow
+runs `format:check`/`lint`/`build` (typecheck) as three separate jobs, and a
+raw `prettier --check` failure there is easy to miss until the PR is
+already open — `npm run format` (which writes fixes, not just checks) costs
+nothing to run every time, so run it before each commit rather than
+retroactively when CI complains. `npm run lint` and `npm run typecheck`
+mirror the other two CI jobs and are worth the same habit.
 
 ## Dev Server Process Hygiene
 

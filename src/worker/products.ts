@@ -54,3 +54,22 @@ export async function createProduct(
     .run();
   return product;
 }
+
+/**
+ * Delete a Product owned by `userId`. Scoped by both `id` and `userId` in
+ * the one query — not a select-then-delete — so a stranger's row is
+ * indistinguishable from a nonexistent one at the DB layer too. Returns
+ * whether a row was actually deleted, so the caller can decide 404 vs 200
+ * without a separate existence check.
+ */
+export async function deleteProduct(
+  db: D1Database,
+  userId: string,
+  id: string,
+): Promise<boolean> {
+  const { meta } = await db
+    .prepare('DELETE FROM "products" WHERE "id" = ? AND "userId" = ?')
+    .bind(id, userId)
+    .run();
+  return meta.changes > 0;
+}

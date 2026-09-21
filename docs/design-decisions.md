@@ -22,3 +22,14 @@ Add an entry only once a sign-off conversation resolves something repeatable
   stacked below it. Two or more buttons with no field attached use
   `.button-group` instead. See the style guide's "Field with action"
   section and docs/adr/0012 (decided in #28).
+
+- A button that starts a request needing server confirmation (add, delete,
+  any create/update/destroy action) disables and relabels to a
+  present-participle string ("Adding…"/"Deleting…") while that request is
+  in flight — native `disabled`, not `aria-disabled` (docs/adr/0012). That
+  state holds for a minimum of 400ms, timed from when the request starts,
+  via `withMinimumDuration`, so a fast response doesn't flicker the state
+  instead of showing it — and any change that would remove the pending
+  element itself (e.g. the row a delete button lives in) waits until after
+  that minimum duration resolves, not before. See docs/adr/0013 (decided
+  in #89).
