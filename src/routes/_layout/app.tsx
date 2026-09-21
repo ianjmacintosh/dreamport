@@ -1,14 +1,9 @@
 import { useState } from "react";
-import {
-  createFileRoute,
-  redirect,
-  useNavigate,
-  useRouter,
-} from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
+import Link from "../../components/Link";
 import TextInput from "../../components/TextInput";
-import { authClient } from "../../utils/auth-client";
 
 /** A Product as `/api/products` returns it (see `src/worker/products.ts`). */
 interface Product {
@@ -61,39 +56,30 @@ export const Route = createFileRoute("/_layout/app")({
   component: App,
 });
 
-/** Which state the delete-account control is in. */
-type DeleteStep = "resting" | "confirming" | "sent";
-
-const SIGN_OUT_FAILED = "We couldn't sign you out. Try again in a moment.";
-const DELETE_REQUEST_FAILED =
-  "We couldn't start account deletion. Try again in a few minutes.";
+const ADD_PRODUCT_FAILED = "We couldn't add that. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
-const ADD_PRODUCT_FAILED = "We couldn't add that. Try again in a moment.";
 
 /**
- * The first authenticated page: it says who you are, holds the signed-in
- * User's flat list of Products (issue #88), and offers the two
- * account-lifecycle actions from issue #26 — sign out, and delete account.
+ * The first authenticated page: it says who you are, and holds the
+ * signed-in User's flat list of Products (issue #88) — add one, see them
+ * all. Account-lifecycle actions (sign out, delete account) live on their
+ * own page, `/app/settings`, linked from here rather than mixed in — this
+ * page is about the Products, not account management.
  *
- * Composed from `TextInput` / `Button` plus heading/paragraph primitives in
- * plain document order: no page-specific CSS, no card treatment or
- * empty-state design for the Products list (that's the design/polish pass,
- * #90), and no confirm-dialog or "danger zone" component for delete account
- * (that would need design sign-off, #28-adjacent). The delete control is a
- * two-step reveal rather than a native `confirm()` so a stray click can't
- * start an irreversible flow; the emailed link is the real confirmation.
+ * Composed from `TextInput` / `Button` / `Link` plus heading/paragraph
+ * primitives in plain document order: no page-specific CSS, no card
+ * treatment or empty-state design for the list (that's the design/polish
+ * pass, #90). The add-Product field and its button sit in `.field-row` — the
+ * same side-by-side single-field-plus-button primitive `/login`'s email step
+ * uses — rather than stacked.
  *
- * A failed sign-out, deletion request, or add-Product surfaces a bare line of
- * error text — enough that a throttled (429) or backend-down request doesn't
- * look like it worked. The styled error treatment and button loading states
- * are #28-adjacent (design polish is #90 for this page).
+ * A failed add-Product surfaces a bare line of error text — enough that a
+ * backend-down request doesn't look like it worked. The styled error
+ * treatment and button loading state are #90 for this page.
  */
 function App() {
   const { email, products: initialProducts } = Route.useRouteContext();
-  const navigate = useNavigate();
-  const router = useRouter();
-  const [deleteStep, setDeleteStep] = useState<DeleteStep>("resting");
   const [error, setError] = useState("");
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [productName, setProductName] = useState("");
@@ -120,39 +106,6 @@ function App() {
     }
   }
 
-  async function signOut() {
-    setError("");
-    try {
-      const { error } = await authClient.signOut();
-      if (error) {
-        setError(SIGN_OUT_FAILED);
-        return;
-      }
-      // `/` is the genuine signed-out state (the homepage has its own way into
-      // `/login` since #50). Invalidate first so no stale route context keeps
-      // rendering "signed in as".
-      void router.invalidate();
-      void navigate({ to: "/" });
-    } catch {
-      setError(CONNECTION_FAILED);
-    }
-  }
-
-  async function requestDeletion() {
-    setError("");
-    try {
-      const { error } = await authClient.deleteUser({ callbackURL: "/" });
-      if (error) {
-        // Stay on the confirm step — nothing was sent.
-        setError(DELETE_REQUEST_FAILED);
-        return;
-      }
-      setDeleteStep("sent");
-    } catch {
-      setError(CONNECTION_FAILED);
-    }
-  }
-
   return (
     <>
       <p>signed in as {email}</p>
@@ -164,15 +117,17 @@ function App() {
           void addProduct();
         }}
       >
-        <TextInput
-          id="product-name"
-          label="Product name"
-          value={productName}
-          onChange={(e) => setProductName(e.target.value)}
-          maxLength={PRODUCT_NAME_MAX_LENGTH}
-          required
-        />
-        <Button type="submit">Add product</Button>
+        <div className="field-row">
+          <TextInput
+            id="product-name"
+            label="Product name"
+            value={productName}
+            onChange={(e) => setProductName(e.target.value)}
+            maxLength={PRODUCT_NAME_MAX_LENGTH}
+            required
+          />
+          <Button type="submit">Add product</Button>
+        </div>
       </form>
       {products.length === 0 ? (
         <p>No products yet.</p>
@@ -180,49 +135,11 @@ function App() {
         products.map((product) => <p key={product.id}>{product.name}</p>)
       )}
 
-      <h2>Sign out</h2>
-      <Button onClick={() => void signOut()}>Sign out</Button>
-
-      <h2>Delete account</h2>
-      {deleteStep === "resting" && (
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setError("");
-            setDeleteStep("confirming");
-          }}
-        >
-          Delete account
-        </Button>
-      )}
-      {deleteStep === "confirming" && (
-        <>
-          <p>
-            This permanently deletes your account and everything in it. We'll
-            email you a link to confirm.
-          </p>
-          <Button variant="primary" onClick={() => void requestDeletion()}>
-            Email me a deletion link
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setError("");
-              setDeleteStep("resting");
-            }}
-          >
-            Cancel
-          </Button>
-        </>
-      )}
-      {deleteStep === "sent" && (
-        <p>
-          Check your email for a link to finish deleting your account. The link
-          expires in 24 hours.
-        </p>
-      )}
-
       {error && <p role="alert">{error}</p>}
+
+      <p>
+        <Link href="/app/settings">Settings</Link>
+      </p>
     </>
   );
 }

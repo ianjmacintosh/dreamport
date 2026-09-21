@@ -157,11 +157,13 @@ test("persistent session: a return visit to /app stays signed in", async ({
   await expect(page.getByText(`signed in as ${email}`)).toBeVisible();
 });
 
-test("sign out from /app returns to the homepage and forgets the session", async ({
+test("sign out from /app/settings returns to the homepage and forgets the session", async ({
   page,
 }) => {
   await signIn(page, TEST_EMAILS.e2eSignOut);
 
+  await page.getByRole("link", { name: "Settings" }).click();
+  await expect(page).toHaveURL(/\/app\/settings$/);
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/localhost:\d+\/$/);
 
@@ -239,7 +241,7 @@ test("the send-code button disables and relabels while the request is in flight"
   });
 });
 
-test("delete account from /app: confirm, follow the emailed link, session is gone", async ({
+test("delete account from /app/settings: confirm, follow the emailed link, session is gone", async ({
   page,
   request,
 }) => {
@@ -247,6 +249,8 @@ test("delete account from /app: confirm, follow the emailed link, session is gon
 
   await signIn(page, email);
 
+  await page.getByRole("link", { name: "Settings" }).click();
+  await expect(page).toHaveURL(/\/app\/settings$/);
   await page.getByRole("button", { name: "Delete account" }).click();
   await page.getByRole("button", { name: "Email me a deletion link" }).click();
   await expect(page.getByText(/Check your email/)).toBeVisible();
