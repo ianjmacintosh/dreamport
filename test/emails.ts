@@ -167,6 +167,9 @@ export const TEST_EMAILS = {
   /** Products v1 (#89 follow-up): Delete button disables/relabels while in flight. */
   e2eDeleteProductPending:
     "delivered+e2e-delete-product-pending+e2e-test@resend.dev",
+  /** Products v1 (#89 follow-up): a near-instant delete still holds the pending row for the minimum duration. */
+  e2eDeleteProductMinDuration:
+    "delivered+e2e-delete-product-min-duration+e2e-test@resend.dev",
   /**
    * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
    * against a real deployed environment. Deliberately NOT a `+e2e-test@`

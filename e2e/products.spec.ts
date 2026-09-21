@@ -133,3 +133,30 @@ test("the Delete button disables and relabels while the request is in flight", a
     timeout: 10_000,
   });
 });
+
+test("even a near-instant delete holds the pending row for a minimum duration", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eDeleteProductMinDuration;
+  const productName = `An instant-delete Product ${Date.now()}`;
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await expect(page.getByText(productName)).toBeVisible();
+
+  // Deliberately no artificial delay: local D1 resolves this in a handful
+  // of milliseconds, which is exactly what regressed before — the row
+  // (carrying the "Deleting…" button) was removed the instant the request
+  // settled, before app.tsx's minimum-duration floor had actually elapsed.
+  const row = page.getByText(productName).locator("..");
+  await row.getByRole("button", { name: "Delete" }).click();
+
+  await page.waitForTimeout(200);
+  await expect(row.getByRole("button", { name: "Deleting…" })).toBeVisible();
+
+  await expect(page.getByText(productName)).not.toBeVisible({
+    timeout: 2_000,
+  });
+});

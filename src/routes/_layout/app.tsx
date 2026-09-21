@@ -177,18 +177,22 @@ function App() {
     setError("");
     setDeletingId(id);
     try {
-      await withMinimumDuration(async () => {
+      // The row itself carries the pending button, so removing it has to
+      // wait for the same floor `withMinimumDuration` enforces — done
+      // inside the callback, the removal would unmount the row (and its
+      // "Deleting…" button) the instant the request resolves, cutting the
+      // pending state short exactly the way the timeout was meant to fix.
+      const ok = await withMinimumDuration(async () => {
         const res = await fetchWithTimeout(`/api/products/${id}`, {
           method: "DELETE",
         });
-        if (!res.ok) {
-          setError(DELETE_PRODUCT_FAILED);
-          return;
-        }
-        // Reflect the removal immediately — no full page reload or refetch
-        // needed for a list this size, same as `addProduct` above.
-        setProducts((prev) => prev.filter((product) => product.id !== id));
+        return res.ok;
       });
+      if (!ok) {
+        setError(DELETE_PRODUCT_FAILED);
+        return;
+      }
+      setProducts((prev) => prev.filter((product) => product.id !== id));
     } catch {
       setError(CONNECTION_FAILED);
     } finally {
