@@ -57,26 +57,30 @@ export const Route = createFileRoute("/_layout/app")({
 });
 
 const ADD_PRODUCT_FAILED = "We couldn't add that. Try again in a moment.";
+const DELETE_PRODUCT_FAILED =
+  "We couldn't delete that. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
 /**
  * The first authenticated page: it says who you are, and holds the
- * signed-in User's flat list of Products (issue #88) — add one, see them
- * all. Account-lifecycle actions (sign out, delete account) live on their
- * own page, `/app/settings`, linked from here rather than mixed in — this
- * page is about the Products, not account management.
+ * signed-in User's flat list of Products — add one (#88), see them all,
+ * delete one (#89). Account-lifecycle actions (sign out, delete account)
+ * live on their own page, `/app/settings`, linked from here rather than
+ * mixed in — this page is about the Products, not account management.
  *
  * Composed from `TextInput` / `Button` / `Link` plus heading/paragraph
  * primitives in plain document order: no page-specific CSS, no card
- * treatment or empty-state design for the list (that's the design/polish
- * pass, #90). The add-Product field and its button sit in `.field-row` — the
- * same side-by-side single-field-plus-button primitive `/login`'s email step
- * uses — rather than stacked.
+ * treatment or empty-state design for the list, no confirmation/undo on
+ * delete (all of that is the design/polish pass, #90). The add-Product field
+ * and its button sit in `.field-row` — the same side-by-side
+ * single-field-plus-button primitive `/login`'s email step uses — rather
+ * than stacked; the per-row delete `Button` isn't a `.field-row` (that
+ * pattern is for an input+action pair, not a display row with an action).
  *
- * A failed add-Product surfaces a bare line of error text — enough that a
- * backend-down request doesn't look like it worked. The styled error
- * treatment and button loading state are #90 for this page.
+ * A failed add-Product or delete surfaces a bare line of error text —
+ * enough that a backend-down request doesn't look like it worked. The
+ * styled error treatment and button loading state are #90 for this page.
  */
 function App() {
   const { email, products: initialProducts } = Route.useRouteContext();
@@ -101,6 +105,22 @@ function App() {
       // needed for a list this size.
       setProducts((prev) => [...prev, product]);
       setProductName("");
+    } catch {
+      setError(CONNECTION_FAILED);
+    }
+  }
+
+  async function deleteProduct(id: string) {
+    setError("");
+    try {
+      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        setError(DELETE_PRODUCT_FAILED);
+        return;
+      }
+      // Reflect the removal immediately — no full page reload or refetch
+      // needed for a list this size, same as `addProduct` above.
+      setProducts((prev) => prev.filter((product) => product.id !== id));
     } catch {
       setError(CONNECTION_FAILED);
     }
@@ -132,7 +152,14 @@ function App() {
       {products.length === 0 ? (
         <p>No products yet.</p>
       ) : (
-        products.map((product) => <p key={product.id}>{product.name}</p>)
+        products.map((product) => (
+          <p key={product.id}>
+            {product.name}{" "}
+            <Button onClick={() => void deleteProduct(product.id)}>
+              Delete
+            </Button>
+          </p>
+        ))
       )}
 
       {error && <p role="alert">{error}</p>}

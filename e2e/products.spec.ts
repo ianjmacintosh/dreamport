@@ -2,10 +2,10 @@ import { test, expect, type Page } from "@playwright/test";
 
 import { TEST_EMAILS } from "../test/emails";
 
-// Products v1 slice 1 (issue #88): sign in, add a Product, see it in the
-// list without a full page reload. Signs in the same way `login.spec.ts`
-// does (fixed `+e2e-test@` code, see docs/adr/0009) — see that file's header
-// comment for why.
+// Products v1: sign in, add a Product, see it in the list without a full
+// page reload (slice 1, issue #88), and delete one (slice 2, issue #89).
+// Signs in the same way `login.spec.ts` does (fixed `+e2e-test@` code, see
+// docs/adr/0009) — see that file's header comment for why.
 
 /** Give this spec its own per-IP send-OTP bucket, same reasoning as `login.spec.ts`. */
 let sendBucket = 0;
@@ -60,4 +60,22 @@ test("sign in, add a Product, and see it in the list", async ({ page }) => {
   // No full page reload: the field clears and is ready for the next entry
   // without the page itself having navigated.
   await expect(page.getByLabel("Product name")).toHaveValue("");
+});
+
+test("sign in, add a Product, delete it, and confirm it's gone", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eDeleteProduct;
+  const productName = `A short-lived Product ${Date.now()}`;
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await expect(page.getByText(productName)).toBeVisible();
+
+  const row = page.getByText(productName).locator("..");
+  await row.getByRole("button", { name: "Delete" }).click();
+
+  await expect(page.getByText(productName)).not.toBeVisible();
 });

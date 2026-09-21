@@ -125,6 +125,19 @@ export const TEST_EMAILS = {
   /** Posts an empty/whitespace-only name; expects a 400 and nothing created. */
   productsInvalidName: "delivered+products-invalid-name@resend.dev",
 
+  // --- Seam 1: DELETE /api/products/:id (#89) ---
+  /** Adds a Product, deletes it, then finds the list empty again. */
+  productsDeleteOwn: "delivered+products-delete-own@resend.dev",
+  /** Rejects a delete from an untrusted origin, leaving the Product intact. */
+  productsDeleteUntrustedOrigin:
+    "delivered+products-delete-untrusted-origin@resend.dev",
+  /** Owner side of the delete ownership boundary check. */
+  productsDeleteOwnerA: "delivered+products-delete-owner-a@resend.dev",
+  /** Other User whose delete on A's Product must 404, not succeed. */
+  productsDeleteOwnerB: "delivered+products-delete-owner-b@resend.dev",
+  /** Deletes an id that was never created; expects a 404. */
+  productsDeleteNotFound: "delivered+products-delete-not-found@resend.dev",
+
   // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
   // Every address below carries the `+e2e-test@` marker (issue #39): the
   // `+<scenario>` label sits ahead of it, so e.g. "e2e-happy" tags the
@@ -147,6 +160,8 @@ export const TEST_EMAILS = {
   e2eNoDoubleSubmit: "delivered+e2e-no-double-submit+e2e-test@resend.dev",
   /** Products v1 slice 1 (#88): sign in, add a Product, see it in the list. */
   e2eAddProduct: "delivered+e2e-add-product+e2e-test@resend.dev",
+  /** Products v1 slice 2 (#89): add a Product, delete it, confirm it's gone. */
+  e2eDeleteProduct: "delivered+e2e-delete-product+e2e-test@resend.dev",
   /**
    * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
    * against a real deployed environment. Deliberately NOT a `+e2e-test@`

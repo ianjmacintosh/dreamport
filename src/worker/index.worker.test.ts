@@ -1095,21 +1095,23 @@ describe("dynamic baseURL (ALLOWED_HOSTS)", () => {
   });
 });
 
+/** Shared by both the create/list and delete describe blocks below. */
+function getProducts(cookie?: string) {
+  return fetchWorker("/api/products", {
+    headers: cookie ? { cookie } : {},
+  });
+}
+
+/** Shared by both the create/list and delete describe blocks below. */
+function addProduct(cookie: string, name: string) {
+  return fetchWorker("/api/products", {
+    method: "POST",
+    headers: { ...json, origin: TRUSTED_ORIGIN, cookie },
+    body: JSON.stringify({ name }),
+  });
+}
+
 describe("/api/products (#88)", () => {
-  function getProducts(cookie?: string) {
-    return fetchWorker("/api/products", {
-      headers: cookie ? { cookie } : {},
-    });
-  }
-
-  function addProduct(cookie: string, name: string) {
-    return fetchWorker("/api/products", {
-      method: "POST",
-      headers: { ...json, origin: TRUSTED_ORIGIN, cookie },
-      body: JSON.stringify({ name }),
-    });
-  }
-
   it("rejects a request with no session", async () => {
     const res = await getProducts();
 
@@ -1188,6 +1190,77 @@ describe("/api/products (#88)", () => {
 
     const asB = await getProducts(cookieB);
     expect(await asB.json()).toEqual({ products: [] });
+  });
+});
+
+describe("DELETE /api/products/:id (#89)", () => {
+  function deleteProduct(id: string, cookie?: string) {
+    return fetchWorker(`/api/products/${id}`, {
+      method: "DELETE",
+      headers: { origin: TRUSTED_ORIGIN, ...(cookie ? { cookie } : {}) },
+    });
+  }
+
+  it("rejects a request with no session", async () => {
+    const res = await deleteProduct("some-id");
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Not signed in" });
+  });
+
+  it("rejects a delete from an untrusted origin", async () => {
+    const cookie = await signIn(TEST_EMAILS.productsDeleteUntrustedOrigin);
+    const created = await addProduct(cookie, "To survive an untrusted delete");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    const res = await fetchWorker(`/api/products/${product.id}`, {
+      method: "DELETE",
+      headers: { origin: "https://evil.example.com", cookie },
+    });
+
+    expect(res.status).toBe(403);
+    const listed = (await (await getProducts(cookie)).json()) as {
+      products: { id: string }[];
+    };
+    expect(listed.products.map((p) => p.id)).toContain(product.id);
+  });
+
+  it("deletes a Product it owns, leaving the list empty again", async () => {
+    const cookie = await signIn(TEST_EMAILS.productsDeleteOwn);
+    const created = await addProduct(cookie, "A short-lived Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    const res = await deleteProduct(product.id, cookie);
+    expect(res.status).toBe(200);
+
+    expect(await (await getProducts(cookie)).json()).toEqual({
+      products: [],
+    });
+  });
+
+  it("404s on a nonexistent id, never a 403", async () => {
+    const cookie = await signIn(TEST_EMAILS.productsDeleteNotFound);
+
+    const res = await deleteProduct("not-a-real-id", cookie);
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Not found" });
+  });
+
+  it("404s a stranger's delete of another User's Product, leaving it intact", async () => {
+    const cookieA = await signIn(TEST_EMAILS.productsDeleteOwnerA);
+    const cookieB = await signIn(TEST_EMAILS.productsDeleteOwnerB);
+    const created = await addProduct(cookieA, "Owner A's Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    const res = await deleteProduct(product.id, cookieB);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Not found" });
+
+    const asA = (await (await getProducts(cookieA)).json()) as {
+      products: { id: string }[];
+    };
+    expect(asA.products.map((p) => p.id)).toEqual([product.id]);
   });
 });
 
