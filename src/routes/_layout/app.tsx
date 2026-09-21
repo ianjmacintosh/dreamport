@@ -74,7 +74,7 @@ const CONNECTION_FAILED =
 function fetchWithTimeout(
   input: string,
   init: RequestInit,
-  timeoutMs = 10_000,
+  timeoutMs = 5_000,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -100,17 +100,25 @@ function fetchWithTimeout(
  * pattern is for an input+action pair, not a display row with an action).
  *
  * A failed add-Product or delete surfaces a bare line of error text —
- * enough that a backend-down request doesn't look like it worked. The
- * styled error treatment and button loading state are #90 for this page.
+ * enough that a backend-down request doesn't look like it worked. While a
+ * request is in flight, its own button disables and its label changes to a
+ * present-participle string ("Adding…"/"Deleting…") — native `disabled`,
+ * the same in-flight-pending mechanism `/login`'s submit buttons already
+ * use (see docs/adr/0012), not a new convention.
  */
 function App() {
   const { email, products: initialProducts } = Route.useRouteContext();
   const [error, setError] = useState("");
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [productName, setProductName] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
+  // Only ever one row's delete in flight at a time — no bulk delete (#89) —
+  // so a single id (rather than a set) is enough to track it.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function addProduct() {
     setError("");
+    setIsAdding(true);
     try {
       const res = await fetchWithTimeout("/api/products", {
         method: "POST",
@@ -128,11 +136,14 @@ function App() {
       setProductName("");
     } catch {
       setError(CONNECTION_FAILED);
+    } finally {
+      setIsAdding(false);
     }
   }
 
   async function deleteProduct(id: string) {
     setError("");
+    setDeletingId(id);
     try {
       const res = await fetchWithTimeout(`/api/products/${id}`, {
         method: "DELETE",
@@ -146,6 +157,8 @@ function App() {
       setProducts((prev) => prev.filter((product) => product.id !== id));
     } catch {
       setError(CONNECTION_FAILED);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -169,7 +182,9 @@ function App() {
             maxLength={PRODUCT_NAME_MAX_LENGTH}
             required
           />
-          <Button type="submit">Add product</Button>
+          <Button type="submit" disabled={isAdding}>
+            {isAdding ? "Adding…" : "Add product"}
+          </Button>
         </div>
       </form>
       {products.length === 0 ? (
@@ -178,8 +193,11 @@ function App() {
         products.map((product) => (
           <p key={product.id}>
             {product.name}{" "}
-            <Button onClick={() => void deleteProduct(product.id)}>
-              Delete
+            <Button
+              disabled={deletingId === product.id}
+              onClick={() => void deleteProduct(product.id)}
+            >
+              {deletingId === product.id ? "Deleting…" : "Delete"}
             </Button>
           </p>
         ))

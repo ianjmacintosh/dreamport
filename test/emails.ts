@@ -162,6 +162,11 @@ export const TEST_EMAILS = {
   e2eAddProduct: "delivered+e2e-add-product+e2e-test@resend.dev",
   /** Products v1 slice 2 (#89): add a Product, delete it, confirm it's gone. */
   e2eDeleteProduct: "delivered+e2e-delete-product+e2e-test@resend.dev",
+  /** Products v1 (#89 follow-up): Add product button disables/relabels while in flight. */
+  e2eAddProductPending: "delivered+e2e-add-product-pending+e2e-test@resend.dev",
+  /** Products v1 (#89 follow-up): Delete button disables/relabels while in flight. */
+  e2eDeleteProductPending:
+    "delivered+e2e-delete-product-pending+e2e-test@resend.dev",
   /**
    * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
    * against a real deployed environment. Deliberately NOT a `+e2e-test@`

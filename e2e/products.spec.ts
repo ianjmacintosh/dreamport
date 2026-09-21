@@ -62,6 +62,30 @@ test("sign in, add a Product, and see it in the list", async ({ page }) => {
   await expect(page.getByLabel("Product name")).toHaveValue("");
 });
 
+test("the Add product button disables and relabels while the request is in flight", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eAddProductPending;
+  const productName = `A slow-to-add Product ${Date.now()}`;
+
+  await signIn(page, email);
+
+  // Slow the create down so the pending state has a real window to observe
+  // — same reasoning as login.spec.ts's send-code delay.
+  await page.route("**/api/products", async (route) => {
+    if (route.request().method() === "POST") {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    await route.fallback();
+  });
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+
+  await expect(page.getByRole("button", { name: "Adding…" })).toBeDisabled();
+  await expect(page.getByText(productName)).toBeVisible({ timeout: 10_000 });
+});
+
 test("sign in, add a Product, delete it, and confirm it's gone", async ({
   page,
 }) => {
@@ -78,4 +102,34 @@ test("sign in, add a Product, delete it, and confirm it's gone", async ({
   await row.getByRole("button", { name: "Delete" }).click();
 
   await expect(page.getByText(productName)).not.toBeVisible();
+});
+
+test("the Delete button disables and relabels while the request is in flight", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eDeleteProductPending;
+  const productName = `A slow-to-delete Product ${Date.now()}`;
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await expect(page.getByText(productName)).toBeVisible();
+
+  // Slow the delete down so the pending state has a real window to observe
+  // — same reasoning as login.spec.ts's send-code delay.
+  await page.route("**/api/products/*", async (route) => {
+    if (route.request().method() === "DELETE") {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    await route.fallback();
+  });
+
+  const row = page.getByText(productName).locator("..");
+  await row.getByRole("button", { name: "Delete" }).click();
+
+  await expect(row.getByRole("button", { name: "Deleting…" })).toBeDisabled();
+  await expect(page.getByText(productName)).not.toBeVisible({
+    timeout: 10_000,
+  });
 });
