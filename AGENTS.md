@@ -74,6 +74,11 @@ Rules for building or editing a page:
 
 This applies everywhere in the app, not just the pattern library.
 
+**Before applying rule 3** (stopping for sign-off), check
+`docs/design-decisions.md` — a repeatable shape may already have a binding
+one-liner decision recorded there from an earlier sign-off, in which case
+build it directly instead of re-opening the conversation.
+
 ## Layout
 
 Structural page layout — page shells, full-bleed sections, sticky
