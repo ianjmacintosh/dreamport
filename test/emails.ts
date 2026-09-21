@@ -115,6 +115,16 @@ export const TEST_EMAILS = {
   /** Signs in, then reads its own email back from the session endpoint. */
   meOk: "delivered+me-ok@resend.dev",
 
+  // --- Seam 1: /api/products (#88) ---
+  /** Adds a Product and reads it back in its own list. */
+  productsAddOne: "delivered+products-add-one@resend.dev",
+  /** Owner side of the cross-user ownership boundary check. */
+  productsOwnerA: "delivered+products-owner-a@resend.dev",
+  /** Other User in the ownership boundary check; must never see A's Products. */
+  productsOwnerB: "delivered+products-owner-b@resend.dev",
+  /** Posts an empty/whitespace-only name; expects a 400 and nothing created. */
+  productsInvalidName: "delivered+products-invalid-name@resend.dev",
+
   // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
   // Every address below carries the `+e2e-test@` marker (issue #39): the
   // `+<scenario>` label sits ahead of it, so e.g. "e2e-happy" tags the
@@ -135,6 +145,8 @@ export const TEST_EMAILS = {
   e2eFocusOnError: "delivered+e2e-focus-on-error+e2e-test@resend.dev",
   /** Design-system pass (#28): the send-code button disables during the request. */
   e2eNoDoubleSubmit: "delivered+e2e-no-double-submit+e2e-test@resend.dev",
+  /** Products v1 slice 1 (#88): sign in, add a Product, see it in the list. */
+  e2eAddProduct: "delivered+e2e-add-product+e2e-test@resend.dev",
   /**
    * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
    * against a real deployed environment. Deliberately NOT a `+e2e-test@`

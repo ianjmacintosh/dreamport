@@ -4,6 +4,7 @@ import {
   ALLOWED_HOSTS,
   allowedHostsForEnvironment,
   hostnameInList,
+  isTrustedRequestOrigin,
   matchesHostPattern,
   PRODUCTION_HOSTS,
   STAGING_HOSTS,
@@ -64,6 +65,76 @@ describe("ALLOWED_HOSTS", () => {
       expect(host).not.toBe("*");
       expect(host).not.toBe("*.workers.dev");
     }
+  });
+});
+
+// Real end-to-end coverage of this check gating an actual route lives in
+// index.worker.test.ts ("/api/products"). These exercise the pure function
+// directly against an explicit `trustedOrigins` list, independent of which
+// environment this build happens to be.
+describe("isTrustedRequestOrigin (#88)", () => {
+  const requestHost = "dreamport.test";
+  const trustedOrigins = ["https://dreamport-staging.bananasquad.workers.dev"];
+
+  it("trusts an origin whose host matches the request's own Host (self-trust)", () => {
+    expect(
+      isTrustedRequestOrigin(
+        "https://dreamport.test",
+        requestHost,
+        trustedOrigins,
+      ),
+    ).toBe(true);
+  });
+
+  it("matches the request Host case-insensitively, same as matchesHostPattern", () => {
+    expect(
+      isTrustedRequestOrigin(
+        "https://DREAMPORT.TEST",
+        requestHost,
+        trustedOrigins,
+      ),
+    ).toBe(true);
+  });
+
+  it("trusts an origin in the explicit trustedOrigins list", () => {
+    expect(
+      isTrustedRequestOrigin(
+        "https://dreamport-staging.bananasquad.workers.dev",
+        requestHost,
+        trustedOrigins,
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects an origin that is neither self nor in trustedOrigins", () => {
+    expect(
+      isTrustedRequestOrigin(
+        "https://evil.example.com",
+        requestHost,
+        trustedOrigins,
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a missing Origin header", () => {
+    expect(isTrustedRequestOrigin(null, requestHost, trustedOrigins)).toBe(
+      false,
+    );
+  });
+
+  it("rejects a malformed Origin header rather than throwing", () => {
+    expect(
+      isTrustedRequestOrigin("not-a-url", requestHost, trustedOrigins),
+    ).toBe(false);
+  });
+
+  it("does not treat a wildcard Host header as a self-trust pattern", () => {
+    // requestHost is untrusted (client-supplied); self-trust must be a
+    // literal comparison, never a wildcard match against it — otherwise a
+    // Host header of "*" would self-trust every Origin.
+    expect(
+      isTrustedRequestOrigin("https://evil.example.com", "*", trustedOrigins),
+    ).toBe(false);
   });
 });
 

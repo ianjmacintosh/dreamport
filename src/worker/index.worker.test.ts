@@ -1095,6 +1095,102 @@ describe("dynamic baseURL (ALLOWED_HOSTS)", () => {
   });
 });
 
+describe("/api/products (#88)", () => {
+  function getProducts(cookie?: string) {
+    return fetchWorker("/api/products", {
+      headers: cookie ? { cookie } : {},
+    });
+  }
+
+  function addProduct(cookie: string, name: string) {
+    return fetchWorker("/api/products", {
+      method: "POST",
+      headers: { ...json, origin: TRUSTED_ORIGIN, cookie },
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  it("rejects a request with no session", async () => {
+    const res = await getProducts();
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Not signed in" });
+  });
+
+  it("rejects an add from an untrusted origin, creating nothing (#88 origin check)", async () => {
+    const cookie = await signIn(TEST_EMAILS.productsInvalidName);
+
+    const res = await fetchWorker("/api/products", {
+      method: "POST",
+      headers: { ...json, origin: "https://evil.example.com", cookie },
+      body: JSON.stringify({ name: "Should not be created" }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(await (await getProducts(cookie)).json()).toEqual({
+      products: [],
+    });
+  });
+
+  it("starts empty, then lists a Product just added", async () => {
+    const cookie = await signIn(TEST_EMAILS.productsAddOne);
+
+    expect(await (await getProducts(cookie)).json()).toEqual({
+      products: [],
+    });
+
+    const created = await addProduct(cookie, "A phone-scale app");
+    expect(created.status).toBe(201);
+    const { product } = (await created.json()) as {
+      product: { id: string; name: string; createdAt: string };
+    };
+    expect(product.name).toBe("A phone-scale app");
+    expect(product.id).toEqual(expect.any(String));
+
+    const listed = await getProducts(cookie);
+    expect(await listed.json()).toEqual({ products: [product] });
+  });
+
+  it("rejects an empty or whitespace-only name, creating nothing", async () => {
+    const cookie = await signIn(TEST_EMAILS.productsInvalidName);
+
+    const blank = await addProduct(cookie, "");
+    expect(blank.status).toBe(400);
+    const whitespace = await addProduct(cookie, "   ");
+    expect(whitespace.status).toBe(400);
+
+    expect(await (await getProducts(cookie)).json()).toEqual({
+      products: [],
+    });
+  });
+
+  it("rejects a name over the length cap, creating nothing", async () => {
+    const cookie = await signIn(TEST_EMAILS.productsInvalidName);
+
+    const tooLong = await addProduct(cookie, "x".repeat(201));
+    expect(tooLong.status).toBe(400);
+
+    expect(await (await getProducts(cookie)).json()).toEqual({
+      products: [],
+    });
+  });
+
+  it("only ever shows a User their own Products, never another User's", async () => {
+    const cookieA = await signIn(TEST_EMAILS.productsOwnerA);
+    const cookieB = await signIn(TEST_EMAILS.productsOwnerB);
+
+    await addProduct(cookieA, "Owner A's Product");
+
+    const asA = (await (await getProducts(cookieA)).json()) as {
+      products: { name: string }[];
+    };
+    expect(asA.products.map((p) => p.name)).toEqual(["Owner A's Product"]);
+
+    const asB = await getProducts(cookieB);
+    expect(await asB.json()).toEqual({ products: [] });
+  });
+});
+
 describe("other /api/* paths", () => {
   it("are owned by the Worker and 404 as JSON", async () => {
     const res = await fetchWorker("/api/does-not-exist");

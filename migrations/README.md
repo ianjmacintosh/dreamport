@@ -26,6 +26,10 @@ confirmation token is a row in the same `verification` table (identifier
 tables — `otpSendThrottle` (per-email limit) and `otpSendDaily` (global
 per-UTC-day send cap) — for the dimensions Better Auth's limiter can't see.
 
+`0003_products.sql` adds the `products` table (issue #88, Products v1 slice
+1): a flat list of Products per User, `userId` cascading on delete the same
+way `session`/`account` do.
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order
