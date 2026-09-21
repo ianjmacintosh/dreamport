@@ -84,6 +84,34 @@ function fetchWithTimeout(
 }
 
 /**
+ * A request that resolves in a handful of milliseconds (typical for local
+ * D1) flips a button's pending state on and back off too fast to read as
+ * anything but a flicker. This runs `fn`, then waits out the rest of
+ * `minMs` before resolving (or rejecting), so a caller that clears its
+ * pending state once this settles gets a real, perceivable window — same UX
+ * reasoning as e.g. a spinner's minimum-display-time convention.
+ *
+ * `Date.now()` stays inside this module-level helper rather than in `App`
+ * itself: the React Compiler's purity check (`react-hooks/purity`) flags an
+ * impure call like `Date.now()` made directly in a component, since it
+ * can't prove the call never happens during render.
+ */
+async function withMinimumDuration<T>(
+  fn: () => Promise<T>,
+  minMs = 400,
+): Promise<T> {
+  const startedAt = Date.now();
+  try {
+    return await fn();
+  } finally {
+    const remaining = minMs - (Date.now() - startedAt);
+    if (remaining > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remaining));
+    }
+  }
+}
+
+/**
  * The first authenticated page: it says who you are, and holds the
  * signed-in User's flat list of Products — add one (#88), see them all,
  * delete one (#89). Account-lifecycle actions (sign out, delete account)
@@ -104,7 +132,9 @@ function fetchWithTimeout(
  * request is in flight, its own button disables and its label changes to a
  * present-participle string ("Adding…"/"Deleting…") — native `disabled`,
  * the same in-flight-pending mechanism `/login`'s submit buttons already
- * use (see docs/adr/0012), not a new convention.
+ * use (see docs/adr/0012), not a new convention — held for a minimum
+ * duration (`ensureMinimumDuration`) so a fast local response doesn't just
+ * flicker the button through its pending state.
  */
 function App() {
   const { email, products: initialProducts } = Route.useRouteContext();
@@ -120,20 +150,22 @@ function App() {
     setError("");
     setIsAdding(true);
     try {
-      const res = await fetchWithTimeout("/api/products", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: productName }),
+      await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout("/api/products", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: productName }),
+        });
+        if (!res.ok) {
+          setError(ADD_PRODUCT_FAILED);
+          return;
+        }
+        const { product } = (await res.json()) as { product: Product };
+        // Reflect the new Product immediately — no full page reload or
+        // refetch needed for a list this size.
+        setProducts((prev) => [...prev, product]);
+        setProductName("");
       });
-      if (!res.ok) {
-        setError(ADD_PRODUCT_FAILED);
-        return;
-      }
-      const { product } = (await res.json()) as { product: Product };
-      // Reflect the new Product immediately — no full page reload or refetch
-      // needed for a list this size.
-      setProducts((prev) => [...prev, product]);
-      setProductName("");
     } catch {
       setError(CONNECTION_FAILED);
     } finally {
@@ -145,16 +177,18 @@ function App() {
     setError("");
     setDeletingId(id);
     try {
-      const res = await fetchWithTimeout(`/api/products/${id}`, {
-        method: "DELETE",
+      await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(`/api/products/${id}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          setError(DELETE_PRODUCT_FAILED);
+          return;
+        }
+        // Reflect the removal immediately — no full page reload or refetch
+        // needed for a list this size, same as `addProduct` above.
+        setProducts((prev) => prev.filter((product) => product.id !== id));
       });
-      if (!res.ok) {
-        setError(DELETE_PRODUCT_FAILED);
-        return;
-      }
-      // Reflect the removal immediately — no full page reload or refetch
-      // needed for a list this size, same as `addProduct` above.
-      setProducts((prev) => prev.filter((product) => product.id !== id));
     } catch {
       setError(CONNECTION_FAILED);
     } finally {
