@@ -170,6 +170,9 @@ export const TEST_EMAILS = {
   /** Products v1 (#89 follow-up): a near-instant delete still holds the pending row for the minimum duration. */
   e2eDeleteProductMinDuration:
     "delivered+e2e-delete-product-min-duration+e2e-test@resend.dev",
+  /** Products v1 slice 3 (#90): clicking Delete reveals Confirm/Cancel; Cancel backs out without deleting. */
+  e2eDeleteProductReveal:
+    "delivered+e2e-delete-product-reveal+e2e-test@resend.dev",
   /**
    * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
    * against a real deployed environment. Deliberately NOT a `+e2e-test@`

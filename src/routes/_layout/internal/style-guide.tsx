@@ -125,6 +125,7 @@ function StyleGuide() {
         <a href="#button-group">Button group</a>
         <a href="#text-inputs">Text inputs</a>
         <a href="#field-row">Field with action</a>
+        <a href="#product-row">Row with action</a>
         <a href="#turnstile-container">Turnstile container</a>
         <a href="#form-shell">Form shell</a>
         <a href="#spacing">Spacing</a>
@@ -353,6 +354,38 @@ function StyleGuide() {
           not eyeballed (docs/adr/0012). It's for a single field with a single
           action — for two or more buttons with no field attached, use{" "}
           <code>.button-group</code> above instead.
+        </p>
+      </Section>
+
+      <Section id="product-row" label="Row with action">
+        <div className="sg-product-row-demo">
+          <div className="product-list">
+            <div className="product-row">
+              <span className="product-row-name">A phone-scale app</span>
+              <div className="product-row-action">
+                <Button variant="secondary">Delete</Button>
+              </div>
+            </div>
+            <div className="product-row">
+              <span className="product-row-name">
+                A longer name to prove the action column still lines up
+              </span>
+              <div className="product-row-action">
+                <Button variant="secondary">Delete</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <Snippet
+          code={`<div className="product-list">\n  <div className="product-row">\n    <span className="product-row-name">A phone-scale app</span>\n    <div className="product-row-action">\n      <Button>Delete</Button>\n    </div>\n  </div>\n</div>`}
+        />
+        <p className="sg-note">
+          Use <code>.product-list</code>/<code>.product-row</code> for a plain
+          display value with one action attached (e.g. a Product's name + its
+          Delete button) — instead of <code>.field-row</code> above, which is
+          for a labelled input paired with one action, not a display row. Every
+          row's action lines up in the same column regardless of how long its
+          name runs.
         </p>
       </Section>
 

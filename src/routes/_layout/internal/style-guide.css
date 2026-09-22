@@ -185,6 +185,13 @@
   margin-bottom: var(--space-3);
 }
 
+/* ── Row with action ── */
+
+.sg-product-row-demo {
+  max-width: 480px;
+  margin-bottom: var(--space-3);
+}
+
 /* ── Turnstile container ── */
 /* .turnstile-container itself is a plain, borderless box in production —
    this outline exists only so the demo shows the space it reserves. */

@@ -3,9 +3,10 @@ import { test, expect, type Page } from "@playwright/test";
 import { TEST_EMAILS } from "../test/emails";
 
 // Products v1: sign in, add a Product, see it in the list without a full
-// page reload (slice 1, issue #88), and delete one (slice 2, issue #89).
-// Signs in the same way `login.spec.ts` does (fixed `+e2e-test@` code, see
-// docs/adr/0009) — see that file's header comment for why.
+// page reload (slice 1, issue #88), delete one (slice 2, issue #89), behind
+// a per-row Confirm/Cancel reveal (slice 3, issue #90). Signs in the same
+// way `login.spec.ts` does (fixed `+e2e-test@` code, see docs/adr/0009) —
+// see that file's header comment for why.
 
 /** Give this spec its own per-IP send-OTP bucket, same reasoning as `login.spec.ts`. */
 let sendBucket = 0;
@@ -100,8 +101,34 @@ test("sign in, add a Product, delete it, and confirm it's gone", async ({
 
   const row = page.getByText(productName).locator("..");
   await row.getByRole("button", { name: "Delete" }).click();
+  await row.getByRole("button", { name: "Confirm" }).click();
 
   await expect(page.getByText(productName)).not.toBeVisible();
+});
+
+test("clicking Delete reveals Confirm/Cancel without deleting, and Cancel backs out", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eDeleteProductReveal;
+  const productName = `A not-actually-deleted Product ${Date.now()}`;
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await expect(page.getByText(productName)).toBeVisible();
+
+  const row = page.getByText(productName).locator("..");
+  await row.getByRole("button", { name: "Delete" }).click();
+
+  await expect(row.getByRole("button", { name: "Confirm" })).toBeVisible();
+  await expect(row.getByRole("button", { name: "Cancel" })).toBeVisible();
+  await expect(row.getByRole("button", { name: "Delete" })).not.toBeVisible();
+
+  await row.getByRole("button", { name: "Cancel" }).click();
+
+  await expect(row.getByRole("button", { name: "Delete" })).toBeVisible();
+  await expect(page.getByText(productName)).toBeVisible();
 });
 
 test("the Delete button disables and relabels while the request is in flight", async ({
@@ -127,6 +154,7 @@ test("the Delete button disables and relabels while the request is in flight", a
 
   const row = page.getByText(productName).locator("..");
   await row.getByRole("button", { name: "Delete" }).click();
+  await row.getByRole("button", { name: "Confirm" }).click();
 
   await expect(row.getByRole("button", { name: "Deleting…" })).toBeDisabled();
   await expect(page.getByText(productName)).not.toBeVisible({
@@ -152,6 +180,7 @@ test("even a near-instant delete holds the pending row for a minimum duration", 
   // settled, before app.tsx's minimum-duration floor had actually elapsed.
   const row = page.getByText(productName).locator("..");
   await row.getByRole("button", { name: "Delete" }).click();
+  await row.getByRole("button", { name: "Confirm" }).click();
 
   await page.waitForTimeout(200);
   await expect(row.getByRole("button", { name: "Deleting…" })).toBeVisible();

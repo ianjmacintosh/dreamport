@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
-import Link from "../../components/Link";
 import TextInput from "../../components/TextInput";
 
 /** A Product as `/api/products` returns it (see `src/worker/products.ts`). */
@@ -19,39 +18,25 @@ interface Product {
  */
 const PRODUCT_NAME_MAX_LENGTH = 200;
 
-export const Route = createFileRoute("/_layout/app")({
-  beforeLoad: async () => {
-    // `/api/me` and `/api/products` (issue #88) are both gated only by the
-    // session cookie, independent of each other's result, so they go out in
-    // parallel rather than one after the other.
-    const [meRes, productsRes] = await Promise.all([
-      fetch("/api/me").catch(() => null),
-      fetch("/api/products").catch(() => null),
-    ]);
-
-    // Client-side route guard — a UX affordance only. `/api/me` verifies the
-    // session against the database on its own, so this redirect is never the
-    // security boundary. Anything short of a clean 200 (no session, offline,
-    // a transient error) bounces to `/login` rather than a dead-end error
-    // screen; a proper retry/error state is deferred to #28.
-    //
-    // TanStack Router's authenticated-routes guide runs the check here in
-    // `beforeLoad` and threads the result through route `context`.
-    if (!meRes || !meRes.ok) {
-      throw redirect({ to: "/login" });
-    }
-
-    const { email } = (await meRes.json()) as { email: string };
-
-    // A failed products fetch just starts the page with an empty list rather
-    // than bouncing back to `/login` — the session itself is already proven
-    // valid by the `/api/me` check above.
+export const Route = createFileRoute("/_appShell/app")({
+  beforeLoad: async ({ context }) => {
+    // The `/api/me` session guard and the signed-in email now live on the
+    // parent `_appShell` layout (#90) — both `/app` and `/app/settings`
+    // needed that same check, and `AppNav` needs the email either way. The
+    // products fetch itself is *started* by the parent too (see its own
+    // comment) so it still runs concurrently with `/api/me` instead of
+    // waiting behind it — this just awaits the pending promise handed down
+    // through context rather than firing its own request. A failed fetch
+    // just starts the page with an empty list rather than bouncing back to
+    // `/login` — the session itself is already proven valid by the parent's
+    // own check.
+    const productsRes = await context.productsPromise;
     const products =
       productsRes && productsRes.ok
         ? ((await productsRes.json()) as { products: Product[] }).products
         : [];
 
-    return { email, products };
+    return { products };
   },
   component: App,
 });
@@ -111,20 +96,19 @@ async function withMinimumDuration<T>(
 }
 
 /**
- * The first authenticated page: it says who you are, and holds the
- * signed-in User's flat list of Products — add one (#88), see them all,
- * delete one (#89). Account-lifecycle actions (sign out, delete account)
- * live on their own page, `/app/settings`, linked from here rather than
- * mixed in — this page is about the Products, not account management.
+ * The first authenticated page: holds the signed-in User's flat list of
+ * Products — add one (#88), see them all, delete one (#89). Who's signed in
+ * and account-lifecycle actions (sign out, delete account) live in `AppNav`
+ * and on its own page, `/app/settings` — this page is about the Products,
+ * not account management.
  *
- * Composed from `TextInput` / `Button` / `Link` plus heading/paragraph
- * primitives in plain document order: no page-specific CSS, no card
- * treatment or empty-state design for the list, no confirmation/undo on
- * delete (all of that is the design/polish pass, #90). The add-Product field
- * and its button sit in `.field-row` — the same side-by-side
- * single-field-plus-button primitive `/login`'s email step uses — rather
- * than stacked; the per-row delete `Button` isn't a `.field-row` (that
- * pattern is for an input+action pair, not a display row with an action).
+ * Composed from `TextInput` / `Button` plus heading/paragraph primitives in
+ * plain document order: no card treatment or empty-state design for the
+ * list. The add-Product field and its button sit in `.field-row` — the same
+ * side-by-side single-field-plus-button primitive `/login`'s email step
+ * uses — rather than stacked; each row's name and Delete action sit in
+ * `.product-row` (#90) instead, a display row with an action rather than an
+ * input paired with one.
  *
  * A failed add-Product or delete surfaces a bare line of error text —
  * enough that a backend-down request doesn't look like it worked. While a
@@ -133,17 +117,22 @@ async function withMinimumDuration<T>(
  * the same in-flight-pending mechanism `/login`'s submit buttons already
  * use (see docs/adr/0012), not a new convention — held for a minimum
  * duration (`ensureMinimumDuration`) so a fast local response doesn't just
- * flicker the button through its pending state.
+ * flicker the button through its pending state. Delete itself is a two-step
+ * inline reveal (#90, Q7) — the same resting/confirming shape
+ * `/app/settings`'s delete-account flow already uses, just per-row instead
+ * of page-level, since a Product list can hold more than one row at a time.
  */
 function App() {
-  const { email, products: initialProducts } = Route.useRouteContext();
+  const { products: initialProducts } = Route.useRouteContext();
   const [error, setError] = useState("");
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [productName, setProductName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
-  // Only ever one row's delete in flight at a time — no bulk delete (#89) —
-  // so a single id (rather than a set) is enough to track it.
+  // Only ever one row's delete in flight, and one row confirming, at a time
+  // — no bulk delete (#89) — so a single id each (rather than a set) is
+  // enough to track them.
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   async function addProduct() {
     setError("");
@@ -174,6 +163,7 @@ function App() {
 
   async function deleteProduct(id: string) {
     setError("");
+    setConfirmingId(null);
     setDeletingId(id);
     try {
       // The row itself carries the pending button, so removing it has to
@@ -201,9 +191,7 @@ function App() {
 
   return (
     <>
-      <p>signed in as {email}</p>
-
-      <h2>Products</h2>
+      <h1>Products</h1>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -227,24 +215,40 @@ function App() {
       {products.length === 0 ? (
         <p>No products yet.</p>
       ) : (
-        products.map((product) => (
-          <p key={product.id}>
-            {product.name}{" "}
-            <Button
-              disabled={deletingId === product.id}
-              onClick={() => void deleteProduct(product.id)}
-            >
-              {deletingId === product.id ? "Deleting…" : "Delete"}
-            </Button>
-          </p>
-        ))
+        <div className="product-list">
+          {products.map((product) => (
+            <div className="product-row" key={product.id}>
+              <span className="product-row-name">{product.name}</span>
+              <div className="product-row-action">
+                {deletingId === product.id ? (
+                  <Button disabled>Deleting…</Button>
+                ) : confirmingId === product.id ? (
+                  <div className="button-group">
+                    <Button onClick={() => void deleteProduct(product.id)}>
+                      Confirm
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setConfirmingId(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setConfirmingId(product.id)}
+                  >
+                    Delete
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {error && <p role="alert">{error}</p>}
-
-      <p>
-        <Link href="/app/settings">Settings</Link>
-      </p>
     </>
   );
 }

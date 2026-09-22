@@ -83,7 +83,8 @@ test("happy path: email, then code, then /app shows the signed-in email", async 
 
   await signIn(page, email);
 
-  await expect(page.getByText(`signed in as ${email}`)).toBeVisible();
+  // The signed-in email lives in AppNav (#90), not on the page itself.
+  await expect(page.getByText(email)).toBeVisible();
 });
 
 test("the sign-in page presents a bot challenge on the email step", async ({
@@ -154,7 +155,7 @@ test("persistent session: a return visit to /app stays signed in", async ({
 
   await page.goto("/app");
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByText(`signed in as ${email}`)).toBeVisible();
+  await expect(page.getByText(email)).toBeVisible();
 });
 
 test("sign out from /app/settings returns to the homepage and forgets the session", async ({
@@ -164,7 +165,9 @@ test("sign out from /app/settings returns to the homepage and forgets the sessio
 
   await page.getByRole("link", { name: "Settings" }).click();
   await expect(page).toHaveURL(/\/app\/settings$/);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  // Log out lives in AppNav (#90) — present on every signed-in page,
+  // including this one, rather than a page-local "Sign out" button.
+  await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL(/localhost:\d+\/$/);
 
   // A later /app visit has no session to fall back on.

@@ -235,6 +235,34 @@ a.button {
   align-self: stretch;
 }
 
+/* A display row with an action attached (e.g. a Product's name + its
+   Delete button, #90) — not `.field-row` above, which is for an input
+   paired with one action, not a plain display value. Grid per AGENTS.md's
+   rule that structural layout is Grid, not Flexbox. Same `display: contents`
+   technique `.field-row` uses on `.input-group`: each `.product-row` is
+   `display: contents` so its own children (the name, the action) place
+   directly into this shared grid instead of as one opaque item each — that
+   sharing is what lines every row's action up in the same column, since a
+   `.product-row` sized on its own would size its "auto" column from just
+   that row's own content. */
+.product-list {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: var(--space-2);
+}
+
+.product-row {
+  display: contents;
+}
+
+.product-row-name {
+  grid-column: 1;
+}
+
+.product-row-action {
+  grid-column: 2;
+}
+
 /* Reserves the Turnstile widget's footprint before it loads, so the
    challenge popping in doesn't shift the submit button down mid-
    interaction. Fixed height, not min-height — Cloudflare's own widget
@@ -333,4 +361,36 @@ a.button {
   font-size: var(--text-sm);
   color: var(--color-text-on-surface);
   margin-bottom: 0;
+}
+
+/* ── Primitives: signed-in app nav ───────────────────────── */
+/* Same 3-column breakout grid as .header/.footer so the content column
+   lines up with <main> — the signed-in equivalent of .header, shown
+   instead of it on every page under the `_appShell` layout (#90). A
+   background/border like .footer's, not bare like .header's, since this
+   bar isn't at the very top of the page the way a marketing header is. */
+
+.app-nav {
+  display: grid;
+  grid-template-columns: 1fr var(--page-width) 1fr;
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-nav-content {
+  grid-column: 2;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: end;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+}
+
+.app-nav-email {
+  /* Pins the email to the left, opposite the Settings/Log out pair, without
+     a third grid track — the auto-flow column items after it already sit
+     flush right via `.app-nav-content`'s own `justify-content: end`. */
+  margin-right: auto;
+  color: var(--color-text-on-surface);
 }
