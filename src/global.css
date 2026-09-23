@@ -175,6 +175,29 @@ a.button {
   cursor: not-allowed;
 }
 
+/* ── Primitives: stable-width button label ─────────────────── */
+/* A button whose label swaps between states (e.g. "Send code" ->
+   "Sending…") resizing along with the swap reads as a jump, not a state
+   change (#90). Stacking every possible label in the same Grid cell (all
+   sharing `grid-area: 1 / 1`) makes the button's own intrinsic width
+   always as wide as its widest label, so toggling which one is visible
+   never resizes it — `visibility: hidden` on the inactive ones (not
+   `display: none`) is what keeps them counted toward the grid's sizing
+   while also pulling them out of the accessibility tree, so only the
+   active label is ever announced. */
+.button-label-stack {
+  display: grid;
+}
+
+.button-label-stack > * {
+  grid-area: 1 / 1;
+  visibility: hidden;
+}
+
+.button-label-stack > [data-active="true"] {
+  visibility: visible;
+}
+
 /* ── Primitives: narrow single-column form layout ─────────── */
 /* Centred column for short forms (e.g. sign-in) — CSS Grid per AGENTS.md's
    rule that structural layout is Grid, not Flexbox. The grid's own `gap`
@@ -233,6 +256,73 @@ a.button {
 .field-row > .button {
   grid-area: button;
   align-self: stretch;
+}
+
+/* Below 640px (--breakpoint-sm in tokens.css — see that token's own
+   comment for why the value is repeated here rather than read from it),
+   the button's own auto column was sized off its widest label ("Verifying
+   you're human…" on `/login`) and squeezed the input column down to
+   near-zero (#90). Stacking label/input/button into one column instead —
+   full width, in reading order — gives the input the whole row back. */
+@media (max-width: 640px) {
+  .field-row {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "label"
+      "input"
+      "button";
+    row-gap: var(--space-2);
+  }
+
+  .field-row > .button {
+    justify-self: stretch;
+  }
+}
+
+/* A display row with an action attached (e.g. a Product's name + its
+   Delete button, #90) — not `.field-row` above, which is for an input
+   paired with one action, not a plain display value. `.product-list` is a
+   real `<ul>` and `.product-row` a real `<li>` — a Product list is a list,
+   and a plain `<div>` stack here would leave assistive tech with no way to
+   tell a screen-reader user how many Products there are or that they're
+   looking at a list at all. Grid per AGENTS.md's rule that structural
+   layout is Grid, not Flexbox — same `display: contents` technique
+   `.field-row` uses on `.input-group`: each `.product-row` is
+   `display: contents` so its own children (the name, the action) place
+   directly into this shared grid instead of as one opaque item each — that
+   sharing is what lines every row's action up in the same column, since a
+   `.product-row` sized on its own would size its "auto" column from just
+   that row's own content. `display: contents` on an `<li>` drops its box
+   but not the element itself, so its list-item semantics survive into the
+   accessibility tree even though `list-style`/padding below have nothing
+   left to render against. */
+.product-list {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: var(--space-2);
+  list-style: none;
+  padding: 0;
+}
+
+.product-row {
+  display: contents;
+}
+
+.product-row-name {
+  grid-column: 1;
+}
+
+.product-row-action {
+  grid-column: 2;
+  /* A grid item defaults to `stretch`, so this filled the "auto" column's
+     full width whenever another row's Confirm/Cancel pair widened it — and
+     a plain `<div>`'s content stays left-aligned inside that wider box,
+     which read as every other row's Delete button drifting left instead of
+     staying pinned to the column's right edge (#90 follow-up). `end` makes
+     this box shrink to its own content and hug that edge instead, so the
+     column widening never moves anything but the row that's actually
+     confirming. */
+  justify-self: end;
 }
 
 /* Reserves the Turnstile widget's footprint before it loads, so the
@@ -333,4 +423,48 @@ a.button {
   font-size: var(--text-sm);
   color: var(--color-text-on-surface);
   margin-bottom: 0;
+}
+
+/* ── Primitives: signed-in app nav ───────────────────────── */
+/* Same 3-column breakout grid as .header/.footer so the content column
+   lines up with <main> — the signed-in equivalent of .header, shown
+   instead of it on every page under the `_appShell` layout (#90). A
+   background/border like .footer's, not bare like .header's, since this
+   bar isn't at the very top of the page the way a marketing header is. */
+
+.app-nav {
+  display: grid;
+  grid-template-columns: 1fr var(--page-width) 1fr;
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-nav-content {
+  grid-column: 2;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: end;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+}
+
+.app-nav-email {
+  /* Pins the email to the left, opposite the Settings/Log out pair, without
+     a third grid track — the auto-flow column items after it already sit
+     flush right via `.app-nav-content`'s own `justify-content: end`. */
+  margin-right: auto;
+  color: var(--color-text-on-surface);
+}
+
+/* Below 640px (--breakpoint-sm in tokens.css) the full address ran the nav
+   out of room and wrapped/crowded Settings and Log out (#90). No dropdown
+   variant exists yet to tuck it behind, so it's dropped entirely on small
+   screens rather than truncated or wrapped — `/app/settings` shows the
+   same address on its own page (see that route), so it's never fully
+   unreachable. */
+@media (max-width: 640px) {
+  .app-nav-email {
+    display: none;
+  }
 }

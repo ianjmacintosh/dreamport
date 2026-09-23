@@ -46,7 +46,7 @@ feels wrong in either direction.
   instant backend. That's a deliberate trade of perceived responsiveness
   for a readable state change, not an oversight.
 - Any future button adopting the ADR-0012 pending pattern should route its
-  async work through `withMinimumDuration` (`src/routes/_layout/app.tsx`)
+  async work through `withMinimumDuration` (`src/routes/_appShell/app.tsx`)
   from the start, with any element-removal/replacement deferred until it
   resolves — not bolted on after a flicker is reported again.
 

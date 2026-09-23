@@ -1,10 +1,5 @@
 import { useState } from "react";
-import {
-  createFileRoute,
-  redirect,
-  useNavigate,
-  useRouter,
-} from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
 import Link from "../../components/Link";
@@ -18,22 +13,13 @@ import { authClient } from "../../utils/auth-client";
 // trailing underscore on `app_` is the documented escape hatch: same
 // `/app/settings` path, but a sibling of `/app` rather than its child. See
 // https://tanstack.com/router/latest/docs/framework/react/routing/file-naming-conventions#non-nested-routes
-export const Route = createFileRoute("/_layout/app_/settings")({
-  beforeLoad: async () => {
-    // Same client-side route guard as `/app` — a UX affordance only, never
-    // the security boundary (see that route's own comment).
-    const res = await fetch("/api/me").catch(() => null);
-    if (!res || !res.ok) {
-      throw redirect({ to: "/login" });
-    }
-  },
+export const Route = createFileRoute("/_appShell/app_/settings")({
   component: Settings,
 });
 
 /** Which state the delete-account control is in. */
 type DeleteStep = "resting" | "confirming" | "sent";
 
-const SIGN_OUT_FAILED = "We couldn't sign you out. Try again in a moment.";
 const DELETE_REQUEST_FAILED =
   "We couldn't start account deletion. Try again in a few minutes.";
 const CONNECTION_FAILED =
@@ -42,7 +28,9 @@ const CONNECTION_FAILED =
 /**
  * Account-lifecycle actions from issue #26 — sign out, and delete account —
  * split off `/app` onto their own page so `/app` stays about the Products
- * list, not account management.
+ * list, not account management. Sign out itself moved on to `AppNav` (#90)
+ * — every signed-in page carries that action now, not just this one — so
+ * this page is delete-account only.
  *
  * Composed from `Button`/`Link` plus heading/paragraph primitives in plain
  * document order: no page-specific CSS, no confirm-dialog or "danger zone"
@@ -51,34 +39,18 @@ const CONNECTION_FAILED =
  * click can't start an irreversible flow; the emailed link is the real
  * confirmation.
  *
- * A failed sign-out or deletion request surfaces a bare line of error text —
- * enough that a throttled (429) or backend-down request doesn't look like it
- * worked. The styled error treatment and button loading states are #90 for
- * this page.
+ * A failed deletion request surfaces a bare line of error text — enough
+ * that a throttled (429) or backend-down request doesn't look like it
+ * worked.
+ *
+ * Shows the signed-in email itself, too (#90) — `AppNav`'s own copy hides
+ * below 640px (no dropdown variant exists yet to tuck it behind), so this
+ * page is where a narrow-screen visitor can still find their address.
  */
 function Settings() {
-  const navigate = useNavigate();
-  const router = useRouter();
+  const { email } = Route.useRouteContext();
   const [deleteStep, setDeleteStep] = useState<DeleteStep>("resting");
   const [error, setError] = useState("");
-
-  async function signOut() {
-    setError("");
-    try {
-      const { error } = await authClient.signOut();
-      if (error) {
-        setError(SIGN_OUT_FAILED);
-        return;
-      }
-      // `/` is the genuine signed-out state (the homepage has its own way into
-      // `/login` since #50). Invalidate first so no stale route context keeps
-      // rendering a signed-in view.
-      void router.invalidate();
-      void navigate({ to: "/" });
-    } catch {
-      setError(CONNECTION_FAILED);
-    }
-  }
 
   async function requestDeletion() {
     setError("");
@@ -98,9 +70,7 @@ function Settings() {
   return (
     <>
       <h1>Settings</h1>
-
-      <h2>Sign out</h2>
-      <Button onClick={() => void signOut()}>Sign out</Button>
+      <p>Signed in as {email}</p>
 
       <h2>Delete account</h2>
       {deleteStep === "resting" && (

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
 import Button from "../../../components/Button";
@@ -101,6 +102,25 @@ const SPACING = [
   "--space-10",
 ];
 
+function ButtonLabelStackDemo() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  return (
+    <div className="sg-button-label-stack-demo">
+      <Button
+        disabled={isSubmitting}
+        state={isSubmitting ? "pending" : "ready"}
+        onClick={() => {
+          setIsSubmitting(true);
+          setTimeout(() => setIsSubmitting(false), 1200);
+        }}
+      >
+        <Button.State name="ready">Send code</Button.State>
+        <Button.State name="pending">Sending…</Button.State>
+      </Button>
+    </div>
+  );
+}
+
 function StyleGuide() {
   return (
     <div id="top">
@@ -122,9 +142,11 @@ function StyleGuide() {
         <a href="#body-text">Body text</a>
         <a href="#links">Links</a>
         <a href="#buttons">Buttons</a>
+        <a href="#button-label-stack">Button label stack</a>
         <a href="#button-group">Button group</a>
         <a href="#text-inputs">Text inputs</a>
         <a href="#field-row">Field with action</a>
+        <a href="#product-row">Row with action</a>
         <a href="#turnstile-container">Turnstile container</a>
         <a href="#form-shell">Form shell</a>
         <a href="#spacing">Spacing</a>
@@ -296,6 +318,32 @@ function StyleGuide() {
         </p>
       </Section>
 
+      <Section id="button-label-stack" label="Button label stack">
+        <ButtonLabelStackDemo />
+        <Snippet
+          code={`<Button disabled={isSubmitting} state={isSubmitting ? "pending" : "ready"}>\n  <Button.State name="ready">Send code</Button.State>\n  <Button.State name="pending">Sending…</Button.State>\n</Button>`}
+        />
+        <p className="sg-note">
+          Pass <code>state</code> plus one{" "}
+          <code>&lt;Button.State name="..."&gt;</code> per state instead of a
+          plain <code>children</code> node whenever a button's own label swaps
+          at runtime (e.g. ready → pending, or a future submitted state) —{" "}
+          <code>&lt;Button&gt;</code> renders every state at once, stacked in
+          the same Grid cell via <code>.button-label-stack</code> (global.css),
+          so the button's intrinsic width is always as wide as its widest state
+          and changing
+          <code>state</code> never resizes it. Click the button above to see the
+          label change without a size change. A named state per{" "}
+          <code>Button.State</code>, not a <code>readyLabel</code>/
+          <code>pendingLabel</code>-style prop pair, is what lets a third state
+          (e.g. "Sent!") get added later without changing <code>Button</code>'s
+          own props — each one can also hold any content, not just a string.
+          Every state except the active one is pulled out of the accessibility
+          tree by <code>visibility: hidden</code>, not just hidden visually, so
+          only the active one is ever announced.
+        </p>
+      </Section>
+
       <Section id="button-group" label="Button group">
         <div className="sg-button-group-demo">
           <div className="button-group">
@@ -352,7 +400,45 @@ function StyleGuide() {
           own top and bottom edges, not the label — verified pixel-for-pixel,
           not eyeballed (docs/adr/0012). It's for a single field with a single
           action — for two or more buttons with no field attached, use{" "}
-          <code>.button-group</code> above instead.
+          <code>.button-group</code> above instead. Below 640px (
+          <code>--breakpoint-sm</code>) it stacks to a single column instead — a
+          button's own widest label (e.g. "Verifying you're human…") was
+          squeezing the input down to almost nothing on a narrow screen
+          otherwise (#90); resize the window to see it.
+        </p>
+      </Section>
+
+      <Section id="product-row" label="Row with action">
+        <div className="sg-product-row-demo">
+          <ul className="product-list">
+            <li className="product-row">
+              <span className="product-row-name">A phone-scale app</span>
+              <div className="product-row-action">
+                <Button variant="secondary">Delete</Button>
+              </div>
+            </li>
+            <li className="product-row">
+              <span className="product-row-name">
+                A longer name to prove the action column still lines up
+              </span>
+              <div className="product-row-action">
+                <Button variant="secondary">Delete</Button>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <Snippet
+          code={`<ul className="product-list">\n  <li className="product-row">\n    <span className="product-row-name">A phone-scale app</span>\n    <div className="product-row-action">\n      <Button>Delete</Button>\n    </div>\n  </li>\n</ul>`}
+        />
+        <p className="sg-note">
+          Use <code>.product-list</code>/<code>.product-row</code> for a plain
+          display value with one action attached (e.g. a Product's name + its
+          Delete button) — instead of <code>.field-row</code> above, which is
+          for a labelled input paired with one action, not a display row. Every
+          row's action lines up in the same column regardless of how long its
+          name runs. A real <code>&lt;ul&gt;</code>/<code>&lt;li&gt;</code>, not
+          a stack of <code>&lt;div&gt;</code>s — a list of Products is a list,
+          and assistive tech needs the actual markup to announce it as one.
         </p>
       </Section>
 
