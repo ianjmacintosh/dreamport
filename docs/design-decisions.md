@@ -33,3 +33,17 @@ Add an entry only once a sign-off conversation resolves something repeatable
   element itself (e.g. the row a delete button lives in) waits until after
   that minimum duration resolves, not before. See docs/adr/0013 (decided
   in #89).
+
+- A signed-in page (e.g. `/app`, `/app/settings`) renders inside the
+  `_appShell` layout — `AppNav` (email, a Settings link, Log out) plus the
+  usual `Footer` — not the marketing `Header`/`_withFooter`. `Header` stays
+  signed-out-only; it has no concept of a session. See
+  `src/routes/_appShell.tsx` and `src/components/AppNav` (decided in #90).
+
+- A destructive, irreversible action (delete account, delete a Product)
+  uses a two-step reveal in place — resting state shows the action itself
+  ("Delete"); clicking it swaps that control for "Confirm"/"Cancel" rather
+  than performing the action — instead of a modal/dialog. A stray click
+  can't trigger the irreversible step, and no dialog component is needed.
+  Decided for delete-account in #26, reaffirmed generally (one confirming
+  state per row, not just per page) for Product delete in #90.
