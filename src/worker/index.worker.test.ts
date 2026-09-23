@@ -1264,6 +1264,135 @@ describe("DELETE /api/products/:id (#89)", () => {
   });
 });
 
+/** Shared by the Ideas describe block below. */
+function getIdeas(productId: string, cookie?: string) {
+  return fetchWorker(`/api/products/${productId}/ideas`, {
+    headers: cookie ? { cookie } : {},
+  });
+}
+
+/** Shared by the Ideas describe block below. */
+function addIdea(productId: string, cookie: string, name: string) {
+  return fetchWorker(`/api/products/${productId}/ideas`, {
+    method: "POST",
+    headers: { ...json, origin: TRUSTED_ORIGIN, cookie },
+    body: JSON.stringify({ name }),
+  });
+}
+
+describe("/api/products/:productId/ideas (#99)", () => {
+  it("rejects a request with no session", async () => {
+    const res = await getIdeas("some-id");
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Not signed in" });
+  });
+
+  it("starts empty, then lists an Idea just added, alongside its Product", async () => {
+    const cookie = await signIn(TEST_EMAILS.ideasAddOne);
+    const created = await addProduct(cookie, "A phone-scale app");
+    const { product } = (await created.json()) as {
+      product: { id: string; name: string; createdAt: string };
+    };
+
+    expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+      product,
+      ideas: [],
+    });
+
+    const createdIdea = await addIdea(product.id, cookie, "Dark mode");
+    expect(createdIdea.status).toBe(201);
+    const { idea } = (await createdIdea.json()) as {
+      idea: { id: string; name: string; createdAt: string };
+    };
+    expect(idea.name).toBe("Dark mode");
+    expect(idea.id).toEqual(expect.any(String));
+
+    expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+      product,
+      ideas: [idea],
+    });
+  });
+
+  it("rejects an add from an untrusted origin, creating nothing", async () => {
+    const cookie = await signIn(TEST_EMAILS.ideasInvalidName);
+    const created = await addProduct(cookie, "Untrusted-origin Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    const res = await fetchWorker(`/api/products/${product.id}/ideas`, {
+      method: "POST",
+      headers: { ...json, origin: "https://evil.example.com", cookie },
+      body: JSON.stringify({ name: "Should not be created" }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+      product,
+      ideas: [],
+    });
+  });
+
+  it("rejects an empty or whitespace-only name, creating nothing", async () => {
+    const cookie = await signIn(TEST_EMAILS.ideasInvalidName);
+    const created = await addProduct(cookie, "Invalid-name Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    const blank = await addIdea(product.id, cookie, "");
+    expect(blank.status).toBe(400);
+    const whitespace = await addIdea(product.id, cookie, "   ");
+    expect(whitespace.status).toBe(400);
+
+    expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+      product,
+      ideas: [],
+    });
+  });
+
+  it("rejects a name over the length cap, creating nothing", async () => {
+    const cookie = await signIn(TEST_EMAILS.ideasInvalidName);
+    const created = await addProduct(cookie, "Too-long-name Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    const tooLong = await addIdea(product.id, cookie, "x".repeat(201));
+    expect(tooLong.status).toBe(400);
+
+    expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+      product,
+      ideas: [],
+    });
+  });
+
+  it("404s a stranger's request against another User's Product, never listing its Ideas", async () => {
+    const cookieA = await signIn(TEST_EMAILS.ideasOwnerA);
+    const cookieB = await signIn(TEST_EMAILS.ideasOwnerB);
+    const created = await addProduct(cookieA, "Owner A's Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+    await addIdea(product.id, cookieA, "Owner A's Idea");
+
+    const listRes = await getIdeas(product.id, cookieB);
+    expect(listRes.status).toBe(404);
+    expect(await listRes.json()).toEqual({ error: "Not found" });
+
+    const postRes = await addIdea(product.id, cookieB, "Should not be created");
+    expect(postRes.status).toBe(404);
+    expect(await postRes.json()).toEqual({ error: "Not found" });
+
+    const asA = (await (await getIdeas(product.id, cookieA)).json()) as {
+      ideas: { name: string }[];
+    };
+    expect(asA.ideas.map((i) => i.name)).toEqual(["Owner A's Idea"]);
+  });
+
+  it("404s a nonexistent productId, never a 403", async () => {
+    const cookie = await signIn(TEST_EMAILS.ideasOwnerA);
+
+    const res = await getIdeas("not-a-real-id", cookie);
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Not found" });
+  });
+});
+
 describe("other /api/* paths", () => {
   it("are owned by the Worker and 404 as JSON", async () => {
     const res = await fetchWorker("/api/does-not-exist");

@@ -20,9 +20,11 @@ import {
 import {
   createProduct,
   deleteProduct,
+  getProduct,
   listProducts,
   PRODUCT_NAME_MAX_LENGTH,
 } from "./products";
+import { createIdea, IDEA_NAME_MAX_LENGTH, listIdeas } from "./ideas";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
 /**
@@ -355,6 +357,80 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     return c.json({}, 200);
+  });
+
+  /**
+   * Ideas v1 slice 1 (issue #99): a Product's own flat list of Ideas.
+   * Session-gated the same way `/api/products` is, plus an ownership check:
+   * `getProduct` scopes by both `productId` and `session.user.id`, so a
+   * `:productId` that exists but isn't the caller's own reads identically to
+   * one that doesn't exist at all — always 404, never 403. Bundles the
+   * Product's own `{ id, name, createdAt }` into the response rather than a
+   * separate endpoint, since the page needs the Product's name for its
+   * heading and the ownership check already has the row in hand.
+   */
+  app.get("/api/products/:productId/ideas", async (c) => {
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const ideas = await listIdeas(c.env.DB, product.id);
+    return c.json({ product, ideas });
+  });
+
+  app.post("/api/products/:productId/ideas", async (c) => {
+    // Same origin check `POST /api/products` already does — this route
+    // creates rows and sits outside `auth.handler` too.
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const body = await c.req.json().catch(() => null);
+    const name =
+      body && typeof body === "object" && typeof body.name === "string"
+        ? body.name.trim()
+        : "";
+    if (!name) {
+      return c.json({ error: "name is required" }, 400);
+    }
+    if (name.length > IDEA_NAME_MAX_LENGTH) {
+      return c.json(
+        { error: `name must be ${IDEA_NAME_MAX_LENGTH} characters or fewer` },
+        400,
+      );
+    }
+
+    const idea = await createIdea(c.env.DB, product.id, name);
+    return c.json({ idea }, 201);
   });
 
   /**

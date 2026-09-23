@@ -30,6 +30,10 @@ per-UTC-day send cap) — for the dimensions Better Auth's limiter can't see.
 1): a flat list of Products per User, `userId` cascading on delete the same
 way `session`/`account` do.
 
+`0004_ideas.sql` adds the `ideas` table (issue #99, Ideas v1 slice 1): a flat
+list of Ideas per Product, `productId` cascading on delete the same way
+`products.userId` does.
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order
