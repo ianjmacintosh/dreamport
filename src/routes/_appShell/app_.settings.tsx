@@ -42,8 +42,13 @@ const CONNECTION_FAILED =
  * A failed deletion request surfaces a bare line of error text — enough
  * that a throttled (429) or backend-down request doesn't look like it
  * worked.
+ *
+ * Shows the signed-in email itself, too (#90) — `AppNav`'s own copy hides
+ * below 640px (no dropdown variant exists yet to tuck it behind), so this
+ * page is where a narrow-screen visitor can still find their address.
  */
 function Settings() {
+  const { email } = Route.useRouteContext();
   const [deleteStep, setDeleteStep] = useState<DeleteStep>("resting");
   const [error, setError] = useState("");
 
@@ -65,6 +70,7 @@ function Settings() {
   return (
     <>
       <h1>Settings</h1>
+      <p>Signed in as {email}</p>
 
       <h2>Delete account</h2>
       {deleteStep === "resting" && (

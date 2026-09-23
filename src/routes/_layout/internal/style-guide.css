@@ -162,6 +162,12 @@
   margin-bottom: var(--space-3);
 }
 
+/* ── Button label stack ── */
+
+.sg-button-label-stack-demo {
+  margin-bottom: var(--space-3);
+}
+
 /* ── Button group ── */
 
 .sg-button-group-demo {

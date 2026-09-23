@@ -73,7 +73,15 @@ const ERROR_ID = "login-error";
  * pending state, not `aria-disabled` — the label itself carries the reason,
  * so there's nothing an `aria-describedby` would add, and it avoids a second
  * disabling convention on top of the one this page already has (see
- * docs/adr/0012).
+ * docs/adr/0012). Both submit buttons' labels swap through `Button`'s
+ * `state`/`Button.State` composition (#90) rather than a plain ternary, so
+ * the button's own width never jumps between its resting/pending/(email
+ * step only) pre-Turnstile states; their field disables alongside the
+ * button so a submitted value can't change out from under the in-flight
+ * request.
+ * `.field-row` itself stacks to a single column below 640px (#90) — the
+ * button's widest label used to squeeze the input to near-nothing on a
+ * narrow viewport.
  */
 function Login() {
   const navigate = useNavigate();
@@ -200,14 +208,25 @@ function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               aria-describedby={error ? ERROR_ID : undefined}
+              disabled={isSubmitting}
               required
             />
-            <Button type="submit" disabled={isSubmitting || !turnstileToken}>
-              {isSubmitting
-                ? "Sending…"
-                : turnstileToken
-                  ? "Send code"
-                  : "Verifying you're human…"}
+            <Button
+              type="submit"
+              disabled={isSubmitting || !turnstileToken}
+              state={
+                !turnstileToken
+                  ? "verifying"
+                  : isSubmitting
+                    ? "pending"
+                    : "ready"
+              }
+            >
+              <Button.State name="verifying">
+                Verifying you're human…
+              </Button.State>
+              <Button.State name="ready">Send code</Button.State>
+              <Button.State name="pending">Sending…</Button.State>
             </Button>
           </div>
           <div className="turnstile-container">
@@ -243,11 +262,17 @@ function Login() {
             value={code}
             onChange={(e) => setCode(e.target.value)}
             aria-describedby={error ? ERROR_ID : undefined}
+            disabled={isSubmitting}
             required
           />
           <div className="button-group">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Verifying…" : "Verify and sign in"}
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              state={isSubmitting ? "pending" : "ready"}
+            >
+              <Button.State name="ready">Verify and sign in</Button.State>
+              <Button.State name="pending">Verifying…</Button.State>
             </Button>
             <Button
               type="button"

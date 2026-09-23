@@ -106,4 +106,13 @@
   --space-8: 2rem;
   --space-9: 2.5rem;
   --space-10: 3rem;
+
+  /* ── Breakpoints ──────────────────────────────────────────── */
+  /* A single width, not a full scale yet — the first responsive rule in
+     this app (#90). A custom property can't be read inside a `@media`
+     feature (no browser resolves `var()` there), so this token is for
+     documentation/JS parity only; every `@media (max-width: ...)` in this
+     app spells out the same 640px literally and has to be kept in sync
+     with this value by hand if it ever changes. */
+  --breakpoint-sm: 640px;
 }

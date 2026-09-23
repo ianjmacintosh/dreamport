@@ -106,9 +106,14 @@ async function withMinimumDuration<T>(
  * plain document order: no card treatment or empty-state design for the
  * list. The add-Product field and its button sit in `.field-row` — the same
  * side-by-side single-field-plus-button primitive `/login`'s email step
- * uses — rather than stacked; each row's name and Delete action sit in
- * `.product-row` (#90) instead, a display row with an action rather than an
- * input paired with one.
+ * uses — rather than stacked; the list itself is a real `<ul>`/`<li>`
+ * (`.product-list`/`.product-row`, #90 follow-up) rather than a stack of
+ * `<div>`s, so a screen reader announces it as an actual list and its
+ * Product count, not an undifferentiated block of text. The list also
+ * carries `aria-labelledby` pointing at the `<h1>`'s own id, giving it an
+ * accessible name ("Products") — otherwise a screen reader entering it (or
+ * jumping to it directly, e.g. VoiceOver's rotor list of lists) hears only
+ * "list, 2 items" with nothing tying it back to the heading above it.
  *
  * A failed add-Product or delete surfaces a bare line of error text —
  * enough that a backend-down request doesn't look like it worked. While a
@@ -117,10 +122,20 @@ async function withMinimumDuration<T>(
  * the same in-flight-pending mechanism `/login`'s submit buttons already
  * use (see docs/adr/0012), not a new convention — held for a minimum
  * duration (`ensureMinimumDuration`) so a fast local response doesn't just
- * flicker the button through its pending state. Delete itself is a two-step
- * inline reveal (#90, Q7) — the same resting/confirming shape
- * `/app/settings`'s delete-account flow already uses, just per-row instead
- * of page-level, since a Product list can hold more than one row at a time.
+ * flicker the button through its pending state. Add-Product's label swap
+ * goes through `Button`'s `state`/`Button.State` composition (#90), same as
+ * `/login`'s submit buttons, so the button's own width doesn't jump between
+ * "Add product" and "Adding…"; the field disables alongside it so its
+ * submitted value can't change out from under the in-flight request. Delete
+ * itself is a two-step inline reveal (#90, Q7) — the same resting/confirming
+ * shape `/app/settings`'s delete-account flow already uses, just per-row
+ * instead of page-level, since a Product list can hold more than one row at
+ * a time. The Confirm/Cancel pair stays mounted into the deleting state
+ * too (#90 follow-up) rather than being swapped out for a lone "Deleting…"
+ * button: Confirm's own label swaps to "Deleting…" via `Button.State`, and
+ * Cancel disables in place rather than disappearing, so deleting no longer
+ * looks like the whole confirm step vanished and a different button took
+ * its place.
  */
 function App() {
   const { products: initialProducts } = Route.useRouteContext();
@@ -191,7 +206,7 @@ function App() {
 
   return (
     <>
-      <h1>Products</h1>
+      <h1 id="products-heading">Products</h1>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -205,30 +220,42 @@ function App() {
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
             maxLength={PRODUCT_NAME_MAX_LENGTH}
+            disabled={isAdding}
             required
           />
-          <Button type="submit" disabled={isAdding}>
-            {isAdding ? "Adding…" : "Add product"}
+          <Button
+            type="submit"
+            disabled={isAdding}
+            state={isAdding ? "pending" : "ready"}
+          >
+            <Button.State name="ready">Add product</Button.State>
+            <Button.State name="pending">Adding…</Button.State>
           </Button>
         </div>
       </form>
       {products.length === 0 ? (
         <p>No products yet.</p>
       ) : (
-        <div className="product-list">
+        <ul className="product-list" aria-labelledby="products-heading">
           {products.map((product) => (
-            <div className="product-row" key={product.id}>
+            <li className="product-row" key={product.id}>
               <span className="product-row-name">{product.name}</span>
               <div className="product-row-action">
-                {deletingId === product.id ? (
-                  <Button disabled>Deleting…</Button>
-                ) : confirmingId === product.id ? (
+                {confirmingId === product.id || deletingId === product.id ? (
                   <div className="button-group">
-                    <Button onClick={() => void deleteProduct(product.id)}>
-                      Confirm
+                    <Button
+                      disabled={deletingId === product.id}
+                      state={
+                        deletingId === product.id ? "deleting" : "confirming"
+                      }
+                      onClick={() => void deleteProduct(product.id)}
+                    >
+                      <Button.State name="confirming">Confirm</Button.State>
+                      <Button.State name="deleting">Deleting…</Button.State>
                     </Button>
                     <Button
                       variant="secondary"
+                      disabled={deletingId === product.id}
                       onClick={() => setConfirmingId(null)}
                     >
                       Cancel
@@ -243,9 +270,9 @@ function App() {
                   </Button>
                 )}
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
       {error && <p role="alert">{error}</p>}
