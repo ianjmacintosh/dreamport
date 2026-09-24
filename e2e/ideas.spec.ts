@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 
 import { TEST_EMAILS } from "../test/emails";
+import { expectOtherRowsUnaffected, LAYOUT_WIDTHS } from "./list-rows";
 import { exemptFromRateLimits } from "./rate-limit-exemption";
 
 // Ideas v1 slice 1 (issue #99): sign in, add a Product, open it via the link
@@ -142,6 +143,11 @@ test("sign in, add a Product, add an Idea, click Delete to reveal Confirm/Cancel
     ideaListItem.getByRole("button", { name: "Cancel" }),
   ).toBeVisible();
 
+  // Edit stays available alongside Confirm/Cancel (#102)
+  await expect(
+    ideaListItem.getByRole("button", { name: "Edit" }),
+  ).toBeVisible();
+
   // Click Cancel to back out
   await ideaListItem.getByRole("button", { name: "Cancel" }).click();
 
@@ -175,7 +181,7 @@ test("sign in, add a Product, add an Idea, rename it, and see the new name", asy
   const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
   await ideaListItem.getByRole("button", { name: "Edit" }).click();
 
-  const renameField = page.getByLabel(`Rename ${ideaName}`);
+  const renameField = page.getByLabel("Rename", { exact: true });
   await expect(renameField).toHaveValue(ideaName);
   await renameField.fill(newName);
   await page.getByRole("button", { name: "Save" }).click();
@@ -210,7 +216,10 @@ test("sign in, add a Product, add an Idea, click Edit, then Cancel backs out wit
 
   const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
   await ideaListItem.getByRole("button", { name: "Edit" }).click();
-  await page.getByLabel(`Rename ${ideaName}`).fill("Should not be saved");
+  // Editing offers Save / Cancel / Delete (#102)
+  await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
+  await page.getByLabel("Rename", { exact: true }).fill("Should not be saved");
   await page.getByRole("button", { name: "Cancel" }).click();
 
   await expect(page.getByText(ideaName)).toBeVisible();
@@ -218,4 +227,47 @@ test("sign in, add a Product, add an Idea, click Edit, then Cancel backs out wit
   await expect(
     ideaListItem.getByRole("button", { name: "Edit" }),
   ).toBeVisible();
+});
+
+// Issue #102: each row is laid out on its own, so switching one row into
+// editing or confirming never shifts the others — at desktop or phone width.
+test("editing or confirming one Idea row leaves every other row's layout unchanged", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eIdeaRowsIndependent;
+  const productName = `Row layout product ${Date.now()}`;
+  const ideaNames = [
+    `Short ${Date.now()}`,
+    `An idea with a much longer name than usual ${Date.now()}`,
+  ];
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("link", { name: productName }).click();
+  await expect(page).toHaveURL(/\/app\/products\/.+/);
+  for (const name of ideaNames) {
+    await page.getByLabel("Idea name").fill(name);
+    await page.getByRole("button", { name: "Add idea" }).click();
+    await expect(page.getByText(name)).toBeVisible();
+  }
+
+  // By position, not text: while editing, the row's name lives in the
+  // input's value, which a text filter can't see. This Product is fresh, so
+  // the first row is ideaNames[0].
+  const row = page
+    .getByRole("list", { name: productName })
+    .locator("li")
+    .first();
+  for (const width of LAYOUT_WIDTHS) {
+    await page.setViewportSize({ width, height: 800 });
+    await expectOtherRowsUnaffected(page, row, () =>
+      row.getByRole("button", { name: "Edit" }).click(),
+    );
+    await expectOtherRowsUnaffected(page, row, () =>
+      row.getByRole("button", { name: "Delete" }).click(),
+    );
+    await row.getByRole("button", { name: "Cancel" }).click();
+  }
 });

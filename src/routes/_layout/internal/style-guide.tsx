@@ -421,7 +421,7 @@ function StyleGuide() {
             </li>
             <li className="list-row">
               <Link className="list-row-name" href="#">
-                A longer name to prove the action column still lines up
+                A longer name to prove the actions still share a right edge
               </Link>
               <div className="list-row-action">
                 <Button variant="secondary">Delete</Button>
@@ -437,11 +437,13 @@ function StyleGuide() {
           value with one action attached (e.g. a Product's name + Delete, an
           Idea's name + Edit/Delete) — instead of <code>.field-row</code> above,
           which is for a labelled input paired with one action, not a display
-          row. Every row's action lines up in the same column regardless of how
-          long its name runs. A real <code>&lt;ul&gt;</code>/
-          <code>&lt;li&gt;</code>, not a stack of <code>&lt;div&gt;</code>s — a
-          list is a list, and assistive tech needs the actual markup to announce
-          it as one.
+          row. Each row is laid out on its own — one row switching to a wider
+          action set (a Confirm/Cancel reveal, an inline rename) never shifts
+          the others — while rows with the same actions still share a right
+          edge. Below 640px every row stacks: name, then actions. A real{" "}
+          <code>&lt;ul&gt;</code>/<code>&lt;li&gt;</code>, not a stack of{" "}
+          <code>&lt;div&gt;</code>s — a list is a list, and assistive tech needs
+          the actual markup to announce it as one.
         </p>
       </Section>
 

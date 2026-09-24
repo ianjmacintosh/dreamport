@@ -101,11 +101,6 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
   component: ProductIdeas,
 });
 
-/** The rename `<form>`'s id — Save sits outside it, so it submits via `form`. */
-function renameFormId(ideaId: string): string {
-  return `rename-idea-${ideaId}`;
-}
-
 const ADD_IDEA_FAILED = "We couldn't add that. Try again in a moment.";
 const DELETE_IDEA_FAILED = "We couldn't delete that. Try again in a moment.";
 const SAVE_IDEA_FAILED = "We couldn't save that. Try again in a moment.";
@@ -134,12 +129,12 @@ const CONNECTION_FAILED =
  * component (here and retrofitted onto Settings) is its own sign-off
  * question deferred to #101.
  *
- * Rename (#102) swaps a row in place, one row at a time: its name becomes a
- * pre-filled `TextInput` inside a `<form>` in the name column, and its
- * Edit/Delete pair becomes Save/Cancel in the action column (`Save` submits
- * that form via the `form` attribute, since the two sit in separate grid
- * cells). Reuses existing primitives only — no sign-off yet on this shape;
- * its final polish is #101's to decide once it can react to the real thing.
+ * Rename (#102) swaps a row in place, one row at a time. Resting, a row's
+ * actions are Edit / Delete. Editing, its name becomes a `.field-row` — a
+ * pre-filled "Rename" `TextInput` with Save / Cancel / Delete as its attached
+ * `.button-group`. Clicking Delete (from either)
+ * shows Edit / Confirm / Cancel. Whether "Confirm"/"Save" should keep the
+ * action's own verb instead is an open question for #101's design pass.
  */
 function ProductIdeas() {
   const { product, ideas: initialIdeas } = Route.useRouteContext();
@@ -222,6 +217,12 @@ function ProductIdeas() {
     setEditName(idea.name);
   }
 
+  function startConfirmingDelete(id: string) {
+    setError("");
+    setEditingId(null);
+    setConfirmingId(id);
+  }
+
   async function saveIdea(id: string) {
     setError("");
     setIsSaving(true);
@@ -289,35 +290,31 @@ function ProductIdeas() {
         <ul className="list" aria-labelledby="ideas-heading">
           {ideas.map((idea) => (
             <li className="list-row" key={idea.id}>
-              {/* Keyed so React never reuses the resting row's Edit
-                  `<button>` as Save's submit button — reused mid-click, that
-                  click's default action would submit the rename form the
-                  instant it appears. */}
+              {/* Keyed so React builds each mode's buttons fresh rather than
+                  reusing one mode's `<button>` for another's mid-click — a
+                  reused Edit turning into a submit button would submit the
+                  rename form the instant it appeared. */}
               {editingId === idea.id ? (
                 <Fragment key="editing">
                   <form
-                    id={renameFormId(idea.id)}
-                    className="list-row-name"
+                    className="field-row"
                     onSubmit={(e) => {
                       e.preventDefault();
                       void saveIdea(idea.id);
                     }}
                   >
                     <TextInput
-                      id={`${renameFormId(idea.id)}-name`}
-                      label={`Rename ${idea.name}`}
+                      id={`rename-idea-${idea.id}`}
+                      label="Rename"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
                       maxLength={IDEA_NAME_MAX_LENGTH}
                       disabled={isSaving}
                       required
                     />
-                  </form>
-                  <div className="list-row-action">
                     <div className="button-group">
                       <Button
                         type="submit"
-                        form={renameFormId(idea.id)}
                         disabled={isSaving}
                         state={isSaving ? "saving" : "ready"}
                       >
@@ -334,54 +331,62 @@ function ProductIdeas() {
                       >
                         Cancel
                       </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={isSaving}
+                        onClick={() => startConfirmingDelete(idea.id)}
+                      >
+                        Delete
+                      </Button>
                     </div>
-                  </div>
+                  </form>
                 </Fragment>
               ) : (
                 <Fragment key="display">
                   <span className="list-row-name">{idea.name}</span>
                   <div className="list-row-action">
-                    {confirmingId === idea.id || deletingId === idea.id ? (
-                      <div className="button-group">
-                        <Button
-                          disabled={deletingId === idea.id}
-                          state={
-                            deletingId === idea.id ? "deleting" : "confirming"
-                          }
-                          onClick={() => void deleteIdea(idea.id)}
-                        >
-                          <Button.State name="confirming">Confirm</Button.State>
-                          <Button.State name="deleting">Deleting…</Button.State>
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          disabled={deletingId === idea.id}
-                          onClick={() => setConfirmingId(null)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="button-group">
+                    <div className="button-group">
+                      <Button
+                        variant="secondary"
+                        disabled={isSaving || deletingId === idea.id}
+                        onClick={() => startEditing(idea)}
+                      >
+                        Edit
+                      </Button>
+                      {confirmingId === idea.id || deletingId === idea.id ? (
+                        <>
+                          <Button
+                            disabled={deletingId === idea.id}
+                            state={
+                              deletingId === idea.id ? "deleting" : "confirming"
+                            }
+                            onClick={() => void deleteIdea(idea.id)}
+                          >
+                            <Button.State name="confirming">
+                              Confirm
+                            </Button.State>
+                            <Button.State name="deleting">
+                              Deleting…
+                            </Button.State>
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            disabled={deletingId === idea.id}
+                            onClick={() => setConfirmingId(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </>
+                      ) : (
                         <Button
                           variant="secondary"
                           disabled={isSaving}
-                          onClick={() => startEditing(idea)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          disabled={isSaving}
-                          onClick={() => {
-                            setEditingId(null);
-                            setConfirmingId(idea.id);
-                          }}
+                          onClick={() => startConfirmingDelete(idea.id)}
                         >
                           Delete
                         </Button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </Fragment>
               )}

@@ -226,6 +226,12 @@ export const TEST_EMAILS = {
   e2eRenameIdea: "delivered+e2e-rename-idea+e2e-test@resend.dev",
   /** #102: clicking Edit then Cancel backs out without saving. */
   e2eRenameIdeaCancel: "delivered+e2e-rename-idea-cancel+e2e-test@resend.dev",
+  /** #102: editing/confirming one Idea row leaves the other rows' layout unchanged. */
+  e2eIdeaRowsIndependent:
+    "delivered+e2e-idea-rows-independent+e2e-test@resend.dev",
+  /** #102: confirming one Product row leaves the other rows' layout unchanged. */
+  e2eProductRowsIndependent:
+    "delivered+e2e-product-rows-independent+e2e-test@resend.dev",
   /**
    * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
    * against a real deployed environment. Deliberately NOT a `+e2e-test@`
