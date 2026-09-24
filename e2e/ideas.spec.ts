@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 
 import { TEST_EMAILS } from "../test/emails";
+import { exemptFromSendRateLimits } from "./rate-limit-exemption";
 
 // Ideas v1 slice 1 (issue #99): sign in, add a Product, open it via the link
 // on `/app`, add an Idea, see it in that Product's own list without a full
@@ -8,19 +9,8 @@ import { TEST_EMAILS } from "../test/emails";
 // (fixed `+e2e-test@` code, see docs/adr/0009) — see that file's header
 // comment for why.
 
-/** Give this spec its own per-IP send-OTP bucket, same reasoning as `login.spec.ts`. */
-let sendBucket = 0;
-test.beforeEach(async ({ page }, testInfo) => {
-  const octet = (testInfo.workerIndex * 40 + sendBucket++) % 256;
-  const ip = `203.0.113.${octet}`;
-  await page.route(
-    "**/api/auth/email-otp/send-verification-otp",
-    (route) =>
-      void route.continue({
-        headers: { ...route.request().headers(), "cf-connecting-ip": ip },
-      }),
-  );
-});
+/** See `exemptFromSendRateLimits` for why every spec sends as one exempt IP. */
+test.beforeEach(({ page }) => exemptFromSendRateLimits(page));
 
 /** Drive `/login` from the email step through to landing on `/app`. */
 async function signIn(page: Page, email: string): Promise<void> {

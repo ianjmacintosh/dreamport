@@ -80,6 +80,8 @@ export const TEST_EMAILS = {
   rlPerEmail: "delivered+rl-per-email@resend.dev",
   /** Sent to in case/space variants to prove both limiters normalise alike. */
   rlNormalise: "delivered+rl-normalise@resend.dev",
+  /** Sent 6x from the e2e-exempt IP; must never trip the per-email limit. */
+  rlExemptPerEmail: "delivered+rl-exempt-per-email@resend.dev",
   /** A normal send + verify while the limiter is on; must be unaffected. */
   rlHappyPath: "delivered+rl-happy-path@resend.dev",
 

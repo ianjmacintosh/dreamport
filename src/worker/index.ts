@@ -31,6 +31,7 @@ import {
   listIdeas,
   renameIdea,
 } from "./ideas";
+import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
 /**
@@ -214,7 +215,9 @@ export function createApp(deps: AppDeps = {}) {
       // Malformed JSON — fall through with no email; the handler 400s.
     }
 
-    if (email) {
+    // The e2e-exempt IP skips this limit the same way it skips Better Auth's
+    // per-IP one (see `isRateLimitExempt`).
+    if (email && !isRateLimitExempt(c.req.raw.headers)) {
       const budget = await peekOtpSendBudget(c.env.DB, email);
       if (!budget.allowed) return tooManyRequests(budget.retryAfter);
     }
