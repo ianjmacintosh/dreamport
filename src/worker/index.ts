@@ -24,7 +24,12 @@ import {
   listProducts,
   PRODUCT_NAME_MAX_LENGTH,
 } from "./products";
-import { createIdea, IDEA_NAME_MAX_LENGTH, listIdeas } from "./ideas";
+import {
+  createIdea,
+  deleteIdea,
+  IDEA_NAME_MAX_LENGTH,
+  listIdeas,
+} from "./ideas";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
 /**
@@ -431,6 +436,47 @@ export function createApp(deps: AppDeps = {}) {
 
     const idea = await createIdea(c.env.DB, product.id, name);
     return c.json({ idea }, 201);
+  });
+
+  /**
+   * Ideas v1 slice 2 (issue #100): delete an Idea under a Product that
+   * belongs to the signed-in User. Same origin check as POST /api/products
+   * (this route sits outside `auth.handler` the same way) and same session
+   * gate. First confirms the Product belongs to the caller via `getProduct`,
+   * then deletes the Idea scoped by both `id` and `productId`. Zero rows
+   * changed means either the Idea doesn't exist or isn't under this Product
+   * — the response never distinguishes the two, so it's always 404, never 403.
+   */
+  app.delete("/api/products/:productId/ideas/:id", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const deleted = await deleteIdea(c.env.DB, product.id, c.req.param("id"));
+    if (!deleted) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json({}, 200);
   });
 
   /**

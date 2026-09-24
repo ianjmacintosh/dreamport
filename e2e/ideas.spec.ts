@@ -75,3 +75,89 @@ test("sign in, add a Product, open it, add an Idea, and see it in the list", asy
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByText(productName)).toBeVisible();
 });
+
+// Ideas v1 slice 2 (issue #100): add a Product, add an Idea, delete it,
+// and confirm it's gone from the list. Also test that Cancel backs out
+// without deleting.
+test("sign in, add a Product, add an Idea, delete it, and confirm it's gone", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eDeleteIdea;
+  const productName = `Delete test product ${Date.now()}`;
+  const ideaName = `Delete test idea ${Date.now()}`;
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await expect(page.getByText(productName)).toBeVisible();
+
+  await page.getByRole("link", { name: productName }).click();
+  await expect(page).toHaveURL(/\/app\/products\/.+/);
+
+  await page.getByLabel("Idea name").fill(ideaName);
+  await page.getByRole("button", { name: "Add idea" }).click();
+  await expect(page.getByText(ideaName)).toBeVisible();
+
+  // Click the Delete button to reveal Confirm/Cancel
+  const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
+  await ideaListItem.getByRole("button", { name: "Delete" }).click();
+
+  // Confirm button should now be visible
+  await expect(
+    ideaListItem.getByRole("button", { name: "Confirm" }),
+  ).toBeVisible();
+  await expect(
+    ideaListItem.getByRole("button", { name: "Cancel" }),
+  ).toBeVisible();
+
+  // Click Confirm to delete
+  await ideaListItem.getByRole("button", { name: "Confirm" }).click();
+
+  // Idea should be removed from the list
+  await expect(page.getByText(ideaName)).not.toBeVisible();
+  await expect(page.getByText("No ideas yet.")).toBeVisible();
+});
+
+// Test that Cancel backs out without deleting
+test("sign in, add a Product, add an Idea, click Delete to reveal Confirm/Cancel, then Cancel backs out", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eDeleteIdeaReveal;
+  const productName = `Cancel test product ${Date.now()}`;
+  const ideaName = `Cancel test idea ${Date.now()}`;
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await expect(page.getByText(productName)).toBeVisible();
+
+  await page.getByRole("link", { name: productName }).click();
+  await expect(page).toHaveURL(/\/app\/products\/.+/);
+
+  await page.getByLabel("Idea name").fill(ideaName);
+  await page.getByRole("button", { name: "Add idea" }).click();
+  await expect(page.getByText(ideaName)).toBeVisible();
+
+  // Click the Delete button to reveal Confirm/Cancel
+  const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
+  await ideaListItem.getByRole("button", { name: "Delete" }).click();
+
+  // Confirm button should now be visible
+  await expect(
+    ideaListItem.getByRole("button", { name: "Confirm" }),
+  ).toBeVisible();
+  await expect(
+    ideaListItem.getByRole("button", { name: "Cancel" }),
+  ).toBeVisible();
+
+  // Click Cancel to back out
+  await ideaListItem.getByRole("button", { name: "Cancel" }).click();
+
+  // Idea should still be visible and Delete button back
+  await expect(page.getByText(ideaName)).toBeVisible();
+  await expect(
+    ideaListItem.getByRole("button", { name: "Delete" }),
+  ).toBeVisible();
+});

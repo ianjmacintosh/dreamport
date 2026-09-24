@@ -5,6 +5,55 @@ import Button from "../../components/Button";
 import Link from "../../components/Link";
 import TextInput from "../../components/TextInput";
 
+/**
+ * Plain `fetch` never times out on its own — if the server accepts the TCP
+ * connection but then goes away without closing it (observed with a Ctrl-C
+ * dev-server shutdown, unlike a hard kill which refuses the connection
+ * outright), the request hangs forever: no error, no way for the caller's
+ * `catch` to ever run. This aborts the request after `timeoutMs` so
+ * `deleteIdea` always lands in its `catch` block instead of leaving the UI
+ * stuck with no feedback.
+ */
+function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs = 5_000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(input, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timeout),
+  );
+}
+
+/**
+ * A request that resolves in a handful of milliseconds (typical for local
+ * D1) flips a button's pending state on and back off too fast to read as
+ * anything but a flicker. This runs `fn`, then waits out the rest of
+ * `minMs` before resolving (or rejecting), so a caller that clears its
+ * pending state once this settles gets a real, perceivable window — same UX
+ * reasoning as e.g. a spinner's minimum-display-time convention.
+ *
+ * `Date.now()` stays inside this module-level helper rather than in the
+ * component itself: the React Compiler's purity check (`react-hooks/purity`)
+ * flags an impure call like `Date.now()` made directly in a component, since
+ * it can't prove the call never happens during render.
+ */
+async function withMinimumDuration<T>(
+  fn: () => Promise<T>,
+  minMs = 400,
+): Promise<T> {
+  const startedAt = Date.now();
+  try {
+    return await fn();
+  } finally {
+    const remaining = minMs - (Date.now() - startedAt);
+    if (remaining > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remaining));
+    }
+  }
+}
+
 /** A Product as `/api/products/:productId/ideas` returns it (see `src/worker/products.ts`). */
 interface Product {
   id: string;
@@ -53,6 +102,7 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
 });
 
 const ADD_IDEA_FAILED = "We couldn't add that. Try again in a moment.";
+const DELETE_IDEA_FAILED = "We couldn't delete that. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -84,6 +134,11 @@ function ProductIdeas() {
   const [ideas, setIdeas] = useState<Idea[]>(initialIdeas);
   const [ideaName, setIdeaName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  // Only ever one row's delete in flight, and one row confirming, at a time
+  // — no bulk delete — so a single id each (rather than a set) is enough to
+  // track them.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   async function addIdea() {
     setError("");
@@ -107,6 +162,37 @@ function ProductIdeas() {
       setError(CONNECTION_FAILED);
     } finally {
       setIsAdding(false);
+    }
+  }
+
+  async function deleteIdea(id: string) {
+    setError("");
+    setConfirmingId(null);
+    setDeletingId(id);
+    try {
+      // The row itself carries the pending button, so removing it has to
+      // wait for the same floor `withMinimumDuration` enforces — done
+      // inside the callback, the removal would unmount the row (and its
+      // "Deleting…" button) the instant the request resolves, cutting the
+      // pending state short exactly the way the timeout was meant to fix.
+      const ok = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(
+          `/api/products/${product.id}/ideas/${id}`,
+          {
+            method: "DELETE",
+          },
+        );
+        return res.ok;
+      });
+      if (!ok) {
+        setError(DELETE_IDEA_FAILED);
+        return;
+      }
+      setIdeas((prev) => prev.filter((idea) => idea.id !== id));
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -142,9 +228,39 @@ function ProductIdeas() {
       {ideas.length === 0 ? (
         <p>No ideas yet.</p>
       ) : (
-        <ul aria-labelledby="ideas-heading">
+        <ul className="product-list" aria-labelledby="ideas-heading">
           {ideas.map((idea) => (
-            <li key={idea.id}>{idea.name}</li>
+            <li className="product-row" key={idea.id}>
+              <span className="product-row-name">{idea.name}</span>
+              <div className="product-row-action">
+                {confirmingId === idea.id || deletingId === idea.id ? (
+                  <div className="button-group">
+                    <Button
+                      disabled={deletingId === idea.id}
+                      state={deletingId === idea.id ? "deleting" : "confirming"}
+                      onClick={() => void deleteIdea(idea.id)}
+                    >
+                      <Button.State name="confirming">Confirm</Button.State>
+                      <Button.State name="deleting">Deleting…</Button.State>
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={deletingId === idea.id}
+                      onClick={() => setConfirmingId(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setConfirmingId(idea.id)}
+                  >
+                    Delete
+                  </Button>
+                )}
+              </div>
+            </li>
           ))}
         </ul>
       )}
