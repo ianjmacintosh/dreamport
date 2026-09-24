@@ -108,7 +108,7 @@ async function withMinimumDuration<T>(
  * list. The add-Product field and its button sit in `.field-row` — the same
  * side-by-side single-field-plus-button primitive `/login`'s email step
  * uses — rather than stacked; the list itself is a real `<ul>`/`<li>`
- * (`.product-list`/`.product-row`, #90 follow-up) rather than a stack of
+ * (`.list`/`.list-row`, #90 follow-up) rather than a stack of
  * `<div>`s, so a screen reader announces it as an actual list and its
  * Product count, not an undifferentiated block of text. The list also
  * carries `aria-labelledby` pointing at the `<h1>`'s own id, giving it an
@@ -237,16 +237,16 @@ function App() {
       {products.length === 0 ? (
         <p>No products yet.</p>
       ) : (
-        <ul className="product-list" aria-labelledby="products-heading">
+        <ul className="list" aria-labelledby="products-heading">
           {products.map((product) => (
-            <li className="product-row" key={product.id}>
+            <li className="list-row" key={product.id}>
               <Link
-                className="product-row-name"
+                className="list-row-name"
                 href={`/app/products/${product.id}`}
               >
                 {product.name}
               </Link>
-              <div className="product-row-action">
+              <div className="list-row-action">
                 {confirmingId === product.id || deletingId === product.id ? (
                   <div className="button-group">
                     <Button
