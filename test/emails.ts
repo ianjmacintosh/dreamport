@@ -138,6 +138,16 @@ export const TEST_EMAILS = {
   /** Deletes an id that was never created; expects a 404. */
   productsDeleteNotFound: "delivered+products-delete-not-found@resend.dev",
 
+  // --- Seam 1: /api/products/:productId/ideas (#99) ---
+  /** Adds a Product, opens it, adds an Idea, reads it back in its own list. */
+  ideasAddOne: "delivered+ideas-add-one@resend.dev",
+  /** Owner side of the Ideas ownership boundary check. */
+  ideasOwnerA: "delivered+ideas-owner-a@resend.dev",
+  /** Other User whose request against A's Product must 404, not list A's Ideas. */
+  ideasOwnerB: "delivered+ideas-owner-b@resend.dev",
+  /** Posts an empty/whitespace-only name; expects a 400 and nothing created. */
+  ideasInvalidName: "delivered+ideas-invalid-name@resend.dev",
+
   // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
   // Every address below carries the `+e2e-test@` marker (issue #39): the
   // `+<scenario>` label sits ahead of it, so e.g. "e2e-happy" tags the
@@ -173,6 +183,8 @@ export const TEST_EMAILS = {
   /** Products v1 slice 3 (#90): clicking Delete reveals Confirm/Cancel; Cancel backs out without deleting. */
   e2eDeleteProductReveal:
     "delivered+e2e-delete-product-reveal+e2e-test@resend.dev",
+  /** Ideas v1 slice 1 (#99): sign in, add a Product, open it, add an Idea, see it in the list. */
+  e2eAddIdea: "delivered+e2e-add-idea+e2e-test@resend.dev",
   /**
    * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
    * against a real deployed environment. Deliberately NOT a `+e2e-test@`

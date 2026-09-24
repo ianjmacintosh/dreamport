@@ -412,15 +412,17 @@ function StyleGuide() {
         <div className="sg-product-row-demo">
           <ul className="product-list">
             <li className="product-row">
-              <span className="product-row-name">A phone-scale app</span>
+              <Link className="product-row-name" href="#">
+                A phone-scale app
+              </Link>
               <div className="product-row-action">
                 <Button variant="secondary">Delete</Button>
               </div>
             </li>
             <li className="product-row">
-              <span className="product-row-name">
+              <Link className="product-row-name" href="#">
                 A longer name to prove the action column still lines up
-              </span>
+              </Link>
               <div className="product-row-action">
                 <Button variant="secondary">Delete</Button>
               </div>
@@ -428,17 +430,18 @@ function StyleGuide() {
           </ul>
         </div>
         <Snippet
-          code={`<ul className="product-list">\n  <li className="product-row">\n    <span className="product-row-name">A phone-scale app</span>\n    <div className="product-row-action">\n      <Button>Delete</Button>\n    </div>\n  </li>\n</ul>`}
+          code={`<ul className="product-list">\n  <li className="product-row">\n    <Link className="product-row-name" href={...}>A phone-scale app</Link>\n    <div className="product-row-action">\n      <Button>Delete</Button>\n    </div>\n  </li>\n</ul>`}
         />
         <p className="sg-note">
-          Use <code>.product-list</code>/<code>.product-row</code> for a plain
-          display value with one action attached (e.g. a Product's name + its
-          Delete button) — instead of <code>.field-row</code> above, which is
-          for a labelled input paired with one action, not a display row. Every
-          row's action lines up in the same column regardless of how long its
-          name runs. A real <code>&lt;ul&gt;</code>/<code>&lt;li&gt;</code>, not
-          a stack of <code>&lt;div&gt;</code>s — a list of Products is a list,
-          and assistive tech needs the actual markup to announce it as one.
+          Use <code>.product-list</code>/<code>.product-row</code> for a linked
+          or plain display value with one action attached (e.g. a Product's
+          name, linking to its own page, + its Delete button) — instead of{" "}
+          <code>.field-row</code> above, which is for a labelled input paired
+          with one action, not a display row. Every row's action lines up in the
+          same column regardless of how long its name runs. A real{" "}
+          <code>&lt;ul&gt;</code>/<code>&lt;li&gt;</code>, not a stack of{" "}
+          <code>&lt;div&gt;</code>s — a list of Products is a list, and
+          assistive tech needs the actual markup to announce it as one.
         </p>
       </Section>
 

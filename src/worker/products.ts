@@ -56,6 +56,25 @@ export async function createProduct(
 }
 
 /**
+ * A User's own Product by id, or null if it doesn't exist or isn't theirs.
+ * Scoped by both `id` and `userId` in one query — same reasoning as
+ * `deleteProduct`: a stranger's Product is indistinguishable from a
+ * nonexistent one.
+ */
+export async function getProduct(
+  db: D1Database,
+  userId: string,
+  id: string,
+): Promise<Product | null> {
+  return db
+    .prepare(
+      'SELECT "id", "name", "createdAt" FROM "products" WHERE "id" = ? AND "userId" = ?',
+    )
+    .bind(id, userId)
+    .first<Product>();
+}
+
+/**
  * Delete a Product owned by `userId`. Scoped by both `id` and `userId` in
  * the one query — not a select-then-delete — so a stranger's row is
  * indistinguishable from a nonexistent one at the DB layer too. Returns

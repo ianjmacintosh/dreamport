@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
+import Link from "../../components/Link";
 import TextInput from "../../components/TextInput";
 
 /** A Product as `/api/products` returns it (see `src/worker/products.ts`). */
@@ -239,7 +240,12 @@ function App() {
         <ul className="product-list" aria-labelledby="products-heading">
           {products.map((product) => (
             <li className="product-row" key={product.id}>
-              <span className="product-row-name">{product.name}</span>
+              <Link
+                className="product-row-name"
+                href={`/app/products/${product.id}`}
+              >
+                {product.name}
+              </Link>
               <div className="product-row-action">
                 {confirmingId === product.id || deletingId === product.id ? (
                   <div className="button-group">
