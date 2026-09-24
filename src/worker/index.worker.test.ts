@@ -1280,6 +1280,15 @@ function addIdea(productId: string, cookie: string, name: string) {
   });
 }
 
+function deleteIdea(productId: string, ideaId: string, cookie?: string) {
+  return fetchWorker(`/api/products/${productId}/ideas/${ideaId}`, {
+    method: "DELETE",
+    headers: cookie
+      ? { origin: TRUSTED_ORIGIN, cookie }
+      : { origin: TRUSTED_ORIGIN },
+  });
+}
+
 describe("/api/products/:productId/ideas (#99)", () => {
   it("rejects a request with no session", async () => {
     const res = await getIdeas("some-id");
@@ -1390,6 +1399,104 @@ describe("/api/products/:productId/ideas (#99)", () => {
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "Not found" });
+  });
+
+  describe("delete (#100)", () => {
+    it("rejects a request with no session", async () => {
+      const res = await deleteIdea("some-product-id", "some-idea-id");
+
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: "Not signed in" });
+    });
+
+    it("rejects a request from an untrusted origin", async () => {
+      const cookie = await signIn(TEST_EMAILS.ideasDeleteUntrusted);
+      const created = await addProduct(cookie, "Untrusted-origin Product");
+      const { product } = (await created.json()) as { product: { id: string } };
+      const idea = await addIdea(product.id, cookie, "Test Idea");
+      const { idea: ideaData } = (await idea.json()) as {
+        idea: { id: string };
+      };
+
+      const res = await fetchWorker(
+        `/api/products/${product.id}/ideas/${ideaData.id}`,
+        {
+          method: "DELETE",
+          headers: { origin: "https://evil.example.com", cookie },
+        },
+      );
+
+      expect(res.status).toBe(403);
+
+      const list = await getIdeas(product.id, cookie);
+      const { ideas } = (await list.json()) as { ideas: { name: string }[] };
+      expect(ideas.map((i) => i.name)).toEqual(["Test Idea"]);
+    });
+
+    it("deletes an Idea and removes it from the list", async () => {
+      const cookie = await signIn(TEST_EMAILS.ideasDeleteOwner);
+      const created = await addProduct(cookie, "Delete Product");
+      const { product } = (await created.json()) as { product: { id: string } };
+      const idea = await addIdea(product.id, cookie, "To Be Deleted");
+      const { idea: ideaData } = (await idea.json()) as {
+        idea: { id: string };
+      };
+
+      expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+        product,
+        ideas: [ideaData],
+      });
+
+      const deleteRes = await deleteIdea(product.id, ideaData.id, cookie);
+      expect(deleteRes.status).toBe(200);
+      expect(await deleteRes.json()).toEqual({});
+
+      expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+        product,
+        ideas: [],
+      });
+    });
+
+    it("404s when a stranger tries to delete an Idea under another User's Product", async () => {
+      const cookieA = await signIn(TEST_EMAILS.ideasDeleteOwnerA);
+      const cookieB = await signIn(TEST_EMAILS.ideasDeleteOwnerB);
+      const created = await addProduct(cookieA, "Owner A's Delete Product");
+      const { product } = (await created.json()) as { product: { id: string } };
+      const idea = await addIdea(product.id, cookieA, "Owner A's Idea");
+      const { idea: ideaData } = (await idea.json()) as {
+        idea: { id: string };
+      };
+
+      const res = await deleteIdea(product.id, ideaData.id, cookieB);
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "Not found" });
+
+      const list = await getIdeas(product.id, cookieA);
+      const { ideas } = (await list.json()) as { ideas: { name: string }[] };
+      expect(ideas.map((i) => i.name)).toEqual(["Owner A's Idea"]);
+    });
+
+    it("404s when trying to delete a nonexistent Idea", async () => {
+      const cookie = await signIn(TEST_EMAILS.ideasDeleteNonexistent);
+      const created = await addProduct(cookie, "Delete Nonexistent Product");
+      const { product } = (await created.json()) as { product: { id: string } };
+
+      const res = await deleteIdea(product.id, "not-a-real-id", cookie);
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "Not found" });
+    });
+
+    it("404s when trying to delete an Idea under a nonexistent Product", async () => {
+      const cookie = await signIn(TEST_EMAILS.ideasDeleteNonexistentProduct);
+
+      const res = await deleteIdea(
+        "not-a-real-product",
+        "not-a-real-idea",
+        cookie,
+      );
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "Not found" });
+    });
   });
 });
 

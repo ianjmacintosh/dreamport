@@ -148,6 +148,21 @@ export const TEST_EMAILS = {
   /** Posts an empty/whitespace-only name; expects a 400 and nothing created. */
   ideasInvalidName: "delivered+ideas-invalid-name@resend.dev",
 
+  // --- Seam 1: DELETE /api/products/:productId/ideas/:id (#100) ---
+  /** Rejects a delete from an untrusted origin, leaving the Idea intact. */
+  ideasDeleteUntrusted: "delivered+ideas-delete-untrusted@resend.dev",
+  /** Adds an Idea, deletes it, then finds the list empty again. */
+  ideasDeleteOwner: "delivered+ideas-delete-owner@resend.dev",
+  /** Owner side of the Ideas delete ownership boundary check. */
+  ideasDeleteOwnerA: "delivered+ideas-delete-owner-a@resend.dev",
+  /** Other User whose delete on A's Idea must 404, not succeed. */
+  ideasDeleteOwnerB: "delivered+ideas-delete-owner-b@resend.dev",
+  /** Deletes an Idea id that was never created; expects a 404. */
+  ideasDeleteNonexistent: "delivered+ideas-delete-nonexistent@resend.dev",
+  /** Deletes an Idea under a Product id that was never created; expects a 404. */
+  ideasDeleteNonexistentProduct:
+    "delivered+ideas-delete-nonexistent-product@resend.dev",
+
   // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
   // Every address below carries the `+e2e-test@` marker (issue #39): the
   // `+<scenario>` label sits ahead of it, so e.g. "e2e-happy" tags the
@@ -185,6 +200,10 @@ export const TEST_EMAILS = {
     "delivered+e2e-delete-product-reveal+e2e-test@resend.dev",
   /** Ideas v1 slice 1 (#99): sign in, add a Product, open it, add an Idea, see it in the list. */
   e2eAddIdea: "delivered+e2e-add-idea+e2e-test@resend.dev",
+  /** Ideas v1 slice 2 (#100): add a Product, add an Idea, delete it, confirm it's gone. */
+  e2eDeleteIdea: "delivered+e2e-delete-idea+e2e-test@resend.dev",
+  /** Ideas v1 slice 2 (#100): clicking Delete reveals Confirm/Cancel; Cancel backs out without deleting. */
+  e2eDeleteIdeaReveal: "delivered+e2e-delete-idea-reveal+e2e-test@resend.dev",
   /**
    * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
    * against a real deployed environment. Deliberately NOT a `+e2e-test@`

@@ -52,3 +52,22 @@ export async function createIdea(
     .run();
   return idea;
 }
+
+/**
+ * Delete an Idea under `productId`. Scoped by both `id` and `productId` in
+ * the one query — same reasoning `deleteProduct` gives for itself: an Idea
+ * under a different Product is indistinguishable from a nonexistent one at
+ * this layer. Caller (the route) has already confirmed `productId` belongs
+ * to the requesting User via `getProduct`.
+ */
+export async function deleteIdea(
+  db: D1Database,
+  productId: string,
+  id: string,
+): Promise<boolean> {
+  const { meta } = await db
+    .prepare('DELETE FROM "ideas" WHERE "id" = ? AND "productId" = ?')
+    .bind(id, productId)
+    .run();
+  return meta.changes > 0;
+}
