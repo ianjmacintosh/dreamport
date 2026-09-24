@@ -228,11 +228,11 @@ function ProductIdeas() {
       {ideas.length === 0 ? (
         <p>No ideas yet.</p>
       ) : (
-        <ul className="product-list" aria-labelledby="ideas-heading">
+        <ul className="list" aria-labelledby="ideas-heading">
           {ideas.map((idea) => (
-            <li className="product-row" key={idea.id}>
-              <span className="product-row-name">{idea.name}</span>
-              <div className="product-row-action">
+            <li className="list-row" key={idea.id}>
+              <span className="list-row-name">{idea.name}</span>
+              <div className="list-row-action">
                 {confirmingId === idea.id || deletingId === idea.id ? (
                   <div className="button-group">
                     <Button

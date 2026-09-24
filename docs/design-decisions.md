@@ -47,3 +47,10 @@ Add an entry only once a sign-off conversation resolves something repeatable
   can't trigger the irreversible step, and no dialog component is needed.
   Decided for delete-account in #26, reaffirmed generally (one confirming
   state per row, not just per page) for Product delete in #90.
+
+- A row that pairs a name or display value with one attached action (a
+  Product's own name + Delete, an Idea's own name + Edit/Delete) uses the
+  `.list`/`.list-row` pattern — real `<ul>`/`<li>`, not `.field-row`
+  (which is for a labelled input, not a display value). See `src/global.css`
+  and the style guide's "Row with action" section (decided in #90, generalized
+  off "Product" naming in #101).

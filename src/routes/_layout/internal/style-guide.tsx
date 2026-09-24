@@ -146,7 +146,7 @@ function StyleGuide() {
         <a href="#button-group">Button group</a>
         <a href="#text-inputs">Text inputs</a>
         <a href="#field-row">Field with action</a>
-        <a href="#product-row">Row with action</a>
+        <a href="#list-row">Row with action</a>
         <a href="#turnstile-container">Turnstile container</a>
         <a href="#form-shell">Form shell</a>
         <a href="#spacing">Spacing</a>
@@ -408,40 +408,40 @@ function StyleGuide() {
         </p>
       </Section>
 
-      <Section id="product-row" label="Row with action">
-        <div className="sg-product-row-demo">
-          <ul className="product-list">
-            <li className="product-row">
-              <Link className="product-row-name" href="#">
+      <Section id="list-row" label="Row with action">
+        <div className="sg-list-row-demo">
+          <ul className="list">
+            <li className="list-row">
+              <Link className="list-row-name" href="#">
                 A phone-scale app
               </Link>
-              <div className="product-row-action">
+              <div className="list-row-action">
                 <Button variant="secondary">Delete</Button>
               </div>
             </li>
-            <li className="product-row">
-              <Link className="product-row-name" href="#">
+            <li className="list-row">
+              <Link className="list-row-name" href="#">
                 A longer name to prove the action column still lines up
               </Link>
-              <div className="product-row-action">
+              <div className="list-row-action">
                 <Button variant="secondary">Delete</Button>
               </div>
             </li>
           </ul>
         </div>
         <Snippet
-          code={`<ul className="product-list">\n  <li className="product-row">\n    <Link className="product-row-name" href={...}>A phone-scale app</Link>\n    <div className="product-row-action">\n      <Button>Delete</Button>\n    </div>\n  </li>\n</ul>`}
+          code={`<ul className="list">\n  <li className="list-row">\n    <Link className="list-row-name" href={...}>A phone-scale app</Link>\n    <div className="list-row-action">\n      <Button>Delete</Button>\n    </div>\n  </li>\n</ul>`}
         />
         <p className="sg-note">
-          Use <code>.product-list</code>/<code>.product-row</code> for a linked
-          or plain display value with one action attached (e.g. a Product's
-          name, linking to its own page, + its Delete button) — instead of{" "}
-          <code>.field-row</code> above, which is for a labelled input paired
-          with one action, not a display row. Every row's action lines up in the
-          same column regardless of how long its name runs. A real{" "}
-          <code>&lt;ul&gt;</code>/<code>&lt;li&gt;</code>, not a stack of{" "}
-          <code>&lt;div&gt;</code>s — a list of Products is a list, and
-          assistive tech needs the actual markup to announce it as one.
+          Use <code>.list</code>/<code>.list-row</code> for a row's own name or
+          value with one action attached (e.g. a Product's name + Delete, an
+          Idea's name + Edit/Delete) — instead of <code>.field-row</code> above,
+          which is for a labelled input paired with one action, not a display
+          row. Every row's action lines up in the same column regardless of how
+          long its name runs. A real <code>&lt;ul&gt;</code>/
+          <code>&lt;li&gt;</code>, not a stack of <code>&lt;div&gt;</code>s — a
+          list is a list, and assistive tech needs the actual markup to announce
+          it as one.
         </p>
       </Section>
 

@@ -237,16 +237,16 @@ function App() {
       {products.length === 0 ? (
         <p>No products yet.</p>
       ) : (
-        <ul className="product-list" aria-labelledby="products-heading">
+        <ul className="list" aria-labelledby="products-heading">
           {products.map((product) => (
-            <li className="product-row" key={product.id}>
+            <li className="list-row" key={product.id}>
               <Link
-                className="product-row-name"
+                className="list-row-name"
                 href={`/app/products/${product.id}`}
               >
                 {product.name}
               </Link>
-              <div className="product-row-action">
+              <div className="list-row-action">
                 {confirmingId === product.id || deletingId === product.id ? (
                   <div className="button-group">
                     <Button
