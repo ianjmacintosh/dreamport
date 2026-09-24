@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 
 import { TEST_EMAILS } from "../test/emails";
-import { exemptFromSendRateLimits } from "./rate-limit-exemption";
+import { exemptFromRateLimits } from "./rate-limit-exemption";
 
 // Ideas v1 slice 1 (issue #99): sign in, add a Product, open it via the link
 // on `/app`, add an Idea, see it in that Product's own list without a full
@@ -9,8 +9,8 @@ import { exemptFromSendRateLimits } from "./rate-limit-exemption";
 // (fixed `+e2e-test@` code, see docs/adr/0009) — see that file's header
 // comment for why.
 
-/** See `exemptFromSendRateLimits` for why every spec sends as one exempt IP. */
-test.beforeEach(({ page }) => exemptFromSendRateLimits(page));
+/** See `exemptFromRateLimits` for why rate-limited auth calls go out as one exempt IP. */
+test.beforeEach(({ page }) => exemptFromRateLimits(page));
 
 /** Drive `/login` from the email step through to landing on `/app`. */
 async function signIn(page: Page, email: string): Promise<void> {

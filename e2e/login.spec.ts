@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 
 import { TEST_EMAILS } from "../test/emails";
-import { exemptFromSendRateLimits } from "./rate-limit-exemption";
+import { exemptFromRateLimits } from "./rate-limit-exemption";
 
 // Every address in TEST_EMAILS used to sign in below carries the
 // `+e2e-test@` marker (issue #39, docs/adr/0009): `generateOTP` in
@@ -9,8 +9,8 @@ import { exemptFromSendRateLimits } from "./rate-limit-exemption";
 // production. `signIn` below types that fixed code straight in — no
 // `/api/test/last-otp` hook needed (that hook is gone; see `index.ts`).
 
-/** See `exemptFromSendRateLimits` for why every spec sends as one exempt IP. */
-test.beforeEach(({ page }) => exemptFromSendRateLimits(page));
+/** See `exemptFromRateLimits` for why rate-limited auth calls go out as one exempt IP. */
+test.beforeEach(({ page }) => exemptFromRateLimits(page));
 
 /**
  * The sign-in flow end to end, against the local Worker booted by
@@ -24,8 +24,9 @@ test.beforeEach(({ page }) => exemptFromSendRateLimits(page));
  * helper just waits for the hidden response field to fill before submitting.
  *
  * Rate limiting (issue #24): the `beforeEach` above sends every send-OTP
- * call as the e2e-exempt IP (#102), so neither the per-IP nor the per-email
- * limit can 429 a spec's sign-in. The global daily cap isn't exempted, but
+ * and account-deletion request as the e2e-exempt IP (#102), so neither the
+ * send path's per-IP/per-email limits nor `/delete-user`'s per-IP one can
+ * 429 a spec. The global daily cap isn't exempted, but
  * it's uncapped locally (no `RESEND_API_KEY`, see `resolveDailyCap`).
  */
 

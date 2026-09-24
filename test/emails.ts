@@ -106,6 +106,8 @@ export const TEST_EMAILS = {
   deleteDailyCap: "delivered+delete-daily-cap@resend.dev",
   /** 4th `/delete-user` inside 60s trips Better Auth's per-IP `customRules`. */
   deleteRateLimit: "delivered+delete-rate-limit@resend.dev",
+  /** Requests deletion 5x from the e2e-exempt IP; must never 429. */
+  deleteRateLimitExempt: "delivered+delete-rate-limit-exempt@resend.dev",
 
   // --- Seam 1: /api/test/last-delete-link (mock-only test hook) ---
   /** A link is sent, then read back through the test hook. */

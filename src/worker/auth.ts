@@ -189,7 +189,9 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
         // The account-deletion request path also sends an email (issue #26).
         // 3 / 60s per IP/session, matching the send-OTP rule; the global
         // daily Resend cap covers it too, in the Hono route in `index.ts`.
-        "/delete-user": { window: 60, max: 3 },
+        // Same e2e-exempt IP carve-out as the send path.
+        "/delete-user": (request) =>
+          isRateLimitExempt(request.headers) ? false : { window: 60, max: 3 },
         // #24 is scoped to the send path. Turning the limiter on globally
         // would otherwise pull Better Auth's default 3 / 10s `/sign-in*` rule
         // onto the verify endpoint as a side effect; `false` opts that path

@@ -8,6 +8,7 @@ import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 import { createApp } from "./index";
 import { recordDailySend } from "./otp-send-throttle";
+import { E2E_RATE_LIMIT_EXEMPT_IP } from "./rate-limit-exemption";
 import {
   PRODUCTION_HOST,
   PRODUCTION_HOSTS,
@@ -200,10 +201,15 @@ function signOut(cookie: string) {
  * Auth runs its origin check on this (state-changing + cookie-bearing), so it
  * carries the same `origin` + `cookie` shape as `signOut`.
  */
-function requestAccountDeletion(cookie: string) {
+function requestAccountDeletion(cookie: string, ip?: string) {
   return fetchWorker("/api/auth/delete-user", {
     method: "POST",
-    headers: { ...json, origin: TRUSTED_ORIGIN, cookie },
+    headers: {
+      ...json,
+      origin: TRUSTED_ORIGIN,
+      cookie,
+      ...(ip ? { "cf-connecting-ip": ip } : {}),
+    },
     body: JSON.stringify({ callbackURL: "/" }),
   });
 }
@@ -865,6 +871,16 @@ describe("delete account (#26)", () => {
     }
 
     expect((await requestAccountDeletion(cookie)).status).toBe(429);
+  });
+
+  it("never 429s a deletion request from the e2e-exempt IP", async () => {
+    const cookie = await signIn(TEST_EMAILS.deleteRateLimitExempt);
+
+    for (let i = 0; i < 5; i++) {
+      expect(
+        (await requestAccountDeletion(cookie, E2E_RATE_LIMIT_EXEMPT_IP)).status,
+      ).toBe(200);
+    }
   });
 });
 

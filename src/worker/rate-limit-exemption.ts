@@ -1,7 +1,8 @@
 /**
  * The client IP Playwright presents (as `cf-connecting-ip`) on every send-OTP
- * call, so e2e sign-ins never trip the send path's per-IP (3 / 60s) or
- * per-email (5 / 10min) limits (issue #102). Without it, e2e specs had to
+ * and account-deletion request, so e2e runs never trip the send path's
+ * per-IP (3 / 60s) or per-email (5 / 10min) limits, or `/delete-user`'s
+ * per-IP one (3 / 60s) (issue #102). Without it, e2e specs had to
  * spread their sends across hand-assigned IPs, and adding specs made them
  * collide into flaky 429s.
  *
@@ -13,7 +14,8 @@
 export const E2E_RATE_LIMIT_EXEMPT_IP = "2001:db8::e2e";
 
 /**
- * Whether this request skips the send path's per-IP and per-email limits:
+ * Whether this request skips the send path's per-IP and per-email limits and
+ * `/delete-user`'s per-IP limit:
  * only when `cf-connecting-ip` is exactly {@link E2E_RATE_LIMIT_EXEMPT_IP}.
  * No environment gate is needed: on any deployed environment Cloudflare's
  * edge sets `cf-connecting-ip` to the real caller's address, overwriting
