@@ -13,6 +13,7 @@ import {
   resolveDailyCap,
   WINDOW_MS,
 } from "./otp-send-throttle";
+import { E2E_RATE_LIMIT_EXEMPT_IP } from "./rate-limit-exemption";
 import type { TurnstileVerifier } from "./turnstile";
 
 /**
@@ -143,6 +144,30 @@ describe("per-IP limit on the send-OTP path", () => {
     expect(
       (await send(TEST_EMAILS.rlFillerD, { ip: "198.51.100.7" })).status,
     ).toBe(200);
+  });
+});
+
+describe("e2e rate-limit exemption on the send-OTP path", () => {
+  it("never 429s the exempt IP on either limit", async () => {
+    const ip = E2E_RATE_LIMIT_EXEMPT_IP;
+    // Past the per-IP rule (3 / 60s) across addresses...
+    for (const email of FILLERS) {
+      expect((await send(email, { ip })).status).toBe(200);
+    }
+    // ...and past the per-email rule (5 / 10min) for one address.
+    for (let i = 0; i < 6; i++) {
+      expect((await send(TEST_EMAILS.rlExemptPerEmail, { ip })).status).toBe(
+        200,
+      );
+    }
+  });
+
+  it("exempts only that exact address, not its neighbours", async () => {
+    const ip = "2001:db8:1::e2e";
+    for (const email of FILLERS.slice(0, 3)) {
+      expect((await send(email, { ip })).status).toBe(200);
+    }
+    expect((await send(TEST_EMAILS.rlFillerD, { ip })).status).toBe(429);
   });
 });
 

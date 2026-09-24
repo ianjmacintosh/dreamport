@@ -71,3 +71,24 @@ export async function deleteIdea(
     .run();
   return meta.changes > 0;
 }
+
+/**
+ * Rename an Idea under `productId`, returning it with its new name, or
+ * `null` if nothing matched. Scoped by both `id` and `productId` in the one
+ * query — same reasoning `deleteIdea` gives for itself. Caller (the route)
+ * has already confirmed `productId` belongs to the requesting User via
+ * `getProduct`, and has already validated `name`.
+ */
+export async function renameIdea(
+  db: D1Database,
+  productId: string,
+  id: string,
+  name: string,
+): Promise<Idea | null> {
+  return db
+    .prepare(
+      'UPDATE "ideas" SET "name" = ? WHERE "id" = ? AND "productId" = ? RETURNING "id", "name", "createdAt"',
+    )
+    .bind(name, id, productId)
+    .first<Idea>();
+}

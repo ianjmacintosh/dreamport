@@ -8,6 +8,7 @@ import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 import { createApp } from "./index";
 import { recordDailySend } from "./otp-send-throttle";
+import { E2E_RATE_LIMIT_EXEMPT_IP } from "./rate-limit-exemption";
 import {
   PRODUCTION_HOST,
   PRODUCTION_HOSTS,
@@ -200,10 +201,15 @@ function signOut(cookie: string) {
  * Auth runs its origin check on this (state-changing + cookie-bearing), so it
  * carries the same `origin` + `cookie` shape as `signOut`.
  */
-function requestAccountDeletion(cookie: string) {
+function requestAccountDeletion(cookie: string, ip?: string) {
   return fetchWorker("/api/auth/delete-user", {
     method: "POST",
-    headers: { ...json, origin: TRUSTED_ORIGIN, cookie },
+    headers: {
+      ...json,
+      origin: TRUSTED_ORIGIN,
+      cookie,
+      ...(ip ? { "cf-connecting-ip": ip } : {}),
+    },
     body: JSON.stringify({ callbackURL: "/" }),
   });
 }
@@ -866,6 +872,16 @@ describe("delete account (#26)", () => {
 
     expect((await requestAccountDeletion(cookie)).status).toBe(429);
   });
+
+  it("never 429s a deletion request from the e2e-exempt IP", async () => {
+    const cookie = await signIn(TEST_EMAILS.deleteRateLimitExempt);
+
+    for (let i = 0; i < 5; i++) {
+      expect(
+        (await requestAccountDeletion(cookie, E2E_RATE_LIMIT_EXEMPT_IP)).status,
+      ).toBe(200);
+    }
+  });
 });
 
 describe("GET /api/test/last-delete-link (mock-only test hook)", () => {
@@ -1289,6 +1305,21 @@ function deleteIdea(productId: string, ideaId: string, cookie?: string) {
   });
 }
 
+function renameIdea(
+  productId: string,
+  ideaId: string,
+  name: unknown,
+  cookie?: string,
+) {
+  return fetchWorker(`/api/products/${productId}/ideas/${ideaId}`, {
+    method: "PATCH",
+    headers: cookie
+      ? { ...json, origin: TRUSTED_ORIGIN, cookie }
+      : { ...json, origin: TRUSTED_ORIGIN },
+    body: JSON.stringify({ name }),
+  });
+}
+
 describe("/api/products/:productId/ideas (#99)", () => {
   it("rejects a request with no session", async () => {
     const res = await getIdeas("some-id");
@@ -1496,6 +1527,124 @@ describe("/api/products/:productId/ideas (#99)", () => {
       );
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({ error: "Not found" });
+    });
+  });
+
+  describe("rename (#102)", () => {
+    /** Sign in, add a Product and one Idea under it, return all three handles. */
+    async function withOneIdea(email: string, ideaName = "Dark mode") {
+      const cookie = await signIn(email);
+      const created = await addProduct(cookie, "Rename Product");
+      const { product } = (await created.json()) as {
+        product: { id: string; name: string; createdAt: string };
+      };
+      const createdIdea = await addIdea(product.id, cookie, ideaName);
+      const { idea } = (await createdIdea.json()) as {
+        idea: { id: string; name: string; createdAt: string };
+      };
+      return { cookie, product, idea };
+    }
+
+    it("rejects a request with no session", async () => {
+      const res = await renameIdea("some-product-id", "some-idea-id", "New");
+
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: "Not signed in" });
+    });
+
+    it("rejects a request from an untrusted origin, changing nothing", async () => {
+      const { cookie, product, idea } = await withOneIdea(
+        TEST_EMAILS.ideasRenameUntrusted,
+      );
+
+      const res = await fetchWorker(
+        `/api/products/${product.id}/ideas/${idea.id}`,
+        {
+          method: "PATCH",
+          headers: { ...json, origin: "https://evil.example.com", cookie },
+          body: JSON.stringify({ name: "Should not apply" }),
+        },
+      );
+
+      expect(res.status).toBe(403);
+      expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+        product,
+        ideas: [idea],
+      });
+    });
+
+    it("renames an Idea, trimming the name, and lists it under the new name", async () => {
+      const { cookie, product, idea } = await withOneIdea(
+        TEST_EMAILS.ideasRenameOwner,
+      );
+
+      const res = await renameIdea(
+        product.id,
+        idea.id,
+        "  Light mode  ",
+        cookie,
+      );
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        idea: { ...idea, name: "Light mode" },
+      });
+
+      expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+        product,
+        ideas: [{ ...idea, name: "Light mode" }],
+      });
+    });
+
+    it("rejects an empty, whitespace-only, missing, or over-cap name, changing nothing", async () => {
+      const { cookie, product, idea } = await withOneIdea(
+        TEST_EMAILS.ideasRenameInvalidName,
+      );
+
+      for (const name of ["", "   ", undefined, 42, "x".repeat(201)]) {
+        const res = await renameIdea(product.id, idea.id, name, cookie);
+        expect(res.status).toBe(400);
+      }
+
+      expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+        product,
+        ideas: [idea],
+      });
+    });
+
+    it("404s when a stranger tries to rename an Idea under another User's Product", async () => {
+      const {
+        cookie: cookieA,
+        product,
+        idea,
+      } = await withOneIdea(TEST_EMAILS.ideasRenameOwnerA, "Owner A's Idea");
+      const cookieB = await signIn(TEST_EMAILS.ideasRenameOwnerB);
+
+      const res = await renameIdea(product.id, idea.id, "Hijacked", cookieB);
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "Not found" });
+
+      const list = await getIdeas(product.id, cookieA);
+      const { ideas } = (await list.json()) as { ideas: { name: string }[] };
+      expect(ideas.map((i) => i.name)).toEqual(["Owner A's Idea"]);
+    });
+
+    it("404s when renaming a nonexistent Idea or one under a nonexistent Product", async () => {
+      const { cookie, product } = await withOneIdea(
+        TEST_EMAILS.ideasRenameNonexistent,
+      );
+
+      const noIdea = await renameIdea(product.id, "not-a-real-id", "X", cookie);
+      expect(noIdea.status).toBe(404);
+      expect(await noIdea.json()).toEqual({ error: "Not found" });
+
+      const noProduct = await renameIdea(
+        "not-a-real-product",
+        "not-a-real-idea",
+        "X",
+        cookie,
+      );
+      expect(noProduct.status).toBe(404);
+      expect(await noProduct.json()).toEqual({ error: "Not found" });
     });
   });
 });

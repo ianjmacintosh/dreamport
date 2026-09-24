@@ -5,6 +5,7 @@ import { D1Dialect } from "kysely-d1";
 
 import { createEmailSender, type EmailSender } from "./email/sender";
 import type { WorkerEnv } from "./env";
+import { isRateLimitExempt } from "./rate-limit-exemption";
 import { ALLOWED_HOSTS, TRUSTED_ORIGINS } from "./trusted-origins";
 
 /** Seconds in a minute / day, for the time configs below. */
@@ -181,11 +182,16 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
       // rule for this endpoint; pinning it here makes the intent explicit and
       // survives an upstream default change.
       customRules: {
-        "/email-otp/send-verification-otp": { window: 60, max: 3 },
+        // `false` for the e2e-exempt IP (see `isRateLimitExempt`), which Better
+        // Auth treats as "don't count this request at all".
+        "/email-otp/send-verification-otp": (request) =>
+          isRateLimitExempt(request.headers) ? false : { window: 60, max: 3 },
         // The account-deletion request path also sends an email (issue #26).
         // 3 / 60s per IP/session, matching the send-OTP rule; the global
         // daily Resend cap covers it too, in the Hono route in `index.ts`.
-        "/delete-user": { window: 60, max: 3 },
+        // Same e2e-exempt IP carve-out as the send path.
+        "/delete-user": (request) =>
+          isRateLimitExempt(request.headers) ? false : { window: 60, max: 3 },
         // #24 is scoped to the send path. Turning the limiter on globally
         // would otherwise pull Better Auth's default 3 / 10s `/sign-in*` rule
         // onto the verify endpoint as a side effect; `false` opts that path

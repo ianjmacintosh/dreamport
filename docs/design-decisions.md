@@ -53,4 +53,12 @@ Add an entry only once a sign-off conversation resolves something repeatable
   `.list`/`.list-row` pattern — real `<ul>`/`<li>`, not `.field-row`
   (which is for a labelled input, not a display value). See `src/global.css`
   and the style guide's "Row with action" section (decided in #90, generalized
-  off "Product" naming in #101).
+  off "Product" naming in #101). Each row is laid out on its own — no row's
+  layout depends on another's, so one row changing mode (confirming,
+  editing) never shifts the rest (decided in #102, replacing #90's shared
+  column).
+
+- A row edited in place (e.g. renaming an Idea) swaps its content for a
+  `.field-row` spanning the whole row. When the field needs more than one
+  action (Save / Cancel / Delete), they go in a `.button-group` in the
+  field-row's button slot (decided in #102).

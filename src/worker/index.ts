@@ -29,7 +29,9 @@ import {
   deleteIdea,
   IDEA_NAME_MAX_LENGTH,
   listIdeas,
+  renameIdea,
 } from "./ideas";
+import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
 /**
@@ -50,6 +52,30 @@ const TURNSTILE_ACTION = "send-otp";
  */
 function currentSession(c: Context<{ Bindings: WorkerEnv }>) {
   return createAuth(c.env).api.getSession({ headers: c.req.raw.headers });
+}
+
+/**
+ * Parse and validate an Idea `name` from the request body — shared by
+ * create (POST) and rename (PATCH) so both enforce the same rule: a
+ * string, non-empty after trimming, at most `IDEA_NAME_MAX_LENGTH`.
+ * Returns the trimmed name, or the 400 response to send instead.
+ */
+async function readIdeaName(c: Context<{ Bindings: WorkerEnv }>) {
+  const body = await c.req.json().catch(() => null);
+  const name =
+    body && typeof body === "object" && typeof body.name === "string"
+      ? body.name.trim()
+      : "";
+  if (!name) {
+    return c.json({ error: "name is required" }, 400);
+  }
+  if (name.length > IDEA_NAME_MAX_LENGTH) {
+    return c.json(
+      { error: `name must be ${IDEA_NAME_MAX_LENGTH} characters or fewer` },
+      400,
+    );
+  }
+  return name;
 }
 
 /**
@@ -189,7 +215,9 @@ export function createApp(deps: AppDeps = {}) {
       // Malformed JSON — fall through with no email; the handler 400s.
     }
 
-    if (email) {
+    // The e2e-exempt IP skips this limit the same way it skips Better Auth's
+    // per-IP one (see `isRateLimitExempt`).
+    if (email && !isRateLimitExempt(c.req.raw.headers)) {
       const budget = await peekOtpSendBudget(c.env.DB, email);
       if (!budget.allowed) return tooManyRequests(budget.retryAfter);
     }
@@ -419,19 +447,9 @@ export function createApp(deps: AppDeps = {}) {
       return c.json({ error: "Not found" }, 404);
     }
 
-    const body = await c.req.json().catch(() => null);
-    const name =
-      body && typeof body === "object" && typeof body.name === "string"
-        ? body.name.trim()
-        : "";
-    if (!name) {
-      return c.json({ error: "name is required" }, 400);
-    }
-    if (name.length > IDEA_NAME_MAX_LENGTH) {
-      return c.json(
-        { error: `name must be ${IDEA_NAME_MAX_LENGTH} characters or fewer` },
-        400,
-      );
+    const name = await readIdeaName(c);
+    if (typeof name !== "string") {
+      return name;
     }
 
     const idea = await createIdea(c.env.DB, product.id, name);
@@ -477,6 +495,56 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     return c.json({}, 200);
+  });
+
+  /**
+   * Issue #102: rename an Idea under a Product that belongs to the
+   * signed-in User. Same origin check, session gate, and `getProduct`
+   * ownership check as the DELETE route above, and the same `name`
+   * validation as create (`readIdeaName`). Zero rows matched reads as 404,
+   * never 403, for the same reason DELETE gives. Responds with the renamed
+   * Idea so the client shows the stored (trimmed) name, not its own copy.
+   */
+  app.patch("/api/products/:productId/ideas/:id", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const name = await readIdeaName(c);
+    if (typeof name !== "string") {
+      return name;
+    }
+
+    const idea = await renameIdea(
+      c.env.DB,
+      product.id,
+      c.req.param("id"),
+      name,
+    );
+    if (!idea) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json({ idea }, 200);
   });
 
   /**

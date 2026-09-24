@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 
 import { TEST_EMAILS } from "../test/emails";
+import { exemptFromRateLimits } from "./rate-limit-exemption";
 
 // Every address in TEST_EMAILS used to sign in below carries the
 // `+e2e-test@` marker (issue #39, docs/adr/0009): `generateOTP` in
@@ -8,27 +9,8 @@ import { TEST_EMAILS } from "../test/emails";
 // production. `signIn` below types that fixed code straight in — no
 // `/api/test/last-otp` hook needed (that hook is gone; see `index.ts`).
 
-/**
- * Give every spec its own per-IP send-OTP bucket. Locally the browser sends no
- * `cf-connecting-ip`, so without this every send in the run shares one 3 / 60s
- * bucket (`auth.ts` `rateLimit`), and this file now issues more than three
- * sign-ins across its specs — sequentially and across parallel workers. The
- * route is scoped to the send-OTP call only: putting the header on every
- * request (via `setExtraHTTPHeaders`) also rewrites the Turnstile widget's
- * calls to `challenges.cloudflare.com` and the challenge never solves.
- */
-let sendBucket = 0;
-test.beforeEach(async ({ page }, testInfo) => {
-  const octet = (testInfo.workerIndex * 40 + sendBucket++) % 256;
-  const ip = `203.0.113.${octet}`;
-  await page.route(
-    "**/api/auth/email-otp/send-verification-otp",
-    (route) =>
-      void route.continue({
-        headers: { ...route.request().headers(), "cf-connecting-ip": ip },
-      }),
-  );
-});
+/** See `exemptFromRateLimits` for why rate-limited auth calls go out as one exempt IP. */
+test.beforeEach(({ page }) => exemptFromRateLimits(page));
 
 /**
  * The sign-in flow end to end, against the local Worker booted by
@@ -41,11 +23,11 @@ test.beforeEach(async ({ page }, testInfo) => {
  * CI job env), so the Turnstile widget on the email step auto-solves; the
  * helper just waits for the hidden response field to fill before submitting.
  *
- * Rate limiting (issue #24): the `beforeEach` above gives each spec its own
- * per-IP send-OTP bucket, so one spec's sends can't 429 another's — including
- * on a CI retry (`retries: 2`). The per-email limiter is a non-issue here
- * (every spec uses a distinct `@resend.dev` address) and the global daily cap
- * (default 90) has ample headroom.
+ * Rate limiting (issue #24): the `beforeEach` above sends every send-OTP
+ * and account-deletion request as the e2e-exempt IP (#102), so neither the
+ * send path's per-IP/per-email limits nor `/delete-user`'s per-IP one can
+ * 429 a spec. The global daily cap isn't exempted, but
+ * it's uncapped locally (no `RESEND_API_KEY`, see `resolveDailyCap`).
  */
 
 /** Open `/login` the way a visitor does: from the homepage header link. */

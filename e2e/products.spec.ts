@@ -1,6 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 
 import { TEST_EMAILS } from "../test/emails";
+import { expectOtherRowsUnaffected, LAYOUT_WIDTHS } from "./list-rows";
+import { exemptFromRateLimits } from "./rate-limit-exemption";
 
 // Products v1: sign in, add a Product, see it in the list without a full
 // page reload (slice 1, issue #88), delete one (slice 2, issue #89), behind
@@ -8,19 +10,8 @@ import { TEST_EMAILS } from "../test/emails";
 // way `login.spec.ts` does (fixed `+e2e-test@` code, see docs/adr/0009) —
 // see that file's header comment for why.
 
-/** Give this spec its own per-IP send-OTP bucket, same reasoning as `login.spec.ts`. */
-let sendBucket = 0;
-test.beforeEach(async ({ page }, testInfo) => {
-  const octet = (testInfo.workerIndex * 40 + sendBucket++) % 256;
-  const ip = `203.0.113.${octet}`;
-  await page.route(
-    "**/api/auth/email-otp/send-verification-otp",
-    (route) =>
-      void route.continue({
-        headers: { ...route.request().headers(), "cf-connecting-ip": ip },
-      }),
-  );
-});
+/** See `exemptFromRateLimits` for why rate-limited auth calls go out as one exempt IP. */
+test.beforeEach(({ page }) => exemptFromRateLimits(page));
 
 /** Drive `/login` from the email step through to landing on `/app`. */
 async function signIn(page: Page, email: string): Promise<void> {
@@ -188,4 +179,32 @@ test("even a near-instant delete holds the pending row for a minimum duration", 
   await expect(page.getByText(productName)).not.toBeVisible({
     timeout: 2_000,
   });
+});
+
+// Issue #102: each row is laid out on its own, so one row's Confirm/Cancel
+// reveal never shifts the others — at desktop or phone width.
+test("confirming one Product row leaves every other row's layout unchanged", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eProductRowsIndependent;
+  const names = [
+    `Short ${Date.now()}`,
+    `A product with a much longer name than usual ${Date.now()}`,
+  ];
+
+  await signIn(page, email);
+  for (const name of names) {
+    await page.getByLabel("Product name").fill(name);
+    await page.getByRole("button", { name: "Add product" }).click();
+    await expect(page.getByText(name)).toBeVisible();
+  }
+
+  const row = page.locator("li").filter({ hasText: names[0] });
+  for (const width of LAYOUT_WIDTHS) {
+    await page.setViewportSize({ width, height: 800 });
+    await expectOtherRowsUnaffected(page, row, () =>
+      row.getByRole("button", { name: "Delete" }).click(),
+    );
+    await row.getByRole("button", { name: "Cancel" }).click();
+  }
 });
