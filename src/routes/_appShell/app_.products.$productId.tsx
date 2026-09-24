@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
+import Link from "../../components/Link";
 import TextInput from "../../components/TextInput";
 
 /** A Product as `/api/products/:productId/ideas` returns it (see `src/worker/products.ts`). */
@@ -69,6 +70,13 @@ const CONNECTION_FAILED =
  * free correctness, not design-system elaboration, the same tier as
  * `<h1>` over a styled `<div>` — with `aria-labelledby` pointing at the
  * `<h1>`'s own id, same `/app`-established pattern.
+ *
+ * Ends with a plain `<Link href="/app">Back to Products</Link>` — this page
+ * otherwise had no way back to the Products list. Same markup
+ * `/app/settings` already uses for its own "Back to Products" link, not a
+ * new component; whether this grows into a dedicated nav/breadcrumb
+ * component (here and retrofitted onto Settings) is its own sign-off
+ * question deferred to #101.
  */
 function ProductIdeas() {
   const { product, ideas: initialIdeas } = Route.useRouteContext();
@@ -142,6 +150,10 @@ function ProductIdeas() {
       )}
 
       {error && <p role="alert">{error}</p>}
+
+      <p>
+        <Link href="/app">Back to Products</Link>
+      </p>
     </>
   );
 }

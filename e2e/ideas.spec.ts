@@ -70,4 +70,8 @@ test("sign in, add a Product, open it, add an Idea, and see it in the list", asy
   // No full page reload: the field clears and is ready for the next entry
   // without the page itself having navigated.
   await expect(page.getByLabel("Idea name")).toHaveValue("");
+
+  await page.getByRole("link", { name: "Back to Products" }).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByText(productName)).toBeVisible();
 });
