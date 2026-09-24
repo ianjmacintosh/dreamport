@@ -26,8 +26,8 @@ branch — each Workers Builds project sets it inline in its own **Build
 command**, and that command is the whole of what each project needs from the
 dashboard:
 
-- `dreamport` — `CLOUDFLARE_ENV=production npm run build`
-- `dreamport-staging` — `CLOUDFLARE_ENV=staging npm run build`
+- `dreamport` — `npm run migrate:production && CLOUDFLARE_ENV=production npm run build`
+- `dreamport-staging` — `npm run migrate:staging && CLOUDFLARE_ENV=staging npm run build`
 
 `CLOUDFLARE_ENV` set this way is the one build input that has always reached
 the build reliably (it shows up verbatim in the Workers Builds log:
@@ -87,9 +87,14 @@ This command starts Vite with the Cloudflare plugin, using the `local` env setti
 The `dreamport-staging` Workers Builds project builds every branch pushed to
 this repo. Its "production branch" setting points at a branch that's never
 pushed to, so every build takes the version path (`wrangler versions
-upload`), not an automatic promote-to-live. Its Build command is fixed
-(`CLOUDFLARE_ENV=staging npm run build` — see the [Build step](#build-step)).
-Every build uploads a preview version at
+upload`), not an automatic promote-to-live. Its Build command is
+`npm run migrate:staging && CLOUDFLARE_ENV=staging npm run build` (see
+[Migrations](#migrations) and the [Build step](#build-step)) — every build
+applies whatever's pending to the shared `dreamport-stage` D1 first, so a
+branch carrying a new migration never previews against a database that
+doesn't have it yet (issue #47; see that section for why this runs on
+every build rather than only the ones that matter). Every build uploads a
+preview version at
 `????????-dreamport-staging.bananasquad.workers.dev`.
 
 **The long-lived staging host is the bare
@@ -131,9 +136,11 @@ the `workers.dev` host is staging.
 ### Production
 
 The `dreamport` Workers Builds project's production branch is `main`, its
-Build command is fixed (`CLOUDFLARE_ENV=production npm run build` — see the
-[Build step](#build-step)), and non-production-branch builds are disabled on
-this project — feature branches build under `dreamport-staging` instead.
+Build command is
+`npm run migrate:production && CLOUDFLARE_ENV=production npm run build`
+(see [Migrations](#migrations) and the [Build step](#build-step)), and
+non-production-branch builds are disabled on this project — feature
+branches build under `dreamport-staging` instead.
 
 When a change lands on `main`, Cloudflare builds and deploys it to `dreamport.ianjmacintosh.com`
 
@@ -354,12 +361,17 @@ Environment is set at **build** time, not deploy time.
 
 The specific build and deploy commands are managed per-project in the Cloudflare web UI:
 
-| Setting                                   | `dreamport` (production)                  | `dreamport-staging` (staging)          |
-| ----------------------------------------- | ----------------------------------------- | -------------------------------------- |
-| Build command                             | `CLOUDFLARE_ENV=production npm run build` | `CLOUDFLARE_ENV=staging npm run build` |
-| Production branch                         | `main`                                    | (never pushed to)                      |
-| Deploy command (production-branch pushes) | `npx wrangler deploy`                     | `npx wrangler deploy`                  |
-| Version command (other branches)          | _(disabled)_                              | `npx wrangler versions upload`         |
+| Setting                                   | `dreamport` (production)                                                | `dreamport-staging` (staging)                                     |
+| ----------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Build command                             | `npm run migrate:production && CLOUDFLARE_ENV=production npm run build` | `npm run migrate:staging && CLOUDFLARE_ENV=staging npm run build` |
+| Production branch                         | `main`                                                                  | (never pushed to)                                                 |
+| Deploy command (production-branch pushes) | `npx wrangler deploy`                                                   | `npx wrangler deploy`                                             |
+| Version command (other branches)          | _(disabled)_                                                            | `npx wrangler versions upload`                                    |
+
+Migrations run as the first step of the Build command itself, before
+`vite build` even starts (see [Migrations](#migrations)) — so neither a
+deploy nor a preview ever runs code against a schema that isn't there yet
+(issue #47).
 
 `CLOUDFLARE_ENV` is set only in the Build command string, never as a separate
 dashboard Build _variable_; `VITE_TURNSTILE_SITE_KEY` isn't set in the
@@ -398,8 +410,6 @@ code is live. That deploy also picks up the optional `SEND_OTP_DAILY_CAP` var
 sends/UTC-day app-wide, sized for Resend's free tier — raise it in
 `wrangler.jsonc` per environment when the plan grows.
 
-Apply them per environment:
-
 ```bash
 npm run migrate:dev
 npm run migrate:staging
@@ -414,17 +424,39 @@ running it. Without `--remote` you hit the local Miniflare copy instead.
 directly. Deploys don't — they go through the build output and take
 `CLOUDFLARE_ENV` instead (see [Deploying](#deploying)).
 
-### Order relative to a deploy
+`dev` has no Workers Builds project (see [Environments](#environments)), so
+`npm run migrate:dev` stays a manual step whenever `dreamport-dev` needs a
+schema change. Staging and production don't — see below.
 
-Migrations are additive and go out **before** the code that depends on the new
-schema, so deployed code never reads a column that doesn't exist yet:
+### Order relative to a deploy (issue #47)
 
-1. Merge the migration and code change to `main`.
-2. **Staging:** `npm run migrate:staging`, then let a preview deploy run (or
-   run the project's Build command from the table above, then
-   `npx wrangler versions upload`). Check sign-in still works.
-3. **Production:** `npm run migrate:production`, then let the `main` deploy run
-   (or the Build command from the table above, then `npx wrangler deploy`).
+Migrations are additive and go out **before** the code that depends on the
+new schema, so deployed code never reads a column that doesn't exist yet.
+For staging and production, this ordering is enforced by the Build command
+itself (see [Deploying](#deploying)) rather than a manual step someone has
+to remember: `npm run migrate:<env>` runs first, and only if it succeeds
+does `vite build`/the actual deploy proceed. Merge the migration and the
+code that depends on it together, in one PR to `main` — the next build of
+each project (staging: any branch push; production: the `main` merge
+itself) picks up whatever's pending and applies it before that build's own
+code goes live.
+
+This replaced an earlier manual-only process (`npm run migrate:staging`/
+`migrate:production` run by hand before letting a deploy through) after it
+silently failed twice: issue #24's rate limiter 500'd the entire staging
+auth API for a window because its migration wasn't applied before the
+branch preview deployed, and Products v1 (#88) shipped to both staging and
+production without anyone running its migration at all, undetected simply
+because nothing was reading from the new table's absence until this was
+written. `npm run migrate:staging`/`migrate:production` still exist as
+plain scripts — useful to apply something ahead of a build on purpose, or
+to check with `list` — but they're no longer a required manual step in the
+normal flow.
+
+Only additive migrations are safe to run this way, ahead of and separate
+from the code deploy — see `migrations/README.md`. A future destructive
+migration still needs its own expand/contract sequence; this mechanism
+doesn't change that.
 
 Roll forward, not back: fix a bad migration with another migration. D1 has no
 transactions (see [ADR-0002](adr/0002-better-auth-over-homegrown.md)), so a
