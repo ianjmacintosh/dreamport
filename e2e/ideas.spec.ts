@@ -161,3 +161,71 @@ test("sign in, add a Product, add an Idea, click Delete to reveal Confirm/Cancel
     ideaListItem.getByRole("button", { name: "Delete" }),
   ).toBeVisible();
 });
+
+// Issue #102: add an Idea, rename it in place, and see the new name.
+test("sign in, add a Product, add an Idea, rename it, and see the new name", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eRenameIdea;
+  const productName = `Rename test product ${Date.now()}`;
+  const ideaName = `Rename test idea ${Date.now()}`;
+  const newName = `Renamed idea ${Date.now()}`;
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("link", { name: productName }).click();
+  await expect(page).toHaveURL(/\/app\/products\/.+/);
+
+  await page.getByLabel("Idea name").fill(ideaName);
+  await page.getByRole("button", { name: "Add idea" }).click();
+  await expect(page.getByText(ideaName)).toBeVisible();
+
+  const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
+  await ideaListItem.getByRole("button", { name: "Edit" }).click();
+
+  const renameField = page.getByLabel(`Rename ${ideaName}`);
+  await expect(renameField).toHaveValue(ideaName);
+  await renameField.fill(newName);
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page.getByText(newName)).toBeVisible();
+  await expect(page.getByText(ideaName)).not.toBeVisible();
+  await expect(renameField).not.toBeVisible();
+
+  // Persisted, not just local state: survives a reload.
+  await page.reload();
+  await expect(page.getByText(newName)).toBeVisible();
+});
+
+// Issue #102: Cancel backs out of a rename without saving.
+test("sign in, add a Product, add an Idea, click Edit, then Cancel backs out without saving", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eRenameIdeaCancel;
+  const productName = `Rename cancel product ${Date.now()}`;
+  const ideaName = `Rename cancel idea ${Date.now()}`;
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("link", { name: productName }).click();
+  await expect(page).toHaveURL(/\/app\/products\/.+/);
+
+  await page.getByLabel("Idea name").fill(ideaName);
+  await page.getByRole("button", { name: "Add idea" }).click();
+  await expect(page.getByText(ideaName)).toBeVisible();
+
+  const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
+  await ideaListItem.getByRole("button", { name: "Edit" }).click();
+  await page.getByLabel(`Rename ${ideaName}`).fill("Should not be saved");
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  await expect(page.getByText(ideaName)).toBeVisible();
+  await expect(page.getByText("Should not be saved")).not.toBeVisible();
+  await expect(
+    ideaListItem.getByRole("button", { name: "Edit" }),
+  ).toBeVisible();
+});

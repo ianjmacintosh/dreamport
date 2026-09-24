@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
@@ -11,7 +11,7 @@ import TextInput from "../../components/TextInput";
  * dev-server shutdown, unlike a hard kill which refuses the connection
  * outright), the request hangs forever: no error, no way for the caller's
  * `catch` to ever run. This aborts the request after `timeoutMs` so
- * `deleteIdea` always lands in its `catch` block instead of leaving the UI
+ * `deleteIdea`/`saveIdea` always land in their `catch` block instead of leaving the UI
  * stuck with no feedback.
  */
 function fetchWithTimeout(
@@ -101,8 +101,14 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
   component: ProductIdeas,
 });
 
+/** The rename `<form>`'s id — Save sits outside it, so it submits via `form`. */
+function renameFormId(ideaId: string): string {
+  return `rename-idea-${ideaId}`;
+}
+
 const ADD_IDEA_FAILED = "We couldn't add that. Try again in a moment.";
 const DELETE_IDEA_FAILED = "We couldn't delete that. Try again in a moment.";
+const SAVE_IDEA_FAILED = "We couldn't save that. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -127,6 +133,13 @@ const CONNECTION_FAILED =
  * new component; whether this grows into a dedicated nav/breadcrumb
  * component (here and retrofitted onto Settings) is its own sign-off
  * question deferred to #101.
+ *
+ * Rename (#102) swaps a row in place, one row at a time: its name becomes a
+ * pre-filled `TextInput` inside a `<form>` in the name column, and its
+ * Edit/Delete pair becomes Save/Cancel in the action column (`Save` submits
+ * that form via the `form` attribute, since the two sit in separate grid
+ * cells). Reuses existing primitives only — no sign-off yet on this shape;
+ * its final polish is #101's to decide once it can react to the real thing.
  */
 function ProductIdeas() {
   const { product, ideas: initialIdeas } = Route.useRouteContext();
@@ -139,6 +152,10 @@ function ProductIdeas() {
   // track them.
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  // Same single-id convention for rename (#102): one row editing at a time.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   async function addIdea() {
     setError("");
@@ -196,6 +213,47 @@ function ProductIdeas() {
     }
   }
 
+  // Editing and confirming a delete are mutually exclusive across the whole
+  // list — entering either one leaves the other.
+  function startEditing(idea: Idea) {
+    setError("");
+    setConfirmingId(null);
+    setEditingId(idea.id);
+    setEditName(idea.name);
+  }
+
+  async function saveIdea(id: string) {
+    setError("");
+    setIsSaving(true);
+    try {
+      const saved = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(
+          `/api/products/${product.id}/ideas/${id}`,
+          {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ name: editName }),
+          },
+        );
+        if (!res.ok) {
+          return null;
+        }
+        return ((await res.json()) as { idea: Idea }).idea;
+      });
+      if (!saved) {
+        setError(SAVE_IDEA_FAILED);
+        return;
+      }
+      // The server's copy, not `editName` — it's the trimmed, stored name.
+      setIdeas((prev) => prev.map((idea) => (idea.id === id ? saved : idea)));
+      setEditingId(null);
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <>
       <h1 id="ideas-heading">Product: {product.name}</h1>
@@ -231,35 +289,102 @@ function ProductIdeas() {
         <ul className="list" aria-labelledby="ideas-heading">
           {ideas.map((idea) => (
             <li className="list-row" key={idea.id}>
-              <span className="list-row-name">{idea.name}</span>
-              <div className="list-row-action">
-                {confirmingId === idea.id || deletingId === idea.id ? (
-                  <div className="button-group">
-                    <Button
-                      disabled={deletingId === idea.id}
-                      state={deletingId === idea.id ? "deleting" : "confirming"}
-                      onClick={() => void deleteIdea(idea.id)}
-                    >
-                      <Button.State name="confirming">Confirm</Button.State>
-                      <Button.State name="deleting">Deleting…</Button.State>
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={deletingId === idea.id}
-                      onClick={() => setConfirmingId(null)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    onClick={() => setConfirmingId(idea.id)}
+              {/* Keyed so React never reuses the resting row's Edit
+                  `<button>` as Save's submit button — reused mid-click, that
+                  click's default action would submit the rename form the
+                  instant it appears. */}
+              {editingId === idea.id ? (
+                <Fragment key="editing">
+                  <form
+                    id={renameFormId(idea.id)}
+                    className="list-row-name"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void saveIdea(idea.id);
+                    }}
                   >
-                    Delete
-                  </Button>
-                )}
-              </div>
+                    <TextInput
+                      id={`${renameFormId(idea.id)}-name`}
+                      label={`Rename ${idea.name}`}
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      maxLength={IDEA_NAME_MAX_LENGTH}
+                      disabled={isSaving}
+                      required
+                    />
+                  </form>
+                  <div className="list-row-action">
+                    <div className="button-group">
+                      <Button
+                        type="submit"
+                        form={renameFormId(idea.id)}
+                        disabled={isSaving}
+                        state={isSaving ? "saving" : "ready"}
+                      >
+                        <Button.State name="ready">Save</Button.State>
+                        <Button.State name="saving">Saving…</Button.State>
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={isSaving}
+                        onClick={() => {
+                          setError("");
+                          setEditingId(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </Fragment>
+              ) : (
+                <Fragment key="display">
+                  <span className="list-row-name">{idea.name}</span>
+                  <div className="list-row-action">
+                    {confirmingId === idea.id || deletingId === idea.id ? (
+                      <div className="button-group">
+                        <Button
+                          disabled={deletingId === idea.id}
+                          state={
+                            deletingId === idea.id ? "deleting" : "confirming"
+                          }
+                          onClick={() => void deleteIdea(idea.id)}
+                        >
+                          <Button.State name="confirming">Confirm</Button.State>
+                          <Button.State name="deleting">Deleting…</Button.State>
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          disabled={deletingId === idea.id}
+                          onClick={() => setConfirmingId(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="button-group">
+                        <Button
+                          variant="secondary"
+                          disabled={isSaving}
+                          onClick={() => startEditing(idea)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          disabled={isSaving}
+                          onClick={() => {
+                            setEditingId(null);
+                            setConfirmingId(idea.id);
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </Fragment>
+              )}
             </li>
           ))}
         </ul>

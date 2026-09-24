@@ -163,6 +163,20 @@ export const TEST_EMAILS = {
   ideasDeleteNonexistentProduct:
     "delivered+ideas-delete-nonexistent-product@resend.dev",
 
+  // --- Seam 1: PATCH /api/products/:productId/ideas/:id (#102) ---
+  /** Rejects a rename from an untrusted origin, leaving the name intact. */
+  ideasRenameUntrusted: "delivered+ideas-rename-untrusted@resend.dev",
+  /** Adds an Idea, renames it, then reads the new name back in the list. */
+  ideasRenameOwner: "delivered+ideas-rename-owner@resend.dev",
+  /** Owner side of the Ideas rename ownership boundary check. */
+  ideasRenameOwnerA: "delivered+ideas-rename-owner-a@resend.dev",
+  /** Other User whose rename of A's Idea must 404, not succeed. */
+  ideasRenameOwnerB: "delivered+ideas-rename-owner-b@resend.dev",
+  /** Renames to an empty/whitespace/over-cap name; expects 400s and no change. */
+  ideasRenameInvalidName: "delivered+ideas-rename-invalid-name@resend.dev",
+  /** Renames an Idea id that was never created; expects a 404. */
+  ideasRenameNonexistent: "delivered+ideas-rename-nonexistent@resend.dev",
+
   // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
   // Every address below carries the `+e2e-test@` marker (issue #39): the
   // `+<scenario>` label sits ahead of it, so e.g. "e2e-happy" tags the
@@ -204,6 +218,10 @@ export const TEST_EMAILS = {
   e2eDeleteIdea: "delivered+e2e-delete-idea+e2e-test@resend.dev",
   /** Ideas v1 slice 2 (#100): clicking Delete reveals Confirm/Cancel; Cancel backs out without deleting. */
   e2eDeleteIdeaReveal: "delivered+e2e-delete-idea-reveal+e2e-test@resend.dev",
+  /** #102: add a Product, add an Idea, rename it, see the new name. */
+  e2eRenameIdea: "delivered+e2e-rename-idea+e2e-test@resend.dev",
+  /** #102: clicking Edit then Cancel backs out without saving. */
+  e2eRenameIdeaCancel: "delivered+e2e-rename-idea-cancel+e2e-test@resend.dev",
   /**
    * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
    * against a real deployed environment. Deliberately NOT a `+e2e-test@`
