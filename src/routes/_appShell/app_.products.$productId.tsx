@@ -112,7 +112,7 @@ function ProductIdeas() {
 
   return (
     <>
-      <h1 id="ideas-heading">{product.name}</h1>
+      <h1 id="ideas-heading">Product: {product.name}</h1>
       <form
         onSubmit={(e) => {
           e.preventDefault();
