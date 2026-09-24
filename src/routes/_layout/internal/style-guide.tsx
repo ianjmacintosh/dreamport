@@ -438,9 +438,9 @@ function StyleGuide() {
           Idea's name + Edit/Delete) — instead of <code>.field-row</code> above,
           which is for a labelled input paired with one action, not a display
           row. Each row is laid out on its own — one row switching to a wider
-          action set (a Confirm/Cancel reveal, an inline rename) never shifts
-          the others — while rows with the same actions still share a right
-          edge. Below 640px every row stacks: name, then actions. A real{" "}
+          action set (a Delete/Cancel reveal, an inline rename) never shifts the
+          others — while rows with the same actions still share a right edge.
+          Below 640px every row stacks: name, then actions. A real{" "}
           <code>&lt;ul&gt;</code>/<code>&lt;li&gt;</code>, not a stack of{" "}
           <code>&lt;div&gt;</code>s — a list is a list, and assistive tech needs
           the actual markup to announce it as one.

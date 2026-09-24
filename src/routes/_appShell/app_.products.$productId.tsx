@@ -113,28 +113,27 @@ const CONNECTION_FAILED =
  *
  * Composed from `TextInput`/`Button` plus heading/paragraph primitives in
  * plain document order, same minimal treatment `/app`'s own Products list
- * had at #88 — the Grid-aligned row layout `/app` now has is #90's later
- * polish pass, and whether Ideas share that pattern is explicitly deferred
- * to its own design sign-off (#101). The add-Idea field and its button sit
+ * had at #88. The add-Idea field and its button sit
  * in `.field-row`, the same side-by-side primitive `/app`'s own add-Product
  * form uses. The list itself is a real `<ul>`/`<li>` (no class on either) —
  * free correctness, not design-system elaboration, the same tier as
- * `<h1>` over a styled `<div>` — with `aria-labelledby` pointing at the
- * `<h1>`'s own id, same `/app`-established pattern.
+ * `<h1>` over a styled `<div>` — with `aria-labelledby` pointing at its own
+ * "Ideas" `<h2>` rather than the page's `<h1>`, so it's announced as
+ * "Ideas, list," not "Product: {name}, list" (#101).
  *
  * Ends with a plain `<Link href="/app">Back to Products</Link>` — this page
  * otherwise had no way back to the Products list. Same markup
  * `/app/settings` already uses for its own "Back to Products" link, not a
  * new component; whether this grows into a dedicated nav/breadcrumb
  * component (here and retrofitted onto Settings) is its own sign-off
- * question deferred to #101.
+ * question, tracked in #109.
  *
  * Rename (#102) swaps a row in place, one row at a time. Resting, a row's
  * actions are Edit / Delete. Editing, its name becomes a `.field-row` — a
  * pre-filled "Rename" `TextInput` with Save / Cancel / Delete as its attached
  * `.button-group`. Clicking Delete (from either)
- * shows Edit / Confirm / Cancel. Whether "Confirm"/"Save" should keep the
- * action's own verb instead is an open question for #101's design pass.
+ * shows Edit / Delete / Cancel — the confirming button keeps the action's own
+ * verb, "Delete," rather than a generic "Confirm" (#101).
  */
 function ProductIdeas() {
   const { product, ideas: initialIdeas } = Route.useRouteContext();
@@ -284,10 +283,11 @@ function ProductIdeas() {
           </Button>
         </div>
       </form>
+      <h2 id="ideas-list-heading">Ideas</h2>
       {ideas.length === 0 ? (
         <p>No ideas yet.</p>
       ) : (
-        <ul className="list" aria-labelledby="ideas-heading">
+        <ul className="list" aria-labelledby="ideas-list-heading">
           {ideas.map((idea) => (
             <li className="list-row" key={idea.id}>
               {/* Keyed so React builds each mode's buttons fresh rather than
@@ -363,7 +363,7 @@ function ProductIdeas() {
                             onClick={() => void deleteIdea(idea.id)}
                           >
                             <Button.State name="confirming">
-                              Confirm
+                              Delete
                             </Button.State>
                             <Button.State name="deleting">
                               Deleting…

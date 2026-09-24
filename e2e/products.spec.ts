@@ -92,12 +92,12 @@ test("sign in, add a Product, delete it, and confirm it's gone", async ({
 
   const row = page.getByText(productName).locator("..");
   await row.getByRole("button", { name: "Delete" }).click();
-  await row.getByRole("button", { name: "Confirm" }).click();
+  await row.getByRole("button", { name: "Delete" }).click();
 
   await expect(page.getByText(productName)).not.toBeVisible();
 });
 
-test("clicking Delete reveals Confirm/Cancel without deleting, and Cancel backs out", async ({
+test("clicking Delete reveals a confirming Delete/Cancel without deleting, and Cancel backs out", async ({
   page,
 }) => {
   const email = TEST_EMAILS.e2eDeleteProductReveal;
@@ -112,9 +112,11 @@ test("clicking Delete reveals Confirm/Cancel without deleting, and Cancel backs 
   const row = page.getByText(productName).locator("..");
   await row.getByRole("button", { name: "Delete" }).click();
 
-  await expect(row.getByRole("button", { name: "Confirm" })).toBeVisible();
+  // The confirming button says "Delete" too (#101), so the reveal shows up
+  // as Cancel appearing alongside one Delete — the resting one swapped out,
+  // not a second one added.
   await expect(row.getByRole("button", { name: "Cancel" })).toBeVisible();
-  await expect(row.getByRole("button", { name: "Delete" })).not.toBeVisible();
+  await expect(row.getByRole("button", { name: "Delete" })).toHaveCount(1);
 
   await row.getByRole("button", { name: "Cancel" }).click();
 
@@ -145,7 +147,7 @@ test("the Delete button disables and relabels while the request is in flight", a
 
   const row = page.getByText(productName).locator("..");
   await row.getByRole("button", { name: "Delete" }).click();
-  await row.getByRole("button", { name: "Confirm" }).click();
+  await row.getByRole("button", { name: "Delete" }).click();
 
   await expect(row.getByRole("button", { name: "Deleting…" })).toBeDisabled();
   await expect(page.getByText(productName)).not.toBeVisible({
@@ -171,7 +173,7 @@ test("even a near-instant delete holds the pending row for a minimum duration", 
   // settled, before app.tsx's minimum-duration floor had actually elapsed.
   const row = page.getByText(productName).locator("..");
   await row.getByRole("button", { name: "Delete" }).click();
-  await row.getByRole("button", { name: "Confirm" }).click();
+  await row.getByRole("button", { name: "Delete" }).click();
 
   await page.waitForTimeout(200);
   await expect(row.getByRole("button", { name: "Deleting…" })).toBeVisible();
@@ -181,7 +183,7 @@ test("even a near-instant delete holds the pending row for a minimum duration", 
   });
 });
 
-// Issue #102: each row is laid out on its own, so one row's Confirm/Cancel
+// Issue #102: each row is laid out on its own, so one row's Delete/Cancel
 // reveal never shifts the others — at desktop or phone width.
 test("confirming one Product row leaves every other row's layout unchanged", async ({
   page,

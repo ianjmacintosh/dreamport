@@ -58,6 +58,10 @@ test("sign in, add a Product, open it, add an Idea, and see it in the list", asy
   await page.getByRole("button", { name: "Add idea" }).click();
 
   await expect(page.getByText(ideaName)).toBeVisible();
+  // The list is named by its own "Ideas" heading, not the page's h1 (#101)
+  await expect(
+    page.getByRole("list", { name: "Ideas", exact: true }).getByText(ideaName),
+  ).toBeVisible();
   // No full page reload: the field clears and is ready for the next entry
   // without the page itself having navigated.
   await expect(page.getByLabel("Idea name")).toHaveValue("");
@@ -90,20 +94,20 @@ test("sign in, add a Product, add an Idea, delete it, and confirm it's gone", as
   await page.getByRole("button", { name: "Add idea" }).click();
   await expect(page.getByText(ideaName)).toBeVisible();
 
-  // Click the Delete button to reveal Confirm/Cancel
+  // Click the Delete button to reveal the confirming Delete/Cancel
   const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
   await ideaListItem.getByRole("button", { name: "Delete" }).click();
 
-  // Confirm button should now be visible
+  // The confirming Delete (#101) should now be visible, alongside Cancel
   await expect(
-    ideaListItem.getByRole("button", { name: "Confirm" }),
+    ideaListItem.getByRole("button", { name: "Delete" }),
   ).toBeVisible();
   await expect(
     ideaListItem.getByRole("button", { name: "Cancel" }),
   ).toBeVisible();
 
-  // Click Confirm to delete
-  await ideaListItem.getByRole("button", { name: "Confirm" }).click();
+  // Click the confirming Delete to delete
+  await ideaListItem.getByRole("button", { name: "Delete" }).click();
 
   // Idea should be removed from the list
   await expect(page.getByText(ideaName)).not.toBeVisible();
@@ -111,7 +115,7 @@ test("sign in, add a Product, add an Idea, delete it, and confirm it's gone", as
 });
 
 // Test that Cancel backs out without deleting
-test("sign in, add a Product, add an Idea, click Delete to reveal Confirm/Cancel, then Cancel backs out", async ({
+test("sign in, add a Product, add an Idea, click Delete to reveal a confirming Delete/Cancel, then Cancel backs out", async ({
   page,
 }) => {
   const email = TEST_EMAILS.e2eDeleteIdeaReveal;
@@ -131,19 +135,19 @@ test("sign in, add a Product, add an Idea, click Delete to reveal Confirm/Cancel
   await page.getByRole("button", { name: "Add idea" }).click();
   await expect(page.getByText(ideaName)).toBeVisible();
 
-  // Click the Delete button to reveal Confirm/Cancel
+  // Click the Delete button to reveal the confirming Delete/Cancel
   const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
   await ideaListItem.getByRole("button", { name: "Delete" }).click();
 
-  // Confirm button should now be visible
+  // The confirming Delete (#101) should now be visible, alongside Cancel
   await expect(
-    ideaListItem.getByRole("button", { name: "Confirm" }),
+    ideaListItem.getByRole("button", { name: "Delete" }),
   ).toBeVisible();
   await expect(
     ideaListItem.getByRole("button", { name: "Cancel" }),
   ).toBeVisible();
 
-  // Edit stays available alongside Confirm/Cancel (#102)
+  // Edit stays available alongside the confirming Delete/Cancel (#102)
   await expect(
     ideaListItem.getByRole("button", { name: "Edit" }),
   ).toBeVisible();
@@ -257,7 +261,7 @@ test("editing or confirming one Idea row leaves every other row's layout unchang
   // input's value, which a text filter can't see. This Product is fresh, so
   // the first row is ideaNames[0].
   const row = page
-    .getByRole("list", { name: productName })
+    .getByRole("list", { name: "Ideas", exact: true })
     .locator("li")
     .first();
   for (const width of LAYOUT_WIDTHS) {
