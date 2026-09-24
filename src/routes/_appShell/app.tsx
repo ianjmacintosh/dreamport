@@ -108,7 +108,7 @@ async function withMinimumDuration<T>(
  * list. The add-Product field and its button sit in `.field-row` — the same
  * side-by-side single-field-plus-button primitive `/login`'s email step
  * uses — rather than stacked; the list itself is a real `<ul>`/`<li>`
- * (`.product-list`/`.product-row`, #90 follow-up) rather than a stack of
+ * (`.list`/`.list-row`, #90 follow-up) rather than a stack of
  * `<div>`s, so a screen reader announces it as an actual list and its
  * Product count, not an undifferentiated block of text. The list also
  * carries `aria-labelledby` pointing at the `<h1>`'s own id, giving it an
