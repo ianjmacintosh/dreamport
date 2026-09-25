@@ -333,6 +333,9 @@ a.button {
 .list-row {
   display: grid;
   grid-template-columns: 1fr auto;
+  /* The name is a line of text beside a taller button group — centre it
+     against the buttons rather than leaving it on the row's top edge. */
+  align-items: center;
 }
 
 .list-row-name {
