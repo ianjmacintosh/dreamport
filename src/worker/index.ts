@@ -22,7 +22,9 @@ import {
   deleteProduct,
   getProduct,
   listProducts,
+  PRODUCT_DESCRIPTION_MAX_LENGTH,
   PRODUCT_NAME_MAX_LENGTH,
+  updateProductDescription,
 } from "./products";
 import {
   createIdea,
@@ -393,12 +395,67 @@ export function createApp(deps: AppDeps = {}) {
   });
 
   /**
+   * Issue #112: set or clear the description of one of the signed-in User's
+   * own Products. Same origin check and session gate as DELETE above.
+   * `description` must be a string; it's trimmed, and an empty result is
+   * stored as `null` ("no description") — unlike `name`, empty is valid.
+   * `updateProductDescription` scopes by both id and userId, so zero rows
+   * matched is always 404, never 403, for the same reason DELETE gives.
+   * Responds with the stored Product so the client shows what was saved.
+   */
+  app.patch("/api/products/:id", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const body = await c.req.json().catch(() => null);
+    if (
+      !body ||
+      typeof body !== "object" ||
+      typeof body.description !== "string"
+    ) {
+      return c.json({ error: "description must be a string" }, 400);
+    }
+    const description = body.description.trim();
+    if (description.length > PRODUCT_DESCRIPTION_MAX_LENGTH) {
+      return c.json(
+        {
+          error: `description must be ${PRODUCT_DESCRIPTION_MAX_LENGTH} characters or fewer`,
+        },
+        400,
+      );
+    }
+
+    const product = await updateProductDescription(
+      c.env.DB,
+      session.user.id,
+      c.req.param("id"),
+      description || null,
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json({ product }, 200);
+  });
+
+  /**
    * Ideas v1 slice 1 (issue #99): a Product's own flat list of Ideas.
    * Session-gated the same way `/api/products` is, plus an ownership check:
    * `getProduct` scopes by both `productId` and `session.user.id`, so a
    * `:productId` that exists but isn't the caller's own reads identically to
    * one that doesn't exist at all — always 404, never 403. Bundles the
-   * Product's own `{ id, name, createdAt }` into the response rather than a
+   * Product's own `{ id, name, description, createdAt }` into the response rather than a
    * separate endpoint, since the page needs the Product's name for its
    * heading and the ownership check already has the row in hand.
    */

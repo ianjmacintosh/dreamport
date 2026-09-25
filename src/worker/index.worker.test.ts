@@ -8,6 +8,7 @@ import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 import { createApp } from "./index";
 import { recordDailySend } from "./otp-send-throttle";
+import { PRODUCT_DESCRIPTION_MAX_LENGTH } from "./products";
 import { E2E_RATE_LIMIT_EXEMPT_IP } from "./rate-limit-exemption";
 import {
   PRODUCTION_HOST,
@@ -1277,6 +1278,145 @@ describe("DELETE /api/products/:id (#89)", () => {
       products: { id: string }[];
     };
     expect(asA.products.map((p) => p.id)).toEqual([product.id]);
+  });
+});
+
+describe("PATCH /api/products/:id (#112)", () => {
+  function setDescription(id: string, description: unknown, cookie?: string) {
+    return fetchWorker(`/api/products/${id}`, {
+      method: "PATCH",
+      headers: {
+        ...json,
+        origin: TRUSTED_ORIGIN,
+        ...(cookie ? { cookie } : {}),
+      },
+      body: JSON.stringify({ description }),
+    });
+  }
+
+  /** Sign in and add one Product, returning both handles. */
+  async function withOneProduct(email: string) {
+    const cookie = await signIn(email);
+    const created = await addProduct(cookie, "A phone-scale app");
+    const { product } = (await created.json()) as {
+      product: {
+        id: string;
+        name: string;
+        description: string | null;
+        createdAt: string;
+      };
+    };
+    return { cookie, product };
+  }
+
+  it("rejects a request with no session", async () => {
+    const res = await setDescription("some-id", "Anything");
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Not signed in" });
+  });
+
+  it("rejects a request from an untrusted origin, changing nothing", async () => {
+    const { cookie, product } = await withOneProduct(
+      TEST_EMAILS.productsDescribeUntrusted,
+    );
+
+    const res = await fetchWorker(`/api/products/${product.id}`, {
+      method: "PATCH",
+      headers: { ...json, origin: "https://evil.example.com", cookie },
+      body: JSON.stringify({ description: "Should not apply" }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(await (await getProducts(cookie)).json()).toEqual({
+      products: [product],
+    });
+  });
+
+  it("starts a new Product with no description, sets one (trimmed), then clears it back to null", async () => {
+    const { cookie, product } = await withOneProduct(
+      TEST_EMAILS.productsDescribeOwner,
+    );
+    expect(product.description).toBeNull();
+
+    const set = await setDescription(
+      product.id,
+      "  Turns a phone into a digital scale.  ",
+      cookie,
+    );
+    expect(set.status).toBe(200);
+    const described = {
+      ...product,
+      description: "Turns a phone into a digital scale.",
+    };
+    expect(await set.json()).toEqual({ product: described });
+    expect(await (await getProducts(cookie)).json()).toEqual({
+      products: [described],
+    });
+
+    for (const empty of ["", "   "]) {
+      const cleared = await setDescription(product.id, empty, cookie);
+      expect(cleared.status).toBe(200);
+      expect(await cleared.json()).toEqual({ product });
+    }
+    expect(await (await getProducts(cookie)).json()).toEqual({
+      products: [product],
+    });
+  });
+
+  it("rejects an over-cap, missing, or non-string description, changing nothing", async () => {
+    const { cookie, product } = await withOneProduct(
+      TEST_EMAILS.productsDescribeInvalid,
+    );
+
+    // Exactly at the cap is fine; one over is not.
+    const atCap = await setDescription(
+      product.id,
+      "x".repeat(PRODUCT_DESCRIPTION_MAX_LENGTH),
+      cookie,
+    );
+    expect(atCap.status).toBe(200);
+    const { product: atCapProduct } = (await atCap.json()) as {
+      product: unknown;
+    };
+
+    for (const description of [
+      "y".repeat(PRODUCT_DESCRIPTION_MAX_LENGTH + 1),
+      undefined,
+      42,
+      null,
+    ]) {
+      const res = await setDescription(product.id, description, cookie);
+      expect(res.status).toBe(400);
+    }
+
+    expect(await (await getProducts(cookie)).json()).toEqual({
+      products: [atCapProduct],
+    });
+  });
+
+  it("404s a stranger's change to another User's Product, leaving it intact", async () => {
+    const { cookie: cookieA, product } = await withOneProduct(
+      TEST_EMAILS.productsDescribeOwnerA,
+    );
+    const cookieB = await signIn(TEST_EMAILS.productsDescribeOwnerB);
+
+    const res = await setDescription(product.id, "Hijacked", cookieB);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Not found" });
+
+    expect(await (await getProducts(cookieA)).json()).toEqual({
+      products: [product],
+    });
+  });
+
+  it("404s on a nonexistent id, never a 403", async () => {
+    const cookie = await signIn(TEST_EMAILS.productsDescribeNotFound);
+
+    const res = await setDescription("not-a-real-id", "Anything", cookie);
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Not found" });
   });
 });
 

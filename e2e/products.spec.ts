@@ -210,3 +210,45 @@ test("confirming one Product row leaves every other row's layout unchanged", asy
     await row.getByRole("button", { name: "Cancel" }).click();
   }
 });
+
+// Issue #112: a Product's description is shown and edited on its own page,
+// persists across a reload, and clears back to "none" with an empty save.
+test("set a Product's description, see it persist across a reload, then clear it", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eProductDescription;
+  const productName = `A described Product ${Date.now()}`;
+  const description = `Turns a phone into a digital scale ${Date.now()}`;
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("link", { name: productName }).click();
+  await expect(page).toHaveURL(/\/app\/products\/.+/);
+
+  await expect(page.getByText("No description yet.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Edit description" }).click();
+  await expect(page.getByLabel("Description")).toHaveValue("");
+  await page.getByLabel("Description").fill(description);
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page.getByText(description)).toBeVisible();
+  await expect(page.getByLabel("Description")).not.toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText(description)).toBeVisible();
+
+  // Editing starts from the stored description; saving it empty clears it.
+  await page.getByRole("button", { name: "Edit description" }).click();
+  await expect(page.getByLabel("Description")).toHaveValue(description);
+  await page.getByLabel("Description").fill("");
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page.getByText("No description yet.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText("No description yet.")).toBeVisible();
+  await expect(page.getByText(description)).not.toBeVisible();
+});
