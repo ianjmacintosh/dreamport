@@ -222,7 +222,7 @@ a.button {
 }
 
 /* Below 640px (same breakpoint as `.field-row`/`.list-row`'s own stacking),
-   a group can be wider than the screen — an Idea row's Edit / Confirm /
+   a group can be wider than the screen — an Idea row's Edit / Delete /
    Cancel is ~312px against ~291px of content at 375px (#102) — and a
    one-row grid can't wrap. Flex-wrap lets the overflowing button drop to
    the next line instead, still spaced by the same gap. Flexbox is fine
@@ -333,6 +333,9 @@ a.button {
 .list-row {
   display: grid;
   grid-template-columns: 1fr auto;
+  /* The name is a line of text beside a taller button group — centre it
+     against the buttons rather than leaving it on the row's top edge. */
+  align-items: center;
 }
 
 .list-row-name {
@@ -352,7 +355,7 @@ a.button {
 
 /* Below 640px (same breakpoint and reasoning as `.field-row`'s own stack
    above), a row's name and actions don't reliably fit side by side — a
-   three-button reveal (Edit / Confirm / Cancel) alone nearly fills a phone's
+   three-button reveal (Edit / Delete / Cancel) alone nearly fills a phone's
    width — so every row stacks: name, then its actions beneath (#102). */
 @media (max-width: 640px) {
   .list-row {

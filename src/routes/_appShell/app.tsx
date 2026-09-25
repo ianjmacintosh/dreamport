@@ -131,9 +131,11 @@ async function withMinimumDuration<T>(
  * itself is a two-step inline reveal (#90, Q7) — the same resting/confirming
  * shape `/app/settings`'s delete-account flow already uses, just per-row
  * instead of page-level, since a Product list can hold more than one row at
- * a time. The Confirm/Cancel pair stays mounted into the deleting state
- * too (#90 follow-up) rather than being swapped out for a lone "Deleting…"
- * button: Confirm's own label swaps to "Deleting…" via `Button.State`, and
+ * a time. The confirming button keeps the action's own verb, "Delete," rather
+ * than a generic "Confirm" (#101). The confirming Delete/Cancel pair stays
+ * mounted into the deleting state too (#90 follow-up) rather than being
+ * swapped out for a lone "Deleting…" button: the confirming Delete's own
+ * label swaps to "Deleting…" via `Button.State`, and
  * Cancel disables in place rather than disappearing, so deleting no longer
  * looks like the whole confirm step vanished and a different button took
  * its place.
@@ -256,7 +258,7 @@ function App() {
                       }
                       onClick={() => void deleteProduct(product.id)}
                     >
-                      <Button.State name="confirming">Confirm</Button.State>
+                      <Button.State name="confirming">Delete</Button.State>
                       <Button.State name="deleting">Deleting…</Button.State>
                     </Button>
                     <Button

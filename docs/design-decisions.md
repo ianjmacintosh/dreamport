@@ -40,13 +40,19 @@ Add an entry only once a sign-off conversation resolves something repeatable
   signed-out-only; it has no concept of a session. See
   `src/routes/_appShell.tsx` and `src/components/AppNav` (decided in #90).
 
-- A destructive, irreversible action (delete account, delete a Product)
-  uses a two-step reveal in place — resting state shows the action itself
-  ("Delete"); clicking it swaps that control for "Confirm"/"Cancel" rather
-  than performing the action — instead of a modal/dialog. A stray click
-  can't trigger the irreversible step, and no dialog component is needed.
-  Decided for delete-account in #26, reaffirmed generally (one confirming
-  state per row, not just per page) for Product delete in #90.
+- A destructive, irreversible action (delete account, delete a Product,
+  delete an Idea) uses a two-step reveal in place — resting state shows
+  the action itself ("Delete"); clicking it swaps that control for a
+  confirming step plus "Cancel" rather than performing the action —
+  instead of a modal/dialog. A stray click can't trigger the irreversible
+  step, and no dialog component is needed. The confirming step keeps the
+  action's own verb rather than a generic "Confirm" — delete-account's own
+  confirming step is "Email me a deletion link," not "Confirm" — so the
+  button never says less than what it's about to do. Decided for
+  delete-account in #26, reaffirmed generally (one confirming state per
+  row, not just per page) for Product delete in #90; #90's own
+  implementation used generic "Confirm" wording, which #101 corrected back
+  to the action's own verb ("Delete") for both Products and Ideas.
 
 - A row that pairs a name or display value with one attached action (a
   Product's own name + Delete, an Idea's own name + Edit/Delete) uses the
