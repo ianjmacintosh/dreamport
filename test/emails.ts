@@ -142,6 +142,20 @@ export const TEST_EMAILS = {
   /** Deletes an id that was never created; expects a 404. */
   productsDeleteNotFound: "delivered+products-delete-not-found@resend.dev",
 
+  // --- Seam 1: PATCH /api/products/:id (#112) ---
+  /** Rejects a description change from an untrusted origin, leaving it unset. */
+  productsDescribeUntrusted: "delivered+products-describe-untrusted@resend.dev",
+  /** Sets a description, reads it back, then clears it with an empty string. */
+  productsDescribeOwner: "delivered+products-describe-owner@resend.dev",
+  /** Owner side of the description ownership boundary check. */
+  productsDescribeOwnerA: "delivered+products-describe-owner-a@resend.dev",
+  /** Other User whose description change on A's Product must 404, not succeed. */
+  productsDescribeOwnerB: "delivered+products-describe-owner-b@resend.dev",
+  /** Sends an over-cap or non-string description; expects 400s and no change. */
+  productsDescribeInvalid: "delivered+products-describe-invalid@resend.dev",
+  /** Describes an id that was never created; expects a 404. */
+  productsDescribeNotFound: "delivered+products-describe-not-found@resend.dev",
+
   // --- Seam 1: /api/products/:productId/ideas (#99) ---
   /** Adds a Product, opens it, adds an Idea, reads it back in its own list. */
   ideasAddOne: "delivered+ideas-add-one@resend.dev",
@@ -226,6 +240,9 @@ export const TEST_EMAILS = {
   e2eRenameIdea: "delivered+e2e-rename-idea+e2e-test@resend.dev",
   /** #102: clicking Edit then Cancel backs out without saving. */
   e2eRenameIdeaCancel: "delivered+e2e-rename-idea-cancel+e2e-test@resend.dev",
+  /** #112: set a Product's description, see it persist across a reload, then clear it. */
+  e2eProductDescription:
+    "delivered+e2e-product-description+e2e-test@resend.dev",
   /** #102: editing/confirming one Idea row leaves the other rows' layout unchanged. */
   e2eIdeaRowsIndependent:
     "delivered+e2e-idea-rows-independent+e2e-test@resend.dev",
