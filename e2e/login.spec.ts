@@ -133,7 +133,9 @@ test("persistent session: a return visit to /app stays signed in", async ({
 
   // Navigate away, then back to /app in the same browser context.
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Dreamport" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Keep dreaming, keep building" }),
+  ).toBeVisible();
 
   await page.goto("/app");
   await expect(page).toHaveURL(/\/app$/);
