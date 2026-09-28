@@ -35,10 +35,12 @@ Add an entry only once a sign-off conversation resolves something repeatable
   in #89).
 
 - A signed-in page (e.g. `/app`, `/app/settings`) renders inside the
-  `_appShell` layout — `AppNav` (email, a Settings link, Log out) plus the
-  usual `Footer` — not the marketing `Header`/`_withFooter`. `Header` stays
-  signed-out-only; it has no concept of a session. See
-  `src/routes/_appShell.tsx` and `src/components/AppNav` (decided in #90).
+  `_appShell` layout — `AppNav` (an account `Dropdown` triggered by the
+  User's own email, holding Settings and Log out) plus the usual `Footer` —
+  not the marketing `Header`/`_withFooter`. `Header` stays signed-out-only;
+  it has no concept of a session. See `src/routes/_appShell.tsx` and
+  `src/components/AppNav` (decided in #90; the flat email/Settings/Log out
+  layout superseded by the `Dropdown` below in #119).
 
 - A destructive, irreversible action (delete account, delete a Product,
   delete an Idea) uses a two-step reveal in place — resting state shows
@@ -68,3 +70,19 @@ Add an entry only once a sign-off conversation resolves something repeatable
   `.field-row` spanning the whole row. When the field needs more than one
   action (Save / Cancel / Delete), they go in a `.button-group` in the
   field-row's button slot (decided in #102).
+
+- An account menu (e.g. `AppNav`'s Settings/Log out) uses the `Dropdown`
+  component — a generic, reusable trigger-plus-panel Component (not a
+  one-off tied to `AppNav`), built on `@base-ui/react`'s `Menu` primitives
+  for behavior (focus management, keyboard nav, outside-click/`Escape`)
+  while `Dropdown` owns all of its own CSS. `AppNav`'s trigger is the
+  signed-in User's email plus a chevron icon; the panel lists only the
+  menu's actual items (Settings, a separator, Log out) — the trigger
+  already shows the email, so the panel doesn't repeat it. See ADR-0014 and
+  the style guide's "Dropdown" section (decided in #119).
+
+- Icons use Phosphor (`@phosphor-icons/react`), imported per-icon by name
+  (e.g. `CaretDown`) rather than a hand-authored SVG or another icon
+  library, at the `"regular"` weight unless a specific icon calls for
+  another. This is the project's icon system going forward, not a one-off
+  for any single icon (decided in #119).
