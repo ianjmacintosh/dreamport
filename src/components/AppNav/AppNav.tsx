@@ -1,5 +1,4 @@
-import Button from "../Button";
-import Link from "../Link";
+import Dropdown from "../Dropdown";
 
 interface AppNavProps {
   /** The signed-in User's email, shown as the trigger for the account
@@ -27,11 +26,11 @@ export function AppNav({ email, onLogout }: AppNavProps) {
   return (
     <nav className="app-nav">
       <div className="app-nav-content">
-        <span className="app-nav-email">{email}</span>
-        <Link href="/app/settings">Settings</Link>
-        <Button variant="secondary" onClick={onLogout}>
-          Log out
-        </Button>
+        <Dropdown label={email}>
+          <Dropdown.LinkItem href="/app/settings">Settings</Dropdown.LinkItem>
+          <Dropdown.Separator />
+          <Dropdown.Item onClick={onLogout}>Log out</Dropdown.Item>
+        </Dropdown>
       </div>
     </nav>
   );

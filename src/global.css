@@ -468,6 +468,95 @@ a.button {
   margin-bottom: 0;
 }
 
+/* ── Components: dropdown ──────────────────────────────────── */
+/* `Dropdown` (#119): a trigger plus a panel of items. Base UI's Menu
+   renders these elements unstyled (ADR-0014) — everything visual lives
+   here. The trigger reads as text (it's e.g. the signed-in email), not a
+   `.button`, so it inherits its surrounding color and gets the same
+   outline-on-hover/focus treatment as `.button` for its affordance. */
+
+.dropdown-trigger {
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-1);
+  /* Lets a long label (a long email on a phone) truncate instead of
+     pushing the trigger wider than its container. */
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.dropdown-trigger:hover,
+.dropdown-trigger:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.dropdown-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-trigger-icon {
+  transition: transform 0.15s;
+}
+
+.dropdown-trigger[data-popup-open] .dropdown-trigger-icon {
+  transform: rotate(180deg);
+}
+
+.dropdown-positioner {
+  z-index: 10;
+}
+
+.dropdown-popup {
+  display: grid;
+  min-width: 10rem;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background-color: var(--color-page-bg);
+  /* Tinted with the darkest text color rather than neutral black, so the
+     shadow sits in the Solarized palette instead of greying it out. */
+  box-shadow: 0 var(--space-1) var(--space-3)
+    color-mix(in srgb, var(--color-text-on-surface) 20%, transparent);
+  outline: none;
+}
+
+.dropdown-item {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 4px;
+  color: var(--color-text-primary);
+  text-decoration: none;
+  cursor: pointer;
+  outline: none;
+}
+
+/* Base UI marks the item under the pointer or keyboard focus with
+   `data-highlighted` — one highlight for both, so arrow-key focus is as
+   visible as hover. `:hover` on the link item is pinned too, since the
+   global `a:hover` rule would otherwise recolor it cyan. */
+.dropdown-item[data-highlighted],
+.dropdown-item:hover {
+  background-color: var(--color-surface);
+  color: var(--color-text-on-surface);
+}
+
+.dropdown-separator {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background-color: var(--color-border);
+}
+
 /* ── Primitives: signed-in app nav ───────────────────────── */
 /* Same 3-column breakout grid as .header/.footer so the content column
    lines up with <main> — the signed-in equivalent of .header, shown
@@ -485,29 +574,10 @@ a.button {
 .app-nav-content {
   grid-column: 2;
   display: grid;
-  grid-auto-flow: column;
   align-items: center;
   justify-content: end;
-  gap: var(--space-4);
   padding: var(--space-4) var(--space-6);
-}
-
-.app-nav-email {
-  /* Pins the email to the left, opposite the Settings/Log out pair, without
-     a third grid track — the auto-flow column items after it already sit
-     flush right via `.app-nav-content`'s own `justify-content: end`. */
-  margin-right: auto;
+  /* The account Dropdown's trigger inherits its text color from here —
+     `--color-text-primary` fails AA on the surface background. */
   color: var(--color-text-on-surface);
-}
-
-/* Below 640px (--breakpoint-sm in tokens.css) the full address ran the nav
-   out of room and wrapped/crowded Settings and Log out (#90). No dropdown
-   variant exists yet to tuck it behind, so it's dropped entirely on small
-   screens rather than truncated or wrapped — `/app/settings` shows the
-   same address on its own page (see that route), so it's never fully
-   unreachable. */
-@media (max-width: 640px) {
-  .app-nav-email {
-    display: none;
-  }
 }

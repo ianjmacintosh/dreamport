@@ -249,6 +249,8 @@ export const TEST_EMAILS = {
   /** #102: confirming one Product row leaves the other rows' layout unchanged. */
   e2eProductRowsIndependent:
     "delivered+e2e-product-rows-independent+e2e-test@resend.dev",
+  /** #119: the account Dropdown opens from its trigger and closes on Escape, returning focus. */
+  e2eAccountDropdown: "delivered+e2e-account-dropdown+e2e-test@resend.dev",
   /**
    * Opt-in post-deploy smoke (`deployment-smoke.spec.ts`) — code send only,
    * against a real deployed environment. Deliberately NOT a `+e2e-test@`

@@ -16,7 +16,7 @@ screen-reader user, not in a quick visual check.
 
 **`Dropdown` is built on `@base-ui/react`'s `Menu` primitives**
 (`Menu.Root`, `Menu.Trigger`, `Menu.Portal`, `Menu.Positioner`,
-`Menu.Popup`, `Menu.Item`, `Menu.Separator`) for all of that behavior.
+`Menu.Popup`, `Menu.Item`, `Menu.LinkItem`, `Menu.Separator`) for all of that behavior.
 Base UI is headless — it renders unstyled elements with the right ARIA
 roles and keyboard handling wired up, and `Dropdown` supplies every CSS
 class itself, the same way `Dropdown` would if it were hand-rolled. This is

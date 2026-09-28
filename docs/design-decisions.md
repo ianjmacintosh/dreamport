@@ -82,7 +82,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
   the style guide's "Dropdown" section (decided in #119).
 
 - Icons use Phosphor (`@phosphor-icons/react`), imported per-icon by name
-  (e.g. `CaretDown`) rather than a hand-authored SVG or another icon
+  (e.g. `CaretDownIcon`) rather than a hand-authored SVG or another icon
   library, at the `"regular"` weight unless a specific icon calls for
   another. This is the project's icon system going forward, not a one-off
   for any single icon (decided in #119).
