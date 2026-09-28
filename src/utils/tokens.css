@@ -98,7 +98,7 @@
 
   /* ── Type scale ───────────────────────────────────────────── */
 
-  --text-hero: clamp(3rem, 12vw, 10rem);
+  --text-hero: clamp(2.5rem, 7vw, 5rem);
   --text-display: 6rem;
   --text-h1: 2.5rem;
   --text-h2: 1.875rem;
