@@ -457,9 +457,8 @@ a.button {
 
 /* ── Primitives: header ───────────────────────────────────── */
 /* Same 3-column breakout grid as .footer so the content column lines up
-   with <main>, but no background or border — the header sits on the page
-   background, not on its own band. Not sticky: present on every page of
-   the layout, not pinned on scroll. */
+   with <main>. Its color comes from the shared bar treatment below. Not
+   sticky: present on every page of the layout, not pinned on scroll. */
 
 .header {
   display: grid;
@@ -489,15 +488,12 @@ a.button {
 /* ── Primitives: signed-in app nav ───────────────────────── */
 /* Same 3-column breakout grid as .header/.footer so the content column
    lines up with <main> — the signed-in equivalent of .header, shown
-   instead of it on every page under the `_appShell` layout (#90). A
-   background/border like .footer's, not bare like .header's, since this
-   bar isn't at the very top of the page the way a marketing header is. */
+   instead of it on every page under the `_appShell` layout (#90). Its
+   color comes from the shared bar treatment below. */
 
 .app-nav {
   display: grid;
   grid-template-columns: 1fr var(--page-width) 1fr;
-  background-color: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
 }
 
 .app-nav-content {
@@ -518,10 +514,6 @@ a.button {
   gap: var(--space-4);
 }
 
-.app-nav-email {
-  color: var(--color-text-on-surface);
-}
-
 /* Below 640px (--breakpoint-sm in tokens.css) the full address ran the nav
    out of room and wrapped/crowded Settings and Log out (#90). No dropdown
    variant exists yet to tuck it behind, so it's dropped entirely on small
@@ -538,4 +530,40 @@ a.button {
   .app-nav-actions {
     gap: var(--space-2);
   }
+}
+
+/* ── Primitives: header bar color (Header + AppNav) ──────── */
+/* One color treatment for both bars (#118) — see the --color-bar-*
+   tokens for the gradient and its accepted contrast trade-off. Everything
+   inside that would otherwise paint in a page-background color (heading
+   violet, link blue, the blue accent button and focus ring) switches to
+   the bar's own cream; plain text (the signed-in email) just inherits
+   it. */
+
+.header,
+.app-nav {
+  background-image: linear-gradient(
+    in oklab 90deg,
+    var(--color-bar-bg-start),
+    var(--color-bar-bg-end)
+  );
+  color: var(--color-bar-text);
+}
+
+:is(.header, .app-nav) :is(.wordmark, .wordmark:hover),
+:is(.header, .app-nav) a:not(.button),
+:is(.header, .app-nav) a:not(.button):hover {
+  color: var(--color-bar-text);
+}
+
+:is(.header, .app-nav) .button,
+:is(.header, .app-nav) .button:hover {
+  background-color: var(--color-bar-button-bg);
+  border-color: var(--color-bar-button-bg);
+  color: var(--color-bar-button-text);
+}
+
+:is(.header, .app-nav) :focus-visible,
+:is(.header, .app-nav) .button:not(:disabled):hover {
+  outline-color: var(--color-bar-text);
 }

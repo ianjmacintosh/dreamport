@@ -74,5 +74,10 @@ Add an entry only once a sign-off conversation resolves something repeatable
   `/`) or `AppNav` (linking to `/app`) — including the homepage, whose
   hero headline says something else rather than repeating the name. It
   drops from `--text-xl` to body size below 640px so `AppNav` fits one row
-  on phones. See the
-  style guide's "Wordmark" section (decided in #118).
+  on phones. See the style guide's "Wordmark" section (decided in #118).
+
+- `Header` and `AppNav` share one bar color: a violet → magenta gradient
+  interpolated in oklab, with cream text and cream-filled buttons, via the
+  `--color-bar-*` tokens. Picked over flat-violet and dark-grey-with-accent-
+  line alternatives in a prototype round; its sub-AA contrast is an accepted
+  trade-off recorded in `tokens.css` (decided in #118).
