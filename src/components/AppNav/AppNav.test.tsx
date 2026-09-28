@@ -6,11 +6,13 @@ import {
 } from "react";
 import { describe, expect, test, vi } from "vitest";
 
+import Dropdown from "../Dropdown";
 import AppNav from "./AppNav";
 
 type NavElement = ReactElement<{
   href?: string;
   className?: string;
+  label?: unknown;
   children?: ReactNode;
   onClick?: () => void;
 }>;
@@ -19,7 +21,9 @@ type NavElement = ReactElement<{
  * Every element nested inside `AppNav`, flattened depth-first. No DOM
  * renderer is available in the unit suite, so this reads the element tree
  * `AppNav` returns directly — same approach `Header.test.tsx` uses — without
- * depending on how the row is grouped.
+ * depending on how the row is grouped. The account Dropdown's
+ * open/close/keyboard behavior is Base UI's, covered end to end in
+ * `e2e/login.spec.ts`.
  */
 function descendants(node: ReactNode): NavElement[] {
   return Children.toArray(node)
@@ -32,6 +36,16 @@ function descendants(node: ReactNode): NavElement[] {
 
 function navElements(email: string, onLogout: () => void): NavElement[] {
   return descendants(AppNav({ email, onLogout }).props.children);
+}
+
+/** The account `Dropdown`'s own items, in panel order. */
+function dropdownItems(email: string, onLogout: () => void): NavElement[] {
+  const dropdown = navElements(email, onLogout).find(
+    (el) => el.type === Dropdown,
+  );
+  return Children.toArray(dropdown?.props.children).filter(
+    isValidElement,
+  ) as NavElement[];
 }
 
 describe("AppNav", () => {
@@ -47,28 +61,30 @@ describe("AppNav", () => {
     expect(links[0]?.props.children).toBe("Dreamport");
   });
 
-  test("shows the signed-in email", () => {
-    const email = navElements("someone@example.com", () => {}).find(
-      (el) => el.type === "span",
+  test("the account dropdown's trigger is the signed-in email", () => {
+    const dropdown = navElements("someone@example.com", () => {}).find(
+      (el) => el.type === Dropdown,
     );
-    expect(email?.props.children).toBe("someone@example.com");
+    expect(dropdown?.props.label).toBe("someone@example.com");
   });
 
-  test("links to /app/settings", () => {
-    const settingsLink = navElements("someone@example.com", () => {}).find(
-      (el) => el.props.href === "/app/settings",
+  test("the dropdown holds Settings, a separator, then Log out", () => {
+    const [settings, separator, logout] = dropdownItems(
+      "someone@example.com",
+      () => {},
     );
-    expect(settingsLink).toBeDefined();
-    expect(settingsLink?.props.children).toBe("Settings");
+    expect(settings.type).toBe(Dropdown.LinkItem);
+    expect(settings.props.href).toBe("/app/settings");
+    expect(settings.props.children).toBe("Settings");
+    expect(separator.type).toBe(Dropdown.Separator);
+    expect(logout.type).toBe(Dropdown.Item);
+    expect(logout.props.children).toBe("Log out");
   });
 
-  test("calls onLogout when Log out is clicked", () => {
+  test("calls onLogout when Log out is chosen", () => {
     const onLogout = vi.fn();
-    const logoutButton = navElements("someone@example.com", onLogout).find(
-      (el) => el.props.children === "Log out",
-    );
-    expect(logoutButton).toBeDefined();
-    logoutButton?.props.onClick?.();
+    const logout = dropdownItems("someone@example.com", onLogout).at(-1);
+    logout?.props.onClick?.();
     expect(onLogout).toHaveBeenCalledOnce();
   });
 });

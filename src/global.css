@@ -441,7 +441,7 @@ a.button {
   margin-top: var(--space-1);
 }
 
-/* ── Primitives: footer ───────────────────────────────────── */
+/* ── Components: footer ───────────────────────────────────── */
 /* Full-bleed background/border, content column pinned to the same
    width and horizontal padding as <main> via a 3-column breakout
    grid — the two 1fr tracks are the bleed, the middle track is where
@@ -455,7 +455,7 @@ a.button {
   border-top: 1px solid var(--color-border);
 }
 
-/* ── Primitives: header ───────────────────────────────────── */
+/* ── Components: header ───────────────────────────────────── */
 /* Same 3-column breakout grid as .footer so the content column lines up
    with <main>. Its color comes from the shared bar treatment below. Not
    sticky: present on every page of the layout, not pinned on scroll. */
@@ -485,7 +485,7 @@ a.button {
   margin-bottom: 0;
 }
 
-/* ── Primitives: signed-in app nav ───────────────────────── */
+/* ── Components: signed-in app nav ───────────────────────── */
 /* Same 3-column breakout grid as .header/.footer so the content column
    lines up with <main> — the signed-in equivalent of .header, shown
    instead of it on every page under the `_appShell` layout (#90). Its
@@ -499,69 +499,30 @@ a.button {
 .app-nav-content {
   grid-column: 2;
   display: grid;
-  /* `minmax(0, …)` lets the actions track shrink below its content's
-     width, so a long email truncates (below) instead of overflowing. */
+  /* `minmax(0, …)` lets the Dropdown's track shrink below its trigger's
+     width, so a long email truncates (see .dropdown-trigger) instead of
+     overflowing — which is also what keeps the wordmark and the account
+     menu on one row at phone widths, where #118 had to stack them. */
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-4) var(--space-6);
 }
 
-/* Email, Settings and Log out, grouped in the right track opposite the
-   wordmark (#118). The email's own track can shrink to zero; Settings and
-   Log out never do. */
-.app-nav-actions {
-  display: grid;
-  grid-template-columns: minmax(0, auto) auto auto;
+/* The account Dropdown's trigger (#119) sits flush right, opposite the
+   wordmark (#118). */
+.app-nav-content > .dropdown-trigger {
   justify-self: end;
-  max-width: 100%;
-  align-items: center;
-  gap: var(--space-4);
 }
 
-/* A long address with the larger wordmark ran the nav out of room between
-   ~640px and ~900px, overflowing the page and wrapping Log out (#118) —
-   it truncates with an ellipsis instead, only as much as it has to. */
-.app-nav-email {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Below 640px (--breakpoint-sm in tokens.css) the full address ran the nav
-   out of room and wrapped/crowded Settings and Log out (#90). No dropdown
-   variant exists yet to tuck it behind, so it's dropped entirely on small
-   screens rather than truncated or wrapped — `/app/settings` shows the
-   same address on its own page (see that route), so it's never fully
-   unreachable.
-
-   Even without the email, the wordmark, Settings and Log out didn't fit
-   one row at common phone widths (360px and below wrapped Log out), so
-   the nav stacks: wordmark on top, Settings and Log out beneath it (#118).
-   A dropdown (#119) is the longer-term replacement for this. */
-@media (max-width: 640px) {
-  .app-nav-email {
-    display: none;
-  }
-
-  .app-nav-content {
-    grid-template-columns: 1fr;
-    row-gap: var(--space-2);
-  }
-
-  .app-nav-actions {
-    grid-template-columns: auto auto;
-    justify-self: start;
-  }
-}
-
-/* ── Primitives: header bar color (Header + AppNav) ──────── */
+/* ── Components: header bar color (Header + AppNav) ──────── */
 /* One color treatment for both bars (#118) — see the --color-bar-*
    tokens for the gradient and its accepted contrast trade-off. Everything
    inside that would otherwise paint in a page-background color (heading
    violet, link blue, the blue accent button and focus ring) switches to
-   the bar's own cream; plain text (the signed-in email) just inherits
-   it. */
+   the bar's own cream; plain text (the account Dropdown's trigger) just
+   inherits it. The Dropdown's panel is portaled out of the bar, so it
+   keeps its own page-background styling. */
 
 .header,
 .app-nav {
@@ -587,6 +548,96 @@ a.button {
 }
 
 :is(.header, .app-nav) :focus-visible,
-:is(.header, .app-nav) .button:not(:disabled):hover {
+:is(.header, .app-nav) .button:not(:disabled):hover,
+:is(.header, .app-nav) .dropdown-trigger:hover {
   outline-color: var(--color-bar-text);
+}
+
+/* ── Components: dropdown ──────────────────────────────────── */
+/* `Dropdown` (#119): a trigger plus a panel of items. Base UI's Menu
+   renders these elements unstyled (ADR-0014) — everything visual lives
+   here. The trigger reads as text (it's e.g. the signed-in email), not a
+   `.button`, so it inherits its surrounding color and gets the same
+   outline-on-hover/focus treatment as `.button` for its affordance. */
+
+.dropdown-trigger {
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-1);
+  /* Lets a long label (a long email on a phone) truncate instead of
+     pushing the trigger wider than its container. */
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.dropdown-trigger:hover,
+.dropdown-trigger:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.dropdown-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-trigger-icon {
+  transition: transform 0.15s;
+}
+
+.dropdown-trigger[data-popup-open] .dropdown-trigger-icon {
+  transform: rotate(180deg);
+}
+
+.dropdown-positioner {
+  z-index: 10;
+}
+
+.dropdown-popup {
+  display: grid;
+  min-width: 10rem;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background-color: var(--color-page-bg);
+  /* Tinted with the darkest text color rather than neutral black, so the
+     shadow sits in the Solarized palette instead of greying it out. */
+  box-shadow: 0 var(--space-1) var(--space-3)
+    color-mix(in srgb, var(--color-text-on-surface) 20%, transparent);
+  outline: none;
+}
+
+.dropdown-item {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 6px;
+  color: var(--color-text-primary);
+  text-decoration: none;
+  cursor: pointer;
+  outline: none;
+}
+
+/* Base UI marks the item under the pointer or keyboard focus with
+   `data-highlighted` — one highlight for both, so arrow-key focus is as
+   visible as hover. `:hover` on the link item is pinned too, since the
+   global `a:hover` rule would otherwise recolor it cyan. */
+.dropdown-item[data-highlighted],
+.dropdown-item:hover {
+  background-color: var(--color-surface);
+  color: var(--color-text-on-surface);
+}
+
+.dropdown-separator {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background-color: var(--color-border);
 }

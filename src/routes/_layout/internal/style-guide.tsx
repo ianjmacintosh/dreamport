@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
 import Button from "../../../components/Button";
+import Dropdown from "../../../components/Dropdown";
 import Link from "../../../components/Link";
 import TextInput from "../../../components/TextInput";
 
@@ -144,6 +145,7 @@ function StyleGuide() {
         <a href="#buttons">Buttons</a>
         <a href="#button-label-stack">Button label stack</a>
         <a href="#button-group">Button group</a>
+        <a href="#dropdown">Dropdown</a>
         <a href="#text-inputs">Text inputs</a>
         <a href="#field-row">Field with action</a>
         <a href="#list-row">Row with action</a>
@@ -379,6 +381,36 @@ function StyleGuide() {
           code") — the gap between them comes from the spacing scale via Grid,
           not inline-flex's incidental whitespace. For a single button attached
           to a single field, use <code>.field-row</code> below instead.
+        </p>
+      </Section>
+
+      <Section id="dropdown" label="Dropdown">
+        <div className="sg-dropdown-demo">
+          <Dropdown label="someone@example.com">
+            <Dropdown.LinkItem href="#dropdown">Settings</Dropdown.LinkItem>
+            <Dropdown.Separator />
+            <Dropdown.Item onClick={() => {}}>Log out</Dropdown.Item>
+          </Dropdown>
+        </div>
+        <Snippet
+          code={`<Dropdown label={email}>\n  <Dropdown.LinkItem href="/app/settings">Settings</Dropdown.LinkItem>\n  <Dropdown.Separator />\n  <Dropdown.Item onClick={onLogout}>Log out</Dropdown.Item>\n</Dropdown>`}
+        />
+        <p className="sg-note">
+          Use <code>&lt;Dropdown&gt;</code> for a trigger that opens a short
+          panel of actions (e.g. <code>AppNav</code>&apos;s account menu). The{" "}
+          <code>label</code> is the trigger&apos;s text — a chevron is added
+          after it for you, and a label too long for its container truncates
+          with an ellipsis. Fill the panel with{" "}
+          <code>&lt;Dropdown.LinkItem href&gt;</code> for navigation,{" "}
+          <code>&lt;Dropdown.Item onClick&gt;</code> for an action, and{" "}
+          <code>&lt;Dropdown.Separator /&gt;</code> between groups. Behavior —
+          focus moving into the panel and back to the trigger, arrow-key
+          navigation, closing on <code>Escape</code> or an outside click — comes
+          from Base UI&apos;s <code>Menu</code> (ADR-0014); every style is{" "}
+          <code>Dropdown</code>&apos;s own. The panel aligns to the
+          trigger&apos;s end edge so a trigger at the right of a bar opens
+          inward. Open it with the keyboard (Enter, then the arrow keys) to see
+          the item highlight, which is the same for pointer and keyboard.
         </p>
       </Section>
 

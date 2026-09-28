@@ -58,6 +58,12 @@ async function signIn(page: Page, email: string): Promise<void> {
   await expect(page).toHaveURL(/\/app$/);
 }
 
+/** Open AppNav's account menu, whose trigger is the signed-in email (#119). */
+async function openAccountMenu(page: Page, email: string): Promise<void> {
+  await page.getByRole("button", { name: email }).click();
+  await expect(page.getByRole("menu")).toBeVisible();
+}
+
 test("happy path: email, then code, then /app shows the signed-in email", async ({
   page,
 }) => {
@@ -67,6 +73,26 @@ test("happy path: email, then code, then /app shows the signed-in email", async 
 
   // The signed-in email lives in AppNav (#90), not on the page itself.
   await expect(page.getByText(email)).toBeVisible();
+});
+
+test("the account menu closes on Escape and hands focus back to its trigger", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eAccountDropdown;
+
+  await signIn(page, email);
+
+  const trigger = page.getByRole("button", { name: email });
+  await trigger.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menu")).toBeVisible();
+  // Arrow keys move between items rather than tabbing out of the menu.
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("menuitem", { name: "Log out" })).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(trigger).toBeFocused();
 });
 
 test("the sign-in page presents a bot challenge on the email step", async ({
@@ -147,11 +173,13 @@ test("sign out from /app/settings returns to the homepage and forgets the sessio
 }) => {
   await signIn(page, TEST_EMAILS.e2eSignOut);
 
-  await page.getByRole("link", { name: "Settings" }).click();
+  await openAccountMenu(page, TEST_EMAILS.e2eSignOut);
+  await page.getByRole("menuitem", { name: "Settings" }).click();
   await expect(page).toHaveURL(/\/app\/settings$/);
-  // Log out lives in AppNav (#90) — present on every signed-in page,
-  // including this one, rather than a page-local "Sign out" button.
-  await page.getByRole("button", { name: "Log out" }).click();
+  // Log out lives in AppNav's account menu (#90, #119) — present on every
+  // signed-in page, including this one, rather than a page-local button.
+  await openAccountMenu(page, TEST_EMAILS.e2eSignOut);
+  await page.getByRole("menuitem", { name: "Log out" }).click();
   await expect(page).toHaveURL(/localhost:\d+\/$/);
 
   // A later /app visit has no session to fall back on.
@@ -236,7 +264,8 @@ test("delete account from /app/settings: confirm, follow the emailed link, sessi
 
   await signIn(page, email);
 
-  await page.getByRole("link", { name: "Settings" }).click();
+  await openAccountMenu(page, email);
+  await page.getByRole("menuitem", { name: "Settings" }).click();
   await expect(page).toHaveURL(/\/app\/settings$/);
   await page.getByRole("button", { name: "Delete account" }).click();
   await page.getByRole("button", { name: "Email me a deletion link" }).click();

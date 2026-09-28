@@ -43,9 +43,9 @@ const CONNECTION_FAILED =
  * that a throttled (429) or backend-down request doesn't look like it
  * worked.
  *
- * Shows the signed-in email itself, too (#90) — `AppNav`'s own copy hides
- * below 640px (no dropdown variant exists yet to tuck it behind), so this
- * page is where a narrow-screen visitor can still find their address.
+ * Shows the signed-in email itself, too (#90) — `AppNav`'s account
+ * `Dropdown` trigger truncates a long address on a narrow screen (#119), so
+ * this page is where a visitor can always read it in full.
  */
 function Settings() {
   const { email } = Route.useRouteContext();

@@ -1,8 +1,9 @@
-import Button from "../Button";
+import Dropdown from "../Dropdown";
 import Link from "../Link";
 
 interface AppNavProps {
-  /** The signed-in User's email, shown plainly — no dropdown (#90 Q1). */
+  /** The signed-in User's email, shown as the trigger for the account
+   * dropdown (Settings, Log out) — see `Dropdown` (#119). */
   email: string;
   /** Called on a Log out click. The caller owns the actual sign-out request
    * (see `_appShell.tsx`) — this component stays presentational, plain
@@ -12,14 +13,16 @@ interface AppNavProps {
 
 /**
  * The persistent bar every signed-in page (`/app`, `/app/settings`, …) is
- * rendered inside of — the Dreamport wordmark (home to `/app`) on the left,
- * then who you're signed in as, a link to Settings, and Log out grouped on
- * the right (#118). Sign-out was originally its own button on `/app/settings` (#26); it
- * moved here so every signed-in page carries the same way out, rather than
- * only the one page that happened to grow it first — Settings loses that
- * section entirely rather than keeping a second copy of the same action.
+ * rendered inside of — the Dreamport wordmark (home to `/app`) on the left
+ * (#118), and on the right who you're signed in as, opening an account
+ * dropdown for Settings and Log out (#119). Sign-out was originally its own
+ * button on `/app/settings` (#26); it moved here so every signed-in page
+ * carries the same way out, rather than only the one page that happened to
+ * grow it first — Settings loses that section entirely rather than keeping a
+ * second copy of the same action.
  *
- * No dropdown, no active-route highlighting (#90 sign-off, Q1: **B**).
+ * No active-route highlighting (#90 sign-off, Q1: **B**; its "no dropdown"
+ * call superseded by #119).
  */
 export function AppNav({ email, onLogout }: AppNavProps) {
   return (
@@ -28,13 +31,11 @@ export function AppNav({ email, onLogout }: AppNavProps) {
         <Link href="/app" className="wordmark">
           Dreamport
         </Link>
-        <div className="app-nav-actions">
-          <span className="app-nav-email">{email}</span>
-          <Link href="/app/settings">Settings</Link>
-          <Button variant="secondary" onClick={onLogout}>
-            Log out
-          </Button>
-        </div>
+        <Dropdown label={email}>
+          <Dropdown.LinkItem href="/app/settings">Settings</Dropdown.LinkItem>
+          <Dropdown.Separator />
+          <Dropdown.Item onClick={onLogout}>Log out</Dropdown.Item>
+        </Dropdown>
       </div>
     </nav>
   );

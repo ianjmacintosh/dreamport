@@ -224,7 +224,7 @@ test("sign in, add a Product, add an Idea, click Edit, then Cancel backs out wit
   await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Delete" })).toBeVisible();
   await page.getByLabel("Rename", { exact: true }).fill("Should not be saved");
-  await page.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
 
   await expect(page.getByText(ideaName)).toBeVisible();
   await expect(page.getByText("Should not be saved")).not.toBeVisible();
