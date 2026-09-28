@@ -68,3 +68,11 @@ Add an entry only once a sign-off conversation resolves something repeatable
   `.field-row` spanning the whole row. When the field needs more than one
   action (Save / Cancel / Delete), they go in a `.button-group` in the
   field-row's button slot (decided in #102).
+
+- The "Dreamport" wordmark is styled text (the `.wordmark` class), not an
+  image asset, shown at the left of every page with `Header` (linking to
+  `/`) or `AppNav` (linking to `/app`) — including the homepage, whose
+  hero headline says something else rather than repeating the name. It
+  drops from `--text-xl` to body size below 640px so `AppNav` fits one row
+  on phones. See the
+  style guide's "Wordmark" section (decided in #118).

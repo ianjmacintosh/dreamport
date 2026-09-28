@@ -76,6 +76,27 @@ a:hover {
   color: var(--color-link-hover);
 }
 
+/* The "Dreamport" wordmark in `Header` and `AppNav` — styled text, no image
+   asset (#118). Reads as a heading rather than a link: heading font and
+   color, no underline, and no hover color swap. */
+.wordmark,
+.wordmark:hover {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-heading);
+  text-decoration: none;
+}
+
+/* Below 640px (--breakpoint-sm) the wordmark at --text-xl left `AppNav`
+   ~14px short of room at 375px, wrapping "Log out" onto two lines (#118).
+   It drops to body size there, in `Header` too, so both bars match. */
+@media (max-width: 640px) {
+  .wordmark {
+    font-size: var(--text-base);
+  }
+}
+
 :focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
@@ -450,12 +471,6 @@ a.button {
   padding: var(--space-4) var(--space-6);
 }
 
-/* Pin "Log in" to the right track so it stays right whether or not the
-   wordmark renders in the left track. */
-.header-content > .button {
-  grid-column: 2;
-}
-
 .footer-content {
   grid-column: 2;
   padding: var(--space-6) var(--space-6) var(--space-8);
@@ -485,18 +500,22 @@ a.button {
 .app-nav-content {
   grid-column: 2;
   display: grid;
-  grid-auto-flow: column;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  justify-content: end;
   gap: var(--space-4);
   padding: var(--space-4) var(--space-6);
 }
 
+/* Email, Settings and Log out, grouped in the right track opposite the
+   wordmark (#118). */
+.app-nav-actions {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
 .app-nav-email {
-  /* Pins the email to the left, opposite the Settings/Log out pair, without
-     a third grid track — the auto-flow column items after it already sit
-     flush right via `.app-nav-content`'s own `justify-content: end`. */
-  margin-right: auto;
   color: var(--color-text-on-surface);
 }
 
@@ -505,9 +524,15 @@ a.button {
    variant exists yet to tuck it behind, so it's dropped entirely on small
    screens rather than truncated or wrapped — `/app/settings` shows the
    same address on its own page (see that route), so it's never fully
-   unreachable. */
+   unreachable. The gaps tighten to --space-2 too, so the wordmark,
+   Settings and Log out fit one row at 375px (#118). */
 @media (max-width: 640px) {
   .app-nav-email {
     display: none;
+  }
+
+  .app-nav-content,
+  .app-nav-actions {
+    gap: var(--space-2);
   }
 }
