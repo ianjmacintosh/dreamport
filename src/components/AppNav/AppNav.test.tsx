@@ -9,34 +9,43 @@ import { describe, expect, test, vi } from "vitest";
 import Dropdown from "../Dropdown";
 import AppNav from "./AppNav";
 
-type DropdownElement = ReactElement<{ label?: unknown; children?: ReactNode }>;
+type NavElement = ReactElement<{
+  href?: string;
+  className?: string;
+  label?: unknown;
+  children?: ReactNode;
+  onClick?: () => void;
+}>;
 
 /**
- * `AppNav`'s account `Dropdown` element. No DOM renderer is available in the
- * unit suite, so this reads the element tree `AppNav` returns directly —
- * same approach `Header.test.tsx` uses. The Dropdown's open/close/keyboard
- * behavior is Base UI's, covered end to end in `e2e/login.spec.ts`.
+ * Every element nested inside `AppNav`, flattened depth-first. No DOM
+ * renderer is available in the unit suite, so this reads the element tree
+ * `AppNav` returns directly — same approach `Header.test.tsx` uses — without
+ * depending on how the row is grouped. The account Dropdown's
+ * open/close/keyboard behavior is Base UI's, covered end to end in
+ * `e2e/login.spec.ts`.
  */
-function accountDropdown(email: string, onLogout: () => void): DropdownElement {
-  const nav = AppNav({ email, onLogout });
-  const content = nav.props.children as ReactElement<{
-    children?: ReactNode;
-  }>;
-  const dropdown = Children.toArray(content.props.children).find(
-    (child) => isValidElement(child) && child.type === Dropdown,
-  );
-  if (!isValidElement(dropdown)) throw new Error("no Dropdown in AppNav");
-  return dropdown as DropdownElement;
+function descendants(node: ReactNode): NavElement[] {
+  return Children.toArray(node)
+    .filter(isValidElement)
+    .flatMap((child) => {
+      const element = child as NavElement;
+      return [element, ...descendants(element.props.children)];
+    });
 }
 
-function dropdownItems(email: string, onLogout: () => void) {
-  return Children.toArray(
-    accountDropdown(email, onLogout).props.children,
-  ).filter(isValidElement) as ReactElement<{
-    href?: string;
-    onClick?: () => void;
-    children?: unknown;
-  }>[];
+function navElements(email: string, onLogout: () => void): NavElement[] {
+  return descendants(AppNav({ email, onLogout }).props.children);
+}
+
+/** The account `Dropdown`'s own items, in panel order. */
+function dropdownItems(email: string, onLogout: () => void): NavElement[] {
+  const dropdown = navElements(email, onLogout).find(
+    (el) => el.type === Dropdown,
+  );
+  return Children.toArray(dropdown?.props.children).filter(
+    isValidElement,
+  ) as NavElement[];
 }
 
 describe("AppNav", () => {
@@ -44,9 +53,19 @@ describe("AppNav", () => {
     expect(AppNav).not.toBe(undefined);
   });
 
+  test("shows the Dreamport wordmark first, linking to /app", () => {
+    const elements = navElements("someone@example.com", () => {});
+    const links = elements.filter((el) => el.props.href !== undefined);
+    expect(links[0]?.props.href).toBe("/app");
+    expect(links[0]?.props.className).toBe("wordmark");
+    expect(links[0]?.props.children).toBe("Dreamport");
+  });
+
   test("the account dropdown's trigger is the signed-in email", () => {
-    const dropdown = accountDropdown("someone@example.com", () => {});
-    expect(dropdown.props.label).toBe("someone@example.com");
+    const dropdown = navElements("someone@example.com", () => {}).find(
+      (el) => el.type === Dropdown,
+    );
+    expect(dropdown?.props.label).toBe("someone@example.com");
   });
 
   test("the dropdown holds Settings, a separator, then Log out", () => {

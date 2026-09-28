@@ -7,8 +7,7 @@ export const Route = createFileRoute("/_withFooter/")({
 function Home() {
   return (
     <>
-      <h1 className="text-hero">Dreamport</h1>
-      <h2>Keep dreaming, keep building</h2>
+      <h1 className="text-hero">Keep dreaming, keep building</h1>
 
       <p className="text-2xl">
         Dreamport is a free tool to put your product ideas in order.
