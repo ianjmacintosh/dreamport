@@ -78,9 +78,12 @@ a:hover {
 
 /* The "Dreamport" wordmark in `Header` and `AppNav` — styled text, no image
    asset (#118). Reads as a heading rather than a link: heading font and
-   color, no underline, and no hover color swap. */
+   color, no underline, and no hover color swap. `justify-self: start`
+   keeps the link as wide as its text instead of stretching across the
+   `1fr` track it sits in within `Header` and `AppNav`. */
 .wordmark,
 .wordmark:hover {
+  justify-self: start;
   font-family: var(--font-heading);
   font-size: var(--text-xl);
   font-weight: 700;
