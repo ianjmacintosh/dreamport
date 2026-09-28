@@ -441,7 +441,7 @@ a.button {
   margin-top: var(--space-1);
 }
 
-/* ── Primitives: footer ───────────────────────────────────── */
+/* ── Components: footer ───────────────────────────────────── */
 /* Full-bleed background/border, content column pinned to the same
    width and horizontal padding as <main> via a 3-column breakout
    grid — the two 1fr tracks are the bleed, the middle track is where
@@ -455,7 +455,7 @@ a.button {
   border-top: 1px solid var(--color-border);
 }
 
-/* ── Primitives: header ───────────────────────────────────── */
+/* ── Components: header ───────────────────────────────────── */
 /* Same 3-column breakout grid as .footer so the content column lines up
    with <main>. Its color comes from the shared bar treatment below. Not
    sticky: present on every page of the layout, not pinned on scroll. */
@@ -483,6 +483,74 @@ a.button {
   font-size: var(--text-sm);
   color: var(--color-text-on-surface);
   margin-bottom: 0;
+}
+
+/* ── Components: signed-in app nav ───────────────────────── */
+/* Same 3-column breakout grid as .header/.footer so the content column
+   lines up with <main> — the signed-in equivalent of .header, shown
+   instead of it on every page under the `_appShell` layout (#90). Its
+   color comes from the shared bar treatment below. */
+
+.app-nav {
+  display: grid;
+  grid-template-columns: 1fr var(--page-width) 1fr;
+}
+
+.app-nav-content {
+  grid-column: 2;
+  display: grid;
+  /* `minmax(0, …)` lets the Dropdown's track shrink below its trigger's
+     width, so a long email truncates (see .dropdown-trigger) instead of
+     overflowing — which is also what keeps the wordmark and the account
+     menu on one row at phone widths, where #118 had to stack them. */
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+}
+
+/* The account Dropdown's trigger (#119) sits flush right, opposite the
+   wordmark (#118). */
+.app-nav-content > .dropdown-trigger {
+  justify-self: end;
+}
+
+/* ── Components: header bar color (Header + AppNav) ──────── */
+/* One color treatment for both bars (#118) — see the --color-bar-*
+   tokens for the gradient and its accepted contrast trade-off. Everything
+   inside that would otherwise paint in a page-background color (heading
+   violet, link blue, the blue accent button and focus ring) switches to
+   the bar's own cream; plain text (the account Dropdown's trigger) just
+   inherits it. The Dropdown's panel is portaled out of the bar, so it
+   keeps its own page-background styling. */
+
+.header,
+.app-nav {
+  background-image: linear-gradient(
+    in oklab 90deg,
+    var(--color-bar-bg-start),
+    var(--color-bar-bg-end)
+  );
+  color: var(--color-bar-text);
+}
+
+:is(.header, .app-nav) :is(.wordmark, .wordmark:hover),
+:is(.header, .app-nav) a:not(.button),
+:is(.header, .app-nav) a:not(.button):hover {
+  color: var(--color-bar-text);
+}
+
+:is(.header, .app-nav) .button,
+:is(.header, .app-nav) .button:hover {
+  background-color: var(--color-bar-button-bg);
+  border-color: var(--color-bar-button-bg);
+  color: var(--color-bar-button-text);
+}
+
+:is(.header, .app-nav) :focus-visible,
+:is(.header, .app-nav) .button:not(:disabled):hover,
+:is(.header, .app-nav) .dropdown-trigger:hover {
+  outline-color: var(--color-bar-text);
 }
 
 /* ── Components: dropdown ──────────────────────────────────── */
@@ -551,7 +619,7 @@ a.button {
 .dropdown-item {
   display: block;
   padding: var(--space-2) var(--space-3);
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--color-text-primary);
   text-decoration: none;
   cursor: pointer;
@@ -572,72 +640,4 @@ a.button {
   height: 1px;
   margin: var(--space-1) 0;
   background-color: var(--color-border);
-}
-
-/* ── Primitives: signed-in app nav ───────────────────────── */
-/* Same 3-column breakout grid as .header/.footer so the content column
-   lines up with <main> — the signed-in equivalent of .header, shown
-   instead of it on every page under the `_appShell` layout (#90). Its
-   color comes from the shared bar treatment below. */
-
-.app-nav {
-  display: grid;
-  grid-template-columns: 1fr var(--page-width) 1fr;
-}
-
-.app-nav-content {
-  grid-column: 2;
-  display: grid;
-  /* `minmax(0, …)` lets the Dropdown's track shrink below its trigger's
-     width, so a long email truncates (see .dropdown-trigger) instead of
-     overflowing — which is also what keeps the wordmark and the account
-     menu on one row at phone widths, where #118 had to stack them. */
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-6);
-}
-
-/* The account Dropdown's trigger (#119) sits flush right, opposite the
-   wordmark (#118). */
-.app-nav-content > .dropdown-trigger {
-  justify-self: end;
-}
-
-/* ── Primitives: header bar color (Header + AppNav) ──────── */
-/* One color treatment for both bars (#118) — see the --color-bar-*
-   tokens for the gradient and its accepted contrast trade-off. Everything
-   inside that would otherwise paint in a page-background color (heading
-   violet, link blue, the blue accent button and focus ring) switches to
-   the bar's own cream; plain text (the account Dropdown's trigger) just
-   inherits it. The Dropdown's panel is portaled out of the bar, so it
-   keeps its own page-background styling. */
-
-.header,
-.app-nav {
-  background-image: linear-gradient(
-    in oklab 90deg,
-    var(--color-bar-bg-start),
-    var(--color-bar-bg-end)
-  );
-  color: var(--color-bar-text);
-}
-
-:is(.header, .app-nav) :is(.wordmark, .wordmark:hover),
-:is(.header, .app-nav) a:not(.button),
-:is(.header, .app-nav) a:not(.button):hover {
-  color: var(--color-bar-text);
-}
-
-:is(.header, .app-nav) .button,
-:is(.header, .app-nav) .button:hover {
-  background-color: var(--color-bar-button-bg);
-  border-color: var(--color-bar-button-bg);
-  color: var(--color-bar-button-text);
-}
-
-:is(.header, .app-nav) :focus-visible,
-:is(.header, .app-nav) .button:not(:disabled):hover,
-:is(.header, .app-nav) .dropdown-trigger:hover {
-  outline-color: var(--color-bar-text);
 }
