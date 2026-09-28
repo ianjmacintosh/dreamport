@@ -72,9 +72,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
 - The "Dreamport" wordmark is styled text (the `.wordmark` class), not an
   image asset, shown at the left of every page with `Header` (linking to
   `/`) or `AppNav` (linking to `/app`) — including the homepage, whose
-  hero headline says something else rather than repeating the name. It
-  drops from `--text-xl` to body size below 640px so `AppNav` fits one row
-  on phones. See the style guide's "Wordmark" section (decided in #118).
+  hero headline says something else rather than repeating the name. It's
+  `--text-h2`, stepping down to `--text-2xl` below 640px, where `AppNav`
+  stacks the wordmark above Settings/Log out. See the style guide's "Wordmark" section (decided in #118).
 
 - `Header` and `AppNav` share one bar color: a violet → magenta gradient
   interpolated in oklab, with cream text and cream-filled buttons, via the

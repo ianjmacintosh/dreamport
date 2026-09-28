@@ -307,8 +307,8 @@ function StyleGuide() {
         />
         <p className="sg-note">
           The app&apos;s name as styled text — heading font and color, bold, no
-          underline, no hover color change; drops to body size below 640px.
-          Shown at the left of every page with <code>Header</code> (links to{" "}
+          underline, no hover color change; steps down a size below 640px. Shown
+          at the left of every page with <code>Header</code> (links to{" "}
           <code>/</code>) or <code>AppNav</code> (links to <code>/app</code>),
           where the bar&apos;s gradient turns it cream (see the{" "}
           <code>--color-bar-*</code> tokens). No image asset for now.

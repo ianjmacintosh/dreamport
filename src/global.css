@@ -85,18 +85,18 @@ a:hover {
 .wordmark:hover {
   justify-self: start;
   font-family: var(--font-heading);
-  font-size: var(--text-xl);
+  font-size: var(--text-h2);
   font-weight: 700;
   color: var(--color-heading);
   text-decoration: none;
 }
 
-/* Below 640px (--breakpoint-sm) the wordmark at --text-xl left `AppNav`
-   ~14px short of room at 375px, wrapping "Log out" onto two lines (#118).
-   It drops to body size there, in `Header` too, so both bars match. */
+/* Below 640px (--breakpoint-sm) the wordmark steps down to --text-2xl,
+   in both `Header` and `AppNav` so the bars match (#118) — full --text-h2
+   squeezed `Header`'s Log in onto two lines at 320px. */
 @media (max-width: 640px) {
   .wordmark {
-    font-size: var(--text-base);
+    font-size: var(--text-2xl);
   }
 }
 
@@ -499,19 +499,33 @@ a.button {
 .app-nav-content {
   grid-column: 2;
   display: grid;
-  grid-template-columns: 1fr auto;
+  /* `minmax(0, …)` lets the actions track shrink below its content's
+     width, so a long email truncates (below) instead of overflowing. */
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-4) var(--space-6);
 }
 
 /* Email, Settings and Log out, grouped in the right track opposite the
-   wordmark (#118). */
+   wordmark (#118). The email's own track can shrink to zero; Settings and
+   Log out never do. */
 .app-nav-actions {
   display: grid;
-  grid-auto-flow: column;
+  grid-template-columns: minmax(0, auto) auto auto;
+  justify-self: end;
+  max-width: 100%;
   align-items: center;
   gap: var(--space-4);
+}
+
+/* A long address with the larger wordmark ran the nav out of room between
+   ~640px and ~900px, overflowing the page and wrapping Log out (#118) —
+   it truncates with an ellipsis instead, only as much as it has to. */
+.app-nav-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Below 640px (--breakpoint-sm in tokens.css) the full address ran the nav
@@ -519,16 +533,25 @@ a.button {
    variant exists yet to tuck it behind, so it's dropped entirely on small
    screens rather than truncated or wrapped — `/app/settings` shows the
    same address on its own page (see that route), so it's never fully
-   unreachable. The gaps tighten to --space-2 too, so the wordmark,
-   Settings and Log out fit one row at 375px (#118). */
+   unreachable.
+
+   Even without the email, the wordmark, Settings and Log out didn't fit
+   one row at common phone widths (360px and below wrapped Log out), so
+   the nav stacks: wordmark on top, Settings and Log out beneath it (#118).
+   A dropdown (#119) is the longer-term replacement for this. */
 @media (max-width: 640px) {
   .app-nav-email {
     display: none;
   }
 
-  .app-nav-content,
+  .app-nav-content {
+    grid-template-columns: 1fr;
+    row-gap: var(--space-2);
+  }
+
   .app-nav-actions {
-    gap: var(--space-2);
+    grid-template-columns: auto auto;
+    justify-self: start;
   }
 }
 
