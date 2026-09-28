@@ -10,16 +10,25 @@
 export interface Product {
   id: string;
   name: string;
+  /** Free text; `null` means none yet (never stored as `""`). */
+  description: string | null;
   createdAt: string;
 }
 
 /**
  * Longest `name` the create endpoint accepts. A Product name is meant to be a
- * short title (v1 is a flat list, no detail fields — see CONTEXT.md), and an
- * explicit cap keeps a single row's size bounded rather than accepting
+ * short title (longer detail belongs in its description — see CONTEXT.md),
+ * and an explicit cap keeps a single row's size bounded rather than accepting
  * whatever a client happens to send.
  */
 export const PRODUCT_NAME_MAX_LENGTH = 200;
+
+/**
+ * Longest `description` the update endpoint accepts — room for a real
+ * description rather than just a longer name (#112), still bounded for the
+ * same reason as `PRODUCT_NAME_MAX_LENGTH`.
+ */
+export const PRODUCT_DESCRIPTION_MAX_LENGTH = 2000;
 
 /** A User's own Products, oldest first. */
 export async function listProducts(
@@ -28,7 +37,7 @@ export async function listProducts(
 ): Promise<Product[]> {
   const { results } = await db
     .prepare(
-      'SELECT "id", "name", "createdAt" FROM "products" WHERE "userId" = ? ORDER BY "createdAt" ASC',
+      'SELECT "id", "name", "description", "createdAt" FROM "products" WHERE "userId" = ? ORDER BY "createdAt" ASC',
     )
     .bind(userId)
     .all<Product>();
@@ -44,6 +53,7 @@ export async function createProduct(
   const product: Product = {
     id: crypto.randomUUID(),
     name,
+    description: null,
     createdAt: new Date().toISOString(),
   };
   await db
@@ -68,7 +78,7 @@ export async function getProduct(
 ): Promise<Product | null> {
   return db
     .prepare(
-      'SELECT "id", "name", "createdAt" FROM "products" WHERE "id" = ? AND "userId" = ?',
+      'SELECT "id", "name", "description", "createdAt" FROM "products" WHERE "id" = ? AND "userId" = ?',
     )
     .bind(id, userId)
     .first<Product>();
@@ -91,4 +101,24 @@ export async function deleteProduct(
     .bind(id, userId)
     .run();
   return meta.changes > 0;
+}
+
+/**
+ * Set (or, with `null`, clear) the description of a Product owned by
+ * `userId`. Caller has already validated and normalised `description`.
+ * Scoped by both `id` and `userId` in the one query, same as
+ * `deleteProduct`; returns the updated Product, or null if no row matched.
+ */
+export async function updateProductDescription(
+  db: D1Database,
+  userId: string,
+  id: string,
+  description: string | null,
+): Promise<Product | null> {
+  return db
+    .prepare(
+      'UPDATE "products" SET "description" = ? WHERE "id" = ? AND "userId" = ? RETURNING "id", "name", "description", "createdAt"',
+    )
+    .bind(description, id, userId)
+    .first<Product>();
 }

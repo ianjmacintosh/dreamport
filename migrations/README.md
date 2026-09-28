@@ -34,6 +34,10 @@ way `session`/`account` do.
 list of Ideas per Product, `productId` cascading on delete the same way
 `products.userId` does.
 
+`0005_product_description.sql` adds a nullable `description` column to
+`products` (issue #112). Existing rows get `NULL`, the "no description yet"
+state.
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order

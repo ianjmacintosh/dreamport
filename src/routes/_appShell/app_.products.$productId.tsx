@@ -11,7 +11,7 @@ import TextInput from "../../components/TextInput";
  * dev-server shutdown, unlike a hard kill which refuses the connection
  * outright), the request hangs forever: no error, no way for the caller's
  * `catch` to ever run. This aborts the request after `timeoutMs` so
- * `deleteIdea`/`saveIdea` always land in their `catch` block instead of leaving the UI
+ * `deleteIdea`/`saveIdea`/`saveDescription` always land in their `catch` block instead of leaving the UI
  * stuck with no feedback.
  */
 function fetchWithTimeout(
@@ -58,6 +58,7 @@ async function withMinimumDuration<T>(
 interface Product {
   id: string;
   name: string;
+  description: string | null;
   createdAt: string;
 }
 
@@ -74,6 +75,9 @@ interface Idea {
  * hint only; the server enforces the real limit.
  */
 const IDEA_NAME_MAX_LENGTH = 200;
+
+/** Mirrors `PRODUCT_DESCRIPTION_MAX_LENGTH` in `src/worker/products.ts` — same client-side-hint-only reasoning. */
+const PRODUCT_DESCRIPTION_MAX_LENGTH = 2000;
 
 // Filename note: `app_.products.$productId.tsx`, not
 // `app.products.$productId.tsx` or `app/products/$productId.tsx` — same
@@ -104,6 +108,8 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
 const ADD_IDEA_FAILED = "We couldn't add that. Try again in a moment.";
 const DELETE_IDEA_FAILED = "We couldn't delete that. Try again in a moment.";
 const SAVE_IDEA_FAILED = "We couldn't save that. Try again in a moment.";
+const SAVE_DESCRIPTION_FAILED =
+  "We couldn't save the description. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -134,9 +140,17 @@ const CONNECTION_FAILED =
  * `.button-group`. Clicking Delete (from either)
  * shows Edit / Delete / Cancel — the confirming button keeps the action's own
  * verb, "Delete," rather than a generic "Confirm" (#101).
+ *
+ * The Product's own description (#112) sits under the heading — its text,
+ * or "No description yet." — with an "Edit description" button that swaps
+ * it for a pre-filled `TextInput` + Save / Cancel `.field-row`, the same
+ * in-place edit shape an Idea row's rename uses. Single-line on purpose:
+ * no multi-line text component exists yet (see #112).
  */
 function ProductIdeas() {
-  const { product, ideas: initialIdeas } = Route.useRouteContext();
+  const { product: initialProduct, ideas: initialIdeas } =
+    Route.useRouteContext();
+  const [product, setProduct] = useState<Product>(initialProduct);
   const [error, setError] = useState("");
   const [ideas, setIdeas] = useState<Idea[]>(initialIdeas);
   const [ideaName, setIdeaName] = useState("");
@@ -150,6 +164,9 @@ function ProductIdeas() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [isSavingDescription, setIsSavingDescription] = useState(false);
 
   async function addIdea() {
     setError("");
@@ -254,9 +271,92 @@ function ProductIdeas() {
     }
   }
 
+  function startEditingDescription() {
+    setError("");
+    setDescriptionDraft(product.description ?? "");
+    setIsEditingDescription(true);
+  }
+
+  async function saveDescription() {
+    setError("");
+    setIsSavingDescription(true);
+    try {
+      const saved = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(`/api/products/${product.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ description: descriptionDraft }),
+        });
+        if (!res.ok) {
+          return null;
+        }
+        return ((await res.json()) as { product: Product }).product;
+      });
+      if (!saved) {
+        setError(SAVE_DESCRIPTION_FAILED);
+        return;
+      }
+      // The server's copy, not `descriptionDraft` — it's trimmed, and an
+      // empty draft comes back as `null`.
+      setProduct(saved);
+      setIsEditingDescription(false);
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setIsSavingDescription(false);
+    }
+  }
+
   return (
     <>
       <h1 id="ideas-heading">Product: {product.name}</h1>
+      {isEditingDescription ? (
+        <form
+          className="field-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveDescription();
+          }}
+        >
+          <TextInput
+            id="product-description"
+            label="Description"
+            value={descriptionDraft}
+            onChange={(e) => setDescriptionDraft(e.target.value)}
+            maxLength={PRODUCT_DESCRIPTION_MAX_LENGTH}
+            disabled={isSavingDescription}
+          />
+          <div className="button-group">
+            <Button
+              type="submit"
+              disabled={isSavingDescription}
+              state={isSavingDescription ? "saving" : "ready"}
+            >
+              <Button.State name="ready">Save</Button.State>
+              <Button.State name="saving">Saving…</Button.State>
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={isSavingDescription}
+              onClick={() => {
+                setError("");
+                setIsEditingDescription(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <p>{product.description ?? "No description yet."}</p>
+          <p>
+            <Button variant="secondary" onClick={startEditingDescription}>
+              Edit description
+            </Button>
+          </p>
+        </>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault();
