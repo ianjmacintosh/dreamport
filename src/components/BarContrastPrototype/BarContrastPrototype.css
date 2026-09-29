@@ -1,36 +1,24 @@
 /* PROTOTYPE — throwaway, #120. Do not merge to main.
-   Each variant overrides the bar only; `A` is today's styling untouched.
-   The Log in button is out of scope (#120's Q1 decides it separately). */
+   Each variant styles only AppNav's account Dropdown trigger; `A` is
+   today's styling untouched. The wordmark is bold large text (3:1 applies)
+   and already passes; the Log in button is #120's Q1, decided separately.
+   Contrast figures are the worst point along the oklab gradient. */
 
-/* B: white text instead of cream. */
-:root[data-bar-variant="B"] {
-  --color-bar-text: #ffffff;
+/* B: 20% base03 translucent tint behind the trigger (worst 5.20:1). */
+:root[data-bar-variant="B"] .app-nav .dropdown-trigger {
+  background-color: rgb(0 43 54 / 0.2);
 }
 
-/* C: white text + a darker violet start so that end clears 4.5:1 too. */
-:root[data-bar-variant="C"] {
-  --color-bar-text: #ffffff;
-  --color-bar-bg-start: #5f64b8;
+/* C: 30% base03 translucent tint behind the trigger (worst 5.90:1). */
+:root[data-bar-variant="C"] .app-nav .dropdown-trigger {
+  background-color: rgb(0 43 54 / 0.3);
 }
 
-/* D: cream text as today, lifted off the gradient by a soft dark shadow;
-   the gradient itself is unchanged. */
-:root[data-bar-variant="D"]
-  :is(.header, .app-nav)
-  :is(.wordmark, .dropdown-trigger, a:not(.button)) {
-  text-shadow: 0 1px 2px rgb(0 43 54 / 0.55);
-}
-
-/* E: cream text as today, with a 10% base03 tint laid over the whole
-   gradient — both ends darken just enough for cream to clear 4.5:1. */
-:root[data-bar-variant="E"] :is(.header, .app-nav) {
-  background-image:
-    linear-gradient(rgb(0 43 54 / 0.1), rgb(0 43 54 / 0.1)),
-    linear-gradient(
-      in oklab 90deg,
-      var(--color-bar-bg-start),
-      var(--color-bar-bg-end)
-    );
+/* D: solid cream behind the trigger with base01 text (4.99:1) — the same
+   pairing #120's Q1 picked for the bar's buttons. */
+:root[data-bar-variant="D"] .app-nav .dropdown-trigger {
+  background-color: var(--sol-base3);
+  color: var(--sol-base01);
 }
 
 /* The switcher itself — deliberately not in the app's visual language. */

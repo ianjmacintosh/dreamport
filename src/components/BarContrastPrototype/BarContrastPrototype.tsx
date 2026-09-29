@@ -1,11 +1,12 @@
 /**
  * PROTOTYPE — throwaway, #120. Do not merge to main.
  *
- * Question: can the header bar (Header + AppNav) do better than cream text
- * on the violet → magenta gradient, which measures under WCAG AA's 4.5:1
- * for normal-size text (the email trigger)?
+ * Question: the account Dropdown's email trigger is normal-size text in
+ * cream straight on the violet → magenta bar, under WCAG AA's 4.5:1. (The
+ * wordmark is bold large text, so only 3:1 applies to it and it already
+ * passes.) What background behind the trigger fixes it best?
  *
- * Five variants of the same bar, switchable via `?variant=` (or the
+ * Four variants of the trigger, switchable via `?variant=` (or the
  * floating bar / ←→ keys), applied on every page so both Header (`/`) and
  * AppNav (`/app`) can be judged in place. The choice also sticks in
  * sessionStorage so navigating between pages keeps it.
@@ -18,28 +19,23 @@ import "./BarContrastPrototype.css";
 const VARIANTS = [
   {
     key: "A",
-    name: "Baseline: cream on current gradient",
-    contrast: "violet 4.06 · magenta 4.21",
+    name: "Baseline: cream text straight on the gradient",
+    contrast: "worst 4.06",
   },
   {
     key: "B",
-    name: "White text",
-    contrast: "violet 4.38 · magenta 4.55",
+    name: "Trigger on a 20% dark translucent tint",
+    contrast: "worst 5.20",
   },
   {
     key: "C",
-    name: "White text + darker violet #5f64b8",
-    contrast: "violet 5.25 · magenta 4.55",
+    name: "Trigger on a 30% dark translucent tint",
+    contrast: "worst 5.90",
   },
   {
     key: "D",
-    name: "Cream + dark text-shadow",
-    contrast: "violet 4.06 · magenta 4.21 (shadow not in the formula)",
-  },
-  {
-    key: "E",
-    name: "Cream + 10% dark tint over the bar",
-    contrast: "violet 4.59 · magenta 4.89",
+    name: "Trigger on solid cream, base01 text (matches bar button)",
+    contrast: "4.99",
   },
 ] as const;
 
@@ -108,7 +104,7 @@ export function BarContrastPrototype() {
         <strong>
           {variant.key} ({variant.name})
         </strong>
-        <span>AA needs 4.5 — {variant.contrast}</span>
+        <span>Email trigger; AA needs 4.5 — {variant.contrast}</span>
       </div>
       <button type="button" onClick={() => step(1)} aria-label="Next">
         →
