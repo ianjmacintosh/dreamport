@@ -178,6 +178,14 @@
   margin-bottom: var(--space-3);
 }
 
+/* The real Header/AppNav size their content to --page-width (a share of
+   the viewport); inside this narrower column that overflows, so the demo
+   gives them the column's own width instead. */
+.sg-bar-demo {
+  --page-width: 100%;
+  margin-bottom: var(--space-3);
+}
+
 /* ── Text inputs ── */
 
 .sg-input-row {

@@ -80,10 +80,17 @@ a:hover {
    asset (#118). Reads as a heading rather than a link: heading font and
    color, no underline, and no hover color swap. `justify-self: start`
    keeps the link as wide as its text instead of stretching across the
-   `1fr` track it sits in within `Header` and `AppNav`. */
+   `1fr` track it sits in within `Header` and `AppNav`.
+
+   `text-box` trims the link's box to x-height → baseline, so when a bar
+   centres it, it's the lowercase letters that line up with the bar's
+   other items (#125). Funnel Display's ascent is far taller than its
+   letters, so the untrimmed box sat the word visibly low. Browsers
+   without `text-box` (Firefox, for now) keep the untrimmed box. */
 .wordmark,
 .wordmark:hover {
   justify-self: start;
+  text-box: trim-both ex alphabetic;
   font-family: var(--font-heading);
   font-size: var(--text-h2);
   font-weight: 700;
@@ -195,6 +202,25 @@ a.button {
   background-color: var(--color-bar-button-bg);
   border-color: var(--color-bar-button-bg);
   color: var(--color-bar-button-text);
+}
+
+/* For a nav link or menu trigger on the header bar (`AppNav`'s sections,
+   account and ☰ triggers, #125): cream text on --color-bar-trigger-tint,
+   the dark wash that lifts normal-size cream text to AA against the
+   gradient (see the --color-bar-* tokens). Regular weight rather than
+   `.button`'s 600, so the current section (`aria-current="page"`, on a
+   stronger wash) can stand out by going bold. `:hover` pins the color
+   against the global `a:hover` rule, same as `.button--primary`. */
+.button--nav,
+.button--nav:hover {
+  background-color: var(--color-bar-trigger-tint);
+  color: var(--color-bar-text);
+  font-weight: 400;
+}
+
+.button--nav[aria-current="page"] {
+  background-color: var(--color-bar-link-current-tint);
+  font-weight: 700;
 }
 
 /* A disabled button (e.g. the send-code button before Turnstile resolves,
@@ -510,37 +536,97 @@ a.button {
 .app-nav-content {
   grid-column: 2;
   display: grid;
-  /* `minmax(0, …)` lets the Dropdown's track shrink below its trigger's
-     width, so a long email truncates (see .dropdown-trigger) instead of
-     overflowing — which is also what keeps the wordmark and the account
-     menu on one row at phone widths, where #118 had to stack them. The
-     Products link (#120) takes a fixed `auto` track between the two, so
-     only the email gives way when space runs short. */
-  grid-template-columns: auto auto minmax(0, 1fr);
+  /* Wordmark left; section links and the account Dropdown together on the
+     right (#125), the `minmax(0, 1fr)` track between them taking whatever
+     is left over. The account track grows to its email's full width first
+     and is the only one that shrinks once the row runs out of room — the
+     email truncates (see .dropdown-trigger) rather than wrapping or
+     pushing the links off the row. */
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, max-content);
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-4) var(--space-6);
 }
 
-/* Below 640px (--breakpoint-sm) `AppNav` drops its wordmark (#120): with
-   the Products link on the bar too, the row had no room left for the
-   account trigger at 375px. Products still leads back to `/app`, and
-   `Header` (signed out) keeps its wordmark. A stopgap until the bar gets a
-   proper phone design. */
+.app-nav-links {
+  grid-column: 3;
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The label reserves its bold width up front (an invisible bold copy
+   from `data-label`), so the current link going bold doesn't nudge its
+   neighbours. */
+.app-nav-link-label {
+  display: inline-grid;
+}
+
+.app-nav-link-label::after {
+  content: attr(data-label);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: 700;
+}
+
+/* The Dropdown triggers (#119) sit flush right. */
+.app-nav-content > .dropdown-trigger {
+  justify-self: end;
+}
+
+/* The account trigger fills its own track (whose width is what gives way
+   when the row runs short), so the email truncates inside it. A `.button`
+   is a flexbox, which won't shrink below its label's unwrapped text on
+   its own. It's capped so a long email truncates early instead of taking
+   the row's free space, which keeps the section links beside it rather
+   than drifting back toward the wordmark (#125). */
+.app-nav-content > .app-nav-account {
+  justify-self: stretch;
+  max-width: 16rem;
+}
+
+/* The ☰ menu that replaces the links and account trigger on phones —
+   hidden at every wider width (the same 640px, negated, so it keeps its
+   own `.button` display wherever it does show). */
+@media not (max-width: 640px) {
+  .app-nav-content > .app-nav-menu {
+    display: none;
+  }
+}
+
+/* An icon is shorter than a line of text; holding the label to one line
+   height keeps the ☰ trigger the same height as the bar's other items. */
+.app-nav-menu .dropdown-trigger-label {
+  min-height: 1lh;
+  display: grid;
+  align-items: center;
+}
+
+.app-nav-menu-email {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+/* Below 640px (--breakpoint-sm) the section links and account trigger
+   don't fit beside the wordmark, so both collapse into the ☰ menu (#125).
+   640px fits today's one section; a bar with several needs more room, so
+   adding sections means revisiting this breakpoint (see
+   docs/design-decisions.md). */
 @media (max-width: 640px) {
   .app-nav-content {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .app-nav-content > .wordmark {
+  .app-nav-content > :is(.app-nav-links, .app-nav-account) {
     display: none;
   }
-}
-
-/* The account Dropdown's trigger (#119) sits flush right, opposite the
-   wordmark (#118). */
-.app-nav-content > .dropdown-trigger {
-  justify-self: end;
 }
 
 /* ── Components: header bar color (Header + AppNav) ──────── */
@@ -569,57 +655,26 @@ a.button {
 }
 
 :is(.header, .app-nav) :focus-visible,
-:is(.header, .app-nav) .button:not(:disabled):hover,
-:is(.header, .app-nav) .dropdown-trigger:hover {
+:is(.header, .app-nav) .button:not(:disabled):hover {
   outline-color: var(--color-bar-text);
 }
 
 /* ── Components: dropdown ──────────────────────────────────── */
 /* `Dropdown` (#119): a trigger plus a panel of items. Base UI's Menu
-   renders these elements unstyled (ADR-0014) — everything visual lives
-   here. The trigger reads as text (it's e.g. the signed-in email), not a
-   `.button`, so it inherits its surrounding color and gets the same
-   outline-on-hover/focus treatment as `.button` for its affordance. */
+   renders these elements unstyled (ADR-0014). The trigger is a `.button`
+   (#125) — size, border, radius, hover outline and variant colors all come
+   from there, so it matches every other button; what's here is only what
+   a menu trigger adds: a chevron after the label, and a label that
+   truncates rather than widening the trigger past its container (a long
+   email on a phone). */
 
 .dropdown-trigger {
-  display: inline-grid;
-  grid-auto-flow: column;
-  align-items: center;
-  gap: var(--space-1);
-  /* Lets a long label (a long email on a phone) truncate instead of
-     pushing the trigger wider than its container. */
   min-width: 0;
   max-width: 100%;
-  padding: var(--space-1) var(--space-2);
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.dropdown-trigger:hover,
-.dropdown-trigger:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-
-/* On the bar, the trigger's cream text is normal-size, so it sits on a
-   dark wash to clear AA against the gradient (#120) — see the
-   --color-bar-* tokens. `.app-nav-link` (AppNav's Products link) gets the
-   same wash and the trigger's padding and radius, so both read as the
-   same kind of pill. */
-.app-nav :is(.dropdown-trigger, .app-nav-link) {
-  background-color: var(--color-bar-trigger-tint);
-}
-
-.app-nav-link {
-  padding: var(--space-1) var(--space-2);
-  border-radius: 6px;
 }
 
 .dropdown-trigger-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -669,8 +724,13 @@ a.button {
   outline: none;
 }
 
+/* A grid so an item can lead with an icon (e.g. AppNav's phone menu). */
 .dropdown-item {
-  display: block;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: 6px;
   color: var(--color-text-primary);
@@ -687,6 +747,19 @@ a.button {
 .dropdown-item:hover {
   background-color: var(--color-surface);
   color: var(--color-text-on-surface);
+}
+
+.dropdown-item[aria-current="page"] {
+  font-weight: 700;
+}
+
+/* `Dropdown.Group`'s heading: plain text, not an item — smaller, and
+   never highlighted. */
+.dropdown-group-label {
+  max-width: 16rem;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
 }
 
 .dropdown-separator {

@@ -45,5 +45,7 @@ describe("Header", () => {
     expect(wordmark).toBeDefined();
     expect(wordmark?.props.className).toBe("wordmark");
     expect(wordmark?.props.children).toBe("Dreamport");
+    // Part of the bar, not a nav item — never "you are here" (#125).
+    expect(wordmark?.props.current).toBe(false);
   });
 });

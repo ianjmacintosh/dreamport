@@ -4,9 +4,23 @@ import { Menu } from "@base-ui/react/menu";
 import Link from "../Link";
 
 interface DropdownProps {
-  /** The trigger's visible text (e.g. the signed-in User's email in
-   * `AppNav`). A chevron is appended after it — callers don't add one. */
+  /** The trigger's visible content (e.g. the signed-in User's email in
+   * `AppNav`, or an icon). A chevron is appended after it — callers don't
+   * add one — unless `chevron` is false. */
   label: ReactNode;
+  /** The trigger's accessible name, for a `label` with no text of its own
+   * (e.g. an icon-only menu button). */
+  "aria-label"?: string;
+  /** Show the chevron after the label. Defaults to true; an icon that
+   * already reads as "opens a menu" (e.g. a ☰) can drop it. */
+  chevron?: boolean;
+  /** The trigger is a `.button`; this picks its variant, same as
+   * `Button`'s. `"nav"` is the tinted look for the header bar (`AppNav`);
+   * `"secondary"` (the default) is the outlined one used everywhere else. */
+  variant?: "secondary" | "nav";
+  /** An extra class on the trigger, for a caller placing it in its own
+   * layout (e.g. `AppNav` showing one trigger per breakpoint). */
+  className?: string;
   /** The panel's contents: `Dropdown.Item`, `Dropdown.LinkItem` and
    * `Dropdown.Separator`, in the order they should appear. */
   children: ReactNode;
@@ -20,12 +34,27 @@ interface DropdownProps {
  * `Menu` primitives, per ADR-0014; every class below is this component's
  * own, styled in global.css — Base UI renders unstyled.
  */
-export function Dropdown({ label, children }: DropdownProps) {
+export function Dropdown({
+  label,
+  "aria-label": ariaLabel,
+  chevron = true,
+  variant = "secondary",
+  className,
+  children,
+}: DropdownProps) {
+  const classes = [
+    "button",
+    `button--${variant}`,
+    "dropdown-trigger",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
     <Menu.Root>
-      <Menu.Trigger className="dropdown-trigger">
+      <Menu.Trigger className={classes} aria-label={ariaLabel}>
         <span className="dropdown-trigger-label">{label}</span>
-        <DropdownChevron />
+        {chevron && <DropdownChevron />}
       </Menu.Trigger>
       <Menu.Portal>
         {/* Aligned to the trigger's end edge so a trigger sitting at the
@@ -103,17 +132,22 @@ function DropdownItem({ onClick, children }: DropdownItemProps) {
 
 interface DropdownLinkItemProps {
   href: string;
+  /** Whether the item is the page the User is on (`aria-current="page"`,
+   * shown bold) — e.g. the current section in `AppNav`'s phone menu, which
+   * spans more pages than its own `href`. Left out, the router decides
+   * from `href` (see `Link`). */
+  current?: boolean;
   children: ReactNode;
 }
 
 /** A navigation in the panel (e.g. Settings) — a real link, rendered
  * through `Link` so internal hrefs go through the router. */
-function DropdownLinkItem({ href, children }: DropdownLinkItemProps) {
+function DropdownLinkItem({ href, current, children }: DropdownLinkItemProps) {
   return (
     <Menu.LinkItem
       className="dropdown-item"
       closeOnClick
-      render={<Link href={href} />}
+      render={<Link href={href} current={current} />}
     >
       {children}
     </Menu.LinkItem>
@@ -125,8 +159,28 @@ function DropdownSeparator() {
   return <Menu.Separator className="dropdown-separator" />;
 }
 
+interface DropdownGroupProps {
+  /** Non-interactive text heading the group (e.g. "Signed in as …") —
+   * read out as the group's name, never focused or chosen. */
+  label: ReactNode;
+  children: ReactNode;
+}
+
+/** A labelled run of items: the label is plain text, not an item. */
+function DropdownGroup({ label, children }: DropdownGroupProps) {
+  return (
+    <Menu.Group>
+      <Menu.GroupLabel className="dropdown-group-label">
+        {label}
+      </Menu.GroupLabel>
+      {children}
+    </Menu.Group>
+  );
+}
+
 Dropdown.Item = DropdownItem;
 Dropdown.LinkItem = DropdownLinkItem;
 Dropdown.Separator = DropdownSeparator;
+Dropdown.Group = DropdownGroup;
 
 export default Dropdown;

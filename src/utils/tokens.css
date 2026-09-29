@@ -78,9 +78,11 @@
      under AA's 4.5:1 for normal-size text, and no in-palette light color
      clears it on either end. The bold wordmark is large text, so it only
      needs 3:1 and is fine as-is (accepted in #120). Normal-size text on
-     the bar (the account Dropdown's trigger and AppNav's Products link)
+     the bar (the account Dropdown's trigger and AppNav's section links)
      instead sits on --color-bar-trigger-tint, a 20% base03 wash that lifts
-     it to at least ~5.20:1 anywhere along the gradient (#120). */
+     it to at least ~5.20:1 anywhere along the gradient (#120). The section
+     link for the page you're on gets the stronger
+     --color-bar-link-current-tint, 35% (~6.30:1 at worst, #125). */
   --color-bar-bg-start: var(--sol-violet);
   --color-bar-bg-end: var(--sol-magenta);
   --color-bar-text: var(--sol-base3);
@@ -89,6 +91,11 @@
   --color-bar-trigger-tint: color-mix(
     in srgb,
     var(--sol-base03) 20%,
+    transparent
+  );
+  --color-bar-link-current-tint: color-mix(
+    in srgb,
+    var(--sol-base03) 35%,
     transparent
   );
 
