@@ -1,0 +1,75 @@
+/* PROTOTYPE — throwaway, #120. Do not merge to main.
+   Each variant overrides the bar only; `A` is today's styling untouched.
+   The Log in button is out of scope (#120's Q1 decides it separately). */
+
+/* B: white text instead of cream. */
+:root[data-bar-variant="B"] {
+  --color-bar-text: #ffffff;
+}
+
+/* C: white text + a darker violet start so that end clears 4.5:1 too. */
+:root[data-bar-variant="C"] {
+  --color-bar-text: #ffffff;
+  --color-bar-bg-start: #5f64b8;
+}
+
+/* D: cream text as today, lifted off the gradient by a soft dark shadow;
+   the gradient itself is unchanged. */
+:root[data-bar-variant="D"]
+  :is(.header, .app-nav)
+  :is(.wordmark, .dropdown-trigger, a:not(.button)) {
+  text-shadow: 0 1px 2px rgb(0 43 54 / 0.55);
+}
+
+/* E: cream text as today, with a 10% base03 tint laid over the whole
+   gradient — both ends darken just enough for cream to clear 4.5:1. */
+:root[data-bar-variant="E"] :is(.header, .app-nav) {
+  background-image:
+    linear-gradient(rgb(0 43 54 / 0.1), rgb(0 43 54 / 0.1)),
+    linear-gradient(
+      in oklab 90deg,
+      var(--color-bar-bg-start),
+      var(--color-bar-bg-end)
+    );
+}
+
+/* The switcher itself — deliberately not in the app's visual language. */
+.prototype-switcher {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  font:
+    13px/1.3 system-ui,
+    sans-serif;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
+}
+
+.prototype-switcher button {
+  border: 0;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  background: #333;
+  color: #fff;
+  cursor: pointer;
+}
+
+.prototype-switcher-label {
+  display: grid;
+  text-align: center;
+}
+
+.prototype-switcher-label span {
+  opacity: 0.75;
+}
