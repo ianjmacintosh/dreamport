@@ -162,6 +162,15 @@
   margin-bottom: var(--space-3);
 }
 
+/* The bar-only button variants on the real bar surface: `.app-nav` brings
+   the gradient and the bar's cream hover outline; this only swaps its
+   page-width grid for the button row above and pads it. */
+.sg-bar-swatch {
+  display: flex;
+  padding: var(--space-4);
+  border-radius: 6px;
+}
+
 /* ── Button label stack ── */
 
 .sg-button-label-stack-demo {
@@ -175,6 +184,14 @@
 }
 
 .sg-dropdown-demo {
+  margin-bottom: var(--space-3);
+}
+
+/* The real Header/AppNav size their content to --page-width (a share of
+   the viewport); inside this narrower column that overflows, so the demo
+   gives them the column's own width instead. */
+.sg-bar-demo {
+  --page-width: 100%;
   margin-bottom: var(--space-3);
 }
 

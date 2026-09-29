@@ -11,6 +11,7 @@ import Header from "./Header";
 type HeaderLink = ReactElement<{
   href: string;
   className?: string;
+  current?: boolean;
   children?: unknown;
 }>;
 
@@ -33,10 +34,10 @@ describe("Header", () => {
     expect(Header).not.toBe(undefined);
   });
 
-  test("offers a primary-button Log in link to /login", () => {
+  test("offers a bar-button Log in link to /login", () => {
     const login = headerLinks().find((l) => l.props.href === "/login");
     expect(login).toBeDefined();
-    expect(login?.props.className).toContain("button--primary");
+    expect(login?.props.className).toContain("button--bar");
     expect(login?.props.children).toBe("Log in");
   });
 
@@ -45,5 +46,7 @@ describe("Header", () => {
     expect(wordmark).toBeDefined();
     expect(wordmark?.props.className).toBe("wordmark");
     expect(wordmark?.props.children).toBe("Dreamport");
+    // Part of the bar, not a nav item — never "you are here" (#125).
+    expect(wordmark?.props.current).toBe(false);
   });
 });

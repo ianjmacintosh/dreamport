@@ -35,8 +35,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
   in #89).
 
 - A signed-in page (e.g. `/app`, `/app/settings`) renders inside the
-  `_appShell` layout — `AppNav` (an account `Dropdown` triggered by the
-  User's own email, holding Settings and Log out) plus the usual `Footer` —
+  `_appShell` layout — `AppNav` (the section links, then an account
+  `Dropdown` triggered by the User's own email, holding Settings and Log
+  out) plus the usual `Footer` —
   not the marketing `Header`/`_withFooter`. `Header` stays signed-out-only;
   it has no concept of a session. See `src/routes/_appShell.tsx` and
   `src/components/AppNav` (decided in #90; the flat email/Settings/Log out
@@ -75,27 +76,59 @@ Add an entry only once a sign-off conversation resolves something repeatable
   component — a generic, reusable trigger-plus-panel Component (not a
   one-off tied to `AppNav`), built on `@base-ui/react`'s `Menu` primitives
   for behavior (focus management, keyboard nav, outside-click/`Escape`)
-  while `Dropdown` owns all of its own CSS. `AppNav`'s trigger is the
+  while `Dropdown` owns its panel's CSS. Its trigger is a `.button`
+  (`variant`, default `"secondary"`; `"nav"` on the bar), so it shares
+  every button's size and hover outline (#125). `AppNav`'s trigger is the
   signed-in User's email plus a chevron icon; the panel lists only the
   menu's actual items (Settings, a separator, Log out) — the trigger
   already shows the email, so the panel doesn't repeat it. See ADR-0014 and
-  the style guide's "Dropdown" section (decided in #119).
+  the style guide's "Dropdown" section (decided in #119). The one panel
+  whose trigger doesn't show the email — `AppNav`'s phone ☰ menu — names
+  it in a non-clickable `Dropdown.Group` label ("Signed in as …") over
+  Settings and Log out instead (#125).
+
+- `AppNav`'s top-level sections (just Products for now) are links on the
+  right of the bar, beside the account `Dropdown`, not beside the wordmark.
+  Each is a pill on `--color-bar-trigger-tint` with its Phosphor icon
+  before the label; the section you're in (`aria-current="page"`) gets
+  `--color-bar-link-current-tint` and goes bold. This reverses #90's "no
+  active-route highlighting", which predated real sections. Everything
+  clickable on the bar (section links, account trigger, ☰) is the same
+  size as a `.button` and gets the same hover outline. The account
+  trigger is capped at 16rem so a long email truncates rather than pushing
+  the links back toward the wordmark. Below 640px the links and account
+  trigger collapse into one icon-only ☰ `Dropdown` (sections, a separator,
+  then the signed-in group). 640px fits one section; adding sections means
+  measuring the row again and likely adding a wider breakpoint (decided in
+  #125, from a prototype that compared rail/pill/marker styles and a
+  bottom tab bar).
 
 - Icons use Phosphor (`@phosphor-icons/react`), imported per-icon by name
   (e.g. `CaretDownIcon`) rather than a hand-authored SVG or another icon
   library, at the `"regular"` weight unless a specific icon calls for
   another. This is the project's icon system going forward, not a one-off
   for any single icon (decided in #119).
+  - One scoped exception: `Dropdown`'s trigger chevron is its own
+    hand-drawn two-line SVG, not Phosphor's `CaretDown`. Phosphor's caret
+    is a single closed path, and the open/close animation folds its two
+    strokes independently, which a single path can't do. It follows
+    Phosphor's regular-weight proportions. Every other icon stays Phosphor
+    (decided in #120).
 
 - The "Dreamport" wordmark is styled text (the `.wordmark` class), not an
   image asset, shown at the left of every page with `Header` (linking to
   `/`) or `AppNav` (linking to `/app`) — including the homepage, whose
   hero headline says something else rather than repeating the name. It's
-  `--text-h2`, stepping down to `--text-2xl` below 640px. `AppNav` keeps
-  the wordmark and its account `Dropdown` on one row at every width, the
-  Dropdown's email trigger truncating as needed (#119 replaced #118's
-  stacked phone layout). See the style guide's "Wordmark" section
-  (decided in #118).
+  `--text-h2`, stepping down to `--text-2xl` below 640px. Its box is
+  trimmed to x-height → baseline (`text-box`), so a bar centres its
+  lowercase letters against the bar's other items rather than centring
+  Funnel Display's much taller line box (#125). `AppNav` keeps everything
+  on one row at every width (#119 replaced #118's stacked phone layout);
+  the wordmark shows at every width, with the rest collapsing into a ☰
+  menu on phones (#125, replacing #120's hide-the-wordmark stopgap). See
+  the style guide's "Wordmark" section (decided in #118). It's part of
+  the bar, not a nav item, so it's never marked as the current page
+  (`current={false}` on its `Link`), even on the page it links to (#125).
 
 - `Header` and `AppNav` share one bar color: a violet → magenta gradient
   interpolated in oklab, with cream text and cream-filled buttons, via the

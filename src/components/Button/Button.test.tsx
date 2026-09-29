@@ -13,6 +13,11 @@ describe("Button", () => {
     expect(Button).not.toBe(undefined);
   });
 
+  test("variant='bar' renders the bar button class", () => {
+    const button = Button({ variant: "bar", children: "Log in" });
+    expect(button.props.className).toBe("button button--bar");
+  });
+
   test("renders plain children when no state is given", () => {
     const button = Button({ children: "Delete" });
     expect(button.props.children).toBe("Delete");

@@ -3,6 +3,7 @@ import {
   createFileRoute,
   Outlet,
   redirect,
+  useLocation,
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
@@ -64,6 +65,7 @@ function AppShellLayout() {
   const { email } = Route.useRouteContext();
   const navigate = useNavigate();
   const router = useRouter();
+  const { pathname } = useLocation();
   const [error, setError] = useState("");
 
   // Sign-out used to be its own button on `/app/settings` (#26); it moved
@@ -92,7 +94,11 @@ function AppShellLayout() {
 
   return (
     <>
-      <AppNav email={email} onLogout={() => void signOut()} />
+      <AppNav
+        email={email}
+        onLogout={() => void signOut()}
+        pathname={pathname}
+      />
       {error && <p role="alert">{error}</p>}
       <main>
         <Outlet />

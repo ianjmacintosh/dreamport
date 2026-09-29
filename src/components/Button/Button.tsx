@@ -36,7 +36,9 @@ function ButtonState(props: ButtonStateProps) {
 }
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary";
+  /** `"bar"` is for a button sitting on the header bar (`Header`/`AppNav`)
+   * — cream fill, dark text, readable against the bar's gradient. */
+  variant?: "primary" | "secondary" | "bar";
   /**
    * Which `Button.State` child's `name` is current. When given, `children`
    * must be one `<Button.State name="...">` per possible state rather than

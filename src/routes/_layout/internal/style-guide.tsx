@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { ListIcon, PackageIcon } from "@phosphor-icons/react";
 
 import Button from "../../../components/Button";
+import AppNav from "../../../components/AppNav";
 import Dropdown from "../../../components/Dropdown";
+import Header from "../../../components/Header";
 import Link from "../../../components/Link";
 import TextInput from "../../../components/TextInput";
 
@@ -146,6 +149,7 @@ function StyleGuide() {
         <a href="#button-label-stack">Button label stack</a>
         <a href="#button-group">Button group</a>
         <a href="#dropdown">Dropdown</a>
+        <a href="#header-bars">Header bars</a>
         <a href="#text-inputs">Text inputs</a>
         <a href="#field-row">Field with action</a>
         <a href="#list-row">Row with action</a>
@@ -313,7 +317,9 @@ function StyleGuide() {
           at the left of every page with <code>Header</code> (links to{" "}
           <code>/</code>) or <code>AppNav</code> (links to <code>/app</code>),
           where the bar&apos;s gradient turns it cream (see the{" "}
-          <code>--color-bar-*</code> tokens). No image asset for now.
+          <code>--color-bar-*</code> tokens). Its box is trimmed to x-height →
+          baseline, so a bar centring it lines up its lowercase letters with the
+          bar&apos;s other items. No image asset for now.
         </p>
       </Section>
 
@@ -328,14 +334,33 @@ function StyleGuide() {
         <Snippet
           code={`<Button variant="primary">Primary</Button>\n<Button variant="secondary">Secondary</Button>\n<Button disabled>Disabled</Button>`}
         />
+        <div className="app-nav sg-button-row sg-bar-swatch">
+          <Button variant="bar">Bar</Button>
+          <a href="#buttons" className="button button--nav">
+            Nav
+          </a>
+          <a href="#buttons" className="button button--nav" aria-current="page">
+            Nav (current page)
+          </a>
+        </div>
+        <Snippet
+          code={`<Button variant="bar">Bar</Button>\n<Link href="/app" className="button button--nav">Nav</Link>\n<Link href="/app" className="button button--nav" current>\n  Nav (current page)\n</Link>`}
+        />
         <p className="sg-note">
           Use the <code>&lt;Button&gt;</code> component with a{" "}
-          <code>variant</code> of <code>primary</code> or <code>secondary</code>{" "}
-          — never style a raw <code>&lt;button&gt;</code> directly. Hover shows
-          the same outline as keyboard focus, not a color swap. A{" "}
-          <code>disabled</code> button uses the body-text color as its own
-          background regardless of variant — muted and clearly inert, distinct
-          from either variant's normal look.
+          <code>variant</code> of <code>primary</code>, <code>secondary</code>{" "}
+          or <code>bar</code> — never style a raw <code>&lt;button&gt;</code>{" "}
+          directly. Hover shows the same outline as keyboard focus, not a color
+          swap. A <code>disabled</code> button uses the body-text color as its
+          own background regardless of variant — muted and clearly inert,
+          distinct from every variant's normal look. <code>bar</code> is only
+          for a button sitting on the header bar (e.g. <code>Header</code>
+          &apos;s Log in) — cream fill, dark text. <code>nav</code> is also
+          bar-only: a nav link or menu trigger (e.g. <code>AppNav</code>&apos;s
+          sections and account menu) — cream text on a dark wash, regular
+          weight, and bold on a stronger wash when it&apos;s the current page.
+          Both are shown above on the bar itself, and in place under Header bars
+          below.
         </p>
       </Section>
 
@@ -395,6 +420,26 @@ function StyleGuide() {
         <Snippet
           code={`<Dropdown label={email}>\n  <Dropdown.LinkItem href="/app/settings">Settings</Dropdown.LinkItem>\n  <Dropdown.Separator />\n  <Dropdown.Item onClick={onLogout}>Log out</Dropdown.Item>\n</Dropdown>`}
         />
+        <div className="sg-dropdown-demo">
+          <Dropdown
+            label={<ListIcon size="1.25em" />}
+            aria-label="Menu"
+            chevron={false}
+          >
+            <Dropdown.LinkItem href="#dropdown" current>
+              <PackageIcon />
+              Products
+            </Dropdown.LinkItem>
+            <Dropdown.Separator />
+            <Dropdown.Group label="Signed in as someone@example.com">
+              <Dropdown.LinkItem href="#dropdown">Settings</Dropdown.LinkItem>
+              <Dropdown.Item onClick={() => {}}>Log out</Dropdown.Item>
+            </Dropdown.Group>
+          </Dropdown>
+        </div>
+        <Snippet
+          code={`<Dropdown label={<ListIcon size="1.25em" />} aria-label="Menu" chevron={false}>\n  <Dropdown.LinkItem href="/app" current>\n    <PackageIcon />\n    Products\n  </Dropdown.LinkItem>\n  <Dropdown.Separator />\n  <Dropdown.Group label={\`Signed in as \${email}\`}>\n    <Dropdown.LinkItem href="/app/settings">Settings</Dropdown.LinkItem>\n    <Dropdown.Item onClick={onLogout}>Log out</Dropdown.Item>\n  </Dropdown.Group>\n</Dropdown>`}
+        />
         <p className="sg-note">
           Use <code>&lt;Dropdown&gt;</code> for a trigger that opens a short
           panel of actions (e.g. <code>AppNav</code>&apos;s account menu). The{" "}
@@ -403,14 +448,53 @@ function StyleGuide() {
           with an ellipsis. Fill the panel with{" "}
           <code>&lt;Dropdown.LinkItem href&gt;</code> for navigation,{" "}
           <code>&lt;Dropdown.Item onClick&gt;</code> for an action, and{" "}
-          <code>&lt;Dropdown.Separator /&gt;</code> between groups. Behavior —
-          focus moving into the panel and back to the trigger, arrow-key
-          navigation, closing on <code>Escape</code> or an outside click — comes
-          from Base UI&apos;s <code>Menu</code> (ADR-0014); every style is{" "}
-          <code>Dropdown</code>&apos;s own. The panel aligns to the
-          trigger&apos;s end edge so a trigger at the right of a bar opens
-          inward. Open it with the keyboard (Enter, then the arrow keys) to see
-          the item highlight, which is the same for pointer and keyboard.
+          <code>&lt;Dropdown.Separator /&gt;</code> between groups. A{" "}
+          <code>&lt;Dropdown.Group label&gt;</code> heads a run of items with
+          plain, non-clickable text (e.g. who you&apos;re signed in as), and{" "}
+          <code>current</code> on a link item marks the page you&apos;re on
+          (bold). For an icon-only trigger, pass the icon as <code>label</code>,
+          give it an <code>aria-label</code>, and drop the chevron with{" "}
+          <code>chevron={"{false}"}</code>. Keep an eye on the current item as
+          this gets reused: a panel that marks where you are overlaps with a
+          select input&apos;s chosen option, and bold is a first pass (#125),
+          not a settled treatment. Behavior — focus moving into the panel and
+          back to the trigger, arrow-key navigation, closing on{" "}
+          <code>Escape</code> or an outside click — comes from Base UI&apos;s{" "}
+          <code>Menu</code> (ADR-0014). The trigger is a <code>.button</code>:{" "}
+          <code>variant</code> picks its look, like <code>Button</code>&apos;s —{" "}
+          <code>"secondary"</code> by default, <code>"nav"</code> on the header
+          bar. The panel aligns to the trigger&apos;s end edge so a trigger at
+          the right of a bar opens inward. Open it with the keyboard (Enter,
+          then the arrow keys) to see the item highlight, which is the same for
+          pointer and keyboard.
+        </p>
+      </Section>
+
+      <Section id="header-bars" label="Header bars">
+        <div className="sg-bar-demo">
+          <Header />
+        </div>
+        <div className="sg-bar-demo">
+          <AppNav
+            email="someone@example.com"
+            onLogout={() => {}}
+            pathname="/app"
+          />
+        </div>
+        <Snippet
+          code={`<Link href="/login" className="button button--bar">Log in</Link>\n\n<Link href="/app" className="button button--nav" current={isCurrent}>\n  <PackageIcon />\n  Products\n</Link>\n\n<Dropdown label={email} variant="nav">…</Dropdown>`}
+        />
+        <p className="sg-note">
+          The real <code>Header</code> (signed out) and <code>AppNav</code>{" "}
+          (signed in, on <code>/app</code>) on the bar gradient. Everything
+          clickable on a bar is a <code>.button</code>, so it&apos;s the same
+          size and has the same hover outline as any other button:{" "}
+          <code>button--bar</code> for Log in, <code>button--nav</code> for a
+          section link, and a <code>Dropdown</code> with{" "}
+          <code>variant=&quot;nav&quot;</code> for the account menu. The current
+          section (<code>current</code> on its <code>Link</code>) takes a
+          stronger wash and goes bold. Narrow the window below 640px to see{" "}
+          <code>AppNav</code> collapse into its ☰ menu.
         </p>
       </Section>
 
