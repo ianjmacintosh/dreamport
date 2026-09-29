@@ -11,6 +11,7 @@ import Header from "./Header";
 type HeaderLink = ReactElement<{
   href: string;
   className?: string;
+  current?: boolean;
   children?: unknown;
 }>;
 
