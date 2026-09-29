@@ -71,19 +71,26 @@
 
   /* The bar across the top of every page — `Header` signed-out, `AppNav`
      signed-in (#118): a violet → magenta gradient, blended in oklab (sRGB
-     muddies the midpoint), with cream text and cream-filled buttons.
+     muddies the midpoint), with cream text and cream-filled `.button--bar`
+     buttons (base01 text on cream, ~4.99:1).
 
-     Known, accepted trade-off: cream measures ~4.06:1 on violet and
-     ~4.21:1 on magenta, and magenta button text ~4.21:1 on cream — all
-     under AA's 4.5:1 for normal-size text (the bold wordmark clears the
-     3:1 large-text bar). No in-palette light color clears 4.5:1 on either
-     end of the gradient. Kept by deliberate choice, same as --color-link;
-     don't "fix" this without revisiting that decision first. */
+     Cream text measures only ~4.06:1 on violet and ~4.21:1 on magenta —
+     under AA's 4.5:1 for normal-size text, and no in-palette light color
+     clears it on either end. The bold wordmark is large text, so it only
+     needs 3:1 and is fine as-is (accepted in #120). Normal-size text on
+     the bar (the account Dropdown's trigger and AppNav's Products link)
+     instead sits on --color-bar-trigger-tint, a 20% base03 wash that lifts
+     it to at least ~5.20:1 anywhere along the gradient (#120). */
   --color-bar-bg-start: var(--sol-violet);
   --color-bar-bg-end: var(--sol-magenta);
   --color-bar-text: var(--sol-base3);
   --color-bar-button-bg: var(--sol-base3);
-  --color-bar-button-text: var(--sol-magenta);
+  --color-bar-button-text: var(--sol-base01);
+  --color-bar-trigger-tint: color-mix(
+    in srgb,
+    var(--sol-base03) 20%,
+    transparent
+  );
 
   /* ── Typography ───────────────────────────────────────────── */
 

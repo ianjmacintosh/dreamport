@@ -14,7 +14,8 @@ interface AppNavProps {
 /**
  * The persistent bar every signed-in page (`/app`, `/app/settings`, …) is
  * rendered inside of — the Dreamport wordmark (home to `/app`) on the left
- * (#118), and on the right who you're signed in as, opening an account
+ * (#118), then a plain Products link (#120 — a flat way back until #109's
+ * breadcrumb), and on the right who you're signed in as, opening an account
  * dropdown for Settings and Log out (#119). Sign-out was originally its own
  * button on `/app/settings` (#26); it moved here so every signed-in page
  * carries the same way out, rather than only the one page that happened to
@@ -30,6 +31,9 @@ export function AppNav({ email, onLogout }: AppNavProps) {
       <div className="app-nav-content">
         <Link href="/app" className="wordmark">
           Dreamport
+        </Link>
+        <Link href="/app" className="app-nav-link">
+          Products
         </Link>
         <Dropdown label={email}>
           <Dropdown.LinkItem href="/app/settings">Settings</Dropdown.LinkItem>

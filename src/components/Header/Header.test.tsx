@@ -33,10 +33,10 @@ describe("Header", () => {
     expect(Header).not.toBe(undefined);
   });
 
-  test("offers a primary-button Log in link to /login", () => {
+  test("offers a bar-button Log in link to /login", () => {
     const login = headerLinks().find((l) => l.props.href === "/login");
     expect(login).toBeDefined();
-    expect(login?.props.className).toContain("button--primary");
+    expect(login?.props.className).toContain("button--bar");
     expect(login?.props.children).toBe("Log in");
   });
 

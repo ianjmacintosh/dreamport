@@ -330,12 +330,14 @@ function StyleGuide() {
         />
         <p className="sg-note">
           Use the <code>&lt;Button&gt;</code> component with a{" "}
-          <code>variant</code> of <code>primary</code> or <code>secondary</code>{" "}
-          — never style a raw <code>&lt;button&gt;</code> directly. Hover shows
-          the same outline as keyboard focus, not a color swap. A{" "}
-          <code>disabled</code> button uses the body-text color as its own
-          background regardless of variant — muted and clearly inert, distinct
-          from either variant's normal look.
+          <code>variant</code> of <code>primary</code>, <code>secondary</code>{" "}
+          or <code>bar</code> — never style a raw <code>&lt;button&gt;</code>{" "}
+          directly. Hover shows the same outline as keyboard focus, not a color
+          swap. A <code>disabled</code> button uses the body-text color as its
+          own background regardless of variant — muted and clearly inert,
+          distinct from every variant's normal look. <code>bar</code> is only
+          for a button sitting on the header bar (e.g. <code>Header</code>
+          &apos;s Log in) — cream fill, dark text.
         </p>
       </Section>
 

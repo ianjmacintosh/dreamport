@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
-import { CaretDownIcon } from "@phosphor-icons/react";
 
 import Link from "../Link";
 
@@ -26,7 +25,7 @@ export function Dropdown({ label, children }: DropdownProps) {
     <Menu.Root>
       <Menu.Trigger className="dropdown-trigger">
         <span className="dropdown-trigger-label">{label}</span>
-        <CaretDownIcon className="dropdown-trigger-icon" aria-hidden="true" />
+        <DropdownChevron />
       </Menu.Trigger>
       <Menu.Portal>
         {/* Aligned to the trigger's end edge so a trigger sitting at the
@@ -40,6 +39,50 @@ export function Dropdown({ label, children }: DropdownProps) {
         </Menu.Positioner>
       </Menu.Portal>
     </Menu.Root>
+  );
+}
+
+/**
+ * The trigger's chevron — this component's own asset rather than Phosphor's
+ * `CaretDown` (a scoped exception, see docs/design-decisions.md): Phosphor's
+ * caret is one closed path, but opening the panel folds the two strokes
+ * independently from a down- to an up-chevron, which needs them as separate
+ * elements. Proportions and stroke weight follow Phosphor's regular caret
+ * (256 viewBox, 16-unit round stroke) so it sits with the other icons.
+ *
+ * Each wing pivots on the shared vertex (128, 168); the `g` slides the
+ * whole shape up as they fold so it stays centred — see
+ * `.dropdown-chevron-*` in global.css.
+ */
+function DropdownChevron() {
+  return (
+    <svg
+      viewBox="0 0 256 256"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="16"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <g className="dropdown-chevron">
+        <line
+          className="dropdown-chevron-wing dropdown-chevron-wing--left"
+          x1="48"
+          y1="88"
+          x2="128"
+          y2="168"
+        />
+        <line
+          className="dropdown-chevron-wing dropdown-chevron-wing--right"
+          x1="208"
+          y1="88"
+          x2="128"
+          y2="168"
+        />
+      </g>
+    </svg>
   );
 }
 

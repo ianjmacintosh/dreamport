@@ -86,15 +86,23 @@ Add an entry only once a sign-off conversation resolves something repeatable
   library, at the `"regular"` weight unless a specific icon calls for
   another. This is the project's icon system going forward, not a one-off
   for any single icon (decided in #119).
+  - One scoped exception: `Dropdown`'s trigger chevron is its own
+    hand-drawn two-line SVG, not Phosphor's `CaretDown`. Phosphor's caret
+    is a single closed path, and the open/close animation folds its two
+    strokes independently, which a single path can't do. It follows
+    Phosphor's regular-weight proportions. Every other icon stays Phosphor
+    (decided in #120).
 
 - The "Dreamport" wordmark is styled text (the `.wordmark` class), not an
   image asset, shown at the left of every page with `Header` (linking to
   `/`) or `AppNav` (linking to `/app`) — including the homepage, whose
   hero headline says something else rather than repeating the name. It's
   `--text-h2`, stepping down to `--text-2xl` below 640px. `AppNav` keeps
-  the wordmark and its account `Dropdown` on one row at every width, the
+  its items and account `Dropdown` on one row at every width, the
   Dropdown's email trigger truncating as needed (#119 replaced #118's
-  stacked phone layout). See the style guide's "Wordmark" section
+  stacked phone layout). Below 640px `AppNav` hides its wordmark so its
+  Products link and account trigger fit (#120, a stopgap until the nav
+  gets its own phone design). See the style guide's "Wordmark" section
   (decided in #118).
 
 - `Header` and `AppNav` share one bar color: a violet → magenta gradient

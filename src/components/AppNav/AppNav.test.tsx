@@ -61,6 +61,13 @@ describe("AppNav", () => {
     expect(links[0]?.props.children).toBe("Dreamport");
   });
 
+  test("links to Products (/app) right after the wordmark", () => {
+    const elements = navElements("someone@example.com", () => {});
+    const links = elements.filter((el) => el.props.href !== undefined);
+    expect(links[1]?.props.href).toBe("/app");
+    expect(links[1]?.props.children).toBe("Products");
+  });
+
   test("the account dropdown's trigger is the signed-in email", () => {
     const dropdown = navElements("someone@example.com", () => {}).find(
       (el) => el.type === Dropdown,

@@ -186,10 +186,21 @@ a.button {
   color: var(--color-text-primary);
 }
 
+/* For a button on the header bar (#120) — see the --color-bar-* tokens.
+   Chosen explicitly via `variant="bar"`, rather than repainting whatever
+   button happens to be rendered inside the bar. `:hover` pins the color
+   against the global `a:hover` rule, same as `.button--primary`. */
+.button--bar,
+.button--bar:hover {
+  background-color: var(--color-bar-button-bg);
+  border-color: var(--color-bar-button-bg);
+  color: var(--color-bar-button-text);
+}
+
 /* A disabled button (e.g. the send-code button before Turnstile resolves,
    #28) uses the body-text color as its own background — muted and clearly
-   inert next to either variant's normal accent/outline treatment, and
-   distinct from both without inventing a new color. `--color-accent-text`
+   inert next to any variant's normal treatment, and distinct from all of
+   them without inventing a new color. `--color-accent-text`
    (cream) keeps the label readable against that darker background, the
    same pairing `.button--primary` already uses the other way round. */
 .button:disabled {
@@ -502,11 +513,28 @@ a.button {
   /* `minmax(0, …)` lets the Dropdown's track shrink below its trigger's
      width, so a long email truncates (see .dropdown-trigger) instead of
      overflowing — which is also what keeps the wordmark and the account
-     menu on one row at phone widths, where #118 had to stack them. */
-  grid-template-columns: auto minmax(0, 1fr);
+     menu on one row at phone widths, where #118 had to stack them. The
+     Products link (#120) takes a fixed `auto` track between the two, so
+     only the email gives way when space runs short. */
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-4) var(--space-6);
+}
+
+/* Below 640px (--breakpoint-sm) `AppNav` drops its wordmark (#120): with
+   the Products link on the bar too, the row had no room left for the
+   account trigger at 375px. Products still leads back to `/app`, and
+   `Header` (signed out) keeps its wordmark. A stopgap until the bar gets a
+   proper phone design. */
+@media (max-width: 640px) {
+  .app-nav-content {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .app-nav-content > .wordmark {
+    display: none;
+  }
 }
 
 /* The account Dropdown's trigger (#119) sits flush right, opposite the
@@ -519,10 +547,10 @@ a.button {
 /* One color treatment for both bars (#118) — see the --color-bar-*
    tokens for the gradient and its accepted contrast trade-off. Everything
    inside that would otherwise paint in a page-background color (heading
-   violet, link blue, the blue accent button and focus ring) switches to
-   the bar's own cream; plain text (the account Dropdown's trigger) just
-   inherits it. The Dropdown's panel is portaled out of the bar, so it
-   keeps its own page-background styling. */
+   violet, link blue and focus ring) switches to the bar's own cream;
+   plain text (the account Dropdown's trigger) just inherits it. Buttons
+   opt in to the bar's look with `.button--bar`. The Dropdown's panel is
+   portaled out of the bar, so it keeps its own page-background styling. */
 
 .header,
 .app-nav {
@@ -538,13 +566,6 @@ a.button {
 :is(.header, .app-nav) a:not(.button),
 :is(.header, .app-nav) a:not(.button):hover {
   color: var(--color-bar-text);
-}
-
-:is(.header, .app-nav) .button,
-:is(.header, .app-nav) .button:hover {
-  background-color: var(--color-bar-button-bg);
-  border-color: var(--color-bar-button-bg);
-  color: var(--color-bar-button-text);
 }
 
 :is(.header, .app-nav) :focus-visible,
@@ -584,18 +605,51 @@ a.button {
   outline-offset: 2px;
 }
 
+/* On the bar, the trigger's cream text is normal-size, so it sits on a
+   dark wash to clear AA against the gradient (#120) — see the
+   --color-bar-* tokens. `.app-nav-link` (AppNav's Products link) gets the
+   same wash and the trigger's padding and radius, so both read as the
+   same kind of pill. */
+.app-nav :is(.dropdown-trigger, .app-nav-link) {
+  background-color: var(--color-bar-trigger-tint);
+}
+
+.app-nav-link {
+  padding: var(--space-1) var(--space-2);
+  border-radius: 6px;
+}
+
 .dropdown-trigger-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dropdown-trigger-icon {
+/* The chevron folds rather than spins (#120): each wing turns 90° about
+   the vertex they share, down-chevron → up-chevron, while the group slides
+   up by the chevron's height so it stays centred. `view-box` makes the
+   origin and translate read in the SVG's own 256-unit coordinates — see
+   `DropdownChevron` in Dropdown.tsx. */
+.dropdown-chevron,
+.dropdown-chevron-wing {
+  transform-box: view-box;
   transition: transform 0.15s;
 }
 
-.dropdown-trigger[data-popup-open] .dropdown-trigger-icon {
-  transform: rotate(180deg);
+.dropdown-chevron-wing {
+  transform-origin: 128px 168px;
+}
+
+.dropdown-trigger[data-popup-open] .dropdown-chevron {
+  transform: translateY(-80px);
+}
+
+.dropdown-trigger[data-popup-open] .dropdown-chevron-wing--left {
+  transform: rotate(-90deg);
+}
+
+.dropdown-trigger[data-popup-open] .dropdown-chevron-wing--right {
+  transform: rotate(90deg);
 }
 
 .dropdown-positioner {
@@ -608,11 +662,10 @@ a.button {
   padding: var(--space-1);
   border: 1px solid var(--color-border);
   border-radius: 6px;
+  /* No shadow (#120) — the border alone sets the panel apart. Stays on
+     the page background rather than --color-surface: that's the
+     highlighted item's color, and body text fails AA on it. */
   background-color: var(--color-page-bg);
-  /* Tinted with the darkest text color rather than neutral black, so the
-     shadow sits in the Solarized palette instead of greying it out. */
-  box-shadow: 0 var(--space-1) var(--space-3)
-    color-mix(in srgb, var(--color-text-on-surface) 20%, transparent);
   outline: none;
 }
 

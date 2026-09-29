@@ -7,7 +7,7 @@ export function Header() {
         <Link href="/" className="wordmark">
           Dreamport
         </Link>
-        <Link href="/login" className="button button--primary">
+        <Link href="/login" className="button button--bar">
           Log in
         </Link>
       </div>
