@@ -334,6 +334,18 @@ function StyleGuide() {
         <Snippet
           code={`<Button variant="primary">Primary</Button>\n<Button variant="secondary">Secondary</Button>\n<Button disabled>Disabled</Button>`}
         />
+        <div className="app-nav sg-button-row sg-bar-swatch">
+          <Button variant="bar">Bar</Button>
+          <a href="#buttons" className="button button--nav">
+            Nav
+          </a>
+          <a href="#buttons" className="button button--nav" aria-current="page">
+            Nav (current page)
+          </a>
+        </div>
+        <Snippet
+          code={`<Button variant="bar">Bar</Button>\n<Link href="/app" className="button button--nav">Nav</Link>\n<Link href="/app" className="button button--nav" current>\n  Nav (current page)\n</Link>`}
+        />
         <p className="sg-note">
           Use the <code>&lt;Button&gt;</code> component with a{" "}
           <code>variant</code> of <code>primary</code>, <code>secondary</code>{" "}
@@ -347,7 +359,8 @@ function StyleGuide() {
           bar-only: a nav link or menu trigger (e.g. <code>AppNav</code>&apos;s
           sections and account menu) — cream text on a dark wash, regular
           weight, and bold on a stronger wash when it&apos;s the current page.
-          Both are shown in place under Header bars below.
+          Both are shown above on the bar itself, and in place under Header bars
+          below.
         </p>
       </Section>
 
