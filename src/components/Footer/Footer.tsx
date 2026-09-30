@@ -8,7 +8,7 @@ interface FooterProps {
   variant?: "app" | "marketing";
 }
 
-const COPYRIGHT = "© 2026 Ian J. MacIntosh";
+const COPYRIGHT = "© 2026 Dreamport";
 
 export function Footer({ variant = "app" }: FooterProps = {}) {
   if (variant === "marketing") {

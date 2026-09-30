@@ -9,7 +9,7 @@ import { describe, expect, test } from "vitest";
 import Link from "../Link";
 import Footer from "./Footer";
 
-const COPYRIGHT = "© 2026 Ian J. MacIntosh";
+const COPYRIGHT = "© 2026 Dreamport";
 
 type FooterElement = ReactElement<{
   href?: string;
