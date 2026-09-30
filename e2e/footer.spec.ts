@@ -6,9 +6,10 @@ import { test, expect } from "@playwright/test";
  * href rather than followed.
  */
 for (const [name, path, heading] of [
-  ["About", "/about", "About Dreamport"],
-  ["Privacy", "/privacy", "Privacy Policy"],
-  ["Terms", "/terms", "Terms of Service"],
+  ["Log In", "/login", "Sign in"],
+  ["About Dreamport", "/about", "About Dreamport"],
+  ["Privacy Policy", "/privacy", "Privacy Policy"],
+  ["Terms of Service", "/terms", "Terms of Service"],
 ] as const) {
   test(`homepage footer: ${name} opens ${path}`, async ({ page }) => {
     await page.goto("/");

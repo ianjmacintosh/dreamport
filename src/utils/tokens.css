@@ -99,6 +99,17 @@
     transparent
   );
 
+  /* The dark signed-out footer (`Footer variant="marketing"`, #121), on
+     base03. Ratios against it: headings base3 ~13.92:1, body/copyright
+     base1 ~5.61:1, links cyan ~4.75:1, link hover base2 ~12.25:1. Links
+     are cyan, not --color-link: Solarized blue only reaches ~4.08:1
+     here. */
+  --color-footer-dark-bg: var(--sol-base03);
+  --color-footer-dark-heading: var(--sol-base3);
+  --color-footer-dark-text: var(--sol-base1);
+  --color-footer-dark-link: var(--sol-cyan);
+  --color-footer-dark-link-hover: var(--sol-base2);
+
   /* ── Typography ───────────────────────────────────────────── */
 
   --font-heading:

@@ -479,16 +479,16 @@ a.button {
 }
 
 /* ── Components: footer ───────────────────────────────────── */
-/* Full-bleed background/border, content column pinned to the same
-   width and horizontal padding as <main> via a 3-column breakout
-   grid — the two 1fr tracks are the bleed, the middle track is where
-   content actually sits. */
+/* Full-bleed background, content column pinned to the same width and
+   horizontal padding as <main> via a 3-column breakout grid — the two
+   1fr tracks are the bleed, the middle track is where content actually
+   sits. Two variants (#121): `.footer--app` (signed-in, quiet, on the
+   page color) and `.footer--marketing` (signed-out, dark). */
 
 .footer {
   display: grid;
   grid-template-columns: 1fr var(--page-width) 1fr;
   margin-top: var(--space-10);
-  background-color: var(--color-surface);
 }
 
 /* ── Components: header ───────────────────────────────────── */
@@ -516,20 +516,28 @@ a.button {
   padding: var(--space-4) var(--space-6);
 }
 
-/* In-app (default) footer: copyright on one end, Privacy/Terms on the
-   other — the same one-left-one-right row as .header-content (#121). */
-.footer-content--app {
-  grid-template-columns: 1fr auto;
-  align-items: center;
+.footer-links {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-/* The in-app footer sits on the page color, not --color-surface, so it
-   doesn't read as a separate band under a working screen. Its links take
-   the copyright's near-black (12.05:1 on the page color) instead of
-   --color-link, since Solarized blue can't reach AA here (3.41:1, see
-   tokens.css). The underline still marks them as links; hover thickens
-   it rather than switching to cyan, which fails AA too. Picked from a
-   four-variant prototype (#121). */
+.footer-copyright {
+  color: var(--color-text-on-surface);
+  font-size: var(--text-sm);
+  margin-bottom: 0;
+}
+
+/* In-app footer: copyright on one end, Privacy Policy · Terms of Service
+   on the other — the same one-left-one-right row as .header-content. It
+   sits on the page color, not --color-surface, so it doesn't read as a
+   separate band under a working screen. Its links take the copyright's
+   near-black (12.05:1 on the page color) instead of --color-link, since
+   Solarized blue can't reach AA here (3.41:1, see tokens.css). The
+   underline still marks them as links; hover thickens it rather than
+   switching to cyan, which fails AA too. */
 .footer--app {
   background-color: var(--color-page-bg);
 }
@@ -542,71 +550,69 @@ a.button {
   text-decoration-thickness: 2px;
 }
 
-/* Marketing footer: Dreamport's description beside the "Learn More" link
-   list, copyright spanning both below (#121). */
+.footer-content--app {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.footer--app .footer-links {
+  grid-auto-flow: column;
+}
+
+/* A middle dot between links. The `/ ""` alt text keeps screen readers
+   from announcing it — the list already separates the items. */
+.footer--app .footer-links li + li::before {
+  content: "·" / "";
+  margin-inline-end: var(--space-2);
+}
+
+/* Marketing footer: dark, Dreamport's description in the wider left
+   two-thirds, the stacked "Learn More" links in the right third, the
+   copyright spanning both below. Colors: see --color-footer-dark-* in
+   tokens.css. */
+.footer--marketing {
+  background-color: var(--color-footer-dark-bg);
+  color: var(--color-footer-dark-text);
+}
+
+.footer--marketing h2 {
+  color: var(--color-footer-dark-heading);
+}
+
+.footer--marketing .footer-copyright {
+  color: var(--color-footer-dark-text);
+}
+
+.footer--marketing a {
+  color: var(--color-footer-dark-link);
+}
+
+.footer--marketing a:hover {
+  color: var(--color-footer-dark-link-hover);
+}
+
 .footer-content--marketing {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 2fr 1fr;
 }
 
 .footer-content--marketing .footer-copyright {
   grid-column: 1 / -1;
 }
 
-.footer-learn-more {
-  text-align: right;
-}
-
-.footer-links {
-  display: grid;
-  grid-auto-flow: column;
-  justify-content: start;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* A middle dot between links. The `/ ""` alt text keeps screen readers
-   from announcing it — the list already separates the items. */
-.footer-links li + li::before {
-  content: "·" / "";
-  margin-inline-end: var(--space-2);
-  color: var(--color-text-on-surface);
-}
-
-.footer-learn-more .footer-links {
-  justify-content: end;
-}
-
-.footer-copyright {
-  font-size: var(--text-sm);
-  color: var(--color-text-on-surface);
-  margin-bottom: 0;
-}
-
-/* Below 640px (--breakpoint-sm) both footers stack to one column, all
-   left-aligned — with no second column there's nothing for the "Learn
-   More" side to justify against. */
+/* Below 640px (--breakpoint-sm) both footers stack to one column. The
+   in-app links go vertical too, dots dropped — wrapping a dotted row
+   would strand a dot at the edge of a line. */
 @media (max-width: 640px) {
   .footer-content--app,
   .footer-content--marketing {
     grid-template-columns: 1fr;
   }
 
-  .footer-learn-more {
-    text-align: left;
-  }
-
-  /* The links stack into a plain vertical list, dots dropped. The dotted
-     "Learn More" row is ~276px wide, more than a 320px screen's content
-     column, and wrapping it would strand a dot at the edge of a line. */
-  .footer-links,
-  .footer-learn-more .footer-links {
+  .footer--app .footer-links {
     grid-auto-flow: row;
-    justify-content: start;
   }
 
-  .footer-links li + li::before {
+  .footer--app .footer-links li + li::before {
     content: none;
   }
 }

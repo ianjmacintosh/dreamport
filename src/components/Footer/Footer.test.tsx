@@ -46,14 +46,14 @@ function headings(props: Parameters<typeof Footer>[0] = {}) {
 }
 
 describe("Footer", () => {
-  test("app: copyright plus Privacy and Terms, no headings", () => {
+  test("app: copyright plus Privacy Policy and Terms of Service, no headings", () => {
     const elements = footerElements({ variant: "app" });
     expect(elements.some((el) => el.props.children === COPYRIGHT)).toBe(true);
     expect(
       links({ variant: "app" }).map((l) => [l.props.children, l.props.href]),
     ).toEqual([
-      ["Privacy", "/privacy"],
-      ["Terms", "/terms"],
+      ["Privacy Policy", "/privacy"],
+      ["Terms of Service", "/terms"],
     ]);
     expect(headings({ variant: "app" })).toEqual([]);
   });
@@ -62,17 +62,18 @@ describe("Footer", () => {
     expect(Footer()).toEqual(Footer({ variant: "app" }));
   });
 
-  test("marketing: About, Contact, Privacy, Terms in that order", () => {
+  test("marketing: Log In, About, Contact, Privacy, Terms in that order", () => {
     expect(
       links({ variant: "marketing" }).map((l) => [
         l.props.children,
         l.props.href,
       ]),
     ).toEqual([
-      ["About", "/about"],
+      ["Log In", "/login"],
+      ["About Dreamport", "/about"],
       ["Contact", "https://ianjmacintosh.com/contact"],
-      ["Privacy", "/privacy"],
-      ["Terms", "/terms"],
+      ["Privacy Policy", "/privacy"],
+      ["Terms of Service", "/terms"],
     ]);
   });
 

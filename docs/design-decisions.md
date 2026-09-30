@@ -38,12 +38,13 @@ Add an entry only once a sign-off conversation resolves something repeatable
   `_appShell` layout — `AppNav` (the section links, then an account
   `Dropdown` triggered by the User's own email, holding Settings and Log
   out) plus `<Footer variant="app" />` (the default; copyright on one end,
-  Privacy/Terms on the other) —
+  Privacy Policy/Terms of Service on the other, on the page color) —
   not the marketing `Header`/`_withFooter`. `Header` stays signed-out-only;
   it has no concept of a session. Signed-out pages (`/`, `/login`, `/about`,
   `/privacy`, `/terms`) render inside `_withFooter` with
   `<Footer variant="marketing" />` instead — a Dreamport description beside
-  a "Learn More" list (About/Contact/Privacy/Terms), copyright below. See
+  a stacked "Learn More" list (Log In/About Dreamport/Contact/Privacy
+  Policy/Terms of Service), copyright below, on a dark background. See
   `src/routes/_appShell.tsx` and `src/components/AppNav` (decided in #90;
   the flat email/Settings/Log out layout superseded by the `Dropdown` below
   in #119; the two `Footer` variants added in #121).
