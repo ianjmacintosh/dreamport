@@ -579,16 +579,17 @@ a.button {
     text-align: left;
   }
 
-  /* The dotted "Learn More" row is ~276px wide, more than a 320px screen's
-     content column, and a one-row grid can't wrap — flex-wrap lets the
-     last link drop to the next line instead (same reasoning as
-     .button-group's own narrow-screen wrap). */
+  /* The links stack into a plain vertical list, dots dropped. The dotted
+     "Learn More" row is ~276px wide, more than a 320px screen's content
+     column, and wrapping it would strand a dot at the edge of a line. */
   .footer-links,
   .footer-learn-more .footer-links {
-    display: flex;
-    flex-wrap: wrap;
+    grid-auto-flow: row;
     justify-content: start;
-    column-gap: var(--space-2);
+  }
+
+  .footer-links li + li::before {
+    content: none;
   }
 }
 
