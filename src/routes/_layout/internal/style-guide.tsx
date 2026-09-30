@@ -604,17 +604,17 @@ function StyleGuide() {
         <div className="sg-form-shell-demo">
           <div className="form-shell">
             <h2>Sign in</h2>
-            <p>Narrow, centred column for short forms.</p>
+            <p>Narrow column for short forms.</p>
           </div>
         </div>
         <Snippet
           code={`<div className="form-shell">\n  <h1>Sign in</h1>\n  <form>...</form>\n</div>`}
         />
         <p className="sg-note">
-          Centres a short form (e.g. sign-in) in a narrow column, per
-          AGENTS.md's rule that structural page layout is Grid, not Flexbox. The
-          grid's own <code>gap</code> is the form's vertical rhythm — it covers
-          spacing between top-level blocks (a heading, a{" "}
+          Holds a short form (e.g. sign-in) in a narrow, left-aligned column,
+          per AGENTS.md's rule that structural page layout is Grid, not Flexbox.
+          The grid's own <code>gap</code> is the form's vertical rhythm — it
+          covers spacing between top-level blocks (a heading, a{" "}
           <code>&lt;form&gt;</code>, error text) without page-local margins. The
           dashed outline here exists only to make the column&apos;s bounds
           visible in this demo.

@@ -260,15 +260,17 @@ a.button {
 }
 
 /* ── Primitives: narrow single-column form layout ─────────── */
-/* Centred column for short forms (e.g. sign-in) — CSS Grid per AGENTS.md's
+/* Narrow column for short forms (e.g. sign-in) — CSS Grid per AGENTS.md's
    rule that structural layout is Grid, not Flexbox. The grid's own `gap`
    is the form's vertical rhythm, so it also covers spacing between
-   adjacent controls (e.g. paired buttons) without a one-off margin. */
+   adjacent controls (e.g. paired buttons) without a one-off margin.
+   Left-aligned like the rest of the page, not centred: it used to be
+   centred back when `/login` rendered alone with no header or footer to
+   line up with (#121). */
 .form-shell {
   display: grid;
   gap: var(--space-4);
   max-width: 26rem;
-  margin: 0 auto;
 }
 
 /* Two or more related actions presented side by side (e.g. "Verify and
