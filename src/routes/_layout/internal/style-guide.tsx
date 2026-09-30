@@ -355,7 +355,7 @@ function StyleGuide() {
           own background regardless of variant — muted and clearly inert,
           distinct from every variant's normal look. <code>bar</code> is only
           for a button sitting on the header bar (e.g. <code>Header</code>
-          &apos;s Log in) — cream fill, dark text. <code>nav</code> is also
+          &apos;s Log In) — cream fill, dark text. <code>nav</code> is also
           bar-only: a nav link or menu trigger (e.g. <code>AppNav</code>&apos;s
           sections and account menu) — cream text on a dark wash, regular
           weight, and bold on a stronger wash when it&apos;s the current page.
@@ -482,14 +482,14 @@ function StyleGuide() {
           />
         </div>
         <Snippet
-          code={`<Link href="/login" className="button button--bar">Log in</Link>\n\n<Link href="/app" className="button button--nav" current={isCurrent}>\n  <PackageIcon />\n  Products\n</Link>\n\n<Dropdown label={email} variant="nav">…</Dropdown>`}
+          code={`<Link href="/login" className="button button--bar">Log In</Link>\n\n<Link href="/app" className="button button--nav" current={isCurrent}>\n  <PackageIcon />\n  Products\n</Link>\n\n<Dropdown label={email} variant="nav">…</Dropdown>`}
         />
         <p className="sg-note">
           The real <code>Header</code> (signed out) and <code>AppNav</code>{" "}
           (signed in, on <code>/app</code>) on the bar gradient. Everything
           clickable on a bar is a <code>.button</code>, so it&apos;s the same
           size and has the same hover outline as any other button:{" "}
-          <code>button--bar</code> for Log in, <code>button--nav</code> for a
+          <code>button--bar</code> for Log In, <code>button--nav</code> for a
           section link, and a <code>Dropdown</code> with{" "}
           <code>variant=&quot;nav&quot;</code> for the account menu. The current
           section (<code>current</code> on its <code>Link</code>) takes a

@@ -100,7 +100,7 @@ a:hover {
 
 /* Below 640px (--breakpoint-sm) the wordmark steps down to --text-2xl,
    in both `Header` and `AppNav` so the bars match (#118) — full --text-h2
-   squeezed `Header`'s Log in onto two lines at 320px. */
+   squeezed `Header`'s Log In onto two lines at 320px. */
 @media (max-width: 640px) {
   .wordmark {
     font-size: var(--text-2xl);
@@ -157,7 +157,7 @@ p {
     outline-color 0.15s;
 }
 
-/* .button also renders on <a> (via Link, e.g. the header's "Log in") —
+/* .button also renders on <a> (via Link, e.g. the header's "Log In") —
    an anchor gets a browser-default underline that a <button> never has. */
 a.button {
   text-decoration: none;

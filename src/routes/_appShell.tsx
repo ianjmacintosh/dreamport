@@ -21,7 +21,7 @@ const CONNECTION_FAILED =
  * inside of: `AppNav` up top, `Footer` at the bottom, same as `_withFooter`
  * does for the signed-out marketing pages — but with `AppNav` instead of
  * `Header`, since a signed-in page shows who you are and a way out, not a
- * "Log in" button (#90 Q2/design-decisions.md), and the quieter `"app"`
+ * "Log In" button (#90 Q2/design-decisions.md), and the quieter `"app"`
  * `Footer` instead of the marketing one (#121).
  *
  * The `/api/me` guard that used to live separately in `/app` and

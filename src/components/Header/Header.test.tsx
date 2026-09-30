@@ -34,11 +34,11 @@ describe("Header", () => {
     expect(Header).not.toBe(undefined);
   });
 
-  test("offers a bar-button Log in link to /login", () => {
+  test("offers a bar-button Log In link to /login", () => {
     const login = headerLinks().find((l) => l.props.href === "/login");
     expect(login).toBeDefined();
     expect(login?.props.className).toContain("button--bar");
-    expect(login?.props.children).toBe("Log in");
+    expect(login?.props.children).toBe("Log In");
   });
 
   test("always shows the Dreamport wordmark, linking to /", () => {

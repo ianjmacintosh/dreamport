@@ -34,7 +34,7 @@ test.beforeEach(({ page }) => exemptFromRateLimits(page));
 async function gotoLoginFromHomepage(page: Page): Promise<void> {
   await page.goto("/");
   // Scoped to the header: the marketing footer has its own "Log In" (#121).
-  await page.getByRole("banner").getByRole("link", { name: "Log in" }).click();
+  await page.getByRole("banner").getByRole("link", { name: "Log In" }).click();
   await expect(page).toHaveURL(/\/login$/);
 }
 
