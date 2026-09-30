@@ -18,7 +18,11 @@ export function Footer({ variant = "app" }: FooterProps = {}) {
         <div className="footer-content footer-content--marketing">
           <div>
             <h2 className="text-h3">Dreamport</h2>
-            <p>[Ian: footer description pending]</p>
+            <p>
+              Dreamport is a platform to help you track, manage, and grow your
+              ideas, with as much or as little structure as you want.{" "}
+              <Link href="/login">Log in</Link> and start your journey today.
+            </p>
           </div>
           <div>
             <h2 className="text-h3">Learn More</h2>

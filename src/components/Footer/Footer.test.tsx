@@ -39,6 +39,13 @@ function links(props: Parameters<typeof Footer>[0] = {}) {
   return footerElements(props).filter((el) => el.type === Link);
 }
 
+/** The links inside the footer's link list (`<ul>`), leaving out any
+ * link in running text such as the marketing blurb's. */
+function listLinks(props: Parameters<typeof Footer>[0] = {}) {
+  const list = footerElements(props).find((el) => el.type === "ul");
+  return descendants(list?.props.children).filter((el) => el.type === Link);
+}
+
 function headings(props: Parameters<typeof Footer>[0] = {}) {
   return footerElements(props)
     .filter((el) => el.type === "h2")
@@ -50,7 +57,10 @@ describe("Footer", () => {
     const elements = footerElements({ variant: "app" });
     expect(elements.some((el) => el.props.children === COPYRIGHT)).toBe(true);
     expect(
-      links({ variant: "app" }).map((l) => [l.props.children, l.props.href]),
+      listLinks({ variant: "app" }).map((l) => [
+        l.props.children,
+        l.props.href,
+      ]),
     ).toEqual([
       ["Privacy Policy", "/privacy"],
       ["Terms of Service", "/terms"],
@@ -64,7 +74,7 @@ describe("Footer", () => {
 
   test("marketing: Log In, About, Contact, Privacy, Terms in that order", () => {
     expect(
-      links({ variant: "marketing" }).map((l) => [
+      listLinks({ variant: "marketing" }).map((l) => [
         l.props.children,
         l.props.href,
       ]),
@@ -82,6 +92,19 @@ describe("Footer", () => {
       (l) => l.props.external,
     );
     expect(external.map((l) => l.props.children)).toEqual(["Contact"]);
+  });
+
+  test("marketing: the Dreamport blurb links to /login", () => {
+    const blurb = footerElements({ variant: "marketing" }).find(
+      (el) =>
+        el.type === "p" &&
+        descendants(el.props.children).some((child) => child.type === Link),
+    );
+    expect(
+      descendants(blurb?.props.children)
+        .filter((el) => el.type === Link)
+        .map((l) => [l.props.children, l.props.href]),
+    ).toEqual([["Log in", "/login"]]);
   });
 
   test("marketing: Dreamport and Learn More headings, plus the copyright", () => {
