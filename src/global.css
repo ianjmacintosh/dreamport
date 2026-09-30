@@ -566,9 +566,9 @@ a.button {
   margin-inline-end: var(--space-2);
 }
 
-/* Marketing footer: dark, Dreamport's description in the wider left
-   two-thirds, the stacked "Learn More" links in the right third, the
-   copyright spanning both below. Colors: see --color-footer-dark-* in
+/* Marketing footer: dark, Dreamport's description in the left half, the
+   stacked "Learn More" links in the right third, the copyright spanning
+   both below. Colors: see --color-footer-dark-* in
    tokens.css. */
 .footer--marketing {
   background-color: var(--color-footer-dark-bg);
@@ -591,8 +591,14 @@ a.button {
   color: var(--color-footer-dark-link-hover);
 }
 
+/* Three tracks: Dreamport's description in the left half, an empty
+   sixth as breathing room, "Learn More" in the right third. */
 .footer-content--marketing {
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 3fr 1fr 2fr;
+}
+
+.footer-learn-more {
+  grid-column: 3;
 }
 
 .footer-content--marketing .footer-copyright {
@@ -606,6 +612,10 @@ a.button {
   .footer-content--app,
   .footer-content--marketing {
     grid-template-columns: 1fr;
+  }
+
+  .footer-learn-more {
+    grid-column: auto;
   }
 
   .footer--app .footer-links {

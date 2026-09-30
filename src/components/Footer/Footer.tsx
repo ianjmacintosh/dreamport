@@ -24,7 +24,7 @@ export function Footer({ variant = "app" }: FooterProps = {}) {
               <Link href="/login">Log in</Link> and start your journey today.
             </p>
           </div>
-          <div>
+          <div className="footer-learn-more">
             <h2 className="text-h3">Learn More</h2>
             <ul className="footer-links text-sm">
               <li>
