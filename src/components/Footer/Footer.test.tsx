@@ -46,14 +46,20 @@ function headings(props: Parameters<typeof Footer>[0] = {}) {
 }
 
 describe("Footer", () => {
-  test("in-app (default): copyright plus Privacy and Terms, no headings", () => {
-    const elements = footerElements();
+  test("app: copyright plus Privacy and Terms, no headings", () => {
+    const elements = footerElements({ variant: "app" });
     expect(elements.some((el) => el.props.children === COPYRIGHT)).toBe(true);
-    expect(links().map((l) => [l.props.children, l.props.href])).toEqual([
+    expect(
+      links({ variant: "app" }).map((l) => [l.props.children, l.props.href]),
+    ).toEqual([
       ["Privacy", "/privacy"],
       ["Terms", "/terms"],
     ]);
-    expect(headings()).toEqual([]);
+    expect(headings({ variant: "app" })).toEqual([]);
+  });
+
+  test("defaults to the app variant", () => {
+    expect(Footer()).toEqual(Footer({ variant: "app" }));
   });
 
   test("marketing: About, Contact, Privacy, Terms in that order", () => {

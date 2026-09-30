@@ -1,16 +1,16 @@
 import Link from "../Link";
 
 interface FooterProps {
-  /** `"marketing"` for the signed-out pages under `_withFooter`: a
-   * Dreamport description beside a "Learn More" link list, copyright below.
-   * Left out, the quieter in-app footer every `_appShell` page gets —
-   * copyright on one end, Privacy/Terms on the other (#121). */
-  variant?: "marketing";
+  /** `"app"` (the default) is the quieter footer every `_appShell` page
+   * gets — copyright on one end, Privacy/Terms on the other. `"marketing"`
+   * is for the signed-out pages under `_withFooter`: a Dreamport
+   * description beside a "Learn More" link list, copyright below (#121). */
+  variant?: "app" | "marketing";
 }
 
 const COPYRIGHT = "© 2026 Ian J. MacIntosh";
 
-export function Footer({ variant }: FooterProps = {}) {
+export function Footer({ variant = "app" }: FooterProps = {}) {
   if (variant === "marketing") {
     return (
       <footer className="footer">

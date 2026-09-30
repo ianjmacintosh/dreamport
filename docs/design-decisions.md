@@ -37,7 +37,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
 - A signed-in page (e.g. `/app`, `/app/settings`) renders inside the
   `_appShell` layout — `AppNav` (the section links, then an account
   `Dropdown` triggered by the User's own email, holding Settings and Log
-  out) plus the default in-app `Footer` (copyright on one end,
+  out) plus `<Footer variant="app" />` (the default; copyright on one end,
   Privacy/Terms on the other) —
   not the marketing `Header`/`_withFooter`. `Header` stays signed-out-only;
   it has no concept of a session. Signed-out pages (`/`, `/login`, `/about`,
