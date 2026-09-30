@@ -37,11 +37,16 @@ Add an entry only once a sign-off conversation resolves something repeatable
 - A signed-in page (e.g. `/app`, `/app/settings`) renders inside the
   `_appShell` layout — `AppNav` (the section links, then an account
   `Dropdown` triggered by the User's own email, holding Settings and Log
-  out) plus the usual `Footer` —
+  out) plus the default in-app `Footer` (copyright on one end,
+  Privacy/Terms on the other) —
   not the marketing `Header`/`_withFooter`. `Header` stays signed-out-only;
-  it has no concept of a session. See `src/routes/_appShell.tsx` and
-  `src/components/AppNav` (decided in #90; the flat email/Settings/Log out
-  layout superseded by the `Dropdown` below in #119).
+  it has no concept of a session. Signed-out pages (`/`, `/login`, `/about`,
+  `/privacy`, `/terms`) render inside `_withFooter` with
+  `<Footer variant="marketing" />` instead — a Dreamport description beside
+  a "Learn More" list (About/Contact/Privacy/Terms), copyright below. See
+  `src/routes/_appShell.tsx` and `src/components/AppNav` (decided in #90;
+  the flat email/Settings/Log out layout superseded by the `Dropdown` below
+  in #119; the two `Footer` variants added in #121).
 
 - A destructive, irreversible action (delete account, delete a Product,
   delete an Idea) uses a two-step reveal in place — resting state shows

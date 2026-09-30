@@ -14,7 +14,7 @@ function WithFooterLayout() {
       <main>
         <Outlet />
       </main>
-      <Footer />
+      <Footer variant="marketing" />
     </>
   );
 }

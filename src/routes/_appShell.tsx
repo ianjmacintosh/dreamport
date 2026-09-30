@@ -21,7 +21,8 @@ const CONNECTION_FAILED =
  * inside of: `AppNav` up top, `Footer` at the bottom, same as `_withFooter`
  * does for the signed-out marketing pages — but with `AppNav` instead of
  * `Header`, since a signed-in page shows who you are and a way out, not a
- * "Log in" button (#90 Q2/design-decisions.md).
+ * "Log in" button (#90 Q2/design-decisions.md), and the quieter default
+ * `Footer` instead of the marketing one (#121).
  *
  * The `/api/me` guard that used to live separately in `/app` and
  * `/app/settings` moves up here — both pages needed it, and `AppNav` needs
@@ -31,8 +32,8 @@ const CONNECTION_FAILED =
  * boundary, and anything short of a clean 200 (no session, offline, a
  * transient error) bounces to `/login` rather than a dead-end error screen.
  *
- * `/login` stays under `_layout` instead, on its own — it's signed-out, so
- * it has no session to show and no nav to render.
+ * `/login` renders under `_withFooter` instead — it's signed-out, so it
+ * has no session to show and no nav to render.
  */
 export const Route = createFileRoute("/_appShell")({
   beforeLoad: async ({ location }) => {

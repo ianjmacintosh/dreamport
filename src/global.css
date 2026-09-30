@@ -512,14 +512,68 @@ a.button {
 
 .footer-content {
   grid-column: 2;
+  display: grid;
+  gap: var(--space-6);
   padding: var(--space-6) var(--space-6) var(--space-8);
-  text-align: center;
+}
+
+/* In-app (default) footer: copyright on one end, Privacy/Terms on the
+   other — the same one-left-one-right row as .header-content (#121). */
+.footer-content--app {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+/* Marketing footer: Dreamport's description beside the "Learn More" link
+   list, copyright spanning both below (#121). */
+.footer-content--marketing {
+  grid-template-columns: 1fr 1fr;
+}
+
+.footer-content--marketing .footer-copyright {
+  grid-column: 1 / -1;
+}
+
+.footer-learn-more {
+  text-align: right;
+}
+
+.footer-links {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.footer-learn-more .footer-links {
+  justify-content: end;
 }
 
 .footer-copyright {
   font-size: var(--text-sm);
   color: var(--color-text-on-surface);
   margin-bottom: 0;
+}
+
+/* Below 640px (--breakpoint-sm) both footers stack to one column, all
+   left-aligned — with no second column there's nothing for the "Learn
+   More" side to justify against. */
+@media (max-width: 640px) {
+  .footer-content--app,
+  .footer-content--marketing {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-learn-more {
+    text-align: left;
+  }
+
+  .footer-learn-more .footer-links {
+    justify-content: start;
+  }
 }
 
 /* ── Components: signed-in app nav ───────────────────────── */

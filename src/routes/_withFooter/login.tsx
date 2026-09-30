@@ -7,7 +7,7 @@ import Link from "../../components/Link";
 import TextInput from "../../components/TextInput";
 import { authClient } from "../../utils/auth-client";
 
-export const Route = createFileRoute("/_layout/login")({
+export const Route = createFileRoute("/_withFooter/login")({
   component: Login,
 });
 
