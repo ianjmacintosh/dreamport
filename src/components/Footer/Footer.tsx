@@ -45,7 +45,7 @@ export function Footer({ variant = "app" }: FooterProps = {}) {
   }
 
   return (
-    <footer className="footer">
+    <footer className="footer footer--app">
       <div className="footer-content footer-content--app">
         <p className="footer-copyright">{COPYRIGHT}</p>
         <ul className="footer-links text-sm">

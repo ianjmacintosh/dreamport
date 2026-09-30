@@ -523,6 +523,25 @@ a.button {
   align-items: center;
 }
 
+/* The in-app footer sits on the page color, not --color-surface, so it
+   doesn't read as a separate band under a working screen. Its links take
+   the copyright's near-black (12.05:1 on the page color) instead of
+   --color-link, since Solarized blue can't reach AA here (3.41:1, see
+   tokens.css). The underline still marks them as links; hover thickens
+   it rather than switching to cyan, which fails AA too. Picked from a
+   four-variant prototype (#121). */
+.footer--app {
+  background-color: var(--color-page-bg);
+}
+
+.footer--app a {
+  color: var(--color-text-on-surface);
+}
+
+.footer--app a:hover {
+  text-decoration-thickness: 2px;
+}
+
 /* Marketing footer: Dreamport's description beside the "Learn More" link
    list, copyright spanning both below (#121). */
 .footer-content--marketing {
