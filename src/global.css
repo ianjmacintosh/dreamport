@@ -489,7 +489,6 @@ a.button {
   grid-template-columns: 1fr var(--page-width) 1fr;
   margin-top: var(--space-10);
   background-color: var(--color-surface);
-  border-top: 1px solid var(--color-border);
 }
 
 /* ── Components: header ───────────────────────────────────── */
@@ -514,7 +513,7 @@ a.button {
   grid-column: 2;
   display: grid;
   gap: var(--space-6);
-  padding: var(--space-6) var(--space-6) var(--space-8);
+  padding: var(--space-4) var(--space-6);
 }
 
 /* In-app (default) footer: copyright on one end, Privacy/Terms on the
