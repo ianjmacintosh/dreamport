@@ -6,6 +6,8 @@ import {
 } from "react";
 import { describe, expect, test } from "vitest";
 
+import Link from "../../components/Link";
+import { Route as HomeRoute } from "./index";
 import { Route as AboutRoute } from "./about";
 import { Route as PrivacyRoute } from "./privacy";
 import { Route as TermsRoute } from "./terms";
@@ -31,7 +33,26 @@ function h1Of(route: { options: { component?: unknown } }): ReactNode {
   return find(tree)?.props.children;
 }
 
+/** Every `Link` in a static page's element tree, as [text, href]. */
+function linksOf(route: { options: { component?: unknown } }) {
+  const tree = (route.options.component as () => PageElement)();
+  const walk = (node: ReactNode): PageElement[] =>
+    Children.toArray(node)
+      .filter(isValidElement)
+      .flatMap((child) => {
+        const el = child as PageElement;
+        return [el, ...walk(el.props.children)];
+      });
+  return walk(tree)
+    .filter((el) => el.type === Link)
+    .map((el) => [el.props.children, (el.props as { href?: string }).href]);
+}
+
 describe("signed-out info pages", () => {
+  test("/ links Start now to /login", () => {
+    expect(linksOf(HomeRoute)).toEqual([["Start now", "/login"]]);
+  });
+
   test("/about renders its heading", () => {
     expect(h1Of(AboutRoute)).toBe("About Dreamport");
   });
