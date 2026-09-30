@@ -76,6 +76,20 @@ a:hover {
   color: var(--color-link-hover);
 }
 
+/* Quiet link: the text's own near-black instead of --color-link, with the
+   underline alone marking it as a link; hover drops the underline rather
+   than swapping color. For links that shouldn't draw the eye (e.g. the
+   in-app footer's Privacy Policy/Terms of Service) — and it clears AA
+   where Solarized blue can't: 12.05:1 on --color-page-bg, 10.61:1 on
+   --color-surface (blue: 3.41:1 / 3.00:1). Decided in #121. */
+a.link-quiet {
+  color: var(--color-text-on-surface);
+}
+
+a.link-quiet:hover {
+  text-decoration: none;
+}
+
 /* The "Dreamport" wordmark in `Header` and `AppNav` — styled text, no image
    asset (#118). Reads as a heading rather than a link: heading font and
    color, no underline, and no hover color swap. `justify-self: start`
@@ -100,7 +114,7 @@ a:hover {
 
 /* Below 640px (--breakpoint-sm) the wordmark steps down to --text-2xl,
    in both `Header` and `AppNav` so the bars match (#118) — full --text-h2
-   squeezed `Header`'s Log in onto two lines at 320px. */
+   squeezed `Header`'s Log In onto two lines at 320px. */
 @media (max-width: 640px) {
   .wordmark {
     font-size: var(--text-2xl);
@@ -157,7 +171,7 @@ p {
     outline-color 0.15s;
 }
 
-/* .button also renders on <a> (via Link, e.g. the header's "Log in") —
+/* .button also renders on <a> (via Link, e.g. the header's "Log In") —
    an anchor gets a browser-default underline that a <button> never has. */
 a.button {
   text-decoration: none;
@@ -260,15 +274,17 @@ a.button {
 }
 
 /* ── Primitives: narrow single-column form layout ─────────── */
-/* Centred column for short forms (e.g. sign-in) — CSS Grid per AGENTS.md's
+/* Narrow column for short forms (e.g. sign-in) — CSS Grid per AGENTS.md's
    rule that structural layout is Grid, not Flexbox. The grid's own `gap`
    is the form's vertical rhythm, so it also covers spacing between
-   adjacent controls (e.g. paired buttons) without a one-off margin. */
+   adjacent controls (e.g. paired buttons) without a one-off margin.
+   Left-aligned like the rest of the page, not centred: it used to be
+   centred back when `/login` rendered alone with no header or footer to
+   line up with (#121). */
 .form-shell {
   display: grid;
   gap: var(--space-4);
-  max-width: 26rem;
-  margin: 0 auto;
+  max-width: 40rem;
 }
 
 /* Two or more related actions presented side by side (e.g. "Verify and
@@ -479,17 +495,16 @@ a.button {
 }
 
 /* ── Components: footer ───────────────────────────────────── */
-/* Full-bleed background/border, content column pinned to the same
-   width and horizontal padding as <main> via a 3-column breakout
-   grid — the two 1fr tracks are the bleed, the middle track is where
-   content actually sits. */
+/* Full-bleed background, content column pinned to the same width and
+   horizontal padding as <main> via a 3-column breakout grid — the two
+   1fr tracks are the bleed, the middle track is where content actually
+   sits. Two variants (#121): `.footer--app` (signed-in, quiet, on the
+   page color) and `.footer--marketing` (signed-out, dark). */
 
 .footer {
   display: grid;
   grid-template-columns: 1fr var(--page-width) 1fr;
   margin-top: var(--space-10);
-  background-color: var(--color-surface);
-  border-top: 1px solid var(--color-border);
 }
 
 /* ── Components: header ───────────────────────────────────── */
@@ -512,14 +527,111 @@ a.button {
 
 .footer-content {
   grid-column: 2;
-  padding: var(--space-6) var(--space-6) var(--space-8);
-  text-align: center;
+  display: grid;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-6);
+}
+
+.footer-links {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .footer-copyright {
-  font-size: var(--text-sm);
   color: var(--color-text-on-surface);
+  font-size: var(--text-sm);
   margin-bottom: 0;
+}
+
+/* In-app footer: copyright on one end, Privacy Policy · Terms of Service
+   on the other — the same one-left-one-right row as .header-content. It
+   sits on the page color, not --color-surface, so it doesn't read as a
+   separate band under a working screen. Its links are .link-quiet. */
+.footer--app {
+  background-color: var(--color-page-bg);
+}
+
+.footer-content--app {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.footer--app .footer-links {
+  grid-auto-flow: column;
+}
+
+/* A middle dot between links. The `/ ""` alt text keeps screen readers
+   from announcing it — the list already separates the items. */
+.footer--app .footer-links li + li::before {
+  content: "·" / "";
+  margin-inline-end: var(--space-2);
+}
+
+/* Marketing footer: dark, Dreamport's description in the left half, the
+   stacked "Learn More" links in the right third, the copyright spanning
+   both below. Colors: see --color-footer-dark-* in
+   tokens.css. */
+.footer--marketing {
+  background-color: var(--color-footer-dark-bg);
+  color: var(--color-footer-dark-text);
+}
+
+.footer--marketing h2 {
+  color: var(--color-footer-dark-heading);
+}
+
+.footer--marketing .footer-copyright {
+  color: var(--color-footer-dark-text);
+}
+
+.footer--marketing a {
+  color: var(--color-footer-dark-link);
+}
+
+.footer--marketing a:hover {
+  color: var(--color-footer-dark-link-hover);
+}
+
+/* Three tracks: Dreamport's description in the left half, an empty
+   sixth as breathing room, "Learn More" in the right third. */
+.footer-content--marketing {
+  grid-template-columns: 3fr 1fr 2fr;
+  /* Double the shared --space-4, so the dark band has more room above
+     its headings (#121). */
+  padding-top: var(--space-8);
+}
+
+.footer-learn-more {
+  grid-column: 3;
+}
+
+.footer-content--marketing .footer-copyright {
+  grid-column: 1 / -1;
+}
+
+/* Below 640px (--breakpoint-sm) both footers stack to one column. The
+   in-app links go vertical too, dots dropped — wrapping a dotted row
+   would strand a dot at the edge of a line. */
+@media (max-width: 640px) {
+  .footer-content--app,
+  .footer-content--marketing {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-learn-more {
+    grid-column: auto;
+  }
+
+  .footer--app .footer-links {
+    grid-auto-flow: row;
+  }
+
+  .footer--app .footer-links li + li::before {
+    content: none;
+  }
 }
 
 /* ── Components: signed-in app nav ───────────────────────── */

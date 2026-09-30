@@ -37,11 +37,35 @@ Add an entry only once a sign-off conversation resolves something repeatable
 - A signed-in page (e.g. `/app`, `/app/settings`) renders inside the
   `_appShell` layout — `AppNav` (the section links, then an account
   `Dropdown` triggered by the User's own email, holding Settings and Log
-  out) plus the usual `Footer` —
-  not the marketing `Header`/`_withFooter`. `Header` stays signed-out-only;
-  it has no concept of a session. See `src/routes/_appShell.tsx` and
-  `src/components/AppNav` (decided in #90; the flat email/Settings/Log out
-  layout superseded by the `Dropdown` below in #119).
+  out) plus `<Footer variant="app" />` (the default; copyright on one end,
+  Privacy Policy/Terms of Service on the other, on the page color) —
+  not the marketing `Header`/`_withFooter`. `Header` itself stays
+  signed-out-only; it has no concept of a session. The public pages (`/`,
+  `/login`, `/about`, `/privacy`, `/terms`) render inside `_withFooter`,
+  whose chrome follows the session: signed out, `Header` plus
+  `<Footer variant="marketing" />` — a Dreamport description beside a
+  stacked "Learn More" list (Log In/About Dreamport/Contact/Privacy
+  Policy/Terms of Service), copyright below, on a dark background; signed
+  in, the same `AppNav` and in-app `Footer` as `_appShell`, so a public
+  page reached from inside the app still looks signed in. `/login` itself
+  sends a signed-in visitor on to `/app`. See `src/routes/_appShell.tsx`,
+  `src/routes/_withFooter.tsx` and `src/components/AppNav` (decided in
+  #90; the flat email/Settings/Log out layout superseded by the `Dropdown`
+  below in #119; the two `Footer` variants and the session-following
+  `_withFooter` chrome added in #121).
+
+- A public page's body copy (the homepage, About, Privacy Policy, Terms
+  of Service) reads at `.text-2xl` — set on each body `<p>`, the way the
+  homepage does — rather than the default body size. Supporting text like
+  a legal page's "Last updated" line stays small (`.text-sm`), and
+  `/login` stays at the default: it's a form, not a page to read. Signed-in
+  pages keep the default body size (decided in #121).
+
+- A link that shouldn't draw the eye (e.g. the in-app footer's Privacy
+  Policy / Terms of Service) uses `.link-quiet` — the text's own
+  near-black, underlined, dropping the underline on hover — rather than
+  the default blue. See the style guide's "Links" section (decided in
+  #121).
 
 - A destructive, irreversible action (delete account, delete a Product,
   delete an Idea) uses a two-step reveal in place — resting state shows

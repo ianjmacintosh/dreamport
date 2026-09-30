@@ -5,6 +5,7 @@ import { ListIcon, PackageIcon } from "@phosphor-icons/react";
 import Button from "../../../components/Button";
 import AppNav from "../../../components/AppNav";
 import Dropdown from "../../../components/Dropdown";
+import Footer from "../../../components/Footer";
 import Header from "../../../components/Header";
 import Link from "../../../components/Link";
 import TextInput from "../../../components/TextInput";
@@ -150,6 +151,7 @@ function StyleGuide() {
         <a href="#button-group">Button group</a>
         <a href="#dropdown">Dropdown</a>
         <a href="#header-bars">Header bars</a>
+        <a href="#footers">Footers</a>
         <a href="#text-inputs">Text inputs</a>
         <a href="#field-row">Field with action</a>
         <a href="#list-row">Row with action</a>
@@ -300,6 +302,22 @@ function StyleGuide() {
           <code>external</code> prop instead of setting <code>target</code>/
           <code>rel</code> by hand.
         </p>
+        <p className="sg-note">
+          A{" "}
+          <Link href="#links" className="link-quiet">
+            quiet link
+          </Link>{" "}
+          (hover it) is for a link that shouldn&apos;t draw the eye, like the
+          in-app footer&apos;s Privacy Policy and Terms of Service. It takes the
+          text&apos;s own near-black, the underline alone marks it as a link,
+          and hover drops the underline instead of changing color. It also
+          passes WCAG AA where the default blue can&apos;t: 12.05:1 on the page
+          color and 10.61:1 on the surface color, against blue&apos;s 3.41:1 and
+          3.00:1.
+        </p>
+        <Snippet
+          code={`<Link href="/privacy" className="link-quiet">\n  Privacy Policy\n</Link>`}
+        />
       </Section>
 
       <Section id="wordmark" label="Wordmark — Motif">
@@ -355,7 +373,7 @@ function StyleGuide() {
           own background regardless of variant — muted and clearly inert,
           distinct from every variant's normal look. <code>bar</code> is only
           for a button sitting on the header bar (e.g. <code>Header</code>
-          &apos;s Log in) — cream fill, dark text. <code>nav</code> is also
+          &apos;s Log In) — cream fill, dark text. <code>nav</code> is also
           bar-only: a nav link or menu trigger (e.g. <code>AppNav</code>&apos;s
           sections and account menu) — cream text on a dark wash, regular
           weight, and bold on a stronger wash when it&apos;s the current page.
@@ -482,19 +500,58 @@ function StyleGuide() {
           />
         </div>
         <Snippet
-          code={`<Link href="/login" className="button button--bar">Log in</Link>\n\n<Link href="/app" className="button button--nav" current={isCurrent}>\n  <PackageIcon />\n  Products\n</Link>\n\n<Dropdown label={email} variant="nav">…</Dropdown>`}
+          code={`<Link href="/login" className="button button--bar">Log In</Link>\n\n<Link href="/app" className="button button--nav" current={isCurrent}>\n  <PackageIcon />\n  Products\n</Link>\n\n<Dropdown label={email} variant="nav">…</Dropdown>`}
         />
         <p className="sg-note">
           The real <code>Header</code> (signed out) and <code>AppNav</code>{" "}
           (signed in, on <code>/app</code>) on the bar gradient. Everything
           clickable on a bar is a <code>.button</code>, so it&apos;s the same
           size and has the same hover outline as any other button:{" "}
-          <code>button--bar</code> for Log in, <code>button--nav</code> for a
+          <code>button--bar</code> for Log In, <code>button--nav</code> for a
           section link, and a <code>Dropdown</code> with{" "}
           <code>variant=&quot;nav&quot;</code> for the account menu. The current
           section (<code>current</code> on its <code>Link</code>) takes a
           stronger wash and goes bold. Narrow the window below 640px to see{" "}
           <code>AppNav</code> collapse into its ☰ menu.
+        </p>
+      </Section>
+
+      <Section id="footers" label="Footers">
+        <div className="sg-bar-demo">
+          <Footer />
+        </div>
+        <div className="sg-bar-demo">
+          <Footer variant="marketing" />
+        </div>
+        <Snippet
+          code={`<Footer />                      {/* in-app, the default */}\n<Footer variant="marketing" />  {/* public pages, signed out */}`}
+        />
+        <p className="sg-note">
+          The layout picks the variant, not the page: <code>_appShell</code>{" "}
+          always renders the in-app <code>Footer</code>, and{" "}
+          <code>_withFooter</code> renders the marketing one when signed out and
+          the in-app one when signed in (see{" "}
+          <code>docs/design-decisions.md</code>).
+        </p>
+        <p className="sg-note">
+          <strong>In-app</strong> (top): quiet, on the page color. Copyright on
+          one end, Privacy Policy · Terms of Service as{" "}
+          <a href="#links">quiet links</a> on the other, all at{" "}
+          <code>--text-sm</code>. The middle dots are decorative and hidden from
+          screen readers.
+        </p>
+        <p className="sg-note">
+          <strong>Marketing</strong> (bottom): dark, from the{" "}
+          <code>--color-footer-dark-*</code> tokens. Headings are{" "}
+          <code>&lt;h2&gt;</code> sized as <code>.text-h3</code>; body and
+          copyright gray; links cyan, going near-white on hover (4.75:1 and
+          12.25:1 on the dark background). The description takes the left half,
+          a sixth is left empty, and the stacked &ldquo;Learn More&rdquo; links
+          take the right third.
+        </p>
+        <p className="sg-note">
+          Narrow the window below 640px to see both stack into one column; the
+          in-app links drop their dots and go vertical.
         </p>
       </Section>
 
@@ -604,17 +661,17 @@ function StyleGuide() {
         <div className="sg-form-shell-demo">
           <div className="form-shell">
             <h2>Sign in</h2>
-            <p>Narrow, centred column for short forms.</p>
+            <p>Narrow column for short forms.</p>
           </div>
         </div>
         <Snippet
           code={`<div className="form-shell">\n  <h1>Sign in</h1>\n  <form>...</form>\n</div>`}
         />
         <p className="sg-note">
-          Centres a short form (e.g. sign-in) in a narrow column, per
-          AGENTS.md's rule that structural page layout is Grid, not Flexbox. The
-          grid's own <code>gap</code> is the form's vertical rhythm — it covers
-          spacing between top-level blocks (a heading, a{" "}
+          Holds a short form (e.g. sign-in) in a narrow, left-aligned column,
+          per AGENTS.md's rule that structural page layout is Grid, not Flexbox.
+          The grid's own <code>gap</code> is the form's vertical rhythm — it
+          covers spacing between top-level blocks (a heading, a{" "}
           <code>&lt;form&gt;</code>, error text) without page-local margins. The
           dashed outline here exists only to make the column&apos;s bounds
           visible in this demo.

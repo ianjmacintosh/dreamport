@@ -1,13 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 import Button from "../../components/Button";
-import Link from "../../components/Link";
 import TextInput from "../../components/TextInput";
 import { authClient } from "../../utils/auth-client";
 
-export const Route = createFileRoute("/_layout/login")({
+export const Route = createFileRoute("/_withFooter/login")({
+  // Already signed in (the `_withFooter` layout's own `/api/me` check found
+  // a session): there's nothing to sign into, so go straight to the app
+  // (#121).
+  beforeLoad: ({ context }) => {
+    if (context.email) {
+      throw redirect({ to: "/app" });
+    }
+  },
   component: Login,
 });
 
@@ -58,7 +65,7 @@ const ERROR_ID = "login-error";
  * the gate hasn't — it rejects before verifying); "Request a new code"
  * returns to the email step for a fresh challenge.
  *
- * Composed from `TextInput` / `Button` / `Link` / a heading, laid out in the
+ * Composed from `TextInput` / `Button` / a heading, laid out in the
  * `.form-shell` narrow-column primitive, plus the Turnstile widget in a
  * `.turnstile-container` that reserves its footprint up front. The inline
  * error text is tied to the active field via `aria-describedby` and takes
@@ -294,10 +301,6 @@ function Login() {
           {error}
         </p>
       )}
-
-      <p>
-        <Link href="/">Back to home</Link>
-      </p>
     </div>
   );
 }

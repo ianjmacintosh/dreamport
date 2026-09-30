@@ -238,6 +238,14 @@ export const TEST_EMAILS = {
   e2eDeleteIdeaReveal: "delivered+e2e-delete-idea-reveal+e2e-test@resend.dev",
   /** #102: add a Product, add an Idea, rename it, see the new name. */
   e2eRenameIdea: "delivered+e2e-rename-idea+e2e-test@resend.dev",
+  /** #121: signed in, a signed-out page (/privacy) shows AppNav and the in-app footer. */
+  e2eSignedInInfoPage: "delivered+e2e-signed-in-info-page+e2e-test@resend.dev",
+  /** #121: signed in, visiting /login goes straight to /app. */
+  e2eSignedInLoginRedirect:
+    "delivered+e2e-signed-in-login-redirect+e2e-test@resend.dev",
+  /** #121: log out from AppNav on /terms; the page falls back to the signed-out Header. */
+  e2eSignOutFromInfoPage:
+    "delivered+e2e-sign-out-from-info-page+e2e-test@resend.dev",
   /** #102: clicking Edit then Cancel backs out without saving. */
   e2eRenameIdeaCancel: "delivered+e2e-rename-idea-cancel+e2e-test@resend.dev",
   /** #112: set a Product's description, see it persist across a reload, then clear it. */

@@ -38,7 +38,7 @@ import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
 /**
  * The `action` the `/login` Turnstile widget is rendered with (see
- * `data-action` / `options.action` in `src/routes/_layout/login.tsx`). The
+ * `data-action` / `options.action` in `src/routes/_withFooter/login.tsx`). The
  * gate checks the verified token was minted for this action — but only in
  * environments running the real widget (`IS_PRODUCTION_ENVIRONMENT`); test
  * keys don't echo a stable action.

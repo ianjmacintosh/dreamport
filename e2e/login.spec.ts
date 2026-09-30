@@ -33,7 +33,8 @@ test.beforeEach(({ page }) => exemptFromRateLimits(page));
 /** Open `/login` the way a visitor does: from the homepage header link. */
 async function gotoLoginFromHomepage(page: Page): Promise<void> {
   await page.goto("/");
-  await page.getByRole("link", { name: "Log in" }).click();
+  // Scoped to the header: the marketing footer has its own "Log In" (#121).
+  await page.getByRole("banner").getByRole("link", { name: "Log In" }).click();
   await expect(page).toHaveURL(/\/login$/);
 }
 
@@ -185,6 +186,51 @@ test("sign out from /app/settings returns to the homepage and forgets the sessio
   // A later /app visit has no session to fall back on.
   await page.goto("/app");
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test("signed in, /privacy shows AppNav and the in-app footer, not the signed-out chrome", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eSignedInInfoPage;
+  await signIn(page, email);
+
+  await page.goto("/privacy");
+  await expect(
+    page.getByRole("heading", { name: "Privacy Policy", level: 1 }),
+  ).toBeVisible();
+  // AppNav's account trigger is the signed-in email (#119).
+  await expect(page.getByRole("button", { name: email })).toBeVisible();
+  // Neither the Header's nor the marketing footer's "Log In" is on the page.
+  await expect(
+    page.getByRole("link", { name: "Log In", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Learn More" })).toHaveCount(
+    0,
+  );
+});
+
+test("signed in, visiting /login goes straight to /app", async ({ page }) => {
+  await signIn(page, TEST_EMAILS.e2eSignedInLoginRedirect);
+
+  await page.goto("/login");
+  await expect(page).toHaveURL(/\/app$/);
+});
+
+test("log out from /terms: the page falls back to the signed-out Header", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eSignOutFromInfoPage;
+  await signIn(page, email);
+
+  await page.goto("/terms");
+  await openAccountMenu(page, email);
+  await page.getByRole("menuitem", { name: "Log out" }).click();
+
+  await expect(page).toHaveURL(/localhost:\d+\/$/);
+  await expect(
+    page.getByRole("banner").getByRole("link", { name: "Log In" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: email })).toHaveCount(0);
 });
 
 test("advancing to the code step moves focus to the code field", async ({

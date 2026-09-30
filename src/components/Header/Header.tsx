@@ -8,7 +8,7 @@ export function Header() {
           Dreamport
         </Link>
         <Link href="/login" className="button button--bar">
-          Log in
+          Log In
         </Link>
       </div>
     </header>

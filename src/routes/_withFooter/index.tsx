@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import Link from "../../components/Link";
+
 export const Route = createFileRoute("/_withFooter/")({
   component: Home,
 });
@@ -24,7 +26,9 @@ function Home() {
         <strong>Lean Analytics</strong> with guard rails to keep you on track
         and on schedule.
       </p>
-      <p className="text-2xl">The best time to start is now. Start now.</p>
+      <p className="text-2xl">
+        The best time to start is now. <Link href="/login">Start now</Link>.
+      </p>
     </>
   );
 }
