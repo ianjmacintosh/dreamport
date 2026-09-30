@@ -32,10 +32,13 @@ function About() {
         That&apos;s your starting point to start building out the ideas
         associated with your product. Maybe some of those ideas will be good,
         some will need to be refined, and (for the exceptionally disciplined)
-        some will be thrown away entirely. That&apos;s all up to you, but you
-        can track them and give them some structure. You can label them by theme
-        (like &quot;Pricing&quot; or &quot;Design&quot;), and keep building
-        them.
+        some will be thrown away entirely.
+      </p>
+
+      <p className="text-2xl">
+        That&apos;s all up to you, but you can track them and give them some
+        structure. You can label them by theme (like &quot;Pricing&quot; or
+        &quot;Design&quot;), and keep building them.
       </p>
 
       <p className="text-2xl">
