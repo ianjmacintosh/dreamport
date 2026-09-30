@@ -597,6 +597,9 @@ a.button {
    sixth as breathing room, "Learn More" in the right third. */
 .footer-content--marketing {
   grid-template-columns: 3fr 1fr 2fr;
+  /* Double the shared --space-4, so the dark band has more room above
+     its headings (#121). */
+  padding-top: var(--space-8);
 }
 
 .footer-learn-more {
