@@ -58,10 +58,14 @@ export function Footer({ variant = "app" }: FooterProps = {}) {
         <p className="footer-copyright">{COPYRIGHT}</p>
         <ul className="footer-links text-sm">
           <li>
-            <Link href="/privacy">Privacy Policy</Link>
+            <Link href="/privacy" className="link-quiet">
+              Privacy Policy
+            </Link>
           </li>
           <li>
-            <Link href="/terms">Terms of Service</Link>
+            <Link href="/terms" className="link-quiet">
+              Terms of Service
+            </Link>
           </li>
         </ul>
       </div>

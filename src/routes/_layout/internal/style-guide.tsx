@@ -5,6 +5,7 @@ import { ListIcon, PackageIcon } from "@phosphor-icons/react";
 import Button from "../../../components/Button";
 import AppNav from "../../../components/AppNav";
 import Dropdown from "../../../components/Dropdown";
+import Footer from "../../../components/Footer";
 import Header from "../../../components/Header";
 import Link from "../../../components/Link";
 import TextInput from "../../../components/TextInput";
@@ -150,6 +151,7 @@ function StyleGuide() {
         <a href="#button-group">Button group</a>
         <a href="#dropdown">Dropdown</a>
         <a href="#header-bars">Header bars</a>
+        <a href="#footers">Footers</a>
         <a href="#text-inputs">Text inputs</a>
         <a href="#field-row">Field with action</a>
         <a href="#list-row">Row with action</a>
@@ -300,6 +302,22 @@ function StyleGuide() {
           <code>external</code> prop instead of setting <code>target</code>/
           <code>rel</code> by hand.
         </p>
+        <p className="sg-note">
+          A{" "}
+          <Link href="#links" className="link-quiet">
+            quiet link
+          </Link>{" "}
+          (hover it) is for a link that shouldn&apos;t draw the eye, like the
+          in-app footer&apos;s Privacy Policy and Terms of Service. It takes the
+          text&apos;s own near-black, the underline alone marks it as a link,
+          and hover drops the underline instead of changing color. It also
+          passes WCAG AA where the default blue can&apos;t: 12.05:1 on the page
+          color and 10.61:1 on the surface color, against blue&apos;s 3.41:1 and
+          3.00:1.
+        </p>
+        <Snippet
+          code={`<Link href="/privacy" className="link-quiet">\n  Privacy Policy\n</Link>`}
+        />
       </Section>
 
       <Section id="wordmark" label="Wordmark — Motif">
@@ -495,6 +513,45 @@ function StyleGuide() {
           section (<code>current</code> on its <code>Link</code>) takes a
           stronger wash and goes bold. Narrow the window below 640px to see{" "}
           <code>AppNav</code> collapse into its ☰ menu.
+        </p>
+      </Section>
+
+      <Section id="footers" label="Footers">
+        <div className="sg-bar-demo">
+          <Footer />
+        </div>
+        <div className="sg-bar-demo">
+          <Footer variant="marketing" />
+        </div>
+        <Snippet
+          code={`<Footer />                      {/* in-app, the default */}\n<Footer variant="marketing" />  {/* public pages, signed out */}`}
+        />
+        <p className="sg-note">
+          The layout picks the variant, not the page: <code>_appShell</code>{" "}
+          always renders the in-app <code>Footer</code>, and{" "}
+          <code>_withFooter</code> renders the marketing one when signed out and
+          the in-app one when signed in (see{" "}
+          <code>docs/design-decisions.md</code>).
+        </p>
+        <p className="sg-note">
+          <strong>In-app</strong> (top): quiet, on the page color. Copyright on
+          one end, Privacy Policy · Terms of Service as{" "}
+          <a href="#links">quiet links</a> on the other, all at{" "}
+          <code>--text-sm</code>. The middle dots are decorative and hidden from
+          screen readers.
+        </p>
+        <p className="sg-note">
+          <strong>Marketing</strong> (bottom): dark, from the{" "}
+          <code>--color-footer-dark-*</code> tokens. Headings are{" "}
+          <code>&lt;h2&gt;</code> sized as <code>.text-h3</code>; body and
+          copyright gray; links cyan, going near-white on hover (4.75:1 and
+          12.25:1 on the dark background). The description takes the left half,
+          a sixth is left empty, and the stacked &ldquo;Learn More&rdquo; links
+          take the right third.
+        </p>
+        <p className="sg-note">
+          Narrow the window below 640px to see both stack into one column; the
+          in-app links drop their dots and go vertical.
         </p>
       </Section>
 

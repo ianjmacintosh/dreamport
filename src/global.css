@@ -76,6 +76,20 @@ a:hover {
   color: var(--color-link-hover);
 }
 
+/* Quiet link: the text's own near-black instead of --color-link, with the
+   underline alone marking it as a link; hover drops the underline rather
+   than swapping color. For links that shouldn't draw the eye (e.g. the
+   in-app footer's Privacy Policy/Terms of Service) — and it clears AA
+   where Solarized blue can't: 12.05:1 on --color-page-bg, 10.61:1 on
+   --color-surface (blue: 3.41:1 / 3.00:1). Decided in #121. */
+a.link-quiet {
+  color: var(--color-text-on-surface);
+}
+
+a.link-quiet:hover {
+  text-decoration: none;
+}
+
 /* The "Dreamport" wordmark in `Header` and `AppNav` — styled text, no image
    asset (#118). Reads as a heading rather than a link: heading font and
    color, no underline, and no hover color swap. `justify-self: start`
@@ -535,21 +549,9 @@ a.button {
 /* In-app footer: copyright on one end, Privacy Policy · Terms of Service
    on the other — the same one-left-one-right row as .header-content. It
    sits on the page color, not --color-surface, so it doesn't read as a
-   separate band under a working screen. Its links take the copyright's
-   near-black (12.05:1 on the page color) instead of --color-link, since
-   Solarized blue can't reach AA here (3.41:1, see tokens.css). The
-   underline still marks them as links; hover thickens it rather than
-   switching to cyan, which fails AA too. */
+   separate band under a working screen. Its links are .link-quiet. */
 .footer--app {
   background-color: var(--color-page-bg);
-}
-
-.footer--app a {
-  color: var(--color-text-on-surface);
-}
-
-.footer--app a:hover {
-  text-decoration-thickness: 2px;
 }
 
 .footer-content--app {

@@ -14,6 +14,7 @@ const COPYRIGHT = "© 2026 Dreamport";
 type FooterElement = ReactElement<{
   href?: string;
   external?: boolean;
+  className?: string;
   children?: ReactNode;
 }>;
 
@@ -66,6 +67,20 @@ describe("Footer", () => {
       ["Terms of Service", "/terms"],
     ]);
     expect(headings({ variant: "app" })).toEqual([]);
+  });
+
+  test("app: its links use the quiet link treatment", () => {
+    expect(listLinks({ variant: "app" }).map((l) => l.props.className)).toEqual(
+      ["link-quiet", "link-quiet"],
+    );
+  });
+
+  test("marketing: its links don't (the dark footer colors its own)", () => {
+    expect(
+      listLinks({ variant: "marketing" }).some(
+        (l) => l.props.className === "link-quiet",
+      ),
+    ).toBe(false);
   });
 
   test("defaults to the app variant", () => {

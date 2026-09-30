@@ -54,6 +54,19 @@ Add an entry only once a sign-off conversation resolves something repeatable
   below in #119; the two `Footer` variants and the session-following
   `_withFooter` chrome added in #121).
 
+- A public page's body copy (the homepage, About, Privacy Policy, Terms
+  of Service) reads at `.text-2xl` — set on each body `<p>`, the way the
+  homepage does — rather than the default body size. Supporting text like
+  a legal page's "Last updated" line stays small (`.text-sm`), and
+  `/login` stays at the default: it's a form, not a page to read. Signed-in
+  pages keep the default body size (decided in #121).
+
+- A link that shouldn't draw the eye (e.g. the in-app footer's Privacy
+  Policy / Terms of Service) uses `.link-quiet` — the text's own
+  near-black, underlined, dropping the underline on hover — rather than
+  the default blue. See the style guide's "Links" section (decided in
+  #121).
+
 - A destructive, irreversible action (delete account, delete a Product,
   delete an Idea) uses a two-step reveal in place — resting state shows
   the action itself ("Delete"); clicking it swaps that control for a
