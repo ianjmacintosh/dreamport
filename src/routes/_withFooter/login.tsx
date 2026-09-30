@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 import Button from "../../components/Button";
@@ -7,6 +7,14 @@ import TextInput from "../../components/TextInput";
 import { authClient } from "../../utils/auth-client";
 
 export const Route = createFileRoute("/_withFooter/login")({
+  // Already signed in (the `_withFooter` layout's own `/api/me` check found
+  // a session): there's nothing to sign into, so go straight to the app
+  // (#121).
+  beforeLoad: ({ context }) => {
+    if (context.email) {
+      throw redirect({ to: "/app" });
+    }
+  },
   component: Login,
 });
 

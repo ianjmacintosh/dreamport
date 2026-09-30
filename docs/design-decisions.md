@@ -39,15 +39,20 @@ Add an entry only once a sign-off conversation resolves something repeatable
   `Dropdown` triggered by the User's own email, holding Settings and Log
   out) plus `<Footer variant="app" />` (the default; copyright on one end,
   Privacy Policy/Terms of Service on the other, on the page color) —
-  not the marketing `Header`/`_withFooter`. `Header` stays signed-out-only;
-  it has no concept of a session. Signed-out pages (`/`, `/login`, `/about`,
-  `/privacy`, `/terms`) render inside `_withFooter` with
-  `<Footer variant="marketing" />` instead — a Dreamport description beside
-  a stacked "Learn More" list (Log In/About Dreamport/Contact/Privacy
-  Policy/Terms of Service), copyright below, on a dark background. See
-  `src/routes/_appShell.tsx` and `src/components/AppNav` (decided in #90;
-  the flat email/Settings/Log out layout superseded by the `Dropdown` below
-  in #119; the two `Footer` variants added in #121).
+  not the marketing `Header`/`_withFooter`. `Header` itself stays
+  signed-out-only; it has no concept of a session. The public pages (`/`,
+  `/login`, `/about`, `/privacy`, `/terms`) render inside `_withFooter`,
+  whose chrome follows the session: signed out, `Header` plus
+  `<Footer variant="marketing" />` — a Dreamport description beside a
+  stacked "Learn More" list (Log In/About Dreamport/Contact/Privacy
+  Policy/Terms of Service), copyright below, on a dark background; signed
+  in, the same `AppNav` and in-app `Footer` as `_appShell`, so a public
+  page reached from inside the app still looks signed in. `/login` itself
+  sends a signed-in visitor on to `/app`. See `src/routes/_appShell.tsx`,
+  `src/routes/_withFooter.tsx` and `src/components/AppNav` (decided in
+  #90; the flat email/Settings/Log out layout superseded by the `Dropdown`
+  below in #119; the two `Footer` variants and the session-following
+  `_withFooter` chrome added in #121).
 
 - A destructive, irreversible action (delete account, delete a Product,
   delete an Idea) uses a two-step reveal in place — resting state shows

@@ -1,20 +1,13 @@
-import { useState } from "react";
 import {
   createFileRoute,
   Outlet,
   redirect,
   useLocation,
-  useNavigate,
-  useRouter,
 } from "@tanstack/react-router";
 
 import AppNav from "../components/AppNav";
 import Footer from "../components/Footer";
-import { authClient } from "../utils/auth-client";
-
-const SIGN_OUT_FAILED = "We couldn't sign you out. Try again in a moment.";
-const CONNECTION_FAILED =
-  "Something went wrong. Check your connection and try again.";
+import { useSignOut } from "../utils/use-sign-out";
 
 /**
  * The shell every signed-in page (`/app`, `/app/settings`, …) renders
@@ -32,8 +25,9 @@ const CONNECTION_FAILED =
  * boundary, and anything short of a clean 200 (no session, offline, a
  * transient error) bounces to `/login` rather than a dead-end error screen.
  *
- * `/login` renders under `_withFooter` instead — it's signed-out, so it
- * has no session to show and no nav to render.
+ * The signed-out pages (`/`, `/about`, `/privacy`, `/terms`, `/login`)
+ * render under `_withFooter` instead, which shows this same `AppNav` and
+ * in-app `Footer` when it finds a session, without the redirect (#121).
  */
 export const Route = createFileRoute("/_appShell")({
   beforeLoad: async ({ location }) => {
@@ -64,34 +58,10 @@ export const Route = createFileRoute("/_appShell")({
 
 function AppShellLayout() {
   const { email } = Route.useRouteContext();
-  const navigate = useNavigate();
-  const router = useRouter();
   const { pathname } = useLocation();
-  const [error, setError] = useState("");
-
   // Sign-out used to be its own button on `/app/settings` (#26); it moved
-  // to `AppNav` so every signed-in page carries the same way out, rather
-  // than only the one page that happened to grow it first. `AppNav` itself
-  // stays presentational (an `onLogout` callback) rather than owning this
-  // directly, since it needs `useNavigate`/`useRouter`/`authClient`, all of
-  // which only work rendered under the real router.
-  async function signOut() {
-    setError("");
-    try {
-      const { error } = await authClient.signOut();
-      if (error) {
-        setError(SIGN_OUT_FAILED);
-        return;
-      }
-      // `/` is the genuine signed-out state (the homepage has its own way
-      // into `/login` since #50). Invalidate first so no stale route
-      // context keeps rendering a signed-in view.
-      void router.invalidate();
-      void navigate({ to: "/" });
-    } catch {
-      setError(CONNECTION_FAILED);
-    }
-  }
+  // to `AppNav` so every signed-in page carries the same way out.
+  const { signOut, error } = useSignOut();
 
   return (
     <>
