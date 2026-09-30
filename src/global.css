@@ -270,7 +270,7 @@ a.button {
 .form-shell {
   display: grid;
   gap: var(--space-4);
-  max-width: 26rem;
+  max-width: 40rem;
 }
 
 /* Two or more related actions presented side by side (e.g. "Verify and
