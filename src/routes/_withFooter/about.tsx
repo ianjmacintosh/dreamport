@@ -11,7 +11,7 @@ function About() {
     <>
       <h1>About Dreamport</h1>
 
-      <p>
+      <p className="text-2xl">
         Dreamport is for anyone who&apos;s ever had a great idea but didn&apos;t
         know what to do with it. Some people store their ideas in a notebook or
         in a file somewhere, while others just let them leave as quick as they
@@ -23,7 +23,7 @@ function About() {
         progress you made is stored in place.
       </p>
 
-      <p>
+      <p className="text-2xl">
         It all starts with your product. Give it a name and add a description.
         That&apos;s your starting point to start building out the ideas
         associated with your product. Maybe some of those ideas will be good,
@@ -34,7 +34,7 @@ function About() {
         them.
       </p>
 
-      <p>
+      <p className="text-2xl">
         If you&apos;re feeling stuck, you can work through exercises to refine
         your ideas. If you like, you can follow proven methodologies that can
         guide you from your product&apos;s infancy to full maturity. But the
