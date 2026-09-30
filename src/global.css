@@ -542,10 +542,18 @@ a.button {
   display: grid;
   grid-auto-flow: column;
   justify-content: start;
-  gap: var(--space-4);
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* A middle dot between links. The `/ ""` alt text keeps screen readers
+   from announcing it — the list already separates the items. */
+.footer-links li + li::before {
+  content: "·" / "";
+  margin-inline-end: var(--space-2);
+  color: var(--color-text-on-surface);
 }
 
 .footer-learn-more .footer-links {
@@ -571,8 +579,16 @@ a.button {
     text-align: left;
   }
 
+  /* The dotted "Learn More" row is ~276px wide, more than a 320px screen's
+     content column, and a one-row grid can't wrap — flex-wrap lets the
+     last link drop to the next line instead (same reasoning as
+     .button-group's own narrow-screen wrap). */
+  .footer-links,
   .footer-learn-more .footer-links {
+    display: flex;
+    flex-wrap: wrap;
     justify-content: start;
+    column-gap: var(--space-2);
   }
 }
 

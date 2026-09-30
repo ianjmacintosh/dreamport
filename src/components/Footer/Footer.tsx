@@ -16,11 +16,11 @@ export function Footer({ variant = "app" }: FooterProps = {}) {
       <footer className="footer">
         <div className="footer-content footer-content--marketing">
           <div>
-            <h2>Dreamport</h2>
+            <h2 className="text-h3">Dreamport</h2>
             <p>[Ian: footer description pending]</p>
           </div>
           <div className="footer-learn-more">
-            <h2>Learn More</h2>
+            <h2 className="text-h3">Learn More</h2>
             <ul className="footer-links">
               <li>
                 <Link href="/about">About</Link>
