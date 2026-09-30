@@ -17,10 +17,14 @@ function About() {
         in a file somewhere, while others just let them leave as quick as they
         arrived. Dreamport gives you a platform where you can record your
         product ideas, build out the concepts associated with them, and revisit
-        them at your own pace. If you want more structure, you can follow proven
-        paths with defined guard rails and timelines to keep you moving forward.
-        And if you want to stop, you can do that too, knowing that all the
-        progress you made is stored in place.
+        them at your own pace.
+      </p>
+
+      <p className="text-2xl">
+        If you want more structure, you can follow proven paths with defined
+        guard rails and timelines to keep you moving forward. And if you want to
+        stop, you can do that too, knowing that all the progress you made is
+        stored in place.
       </p>
 
       <p className="text-2xl">
