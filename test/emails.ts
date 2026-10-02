@@ -262,6 +262,9 @@ export const TEST_EMAILS = {
     "delivered+e2e-sign-out-from-info-page+e2e-test@resend.dev",
   /** #102: clicking Edit then Cancel backs out without saving. */
   e2eRenameIdeaCancel: "delivered+e2e-rename-idea-cancel+e2e-test@resend.dev",
+  /** #128: after a successful verify, "Verify and sign in" never re-enables before the redirect. */
+  e2eVerifyStaysDisabled:
+    "delivered+e2e-verify-stays-disabled+e2e-test@resend.dev",
   /** #113: add an Idea with a Tag checked, see the Tag listed with it. */
   e2eAddIdeaWithTag: "delivered+e2e-add-idea-with-tag+e2e-test@resend.dev",
   /** #113: change an Idea's Tags via edit mode, see the new Tags listed. */

@@ -68,7 +68,9 @@ test.describe("deployed Turnstile smoke", () => {
     // Reaching the code step means the Worker verified the token (so
     // TURNSTILE_SECRET_KEY is set and the key pair matches) and Better Auth
     // issued a code.
-    await expect(page.getByLabel("Six-digit code")).toBeVisible({
+    await expect(
+      page.getByRole("textbox", { name: "Six-digit code" }),
+    ).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByRole("alert")).toHaveCount(0);

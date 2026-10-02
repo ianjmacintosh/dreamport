@@ -65,7 +65,10 @@ Add an entry only once a sign-off conversation resolves something repeatable
   Policy / Terms of Service) uses `.link-quiet` — the text's own
   near-black, underlined, dropping the underline on hover — rather than
   the default blue. See the style guide's "Links" section (decided in
-  #121).
+  #121). A secondary action on a `<button>` that shouldn't compete with the
+  form's main button (e.g. `/login`'s "Request a new code") gets the same
+  look via `.button-link`, as inline text below that button rather than a
+  secondary `Button` beside it (decided in #128).
 
 - A destructive, irreversible action (delete account, delete a Product,
   delete an Idea) uses a two-step reveal in place — resting state shows

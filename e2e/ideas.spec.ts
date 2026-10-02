@@ -25,9 +25,11 @@ async function signIn(page: Page, email: string): Promise<void> {
 
   await page.getByRole("button", { name: "Send code" }).click();
 
-  await expect(page.getByLabel("Six-digit code")).toBeVisible();
-  await page.getByLabel("Six-digit code").fill("000000");
-  await page.getByRole("button", { name: "Verify and sign in" }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Six-digit code" }),
+  ).toBeVisible();
+  // The sixth digit submits the form on its own (`autoSubmit`, #128).
+  await page.getByRole("textbox", { name: "Six-digit code" }).fill("000000");
 
   await expect(page).toHaveURL(/\/app$/);
 }

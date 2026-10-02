@@ -340,6 +340,18 @@ function StyleGuide() {
         <Snippet
           code={`<Link href="/privacy" className="link-quiet">\n  Privacy Policy\n</Link>`}
         />
+        <p className="sg-note">
+          Email never arrived?{" "}
+          <button type="button" className="button-link">
+            Request a new code
+          </button>{" "}
+          — a quiet button is the same look on a <code>&lt;button&gt;</code>,
+          for a secondary action that changes state instead of navigating and
+          shouldn&apos;t compete with the form&apos;s real button.
+        </p>
+        <Snippet
+          code={`<button type="button" className="button-link">\n  Request a new code\n</button>`}
+        />
       </Section>
 
       <Section id="wordmark" label="Wordmark — Motif">
@@ -433,17 +445,17 @@ function StyleGuide() {
       <Section id="button-group" label="Button group">
         <div className="sg-button-group-demo">
           <div className="button-group">
-            <Button variant="primary">Verify and sign in</Button>
-            <Button variant="secondary">Request a new code</Button>
+            <Button variant="primary">Save</Button>
+            <Button variant="secondary">Cancel</Button>
           </div>
         </div>
         <Snippet
-          code={`<div className="button-group">\n  <Button variant="primary">Verify and sign in</Button>\n  <Button variant="secondary">Request a new code</Button>\n</div>`}
+          code={`<div className="button-group">\n  <Button variant="primary">Save</Button>\n  <Button variant="secondary">Cancel</Button>\n</div>`}
         />
         <p className="sg-note">
           Use <code>.button-group</code> for two or more related actions
-          presented side by side (e.g. "Verify and sign in" / "Request a new
-          code") — the gap between them comes from the spacing scale via Grid,
+          presented side by side (e.g. an Idea row&apos;s Save / Cancel /
+          Delete) — the gap between them comes from the spacing scale via Grid,
           not inline-flex's incidental whitespace. For a single button attached
           to a single field, use <code>.field-row</code> below instead.
         </p>

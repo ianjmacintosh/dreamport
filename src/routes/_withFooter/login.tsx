@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+import { OTPField } from "@base-ui/react/otp-field";
 
 import Button from "../../components/Button";
 import TextInput from "../../components/TextInput";
 import { authClient } from "../../utils/auth-client";
+
+import "./login.css";
 
 export const Route = createFileRoute("/_withFooter/login")({
   // Already signed in (the `_withFooter` layout's own `/api/me` check found
@@ -46,6 +49,9 @@ const VERIFY_FAILED = "That code didn't work. Request a new one and try again.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
+/** How many digits the emailed sign-in code has — one box per digit. */
+const CODE_LENGTH = 6;
+
 /** id of the shared inline error text, referenced by whichever field it
  * currently describes via `aria-describedby`. */
 const ERROR_ID = "login-error";
@@ -71,6 +77,15 @@ const ERROR_ID = "login-error";
  * error text is tied to the active field via `aria-describedby` and takes
  * focus on failure; the code field takes focus when the form advances to it
  * (#28).
+ *
+ * The code step is Base UI's `OTPField` — one `.otp-field-input` box per
+ * digit, with paste-splitting and arrow/backspace movement between boxes —
+ * stacked above "Verify and sign in" (#128). `autoSubmit` submits the form
+ * the moment the last digit lands, so typing or pasting the code is enough;
+ * the button stays for resubmitting after a failure. "Request a new code"
+ * is a `.button-link` below the button, so it doesn't compete with it.
+ * On a successful verify the form stays in its submitting state until the
+ * route changes, rather than re-enabling the button while `/app` loads.
  *
  * The email step's submit button sits beside the email field (`.field-row`)
  * rather than below the widget, and stays disabled — with a label explaining
@@ -179,19 +194,21 @@ function Login() {
     setIsSubmitting(true);
     try {
       const { error } = await authClient.signIn.emailOtp({ email, otp: code });
-      if (error) {
-        setError(VERIFY_FAILED);
+      if (!error) {
+        // Stay submitting: `navigate()` doesn't unmount this form
+        // synchronously, so clearing the state here would re-enable the
+        // button for the frames before `/app` takes over (#128).
+        navigate({ to: "/app" });
         return;
       }
-      navigate({ to: "/app" });
+      setError(VERIFY_FAILED);
     } catch {
       // Thrown only when the request never reached the server — the code may
       // still be good, so point at the connection, not the code.
       setError(CONNECTION_FAILED);
-    } finally {
-      submittingRef.current = false;
-      setIsSubmitting(false);
     }
+    submittingRef.current = false;
+    setIsSubmitting(false);
   }
 
   return (
@@ -259,31 +276,51 @@ function Login() {
             void verifyCode();
           }}
         >
-          <p>We sent a six-digit code to {email}.</p>
-          <TextInput
-            ref={codeInputRef}
+          <p>
+            We sent a six-digit code to <strong>{email}</strong>
+          </p>
+          <label className="input-label" htmlFor="code">
+            Six-digit code
+          </label>
+          <OTPField.Root
             id="code"
-            label="Six-digit code"
-            inputMode="numeric"
-            autoComplete="one-time-code"
+            className="otp-field"
+            length={CODE_LENGTH}
             value={code}
-            onChange={(e) => setCode(e.target.value)}
-            aria-describedby={error ? ERROR_ID : undefined}
+            onValueChange={setCode}
+            autoSubmit
             disabled={isSubmitting}
             required
-          />
-          <div className="button-group">
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              state={isSubmitting ? "pending" : "ready"}
-            >
-              <Button.State name="ready">Verify and sign in</Button.State>
-              <Button.State name="pending">Verifying…</Button.State>
-            </Button>
-            <Button
+          >
+            {Array.from({ length: CODE_LENGTH }, (_, i) => (
+              <OTPField.Input
+                key={i}
+                ref={i === 0 ? codeInputRef : undefined}
+                className="otp-field-input"
+                // On every box rather than the Root's group, so the error is
+                // read as the description of whichever box has focus.
+                aria-describedby={error ? ERROR_ID : undefined}
+                // The first box takes the `<label>` above; Base UI ignores
+                // `aria-label` on it.
+                aria-label={
+                  i === 0 ? undefined : `Digit ${i + 1} of ${CODE_LENGTH}`
+                }
+              />
+            ))}
+          </OTPField.Root>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            state={isSubmitting ? "pending" : "ready"}
+          >
+            <Button.State name="ready">Verify and sign in</Button.State>
+            <Button.State name="pending">Verifying…</Button.State>
+          </Button>
+          <p className="login-resend">
+            Email never arrived?{" "}
+            <button
               type="button"
-              variant="secondary"
+              className="button-link"
               disabled={isSubmitting}
               onClick={() => {
                 setError("");
@@ -291,8 +328,8 @@ function Login() {
               }}
             >
               Request a new code
-            </Button>
-          </div>
+            </button>
+          </p>
         </form>
       )}
 
