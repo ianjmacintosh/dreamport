@@ -49,9 +49,12 @@ export async function listTagsByIdea(
  * a nonexistent one" scoping `renameIdea` uses. Caller has already
  * validated every name against the catalog.
  *
- * The delete and the inserts go in one `batch`, which D1 runs as a single
- * transaction — a failure partway leaves the old set intact rather than an
- * Idea with half its new Tags.
+ * The delete and the inserts go in one `batch`, which D1 applies
+ * atomically (a failing statement rolls the whole batch back) — so a
+ * failure partway leaves the old set intact rather than an Idea with half
+ * its new Tags. That's not the interactive `BEGIN`/`COMMIT` transaction
+ * `migrations/README.md` says D1 lacks; a batch is the one atomic unit D1
+ * does offer.
  */
 export async function setIdeaTags(
   db: D1Database,
