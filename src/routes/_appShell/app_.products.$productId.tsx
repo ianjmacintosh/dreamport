@@ -3,6 +3,8 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
 import Link from "../../components/Link";
+import TagList from "../../components/TagList";
+import TagPicker from "../../components/TagPicker";
 import TextInput from "../../components/TextInput";
 
 /**
@@ -67,6 +69,8 @@ interface Idea {
   id: string;
   name: string;
   createdAt: string;
+  /** Tag names, alphabetical (#113). */
+  tags: string[];
 }
 
 /**
@@ -90,24 +94,50 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
     // `_appShell`'s own `/api/me` guard uses: anything short of a clean 200
     // (not signed in, not this User's Product, offline, a transient error)
     // redirects to `/app` rather than a dedicated not-found page.
-    const res = await fetch(`/api/products/${params.productId}/ideas`).catch(
-      () => null,
-    );
-    if (!res || !res.ok) {
+    // The Tag catalog (#113) is fetched alongside — it's needed for the
+    // add-Idea form's `TagPicker`, and goes through the same redirect.
+    const [res, tagsRes] = await Promise.all([
+      fetch(`/api/products/${params.productId}/ideas`).catch(() => null),
+      fetch("/api/tags").catch(() => null),
+    ]);
+    if (!res || !res.ok || !tagsRes || !tagsRes.ok) {
       throw redirect({ to: "/app" });
     }
     const { product, ideas } = (await res.json()) as {
       product: Product;
       ideas: Idea[];
     };
-    return { product, ideas };
+    const { tags } = (await tagsRes.json()) as { tags: string[] };
+    return { product, ideas, tagCatalog: tags };
   },
   component: ProductIdeas,
 });
 
+/** PUT an Idea's whole Tag set (#113); the stored set, or `null` on failure. */
+async function putIdeaTags(
+  productId: string,
+  ideaId: string,
+  tags: string[],
+): Promise<string[] | null> {
+  const res = await fetchWithTimeout(
+    `/api/products/${productId}/ideas/${ideaId}/tags`,
+    {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tags }),
+    },
+  );
+  if (!res.ok) {
+    return null;
+  }
+  return ((await res.json()) as { tags: string[] }).tags;
+}
+
 const ADD_IDEA_FAILED = "We couldn't add that. Try again in a moment.";
 const DELETE_IDEA_FAILED = "We couldn't delete that. Try again in a moment.";
 const SAVE_IDEA_FAILED = "We couldn't save that. Try again in a moment.";
+const ADD_IDEA_TAGS_FAILED =
+  "We added that, but couldn't save its tags. Edit it to try again.";
 const SAVE_DESCRIPTION_FAILED =
   "We couldn't save the description. Try again in a moment.";
 const CONNECTION_FAILED =
@@ -119,9 +149,10 @@ const CONNECTION_FAILED =
  *
  * Composed from `TextInput`/`Button` plus heading/paragraph primitives in
  * plain document order, same minimal treatment `/app`'s own Products list
- * had at #88. The add-Idea field and its button sit
- * in `.field-row`, the same side-by-side primitive `/app`'s own add-Product
- * form uses. The list itself is a real `<ul>`/`<li>` (no class on either) —
+ * had at #88. The add-Idea form puts its name field and its `TagPicker` side
+ * by side (`.field-pair`, 3:1), then "Add idea" below both, so the Tags read
+ * as part of the form (#113); `.form-section` sets it apart from the list
+ * under it. The list itself is a real `<ul>`/`<li>` —
  * free correctness, not design-system elaboration, the same tier as
  * `<h1>` over a styled `<div>` — with `aria-labelledby` pointing at its own
  * "Ideas" `<h2>` rather than the page's `<h1>`, so it's announced as
@@ -135,9 +166,10 @@ const CONNECTION_FAILED =
  * question, tracked in #109.
  *
  * Rename (#102) swaps a row in place, one row at a time. Resting, a row's
- * actions are Edit / Delete. Editing, its name becomes a `.field-row` — a
- * pre-filled "Rename" `TextInput` with Save / Cancel / Delete as its attached
- * `.button-group`. Clicking Delete (from either)
+ * actions are Edit / Delete. Editing, the row becomes a form laid out like the
+ * add form (#113) — a pre-filled "Rename" `TextInput` beside a `TagPicker`,
+ * then Save / Cancel / Delete as a `.button-group` — on a tinted panel
+ * (`.list-row--editing`). Clicking Delete (from either)
  * shows Edit / Delete / Cancel — the confirming button keeps the action's own
  * verb, "Delete," rather than a generic "Confirm" (#101).
  *
@@ -146,14 +178,23 @@ const CONNECTION_FAILED =
  * it for a pre-filled `TextInput` + Save / Cancel `.field-row`, the same
  * in-place edit shape an Idea row's rename uses. Single-line on purpose:
  * no multi-line text component exists yet (see #112).
+ *
+ * Tags (#113): a resting row (`.list-row--tagged`) shows its Idea's Tags as
+ * pills (`TagList`) in a fixed-width column between the name and the
+ * actions — as many as fit, then "+N". Tags are saved with their own PUT,
+ * after the Idea's create (POST) or rename (PATCH) succeeds.
  */
 function ProductIdeas() {
-  const { product: initialProduct, ideas: initialIdeas } =
-    Route.useRouteContext();
+  const {
+    product: initialProduct,
+    ideas: initialIdeas,
+    tagCatalog,
+  } = Route.useRouteContext();
   const [product, setProduct] = useState<Product>(initialProduct);
   const [error, setError] = useState("");
   const [ideas, setIdeas] = useState<Idea[]>(initialIdeas);
   const [ideaName, setIdeaName] = useState("");
+  const [ideaTags, setIdeaTags] = useState<string[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   // Only ever one row's delete in flight, and one row confirming, at a time
   // — no bulk delete — so a single id each (rather than a set) is enough to
@@ -163,6 +204,7 @@ function ProductIdeas() {
   // Same single-id convention for rename (#102): one row editing at a time.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState("");
@@ -182,10 +224,20 @@ function ProductIdeas() {
         return;
       }
       const { idea } = (await res.json()) as { idea: Idea };
+      // The Idea exists now whether or not its Tags save — so it's listed
+      // either way, and a Tag failure gets its own message.
+      const tags =
+        ideaTags.length > 0
+          ? await putIdeaTags(product.id, idea.id, ideaTags).catch(() => null)
+          : [];
       // Reflect the new Idea immediately — no full page reload or refetch
       // needed for a list this size.
-      setIdeas((prev) => [...prev, idea]);
+      setIdeas((prev) => [...prev, { ...idea, tags: tags ?? [] }]);
       setIdeaName("");
+      setIdeaTags([]);
+      if (!tags) {
+        setError(ADD_IDEA_TAGS_FAILED);
+      }
     } catch {
       setError(CONNECTION_FAILED);
     } finally {
@@ -231,6 +283,7 @@ function ProductIdeas() {
     setConfirmingId(null);
     setEditingId(idea.id);
     setEditName(idea.name);
+    setEditTags(idea.tags);
   }
 
   function startConfirmingDelete(id: string) {
@@ -255,14 +308,29 @@ function ProductIdeas() {
         if (!res.ok) {
           return null;
         }
-        return ((await res.json()) as { idea: Idea }).idea;
+        const renamed = ((await res.json()) as { idea: Idea }).idea;
+        const tags = await putIdeaTags(product.id, id, editTags).catch(
+          () => null,
+        );
+        // A failed Tag save still keeps the rename that did land.
+        return { renamed, tags };
       });
       if (!saved) {
         setError(SAVE_IDEA_FAILED);
         return;
       }
-      // The server's copy, not `editName` — it's the trimmed, stored name.
-      setIdeas((prev) => prev.map((idea) => (idea.id === id ? saved : idea)));
+      // The server's copies, not `editName`/`editTags` — the trimmed,
+      // stored name and the deduplicated, sorted Tags.
+      const { renamed, tags } = saved;
+      setIdeas((prev) =>
+        prev.map((idea) =>
+          idea.id === id ? { ...renamed, tags: tags ?? renamed.tags } : idea,
+        ),
+      );
+      if (!tags) {
+        setError(SAVE_IDEA_FAILED);
+        return;
+      }
       setEditingId(null);
     } catch {
       setError(CONNECTION_FAILED);
@@ -358,12 +426,13 @@ function ProductIdeas() {
         </>
       )}
       <form
+        className="form-section"
         onSubmit={(e) => {
           e.preventDefault();
           void addIdea();
         }}
       >
-        <div className="field-row">
+        <div className="field-pair">
           <TextInput
             id="idea-name"
             label="Idea name"
@@ -373,23 +442,37 @@ function ProductIdeas() {
             disabled={isAdding}
             required
           />
-          <Button
-            type="submit"
+          <TagPicker
+            id="idea-tags"
+            catalog={tagCatalog}
+            selected={ideaTags}
+            onChange={setIdeaTags}
             disabled={isAdding}
-            state={isAdding ? "pending" : "ready"}
-          >
-            <Button.State name="ready">Add idea</Button.State>
-            <Button.State name="pending">Adding…</Button.State>
-          </Button>
+          />
         </div>
+        <Button
+          type="submit"
+          disabled={isAdding}
+          state={isAdding ? "pending" : "ready"}
+        >
+          <Button.State name="ready">Add idea</Button.State>
+          <Button.State name="pending">Adding…</Button.State>
+        </Button>
       </form>
       <h2 id="ideas-list-heading">Ideas</h2>
       {ideas.length === 0 ? (
         <p>No ideas yet.</p>
       ) : (
-        <ul className="list" aria-labelledby="ideas-list-heading">
+        <ul className="list list--tagged" aria-labelledby="ideas-list-heading">
           {ideas.map((idea) => (
-            <li className="list-row" key={idea.id}>
+            <li
+              className={
+                editingId === idea.id
+                  ? "list-row list-row--editing"
+                  : "list-row list-row--tagged"
+              }
+              key={idea.id}
+            >
               {/* Keyed so React builds each mode's buttons fresh rather than
                   reusing one mode's `<button>` for another's mid-click — a
                   reused Edit turning into a submit button would submit the
@@ -397,21 +480,29 @@ function ProductIdeas() {
               {editingId === idea.id ? (
                 <Fragment key="editing">
                   <form
-                    className="field-row"
                     onSubmit={(e) => {
                       e.preventDefault();
                       void saveIdea(idea.id);
                     }}
                   >
-                    <TextInput
-                      id={`rename-idea-${idea.id}`}
-                      label="Rename"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      maxLength={IDEA_NAME_MAX_LENGTH}
-                      disabled={isSaving}
-                      required
-                    />
+                    <div className="field-pair">
+                      <TextInput
+                        id={`rename-idea-${idea.id}`}
+                        label="Rename"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        maxLength={IDEA_NAME_MAX_LENGTH}
+                        disabled={isSaving}
+                        required
+                      />
+                      <TagPicker
+                        id={`edit-idea-tags-${idea.id}`}
+                        catalog={tagCatalog}
+                        selected={editTags}
+                        onChange={setEditTags}
+                        disabled={isSaving}
+                      />
+                    </div>
                     <div className="button-group">
                       <Button
                         type="submit"
@@ -443,7 +534,10 @@ function ProductIdeas() {
                 </Fragment>
               ) : (
                 <Fragment key="display">
-                  <span className="list-row-name">{idea.name}</span>
+                  <div className="list-row-name">{idea.name}</div>
+                  <div className="list-row-tags">
+                    <TagList tags={idea.tags} />
+                  </div>
                   <div className="list-row-action">
                     <div className="button-group">
                       <Button
@@ -494,7 +588,6 @@ function ProductIdeas() {
           ))}
         </ul>
       )}
-
       {error && <p role="alert">{error}</p>}
 
       <p>

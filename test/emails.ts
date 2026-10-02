@@ -195,6 +195,20 @@ export const TEST_EMAILS = {
   /** Renames an Idea id that was never created; expects a 404. */
   ideasRenameNonexistent: "delivered+ideas-rename-nonexistent@resend.dev",
 
+  // --- Seam 1: PUT /api/products/:productId/ideas/:id/tags (#113) ---
+  /** Rejects a tag change from an untrusted origin, leaving the tags intact. */
+  ideasTagsUntrusted: "delivered+ideas-tags-untrusted@resend.dev",
+  /** Sets an Idea's tags, replaces them, then reads them back in the list. */
+  ideasTagsOwner: "delivered+ideas-tags-owner@resend.dev",
+  /** Sends an unknown tag name or a malformed body; expects 400s and no change. */
+  ideasTagsInvalid: "delivered+ideas-tags-invalid@resend.dev",
+  /** Owner side of the Idea tags ownership boundary check. */
+  ideasTagsOwnerA: "delivered+ideas-tags-owner-a@resend.dev",
+  /** Other User whose tag change on A's Idea must 404, not succeed. */
+  ideasTagsOwnerB: "delivered+ideas-tags-owner-b@resend.dev",
+  /** Tags an Idea id that was never created; expects a 404. */
+  ideasTagsNonexistent: "delivered+ideas-tags-nonexistent@resend.dev",
+
   // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
   // Every address below carries the `+e2e-test@` marker (issue #39): the
   // `+<scenario>` label sits ahead of it, so e.g. "e2e-happy" tags the
@@ -248,6 +262,12 @@ export const TEST_EMAILS = {
     "delivered+e2e-sign-out-from-info-page+e2e-test@resend.dev",
   /** #102: clicking Edit then Cancel backs out without saving. */
   e2eRenameIdeaCancel: "delivered+e2e-rename-idea-cancel+e2e-test@resend.dev",
+  /** #113: add an Idea with a Tag checked, see the Tag listed with it. */
+  e2eAddIdeaWithTag: "delivered+e2e-add-idea-with-tag+e2e-test@resend.dev",
+  /** #113: change an Idea's Tags via edit mode, see the new Tags listed. */
+  e2eEditIdeaTags: "delivered+e2e-edit-idea-tags+e2e-test@resend.dev",
+  /** #113: an Idea with every Tag shows "+N" on desktop and every pill on a phone. */
+  e2eIdeaTagOverflow: "delivered+e2e-idea-tag-overflow+e2e-test@resend.dev",
   /** #112: set a Product's description, see it persist across a reload, then clear it. */
   e2eProductDescription:
     "delivered+e2e-product-description+e2e-test@resend.dev",

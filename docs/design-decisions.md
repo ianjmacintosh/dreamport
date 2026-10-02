@@ -94,7 +94,35 @@ Add an entry only once a sign-off conversation resolves something repeatable
 - A row edited in place (e.g. renaming an Idea) swaps its content for a
   `.field-row` spanning the whole row. When the field needs more than one
   action (Save / Cancel / Delete), they go in a `.button-group` in the
-  field-row's button slot (decided in #102).
+  field-row's button slot (decided in #102). When the row's form has more
+  than one field (an Idea's name plus its Tags, #113), it lays them out like
+  the add form instead — a `.field-pair`, the `.button-group` below — on a
+  tinted panel (`.list-row--editing`) so it reads as one form, set apart
+  from the rows around it.
+
+- Tags are condensed, filled pills, one neutral color for every Tag;
+  per-Tag colors would be a separate decision (decided in #113, picked
+  from a six-variant prototype on branch `113-idea-tags-prototype`).
+  - In a list, an Idea's Tags get a fixed-width column between its name
+    and its actions (`.list-row--tagged`), the same width on every row, so
+    a long name never gets squeezed and the pills line up down the list.
+    The column shows as many pills as fit, then an outlined "+N" pill that
+    opens a popover with every Tag. Below 640px a row stacks name / Tags /
+    actions and shows every pill, with much more room between rows (and
+    some within one) so neighbouring Ideas don't run together.
+  - The "+N" pill is outlined, never filled like a Tag: it's a different
+    kind of thing, and a custom Tag could be named "+2".
+  - Tags are chosen with a `TagPicker`: a box shaped like a text input
+    holding the chosen pills — as many as fit, then "+N", always one line
+    tall — that opens a `Dropdown` with a checkbox item per catalog Tag.
+    Inside the box "+N" gets no hover of its own; the whole box is the
+    control.
+  - A pill too wide for its space on its own is cut off with "…"; the full
+    name stays in the popover and the dropdown.
+  - The add-Idea form puts its name and its `TagPicker` side by side
+    (`.field-pair`, 3:1), with "Add idea" below both, so the Tags read as
+    part of the form — and never as a filter on the list below.
+    `.form-section` leaves clear room between the form and that list.
 
 - An account menu (e.g. `AppNav`'s Settings/Log out) uses the `Dropdown`
   component — a generic, reusable trigger-plus-panel Component (not a

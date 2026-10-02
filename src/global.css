@@ -378,6 +378,32 @@ a.button {
   }
 }
 
+/* Two fields side by side in one form: a main field taking most of the
+   width and a narrow companion beside it (an Idea's name + its
+   `TagPicker`, #113) — 3:1. The form's button(s) go below, not in a
+   column of their own. Stacks below 640px, same breakpoint as
+   `.field-row`. Each field keeps its own label and bottom margin, so the
+   two line up label-to-label and box-to-box. */
+.field-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  column-gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .field-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* A form that closes off its own section of the page, with more room after
+   it than a paragraph gets — e.g. the add-Idea form above the "Ideas"
+   heading, which otherwise read as part of the form (#113). */
+.form-section {
+  margin-bottom: var(--space-10);
+}
+
 /* A display row with an action attached (e.g. a row's own name or value +
    its actions — a Product's name + Delete, an Idea's name + Edit/Delete,
    #90) — not `.field-row` above, which is for an input paired with its
@@ -430,6 +456,38 @@ a.button {
   grid-column: 1 / -1;
 }
 
+/* A row that also shows Tags (an Idea, #113): name | Tags | actions. The
+   Tags column is the same 14rem on every row, so pills line up down the
+   list and a row's name always gets the rest of the width — `TagList`
+   fits as many pills as that column holds, then "+N". */
+.list-row--tagged {
+  grid-template-columns: minmax(0, 1fr) 14rem auto;
+  column-gap: var(--space-4);
+}
+
+.list-row--tagged > .list-row-action {
+  grid-column: 3;
+}
+
+.list-row-tags {
+  min-width: 0;
+}
+
+/* A row swapped into a multi-field form (an Idea's name + Tags, #113) sits
+   on a tinted panel, so it reads as one form set apart from its neighbours
+   rather than as more rows. Labels switch to --color-text-on-surface: the
+   only text color that passes AA on --color-surface. */
+.list-row--editing {
+  grid-template-columns: minmax(0, 1fr);
+  padding: var(--space-4);
+  border-radius: 8px;
+  background-color: var(--color-surface);
+}
+
+.list-row--editing .input-label {
+  color: var(--color-text-on-surface);
+}
+
 /* Below 640px (same breakpoint and reasoning as `.field-row`'s own stack
    above), a row's name and actions don't reliably fit side by side — a
    three-button reveal (Edit / Delete / Cancel) alone nearly fills a phone's
@@ -441,6 +499,25 @@ a.button {
   }
 
   .list-row-action {
+    grid-column: 1;
+  }
+}
+
+/* Below 640px a tagged row stacks name / Tags / actions (every pill
+   showing, see `.tag-list`), which made neighbouring Ideas run together —
+   so a tagged list spaces its rows much further apart, and each row's own
+   parts a little further apart too (#113). */
+@media (max-width: 640px) {
+  .list--tagged {
+    row-gap: var(--space-10);
+  }
+
+  .list-row--tagged {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-4);
+  }
+
+  .list-row--tagged > .list-row-action {
     grid-column: 1;
   }
 }
@@ -878,4 +955,193 @@ a.button {
   height: 1px;
   margin: var(--space-1) 0;
   background-color: var(--color-border);
+}
+
+/* `Dropdown.CheckboxItem`'s check mark (#113). Its slot is always laid out
+   — hidden, not removed, when unchecked — so every item's label starts at
+   the same x whether it's checked or not. */
+.dropdown-item-check {
+  display: grid;
+}
+
+.dropdown-item-check[data-unchecked] {
+  visibility: hidden;
+}
+
+/* ── Components: tags ──────────────────────────────────────── */
+/* A Tag pill (#113): condensed and filled, one neutral look for every Tag —
+   per-Tag colors would be their own design decision. --color-text-on-surface
+   on --color-surface, the pairing that passes AA there. A pill too wide for
+   its box on its own gets cut off with "…" (the full name is its `title`,
+   and in `TagList`'s popover / `TagPicker`'s panel). */
+.tag {
+  min-width: 0;
+  padding: 0 var(--space-2);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text-on-surface);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The "+N" more pill: same size as a Tag but outlined, not filled — it's a
+   different kind of thing, and must never pass for a Tag (a custom Tag
+   could be named "+2"). A button in `TagList` (opens the popover); plain
+   text inside `TagPicker`'s trigger, where it gets no hover of its own. */
+.tag-more {
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: none;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+button.tag-more {
+  cursor: pointer;
+}
+
+button.tag-more:hover,
+button.tag-more[data-popup-open] {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* `FittedTags` (shared by `TagList` and `TagPicker`): one line of pills
+   that never wraps, then the more pill. The pills that didn't fit are
+   rendered but hidden (`.tag--overflow`); `.fitted-tags-measure` is an
+   invisible copy at natural widths that the fitting reads. Flexbox —
+   alignment inside a component, not page structure (AGENTS.md). */
+.fitted-tags {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.fitted-tags-row {
+  display: flex;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fitted-tags-row > .tag--overflow {
+  display: none;
+}
+
+.fitted-tags-more {
+  display: grid;
+  flex-shrink: 0;
+}
+
+.fitted-tags-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  gap: var(--space-1);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.fitted-tags-measure > * {
+  flex-shrink: 0;
+}
+
+/* `TagList` below 640px: a row's Tags have a full-width line of their own,
+   so every pill shows, wrapped (a long name wrapping inside its pill too),
+   and the more pill goes. */
+@media (max-width: 640px) {
+  .tag-list .fitted-tags-row {
+    flex-wrap: wrap;
+  }
+
+  .tag-list .fitted-tags-row > .tag--overflow {
+    display: block;
+  }
+
+  .tag-list .fitted-tags-row > .tag {
+    white-space: normal;
+  }
+
+  .tag-list .fitted-tags-more {
+    display: none;
+  }
+}
+
+/* `TagList`'s popover: every Tag, wrapped, long names included. Its panel
+   is `Dropdown`'s (`.dropdown-popup`) on purpose — one look for "a panel
+   that opened from a trigger". */
+.tag-popup {
+  max-width: 16rem;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+}
+
+.tag-popup-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.tag-popup-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag-popup-list > .tag {
+  white-space: normal;
+}
+
+/* `TagPicker`: spaced below like a text input (`.input`'s margin-bottom). */
+.tag-picker {
+  margin-bottom: var(--space-4);
+}
+
+/* The trigger is shaped like `.input` — full width, the input's own fill,
+   radius and height, content left and the chevron at the far end — so it
+   reads as a form field. Its height is the input's (one line of
+   --text-base plus .input's padding and border), and it never grows:
+   `FittedTags` keeps the pills to one line. */
+.tag-picker-trigger.button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  justify-items: stretch;
+  width: 100%;
+  min-height: calc(var(--text-base) * 1.5 + var(--space-2) * 2 + 2px);
+  padding: var(--space-1) var(--space-3);
+  background-color: var(--color-page-bg);
+  font-weight: 400;
+  text-align: left;
+}
+
+.tag-picker-trigger .dropdown-trigger-label {
+  min-width: 0;
+}
+
+/* Inside the trigger the whole box is the control: no hover of the more
+   pill's own, and the box's pointer cursor throughout. */
+.tag-picker-trigger .tag-more {
+  cursor: inherit;
+}
+
+.tag-picker-placeholder {
+  color: var(--color-text-primary);
 }

@@ -1789,6 +1789,231 @@ describe("/api/products/:productId/ideas (#99)", () => {
   });
 });
 
+/** The six starter Tags (#111), in the catalog's own alphabetical order. */
+const TAG_CATALOG = [
+  "Design",
+  "Distribution",
+  "Functionality",
+  "Pricing",
+  "Promotion",
+  "Staffing",
+];
+
+function setIdeaTags(
+  productId: string,
+  ideaId: string,
+  tags: unknown,
+  cookie?: string,
+) {
+  return fetchWorker(`/api/products/${productId}/ideas/${ideaId}/tags`, {
+    method: "PUT",
+    headers: cookie
+      ? { ...json, origin: TRUSTED_ORIGIN, cookie }
+      : { ...json, origin: TRUSTED_ORIGIN },
+    body: JSON.stringify({ tags }),
+  });
+}
+
+describe("GET /api/tags (#113)", () => {
+  it("lists the fixed Tag catalog, with no session needed", async () => {
+    const res = await fetchWorker("/api/tags");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ tags: TAG_CATALOG });
+  });
+});
+
+describe("PUT /api/products/:productId/ideas/:id/tags (#113)", () => {
+  async function withOneIdea(email: string, ideaName = "Dark mode") {
+    const cookie = await signIn(email);
+    const created = await addProduct(cookie, "A phone-scale app");
+    const { product } = (await created.json()) as {
+      product: { id: string; name: string; createdAt: string };
+    };
+    const createdIdea = await addIdea(product.id, cookie, ideaName);
+    const { idea } = (await createdIdea.json()) as {
+      idea: { id: string; name: string; createdAt: string; tags: string[] };
+    };
+    return { cookie, product, idea };
+  }
+
+  it("rejects a request with no session", async () => {
+    const res = await setIdeaTags("some-product-id", "some-idea-id", []);
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Not signed in" });
+  });
+
+  it("rejects a request from an untrusted origin, changing nothing", async () => {
+    const { cookie, product, idea } = await withOneIdea(
+      TEST_EMAILS.ideasTagsUntrusted,
+    );
+
+    const res = await fetchWorker(
+      `/api/products/${product.id}/ideas/${idea.id}/tags`,
+      {
+        method: "PUT",
+        headers: { ...json, origin: "https://evil.example.com", cookie },
+        body: JSON.stringify({ tags: ["Design"] }),
+      },
+    );
+
+    expect(res.status).toBe(403);
+    expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+      product,
+      ideas: [idea],
+    });
+  });
+
+  it("starts an Idea with no tags, sets them, replaces them, and lists them with the Idea", async () => {
+    const { cookie, product, idea } = await withOneIdea(
+      TEST_EMAILS.ideasTagsOwner,
+    );
+    expect(idea.tags).toEqual([]);
+
+    // Submitted out of order and with a duplicate; stored once each, sorted.
+    const set = await setIdeaTags(
+      product.id,
+      idea.id,
+      ["Pricing", "Design", "Pricing"],
+      cookie,
+    );
+    expect(set.status).toBe(200);
+    expect(await set.json()).toEqual({ tags: ["Design", "Pricing"] });
+    expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+      product,
+      ideas: [{ ...idea, tags: ["Design", "Pricing"] }],
+    });
+
+    // The whole set is replaced, not added to.
+    const replaced = await setIdeaTags(
+      product.id,
+      idea.id,
+      ["Staffing"],
+      cookie,
+    );
+    expect(await replaced.json()).toEqual({ tags: ["Staffing"] });
+
+    const cleared = await setIdeaTags(product.id, idea.id, [], cookie);
+    expect(await cleared.json()).toEqual({ tags: [] });
+    expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+      product,
+      ideas: [idea],
+    });
+  });
+
+  it("lists each Idea with its own tags, not another Idea's", async () => {
+    const { cookie, product, idea } = await withOneIdea(
+      TEST_EMAILS.ideasTagsOwner,
+    );
+    const second = await addIdea(product.id, cookie, "Light mode");
+    const { idea: other } = (await second.json()) as {
+      idea: { id: string; name: string; createdAt: string; tags: string[] };
+    };
+
+    await setIdeaTags(product.id, idea.id, ["Design"], cookie);
+    await setIdeaTags(product.id, other.id, ["Pricing", "Promotion"], cookie);
+
+    expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+      product,
+      ideas: [
+        { ...idea, tags: ["Design"] },
+        { ...other, tags: ["Pricing", "Promotion"] },
+      ],
+    });
+  });
+
+  it("rejects an unknown tag name or a malformed body with a 400, changing nothing", async () => {
+    const { cookie, product, idea } = await withOneIdea(
+      TEST_EMAILS.ideasTagsInvalid,
+    );
+    await setIdeaTags(product.id, idea.id, ["Design"], cookie);
+
+    for (const tags of [
+      ["Design", "Not a real tag"],
+      ["design"],
+      "Design",
+      undefined,
+      [42],
+    ]) {
+      const res = await setIdeaTags(product.id, idea.id, tags, cookie);
+      expect(res.status).toBe(400);
+    }
+
+    expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
+      product,
+      ideas: [{ ...idea, tags: ["Design"] }],
+    });
+  });
+
+  it("404s when a stranger tries to tag an Idea under another User's Product", async () => {
+    const {
+      cookie: cookieA,
+      product,
+      idea,
+    } = await withOneIdea(TEST_EMAILS.ideasTagsOwnerA, "Owner A's Idea");
+    const cookieB = await signIn(TEST_EMAILS.ideasTagsOwnerB);
+
+    const res = await setIdeaTags(product.id, idea.id, ["Design"], cookieB);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Not found" });
+
+    // B's own Product id doesn't unlock A's Idea either.
+    const created = await addProduct(cookieB, "B's own Product");
+    const { product: productB } = (await created.json()) as {
+      product: { id: string };
+    };
+    const viaOwnProduct = await setIdeaTags(
+      productB.id,
+      idea.id,
+      ["Design"],
+      cookieB,
+    );
+    expect(viaOwnProduct.status).toBe(404);
+
+    expect(await (await getIdeas(product.id, cookieA)).json()).toEqual({
+      product,
+      ideas: [idea],
+    });
+  });
+
+  it("404s when tagging a nonexistent Idea or one under a nonexistent Product", async () => {
+    const { cookie, product } = await withOneIdea(
+      TEST_EMAILS.ideasTagsNonexistent,
+    );
+
+    const noIdea = await setIdeaTags(
+      product.id,
+      "not-a-real-id",
+      ["Design"],
+      cookie,
+    );
+    expect(noIdea.status).toBe(404);
+    expect(await noIdea.json()).toEqual({ error: "Not found" });
+
+    const noProduct = await setIdeaTags(
+      "not-a-real-product",
+      "not-a-real-idea",
+      ["Design"],
+      cookie,
+    );
+    expect(noProduct.status).toBe(404);
+    expect(await noProduct.json()).toEqual({ error: "Not found" });
+  });
+
+  it("keeps an Idea's tags across a rename, and returns them with it", async () => {
+    const { cookie, product, idea } = await withOneIdea(
+      TEST_EMAILS.ideasTagsOwner,
+    );
+    await setIdeaTags(product.id, idea.id, ["Design"], cookie);
+
+    const res = await renameIdea(product.id, idea.id, "Light mode", cookie);
+    expect(await res.json()).toEqual({
+      idea: { ...idea, name: "Light mode", tags: ["Design"] },
+    });
+  });
+});
+
 describe("other /api/* paths", () => {
   it("are owned by the Worker and 404 as JSON", async () => {
     const res = await fetchWorker("/api/does-not-exist");
