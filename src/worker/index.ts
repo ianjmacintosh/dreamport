@@ -33,6 +33,7 @@ import {
   listIdeas,
   renameIdea,
 } from "./ideas";
+import { listTags, listTagsByIdea, setIdeaTags } from "./tags";
 import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
@@ -474,8 +475,17 @@ export function createApp(deps: AppDeps = {}) {
       return c.json({ error: "Not found" }, 404);
     }
 
-    const ideas = await listIdeas(c.env.DB, product.id);
-    return c.json({ product, ideas });
+    const [ideas, tagsByIdea] = await Promise.all([
+      listIdeas(c.env.DB, product.id),
+      listTagsByIdea(c.env.DB, product.id),
+    ]);
+    return c.json({
+      product,
+      ideas: ideas.map((idea) => ({
+        ...idea,
+        tags: tagsByIdea.get(idea.id) ?? [],
+      })),
+    });
   });
 
   app.post("/api/products/:productId/ideas", async (c) => {
@@ -510,7 +520,9 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     const idea = await createIdea(c.env.DB, product.id, name);
-    return c.json({ idea }, 201);
+    // A new Idea has no Tags yet (#113) — the client sets them with a
+    // follow-up PUT — but carries the same shape the list response does.
+    return c.json({ idea: { ...idea, tags: [] } }, 201);
   });
 
   /**
@@ -601,7 +613,81 @@ export function createApp(deps: AppDeps = {}) {
       return c.json({ error: "Not found" }, 404);
     }
 
-    return c.json({ idea }, 200);
+    // Same shape the list response gives an Idea (#113), so the client can
+    // swap the renamed Idea in without dropping its Tags.
+    const tagsByIdea = await listTagsByIdea(c.env.DB, product.id);
+    return c.json(
+      { idea: { ...idea, tags: tagsByIdea.get(idea.id) ?? [] } },
+      200,
+    );
+  });
+
+  /**
+   * Issue #113: the fixed Tag catalog. No session needed — it's the same
+   * Dreamport-curated list for everyone, nothing private in it.
+   */
+  app.get("/api/tags", async (c) => {
+    return c.json({ tags: await listTags(c.env.DB) });
+  });
+
+  /**
+   * Issue #113: replace one Idea's whole Tag set. Same origin check,
+   * session gate, and `getProduct` ownership check as the rename route
+   * above; zero Ideas matched reads as 404, never 403, for the same reason.
+   * `tags` must be an array of names that all exist in the catalog —
+   * anything else is a 400 and changes nothing. Responds with the stored
+   * set (deduplicated, alphabetical).
+   */
+  app.put("/api/products/:productId/ideas/:id/tags", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const body = await c.req.json().catch(() => null);
+    const submitted: unknown =
+      body && typeof body === "object" ? body.tags : undefined;
+    if (
+      !Array.isArray(submitted) ||
+      !submitted.every((tag) => typeof tag === "string")
+    ) {
+      return c.json({ error: "tags must be an array of tag names" }, 400);
+    }
+    const catalog = new Set(await listTags(c.env.DB));
+    const unknown = submitted.filter((tag) => !catalog.has(tag));
+    if (unknown.length > 0) {
+      return c.json({ error: `Unknown tags: ${unknown.join(", ")}` }, 400);
+    }
+
+    const tags = await setIdeaTags(
+      c.env.DB,
+      product.id,
+      c.req.param("id"),
+      submitted,
+    );
+    if (!tags) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json({ tags }, 200);
   });
 
   /**

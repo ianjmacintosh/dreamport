@@ -275,3 +275,84 @@ test("editing or confirming one Idea row leaves every other row's layout unchang
     await row.getByRole("button", { name: "Cancel" }).click();
   }
 });
+
+// Issue #113: check a Tag while adding an Idea, see it listed with the Idea.
+test("sign in, add a Product, add an Idea with a Tag checked, and see the Tag listed", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eAddIdeaWithTag;
+  const productName = `Tag add product ${Date.now()}`;
+  const ideaName = `Tag add idea ${Date.now()}`;
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("link", { name: productName }).click();
+  await expect(page).toHaveURL(/\/app\/products\/.+/);
+
+  await page.getByLabel("Idea name").fill(ideaName);
+  await page.getByRole("checkbox", { name: "Pricing" }).check();
+  await page.getByRole("button", { name: "Add idea" }).click();
+
+  const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
+  await expect(ideaListItem.getByText("Tags: Pricing")).toBeVisible();
+  // The add form resets for the next Idea, Tags included.
+  await expect(
+    page.getByRole("checkbox", { name: "Pricing" }),
+  ).not.toBeChecked();
+
+  // Persisted, not just local state: survives a reload.
+  await page.reload();
+  await expect(
+    page
+      .locator("li", { has: page.getByText(ideaName) })
+      .getByText("Tags: Pricing"),
+  ).toBeVisible();
+});
+
+// Issue #113: change an Idea's Tags via its edit mode.
+test("sign in, add a Product, add an Idea, change its Tags in edit mode, and see the new Tags", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eEditIdeaTags;
+  const productName = `Tag edit product ${Date.now()}`;
+  const ideaName = `Tag edit idea ${Date.now()}`;
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("link", { name: productName }).click();
+  await expect(page).toHaveURL(/\/app\/products\/.+/);
+
+  await page.getByLabel("Idea name").fill(ideaName);
+  await page.getByRole("checkbox", { name: "Design" }).check();
+  await page.getByRole("button", { name: "Add idea" }).click();
+
+  const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
+  await expect(ideaListItem.getByText("Tags: Design")).toBeVisible();
+
+  await ideaListItem.getByRole("button", { name: "Edit" }).click();
+  const editForm = page.locator("li form");
+  // Edit mode starts from the Idea's current Tags.
+  await expect(
+    editForm.getByRole("checkbox", { name: "Design" }),
+  ).toBeChecked();
+  await editForm.getByRole("checkbox", { name: "Design" }).uncheck();
+  await editForm.getByRole("checkbox", { name: "Staffing" }).check();
+  await editForm.getByRole("checkbox", { name: "Promotion" }).check();
+  await editForm.getByRole("button", { name: "Save" }).click();
+
+  await expect(editForm).not.toBeVisible();
+  await expect(
+    ideaListItem.getByText("Tags: Promotion, Staffing"),
+  ).toBeVisible();
+
+  await page.reload();
+  await expect(
+    page
+      .locator("li", { has: page.getByText(ideaName) })
+      .getByText("Tags: Promotion, Staffing"),
+  ).toBeVisible();
+});

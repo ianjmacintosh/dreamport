@@ -38,6 +38,10 @@ list of Ideas per Product, `productId` cascading on delete the same way
 `products` (issue #112). Existing rows get `NULL`, the "no description yet"
 state.
 
+`0006_idea_tags.sql` adds the Tag catalog (issue #113): a `tags` table keyed
+by the Tag's own name, seeded with the six starter Tags, plus an `idea_tags`
+join table cascading off `ideas` on delete.
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order
