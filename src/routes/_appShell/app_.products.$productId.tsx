@@ -3,6 +3,8 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
 import Link from "../../components/Link";
+import TagList from "../../components/TagList";
+import TagPicker from "../../components/TagPicker";
 import TextInput from "../../components/TextInput";
 
 /**
@@ -93,7 +95,7 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
     // (not signed in, not this User's Product, offline, a transient error)
     // redirects to `/app` rather than a dedicated not-found page.
     // The Tag catalog (#113) is fetched alongside — it's needed for the
-    // add-Idea form's checkboxes, and goes through the same redirect.
+    // add-Idea form's `TagPicker`, and goes through the same redirect.
     const [res, tagsRes] = await Promise.all([
       fetch(`/api/products/${params.productId}/ideas`).catch(() => null),
       fetch("/api/tags").catch(() => null),
@@ -110,11 +112,6 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
   },
   component: ProductIdeas,
 });
-
-/** `tags` with `tag` added (`checked`) or removed — a Tag checkbox's change. */
-function toggleTag(tags: string[], tag: string, checked: boolean): string[] {
-  return checked ? [...tags, tag] : tags.filter((t) => t !== tag);
-}
 
 /** PUT an Idea's whole Tag set (#113); the stored set, or `null` on failure. */
 async function putIdeaTags(
@@ -152,9 +149,10 @@ const CONNECTION_FAILED =
  *
  * Composed from `TextInput`/`Button` plus heading/paragraph primitives in
  * plain document order, same minimal treatment `/app`'s own Products list
- * had at #88. The add-Idea field and its button sit
- * in `.field-row`, the same side-by-side primitive `/app`'s own add-Product
- * form uses. The list itself is a real `<ul>`/`<li>` (no class on either) —
+ * had at #88. The add-Idea form puts its name field and its `TagPicker` side
+ * by side (`.field-pair`, 3:1), then "Add idea" below both, so the Tags read
+ * as part of the form (#113); `.form-section` sets it apart from the list
+ * under it. The list itself is a real `<ul>`/`<li>` —
  * free correctness, not design-system elaboration, the same tier as
  * `<h1>` over a styled `<div>` — with `aria-labelledby` pointing at its own
  * "Ideas" `<h2>` rather than the page's `<h1>`, so it's announced as
@@ -168,9 +166,10 @@ const CONNECTION_FAILED =
  * question, tracked in #109.
  *
  * Rename (#102) swaps a row in place, one row at a time. Resting, a row's
- * actions are Edit / Delete. Editing, its name becomes a `.field-row` — a
- * pre-filled "Rename" `TextInput` with Save / Cancel / Delete as its attached
- * `.button-group`. Clicking Delete (from either)
+ * actions are Edit / Delete. Editing, the row becomes a form laid out like the
+ * add form (#113) — a pre-filled "Rename" `TextInput` beside a `TagPicker`,
+ * then Save / Cancel / Delete as a `.button-group` — on a tinted panel
+ * (`.list-row--editing`). Clicking Delete (from either)
  * shows Edit / Delete / Cancel — the confirming button keeps the action's own
  * verb, "Delete," rather than a generic "Confirm" (#101).
  *
@@ -180,13 +179,10 @@ const CONNECTION_FAILED =
  * in-place edit shape an Idea row's rename uses. Single-line on purpose:
  * no multi-line text component exists yet (see #112).
  *
- * Tags (#113): the add-Idea form and an Idea's edit mode each carry a bare
- * `<fieldset>` of checkboxes, one per catalog Tag, and a resting row shows
- * its Idea's Tags as plain text after the name. Deliberately unstyled — tag
- * display gets its real visual treatment in the polish slice (#115). Tags
- * are saved with their own PUT, after the Idea's create (POST) or rename
- * (PATCH) succeeds. The fieldset is written out in both places rather than
- * pulled into a component — no new component without sign-off (AGENTS.md).
+ * Tags (#113): a resting row (`.list-row--tagged`) shows its Idea's Tags as
+ * pills (`TagList`) in a fixed-width column between the name and the
+ * actions — as many as fit, then "+N". Tags are saved with their own PUT,
+ * after the Idea's create (POST) or rename (PATCH) succeeds.
  */
 function ProductIdeas() {
   const {
@@ -430,12 +426,13 @@ function ProductIdeas() {
         </>
       )}
       <form
+        className="form-section"
         onSubmit={(e) => {
           e.preventDefault();
           void addIdea();
         }}
       >
-        <div className="field-row">
+        <div className="field-pair">
           <TextInput
             id="idea-name"
             label="Idea name"
@@ -445,38 +442,37 @@ function ProductIdeas() {
             disabled={isAdding}
             required
           />
-          <Button
-            type="submit"
+          <TagPicker
+            id="idea-tags"
+            catalog={tagCatalog}
+            selected={ideaTags}
+            onChange={setIdeaTags}
             disabled={isAdding}
-            state={isAdding ? "pending" : "ready"}
-          >
-            <Button.State name="ready">Add idea</Button.State>
-            <Button.State name="pending">Adding…</Button.State>
-          </Button>
+          />
         </div>
-        <fieldset disabled={isAdding}>
-          <legend>Tags</legend>
-          {tagCatalog.map((tag) => (
-            <label key={tag}>
-              <input
-                type="checkbox"
-                checked={ideaTags.includes(tag)}
-                onChange={(e) =>
-                  setIdeaTags((prev) => toggleTag(prev, tag, e.target.checked))
-                }
-              />{" "}
-              {tag}{" "}
-            </label>
-          ))}
-        </fieldset>
+        <Button
+          type="submit"
+          disabled={isAdding}
+          state={isAdding ? "pending" : "ready"}
+        >
+          <Button.State name="ready">Add idea</Button.State>
+          <Button.State name="pending">Adding…</Button.State>
+        </Button>
       </form>
       <h2 id="ideas-list-heading">Ideas</h2>
       {ideas.length === 0 ? (
         <p>No ideas yet.</p>
       ) : (
-        <ul className="list" aria-labelledby="ideas-list-heading">
+        <ul className="list list--tagged" aria-labelledby="ideas-list-heading">
           {ideas.map((idea) => (
-            <li className="list-row" key={idea.id}>
+            <li
+              className={
+                editingId === idea.id
+                  ? "list-row list-row--editing"
+                  : "list-row list-row--tagged"
+              }
+              key={idea.id}
+            >
               {/* Keyed so React builds each mode's buttons fresh rather than
                   reusing one mode's `<button>` for another's mid-click — a
                   reused Edit turning into a submit button would submit the
@@ -489,7 +485,7 @@ function ProductIdeas() {
                       void saveIdea(idea.id);
                     }}
                   >
-                    <div className="field-row">
+                    <div className="field-pair">
                       <TextInput
                         id={`rename-idea-${idea.id}`}
                         label="Rename"
@@ -499,64 +495,49 @@ function ProductIdeas() {
                         disabled={isSaving}
                         required
                       />
-                      <div className="button-group">
-                        <Button
-                          type="submit"
-                          disabled={isSaving}
-                          state={isSaving ? "saving" : "ready"}
-                        >
-                          <Button.State name="ready">Save</Button.State>
-                          <Button.State name="saving">Saving…</Button.State>
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          disabled={isSaving}
-                          onClick={() => {
-                            setError("");
-                            setEditingId(null);
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          disabled={isSaving}
-                          onClick={() => startConfirmingDelete(idea.id)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
+                      <TagPicker
+                        id={`edit-idea-tags-${idea.id}`}
+                        catalog={tagCatalog}
+                        selected={editTags}
+                        onChange={setEditTags}
+                        disabled={isSaving}
+                      />
                     </div>
-                    <fieldset disabled={isSaving}>
-                      <legend>Tags</legend>
-                      {tagCatalog.map((tag) => (
-                        <label key={tag}>
-                          <input
-                            type="checkbox"
-                            checked={editTags.includes(tag)}
-                            onChange={(e) =>
-                              setEditTags((prev) =>
-                                toggleTag(prev, tag, e.target.checked),
-                              )
-                            }
-                          />{" "}
-                          {tag}{" "}
-                        </label>
-                      ))}
-                    </fieldset>
+                    <div className="button-group">
+                      <Button
+                        type="submit"
+                        disabled={isSaving}
+                        state={isSaving ? "saving" : "ready"}
+                      >
+                        <Button.State name="ready">Save</Button.State>
+                        <Button.State name="saving">Saving…</Button.State>
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={isSaving}
+                        onClick={() => {
+                          setError("");
+                          setEditingId(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={isSaving}
+                        onClick={() => startConfirmingDelete(idea.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </form>
                 </Fragment>
               ) : (
                 <Fragment key="display">
-                  <span className="list-row-name">
-                    {idea.name}
-                    {idea.tags.length > 0 && (
-                      <>
-                        {" "}
-                        <span>Tags: {idea.tags.join(", ")}</span>
-                      </>
-                    )}
-                  </span>
+                  <div className="list-row-name">{idea.name}</div>
+                  <div className="list-row-tags">
+                    <TagList tags={idea.tags} />
+                  </div>
                   <div className="list-row-action">
                     <div className="button-group">
                       <Button
@@ -607,7 +588,6 @@ function ProductIdeas() {
           ))}
         </ul>
       )}
-
       {error && <p role="alert">{error}</p>}
 
       <p>

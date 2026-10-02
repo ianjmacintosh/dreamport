@@ -266,6 +266,8 @@ export const TEST_EMAILS = {
   e2eAddIdeaWithTag: "delivered+e2e-add-idea-with-tag+e2e-test@resend.dev",
   /** #113: change an Idea's Tags via edit mode, see the new Tags listed. */
   e2eEditIdeaTags: "delivered+e2e-edit-idea-tags+e2e-test@resend.dev",
+  /** #113: an Idea with every Tag shows "+N" on desktop and every pill on a phone. */
+  e2eIdeaTagOverflow: "delivered+e2e-idea-tag-overflow+e2e-test@resend.dev",
   /** #112: set a Product's description, see it persist across a reload, then clear it. */
   e2eProductDescription:
     "delivered+e2e-product-description+e2e-test@resend.dev",

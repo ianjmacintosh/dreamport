@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
+import { CheckIcon } from "@phosphor-icons/react";
 
 import Link from "../Link";
 
@@ -21,8 +22,15 @@ interface DropdownProps {
   /** An extra class on the trigger, for a caller placing it in its own
    * layout (e.g. `AppNav` showing one trigger per breakpoint). */
   className?: string;
-  /** The panel's contents: `Dropdown.Item`, `Dropdown.LinkItem` and
-   * `Dropdown.Separator`, in the order they should appear. */
+  /** Which trigger edge the panel lines up with. `"end"` (the default)
+   * suits a trigger at the right of a bar; `"start"` one at the left of a
+   * form (e.g. `TagPicker`'s). */
+  align?: "start" | "end";
+  /** Disable the trigger, e.g. while its form is submitting. */
+  disabled?: boolean;
+  /** The panel's contents: `Dropdown.Item`, `Dropdown.LinkItem`,
+   * `Dropdown.CheckboxItem` and `Dropdown.Separator`, in the order they
+   * should appear. */
   children: ReactNode;
 }
 
@@ -40,6 +48,8 @@ export function Dropdown({
   chevron = true,
   variant = "secondary",
   className,
+  align = "end",
+  disabled,
   children,
 }: DropdownProps) {
   const classes = [
@@ -52,16 +62,20 @@ export function Dropdown({
     .join(" ");
   return (
     <Menu.Root>
-      <Menu.Trigger className={classes} aria-label={ariaLabel}>
+      <Menu.Trigger
+        className={classes}
+        aria-label={ariaLabel}
+        disabled={disabled}
+      >
         <span className="dropdown-trigger-label">{label}</span>
         {chevron && <DropdownChevron />}
       </Menu.Trigger>
       <Menu.Portal>
-        {/* Aligned to the trigger's end edge so a trigger sitting at the
-            right of a bar opens its panel inward, not off-screen. */}
+        {/* Aligned to the trigger's end edge by default so a trigger sitting
+            at the right of a bar opens its panel inward, not off-screen. */}
         <Menu.Positioner
           className="dropdown-positioner"
-          align="end"
+          align={align}
           sideOffset={8}
         >
           <Menu.Popup className="dropdown-popup">{children}</Menu.Popup>
@@ -154,6 +168,39 @@ function DropdownLinkItem({ href, current, children }: DropdownLinkItemProps) {
   );
 }
 
+interface DropdownCheckboxItemProps {
+  checked: boolean;
+  /** Called with the new checked state, by click or by keyboard. */
+  onCheckedChange: (checked: boolean) => void;
+  children: ReactNode;
+}
+
+/**
+ * An on/off choice in the panel (e.g. one Tag in `TagPicker`, #113). Unlike
+ * `Dropdown.Item`, choosing it leaves the panel open, so several can be
+ * toggled in one visit. The check mark's slot is always there, empty when
+ * unchecked, so labels line up whether or not they're checked.
+ */
+function DropdownCheckboxItem({
+  checked,
+  onCheckedChange,
+  children,
+}: DropdownCheckboxItemProps) {
+  return (
+    <Menu.CheckboxItem
+      className="dropdown-item"
+      checked={checked}
+      onCheckedChange={(next) => onCheckedChange(next)}
+      closeOnClick={false}
+    >
+      <Menu.CheckboxItemIndicator className="dropdown-item-check" keepMounted>
+        <CheckIcon aria-hidden="true" />
+      </Menu.CheckboxItemIndicator>
+      {children}
+    </Menu.CheckboxItem>
+  );
+}
+
 /** A divider between groups of items. */
 function DropdownSeparator() {
   return <Menu.Separator className="dropdown-separator" />;
@@ -180,6 +227,7 @@ function DropdownGroup({ label, children }: DropdownGroupProps) {
 
 Dropdown.Item = DropdownItem;
 Dropdown.LinkItem = DropdownLinkItem;
+Dropdown.CheckboxItem = DropdownCheckboxItem;
 Dropdown.Separator = DropdownSeparator;
 Dropdown.Group = DropdownGroup;
 

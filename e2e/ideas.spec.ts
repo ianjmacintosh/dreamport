@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 
 import { TEST_EMAILS } from "../test/emails";
 import { expectOtherRowsUnaffected, LAYOUT_WIDTHS } from "./list-rows";
@@ -276,8 +276,42 @@ test("editing or confirming one Idea row leaves every other row's layout unchang
   }
 });
 
-// Issue #113: check a Tag while adding an Idea, see it listed with the Idea.
-test("sign in, add a Product, add an Idea with a Tag checked, and see the Tag listed", async ({
+/**
+ * A `TagPicker`'s trigger inside `scope` (#113). Its accessible name says
+ * what's chosen — "Tags: Design, Pricing", or "Tags: none chosen".
+ */
+function tagPickerTrigger(scope: Locator): Locator {
+  return scope.getByRole("button", { name: /^Tags: / });
+}
+
+/**
+ * Toggle Tags in a `TagPicker` (#113): open its Dropdown from the trigger
+ * inside `scope`, click each named checkbox item (the panel stays open
+ * between clicks), then close it with Escape.
+ */
+async function toggleTags(
+  page: Page,
+  scope: Locator,
+  tags: string[],
+): Promise<void> {
+  await tagPickerTrigger(scope).click();
+  for (const tag of tags) {
+    await page.getByRole("menuitemcheckbox", { name: tag }).click();
+  }
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).not.toBeVisible();
+}
+
+/** The pills in an Idea row's resting `TagList`. */
+function restingTags(page: Page, ideaName: string): Locator {
+  return page
+    .locator("li", { has: page.getByText(ideaName) })
+    .getByRole("list", { name: "Tags", exact: true })
+    .getByRole("listitem");
+}
+
+// Issue #113: choose a Tag while adding an Idea, see it as a pill on the Idea.
+test("sign in, add a Product, add an Idea with a Tag, and see the Tag listed", async ({
   page,
 }) => {
   const email = TEST_EMAILS.e2eAddIdeaWithTag;
@@ -291,24 +325,22 @@ test("sign in, add a Product, add an Idea with a Tag checked, and see the Tag li
   await page.getByRole("link", { name: productName }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+/);
 
+  const addForm = page.locator("form", { has: page.getByLabel("Idea name") });
   await page.getByLabel("Idea name").fill(ideaName);
-  await page.getByRole("checkbox", { name: "Pricing" }).check();
+  await toggleTags(page, addForm, ["Pricing"]);
+  // The chosen Tag shows in the form before submitting.
+  await expect(tagPickerTrigger(addForm)).toHaveAccessibleName("Tags: Pricing");
   await page.getByRole("button", { name: "Add idea" }).click();
 
-  const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
-  await expect(ideaListItem.getByText("Tags: Pricing")).toBeVisible();
+  await expect(restingTags(page, ideaName)).toHaveText(["Pricing"]);
   // The add form resets for the next Idea, Tags included.
-  await expect(
-    page.getByRole("checkbox", { name: "Pricing" }),
-  ).not.toBeChecked();
+  await expect(tagPickerTrigger(addForm)).toHaveAccessibleName(
+    "Tags: none chosen",
+  );
 
   // Persisted, not just local state: survives a reload.
   await page.reload();
-  await expect(
-    page
-      .locator("li", { has: page.getByText(ideaName) })
-      .getByText("Tags: Pricing"),
-  ).toBeVisible();
+  await expect(restingTags(page, ideaName)).toHaveText(["Pricing"]);
 });
 
 // Issue #113: change an Idea's Tags via its edit mode.
@@ -326,33 +358,87 @@ test("sign in, add a Product, add an Idea, change its Tags in edit mode, and see
   await page.getByRole("link", { name: productName }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+/);
 
+  const addForm = page.locator("form", { has: page.getByLabel("Idea name") });
   await page.getByLabel("Idea name").fill(ideaName);
-  await page.getByRole("checkbox", { name: "Design" }).check();
+  await toggleTags(page, addForm, ["Design"]);
   await page.getByRole("button", { name: "Add idea" }).click();
+  await expect(restingTags(page, ideaName)).toHaveText(["Design"]);
 
   const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
-  await expect(ideaListItem.getByText("Tags: Design")).toBeVisible();
-
   await ideaListItem.getByRole("button", { name: "Edit" }).click();
   const editForm = page.locator("li form");
   // Edit mode starts from the Idea's current Tags.
-  await expect(
-    editForm.getByRole("checkbox", { name: "Design" }),
-  ).toBeChecked();
-  await editForm.getByRole("checkbox", { name: "Design" }).uncheck();
-  await editForm.getByRole("checkbox", { name: "Staffing" }).check();
-  await editForm.getByRole("checkbox", { name: "Promotion" }).check();
+  await expect(tagPickerTrigger(editForm)).toHaveAccessibleName("Tags: Design");
+  await toggleTags(page, editForm, ["Design", "Staffing", "Promotion"]);
   await editForm.getByRole("button", { name: "Save" }).click();
 
   await expect(editForm).not.toBeVisible();
-  await expect(
-    ideaListItem.getByText("Tags: Promotion, Staffing"),
-  ).toBeVisible();
+  // Catalog (alphabetical) order, not the order they were picked in.
+  await expect(restingTags(page, ideaName)).toHaveText([
+    "Promotion",
+    "Staffing",
+  ]);
 
   await page.reload();
-  await expect(
-    page
-      .locator("li", { has: page.getByText(ideaName) })
-      .getByText("Tags: Promotion, Staffing"),
-  ).toBeVisible();
+  await expect(restingTags(page, ideaName)).toHaveText([
+    "Promotion",
+    "Staffing",
+  ]);
+});
+
+// Issue #113: Tags that don't fit. On desktop a row's Tag column and the
+// `TagPicker` box each stay one line — as many pills as fit, then "+N"; a
+// row's "+N" opens a popover with every Tag. On a phone a row shows every
+// pill instead.
+test("an Idea with every Tag shows +N on desktop and every pill on a phone", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eIdeaTagOverflow;
+  const productName = `Tag overflow product ${Date.now()}`;
+  const ideaName = `Tag overflow idea ${Date.now()}`;
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("link", { name: productName }).click();
+  await expect(page).toHaveURL(/\/app\/products\/.+/);
+
+  const addForm = page.locator("form", { has: page.getByLabel("Idea name") });
+  await page.getByLabel("Idea name").fill(ideaName);
+  await tagPickerTrigger(addForm).click();
+  const catalog = await page.getByRole("menuitemcheckbox").allTextContents();
+  expect(catalog.length).toBeGreaterThan(3);
+  for (const tag of catalog) {
+    await page.getByRole("menuitemcheckbox", { name: tag }).click();
+  }
+  await page.keyboard.press("Escape");
+
+  // Every Tag chosen, yet the box stays the name field's height: one line.
+  const nameBox = await page.getByLabel("Idea name").boundingBox();
+  const pickerBox = await tagPickerTrigger(addForm).boundingBox();
+  expect(Math.round(pickerBox!.height)).toBe(Math.round(nameBox!.height));
+
+  await page.getByRole("button", { name: "Add idea" }).click();
+
+  const row = page.locator("li", { has: page.getByText(ideaName) });
+  const more = row.getByRole("button", { name: /^Show \d+ more tags?$/ });
+  await expect(more).toBeVisible();
+  // The pills shown plus the ones "+N" stands for are every Tag.
+  const shown = await restingTags(page, ideaName).count();
+  expect(shown).toBeGreaterThan(0);
+  await expect(more).toHaveAccessibleName(
+    `Show ${catalog.length - shown} more tags`,
+  );
+  await more.click();
+  await expect(page.getByRole("dialog").getByRole("listitem")).toHaveText(
+    catalog,
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+
+  await page.setViewportSize({ width: 375, height: 900 });
+  await expect(restingTags(page, ideaName)).toHaveText(catalog);
+  await expect(more).not.toBeVisible();
 });

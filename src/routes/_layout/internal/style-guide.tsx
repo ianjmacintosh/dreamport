@@ -8,6 +8,8 @@ import Dropdown from "../../../components/Dropdown";
 import Footer from "../../../components/Footer";
 import Header from "../../../components/Header";
 import Link from "../../../components/Link";
+import TagList from "../../../components/TagList";
+import TagPicker from "../../../components/TagPicker";
 import TextInput from "../../../components/TextInput";
 
 import "./style-guide.css";
@@ -28,6 +30,25 @@ function Snippet({ code }: { code: string }) {
     <pre className="sg-snippet">
       <code>{code}</code>
     </pre>
+  );
+}
+
+function TagPickerDemo() {
+  const [tags, setTags] = useState<string[]>(["Pricing"]);
+  return (
+    <TagPicker
+      id="sg-tag-picker"
+      catalog={[
+        "Design",
+        "Distribution",
+        "Functionality",
+        "Pricing",
+        "Promotion",
+        "Staffing",
+      ]}
+      selected={tags}
+      onChange={setTags}
+    />
   );
 }
 
@@ -154,6 +175,7 @@ function StyleGuide() {
         <a href="#footers">Footers</a>
         <a href="#text-inputs">Text inputs</a>
         <a href="#field-row">Field with action</a>
+        <a href="#tags">Tags</a>
         <a href="#list-row">Row with action</a>
         <a href="#turnstile-container">Turnstile container</a>
         <a href="#form-shell">Form shell</a>
@@ -482,8 +504,12 @@ function StyleGuide() {
           <code>variant</code> picks its look, like <code>Button</code>&apos;s —{" "}
           <code>"secondary"</code> by default, <code>"nav"</code> on the header
           bar. The panel aligns to the trigger&apos;s end edge so a trigger at
-          the right of a bar opens inward. Open it with the keyboard (Enter,
-          then the arrow keys) to see the item highlight, which is the same for
+          the right of a bar opens inward; pass <code>align="start"</code> for a
+          trigger at the left of a form. For on/off choices, fill it with{" "}
+          <code>&lt;Dropdown.CheckboxItem checked onCheckedChange&gt;</code>{" "}
+          instead — the panel stays open while they&apos;re toggled (see{" "}
+          <code>TagPicker</code> below). Open it with the keyboard (Enter, then
+          the arrow keys) to see the item highlight, which is the same for
           pointer and keyboard.
         </p>
       </Section>
@@ -597,6 +623,76 @@ function StyleGuide() {
           button's own widest label (e.g. "Verifying you're human…") was
           squeezing the input down to almost nothing on a narrow screen
           otherwise (#90); resize the window to see it.
+        </p>
+      </Section>
+
+      <Section id="tags" label="Tags">
+        <form className="field-pair" onSubmit={(e) => e.preventDefault()}>
+          <TextInput id="sg-idea-name" label="Idea name" />
+          <TagPickerDemo />
+        </form>
+        <Snippet
+          code={`<div className="field-pair">\n  <TextInput id="idea-name" label="Idea name" ... />\n  <TagPicker\n    id="idea-tags"\n    catalog={tagCatalog}\n    selected={tags}\n    onChange={setTags}\n  />\n</div>`}
+        />
+        <ul className="list list--tagged">
+          <li className="list-row list-row--tagged">
+            <div className="list-row-name">Onboarding checklist</div>
+            <div className="list-row-tags">
+              <TagList tags={["Design", "Pricing"]} />
+            </div>
+            <div className="list-row-action">
+              <Button variant="secondary">Edit</Button>
+            </div>
+          </li>
+          <li className="list-row list-row--tagged">
+            <div className="list-row-name">
+              An Idea with more Tags than its column holds
+            </div>
+            <div className="list-row-tags">
+              <TagList
+                tags={[
+                  "Design",
+                  "Distribution",
+                  "Functionality",
+                  "Pricing",
+                  "Promotion",
+                  "Staffing",
+                ]}
+              />
+            </div>
+            <div className="list-row-action">
+              <Button variant="secondary">Edit</Button>
+            </div>
+          </li>
+        </ul>
+        <Snippet
+          code={`<ul className="list list--tagged">\n  <li className="list-row list-row--tagged">\n    <div className="list-row-name">{idea.name}</div>\n    <div className="list-row-tags">\n      <TagList tags={idea.tags} />\n    </div>\n    <div className="list-row-action">...</div>\n  </li>\n</ul>`}
+        />
+        <p className="sg-note">
+          A Tag is a condensed, filled pill — one neutral look for every Tag.
+          The outlined &ldquo;+N&rdquo; pill stands for the Tags that
+          didn&apos;t fit; it&apos;s outlined so it can never pass for a Tag.{" "}
+          <code>&lt;TagList&gt;</code> shows an Idea&apos;s Tags on one line: as
+          many as fit, then &ldquo;+N&rdquo;, a button opening a popover with
+          every Tag. Below 640px it shows every pill, wrapped, instead. A pill
+          too wide on its own is cut off with &ldquo;…&rdquo;.{" "}
+          <code>&lt;TagPicker&gt;</code> is the form field for choosing them: a
+          box shaped like a text input, always one line tall, holding the chosen
+          pills the same way (its &ldquo;+N&rdquo; is plain text — the whole box
+          opens the <code>Dropdown</code> of checkbox items). It isn&apos;t a
+          native form control — the form holds <code>selected</code> and sends
+          it on submit.
+        </p>
+        <p className="sg-note">
+          <code>.field-pair</code> puts a main field and a narrow companion side
+          by side, 3:1, the form&apos;s button(s) below (stacked below 640px).{" "}
+          <code>.list--tagged</code>/<code>.list-row--tagged</code> give a row a
+          fixed 14rem Tags column (<code>.list-row-tags</code>) between its name
+          and its actions, so pills line up down the list; below 640px a row
+          stacks name / Tags / actions with more room between rows. A tagged row
+          edited in place takes <code>.list-row--editing</code>, a tinted panel.{" "}
+          <code>.form-section</code> leaves a section&apos;s worth of room after
+          a form, e.g. before the list it adds to (#113).
         </p>
       </Section>
 
