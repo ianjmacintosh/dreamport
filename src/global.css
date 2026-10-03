@@ -287,8 +287,8 @@ a.button {
   max-width: 40rem;
 }
 
-/* Two or more related actions presented side by side (e.g. "Verify and
-   sign in" / "Request a new code") — Grid so the gap between them comes
+/* Two or more related actions presented side by side (e.g. an Idea row's
+   Save / Cancel / Delete) — Grid so the gap between them comes
    from the spacing scale rather than relying on inline-flex's incidental
    whitespace. */
 .button-group {
@@ -569,6 +569,52 @@ a.button {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   margin-top: var(--space-1);
+}
+
+/* ── Primitives: one-time code input ──────────────────────── */
+/* Base UI's `OTPField`, one box per digit (#128). Each box is an `.input`
+   too (`className="input otp-field-input"`), so it shares the text input's
+   border, radius, fill, hover and focus — only the box's own shape and its
+   large monospaced digit are set here. The columns shrink below their
+   2.75rem width when the row runs out of room (a 320px phone), instead of
+   overflowing. */
+.otp-field {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 2.75rem));
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.otp-field-input {
+  min-width: 0;
+  height: 3.25rem;
+  padding: 0;
+  margin-bottom: 0;
+  caret-color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  text-align: center;
+}
+
+/* A filled box keeps `.input`'s hover border, so the boxes still to fill
+   stand out from the ones already done. */
+.otp-field-input[data-filled] {
+  border-color: var(--color-text-muted);
+}
+
+.otp-field-input[data-filled]:focus-visible {
+  border-color: var(--color-accent);
+}
+
+/* Base UI selects a box's digit whenever the box takes focus, so the next
+   keystroke overwrites it. With one character per box the focus ring already
+   marks the active box, so the selection highlight only reads as a glitch —
+   most visibly on the last box once the code is complete. Both properties
+   override the global `::selection` rule: clearing only the background
+   left its cream selection text invisible on the cream box. */
+.otp-field-input::selection {
+  background-color: transparent;
+  color: var(--color-text-primary);
 }
 
 /* ── Components: footer ───────────────────────────────────── */

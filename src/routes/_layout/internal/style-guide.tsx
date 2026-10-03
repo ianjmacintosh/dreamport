@@ -433,17 +433,17 @@ function StyleGuide() {
       <Section id="button-group" label="Button group">
         <div className="sg-button-group-demo">
           <div className="button-group">
-            <Button variant="primary">Verify and sign in</Button>
-            <Button variant="secondary">Request a new code</Button>
+            <Button variant="primary">Save</Button>
+            <Button variant="secondary">Cancel</Button>
           </div>
         </div>
         <Snippet
-          code={`<div className="button-group">\n  <Button variant="primary">Verify and sign in</Button>\n  <Button variant="secondary">Request a new code</Button>\n</div>`}
+          code={`<div className="button-group">\n  <Button variant="primary">Save</Button>\n  <Button variant="secondary">Cancel</Button>\n</div>`}
         />
         <p className="sg-note">
           Use <code>.button-group</code> for two or more related actions
-          presented side by side (e.g. "Verify and sign in" / "Request a new
-          code") — the gap between them comes from the spacing scale via Grid,
+          presented side by side (e.g. an Idea row&apos;s Save / Cancel /
+          Delete) — the gap between them comes from the spacing scale via Grid,
           not inline-flex's incidental whitespace. For a single button attached
           to a single field, use <code>.field-row</code> below instead.
         </p>

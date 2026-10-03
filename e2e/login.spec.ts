@@ -52,9 +52,11 @@ async function signIn(page: Page, email: string): Promise<void> {
 
   await page.getByRole("button", { name: "Send code" }).click();
 
-  await expect(page.getByLabel("Six-digit code")).toBeVisible();
-  await page.getByLabel("Six-digit code").fill("000000");
-  await page.getByRole("button", { name: "Verify and sign in" }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Six-digit code" }),
+  ).toBeVisible();
+  // The sixth digit submits the form on its own (`autoSubmit`, #128).
+  await page.getByRole("textbox", { name: "Six-digit code" }).fill("000000");
 
   await expect(page).toHaveURL(/\/app$/);
 }
@@ -233,6 +235,14 @@ test("log out from /terms: the page falls back to the signed-out Header", async 
   await expect(page.getByRole("button", { name: email })).toHaveCount(0);
 });
 
+test("the sign-in page loads with the email field focused", async ({
+  page,
+}) => {
+  await gotoLoginFromHomepage(page);
+
+  await expect(page.getByLabel("Email address")).toBeFocused();
+});
+
 test("advancing to the code step moves focus to the code field", async ({
   page,
 }) => {
@@ -245,10 +255,12 @@ test("advancing to the code step moves focus to the code field", async ({
   );
   await page.getByRole("button", { name: "Send code" }).click();
 
-  await expect(page.getByLabel("Six-digit code")).toBeFocused();
+  await expect(
+    page.getByRole("textbox", { name: "Six-digit code" }),
+  ).toBeFocused();
 });
 
-test("a failed verification moves focus to the error text", async ({
+test("a failed verification shows the error and moves focus to the first code box", async ({
   page,
 }) => {
   await gotoLoginFromHomepage(page);
@@ -260,14 +272,80 @@ test("a failed verification moves focus to the error text", async ({
   );
   await page.getByRole("button", { name: "Send code" }).click();
 
-  await expect(page.getByLabel("Six-digit code")).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Six-digit code" }),
+  ).toBeVisible();
   // The fixed test code is "000000" — anything else is wrong.
-  await page.getByLabel("Six-digit code").fill("111111");
-  await page.getByRole("button", { name: "Verify and sign in" }).click();
+  // The sixth digit submits the form on its own (`autoSubmit`, #128).
+  await page.getByRole("textbox", { name: "Six-digit code" }).fill("111111");
+
+  await expect(page.getByRole("alert")).toBeVisible();
+  // The boxes are cleared, so the retry starts typing straight into the
+  // first one (#128); the alert role still announces the error.
+  await expect(
+    page.getByRole("textbox", { name: "Six-digit code" }),
+  ).toBeFocused();
+});
+
+test("a wrong code shows the error above the code field and clears the boxes", async ({
+  page,
+}) => {
+  await gotoLoginFromHomepage(page);
+  await page.getByLabel("Email address").fill(TEST_EMAILS.e2eWrongCodeClears);
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
+    /.+/,
+    { timeout: 15_000 },
+  );
+  await page.getByRole("button", { name: "Send code" }).click();
+
+  // The fixed test code is "000000" — anything else is wrong.
+  await page.getByRole("textbox", { name: "Six-digit code" }).fill("111111");
 
   const alert = page.getByRole("alert");
   await expect(alert).toBeVisible();
-  await expect(alert).toBeFocused();
+
+  // Between the "We sent a six-digit code to …" line and the field's label.
+  const sentLine = await page
+    .getByText(/We sent a six-digit code to/)
+    .boundingBox();
+  const alertBox = await alert.boundingBox();
+  const label = await page
+    .getByText("Six-digit code", { exact: true })
+    .boundingBox();
+  expect(alertBox!.y).toBeGreaterThan(sentLine!.y);
+  expect(alertBox!.y).toBeLessThan(label!.y);
+
+  const boxes = page
+    .getByRole("group", { name: "Six-digit code" })
+    .getByRole("textbox");
+  await expect(boxes).toHaveCount(6);
+  for (const box of await boxes.all()) {
+    await expect(box).toHaveValue("");
+  }
+});
+
+test('"Request a new code" links back to a blank email step', async ({
+  page,
+}) => {
+  await gotoLoginFromHomepage(page);
+  await page.getByLabel("Email address").fill(TEST_EMAILS.e2eRequestNewCode);
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
+    /.+/,
+    { timeout: 15_000 },
+  );
+  await page.getByRole("button", { name: "Send code" }).click();
+
+  const requestNewCode = page.getByRole("link", { name: "Request a new code" });
+  await expect(requestNewCode).toHaveAttribute("href", "/login");
+  await requestNewCode.click();
+
+  // Back on the email step with the address to type again, so a typo in it
+  // gets a second look.
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByLabel("Email address")).toHaveValue("");
+  await expect(
+    page.getByRole("textbox", { name: "Six-digit code" }),
+  ).toHaveCount(0);
 });
 
 test("the send-code button disables and relabels while the request is in flight", async ({
@@ -297,7 +375,9 @@ test("the send-code button disables and relabels while the request is in flight"
   await sendButton.click();
 
   await expect(page.getByRole("button", { name: "Sending…" })).toBeDisabled();
-  await expect(page.getByLabel("Six-digit code")).toBeVisible({
+  await expect(
+    page.getByRole("textbox", { name: "Six-digit code" }),
+  ).toBeVisible({
     timeout: 10_000,
   });
 });
@@ -332,4 +412,53 @@ test("delete account from /app/settings: confirm, follow the emailed link, sessi
   // The account is gone: /app has nothing to authenticate.
   await page.goto("/app");
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test("after a successful verify, the verify button stays disabled until /app loads", async ({
+  page,
+}) => {
+  await gotoLoginFromHomepage(page);
+  await page
+    .getByLabel("Email address")
+    .fill(TEST_EMAILS.e2eVerifyStaysDisabled);
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
+    /.+/,
+    { timeout: 15_000 },
+  );
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Six-digit code" }),
+  ).toBeVisible();
+
+  // Record every time the code step's submit button goes from disabled back
+  // to enabled. The bug (#128) re-enabled it for a render between a
+  // successful verify and the route change — too brief to catch with a
+  // polling assertion, so watch the attribute itself.
+  await page.evaluate(() => {
+    const w = window as unknown as { reEnabled: number };
+    w.reEnabled = 0;
+    new MutationObserver((records) => {
+      for (const r of records) {
+        const el = r.target as HTMLButtonElement;
+        if (el.type === "submit" && r.oldValue !== null && !el.disabled) {
+          w.reEnabled++;
+        }
+      }
+    }).observe(document.body, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["disabled"],
+      attributeOldValue: true,
+    });
+  });
+
+  // The sixth digit submits the form on its own (`autoSubmit`, #128).
+  await page.getByRole("textbox", { name: "Six-digit code" }).fill("000000");
+  await expect(page).toHaveURL(/\/app$/);
+
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { reEnabled: number }).reEnabled,
+    ),
+  ).toBe(0);
 });

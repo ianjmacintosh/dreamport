@@ -1,0 +1,20 @@
+/* `/login`-specific styling — kept out of global.css the same way
+   style-guide.css is, since none of this applies anywhere else. */
+
+/* The error text (#28) takes `tabIndex={-1}` + a scripted `.focus()` so a
+   screen reader announces it the moment it appears — it's never meant to
+   be an interactive target. Without this, it inherits the global
+   `:focus-visible` outline (global.css's root rule) the same as any real
+   focusable control, which reads as a stray a11y glitch on plain alert
+   text rather than a deliberate focus move. No other `role="alert"` in the
+   app needs this — `/login` is the only one given a `tabIndex` at all. */
+#login-error:focus-visible {
+  outline: none;
+}
+
+/* The code step's "Email never arrived? Request a new code" line sits below
+   "Verify and sign in" with the same breathing room the form's fields
+   leave (#128). */
+.login-resend {
+  margin-top: var(--space-4);
+}
