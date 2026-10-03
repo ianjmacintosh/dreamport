@@ -4,6 +4,7 @@ import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { OTPField } from "@base-ui/react/otp-field";
 
 import Button from "../../components/Button";
+import Link from "../../components/Link";
 import TextInput from "../../components/TextInput";
 import { authClient } from "../../utils/auth-client";
 
@@ -45,7 +46,8 @@ const TURNSTILE_UNAVAILABLE =
 const SIGNIN_UNAVAILABLE =
   "Sign-in is temporarily unavailable. Try again in a few minutes.";
 const SEND_FAILED = "We couldn't send a code. Check the address and try again.";
-const VERIFY_FAILED = "That code didn't work. Request a new one and try again.";
+const VERIFY_FAILED =
+  "The code you entered is incorrect. Try again or request a new code.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -69,7 +71,7 @@ const ERROR_ID = "login-error";
  * Turnstile tokens are single-use, so the widget lives only on the email step
  * and is re-armed after a send that actually consumed the token (a 503 from
  * the gate hasn't — it rejects before verifying); "Request a new code"
- * returns to the email step for a fresh challenge.
+ * returns to a blank email step for a fresh challenge.
  *
  * Composed from `TextInput` / `Button` / a heading, laid out in the
  * `.form-shell` narrow-column primitive, plus the Turnstile widget in a
@@ -78,12 +80,13 @@ const ERROR_ID = "login-error";
  * focus on failure; the code field takes focus when the form advances to it
  * (#28).
  *
- * The code step is Base UI's `OTPField` — one `.otp-field-input` box per
+ * The code step is Base UI's `OTPField` — one `.input.otp-field-input` box per
  * digit, with paste-splitting and arrow/backspace movement between boxes —
  * stacked above "Verify and sign in" (#128). `autoSubmit` submits the form
  * the moment the last digit lands, so typing or pasting the code is enough;
- * the button stays for resubmitting after a failure. "Request a new code"
- * is a `.button-link` below the button, so it doesn't compete with it.
+ * a wrong code clears the boxes for another try, with the error shown
+ * above them. "Request a new code" is a quiet link (`.link-quiet`) to
+ * `/login` below the button, so it doesn't compete with it.
  * On a successful verify the form stays in its submitting state until the
  * route changes, rather than re-enabling the button while `/app` loads.
  *
@@ -121,24 +124,30 @@ function Login() {
   // the visual disabled state — this ref guards reentry synchronously, before
   // that state update has committed.
   const submittingRef = useRef(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
   const codeInputRef = useRef<HTMLInputElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
 
-  // Move focus to the code field as soon as the form advances to it.
+  // Focus each step's field as soon as it shows: the email field when the
+  // page loads (or "Request a new code" starts over), the first code box
+  // when the form advances to it.
   useEffect(() => {
-    if (step === "code") {
-      codeInputRef.current?.focus();
-    }
+    (step === "email" ? emailInputRef : codeInputRef).current?.focus();
   }, [step]);
 
-  // Move focus to the error text whenever a submission fails. `error` is
-  // always cleared to "" before a new attempt (see sendCode/verifyCode), so
-  // this fires even when two attempts fail with the same message.
+  // Whenever a submission fails, move focus: on the email step to the error
+  // text, on the code step back to the (cleared) first box so the retry can
+  // be typed straight in — `role="alert"` and the boxes' `aria-describedby`
+  // still announce the error there (#128). `error` is always cleared to ""
+  // before a new attempt (see sendCode/verifyCode), so this fires even when
+  // two attempts fail with the same message.
   useEffect(() => {
     if (error) {
-      errorRef.current?.focus();
+      (step === "email" ? errorRef : codeInputRef).current?.focus();
     }
-  }, [error]);
+    // Every step change clears `error` first, so `step` here never moves
+    // focus on its own.
+  }, [error, step]);
 
   /** Drop the current token and make the widget fetch a fresh one. */
   function rearmTurnstile() {
@@ -201,6 +210,9 @@ function Login() {
         navigate({ to: "/app" });
         return;
       }
+      // A wrong code is spent: clear the boxes so the retry starts from the
+      // first one rather than editing digits that already failed.
+      setCode("");
       setError(VERIFY_FAILED);
     } catch {
       // Thrown only when the request never reached the server — the code may
@@ -210,6 +222,15 @@ function Login() {
     submittingRef.current = false;
     setIsSubmitting(false);
   }
+
+  // The shared error text: below the email step's form, but on the code
+  // step between "We sent a six-digit code to …" and the code field, where
+  // it's read before the (now cleared) boxes (#128).
+  const errorText = error && (
+    <p role="alert" id={ERROR_ID} tabIndex={-1} ref={errorRef}>
+      {error}
+    </p>
+  );
 
   return (
     <div className="form-shell">
@@ -224,6 +245,7 @@ function Login() {
         >
           <div className="field-row">
             <TextInput
+              ref={emailInputRef}
               id="email"
               label="Email address"
               type="email"
@@ -279,6 +301,7 @@ function Login() {
           <p>
             We sent a six-digit code to <strong>{email}</strong>
           </p>
+          {errorText}
           <label className="input-label" htmlFor="code">
             Six-digit code
           </label>
@@ -296,7 +319,7 @@ function Login() {
               <OTPField.Input
                 key={i}
                 ref={i === 0 ? codeInputRef : undefined}
-                className="otp-field-input"
+                className="input otp-field-input"
                 // On every box rather than the Root's group, so the error is
                 // read as the description of whichever box has focus.
                 aria-describedby={error ? ERROR_ID : undefined}
@@ -318,26 +341,34 @@ function Login() {
           </Button>
           <p className="login-resend">
             Email never arrived?{" "}
-            <button
-              type="button"
-              className="button-link"
-              disabled={isSubmitting}
-              onClick={() => {
+            <Link
+              href="/login"
+              className="link-quiet"
+              // A way to start over, not a "you are here" marker.
+              current={false}
+              onClick={(e) => {
+                // Inert while a code is being checked, like the form's other
+                // controls, but with no disabled look of its own.
+                if (submittingRef.current) {
+                  e.preventDefault();
+                  return;
+                }
+                // Already on /login, so the router won't remount this page:
+                // start it over by hand, email included, so the address gets
+                // typed (and checked) again.
                 setError("");
+                setCode("");
+                setEmail("");
                 setStep("email");
               }}
             >
               Request a new code
-            </button>
+            </Link>
           </p>
         </form>
       )}
 
-      {error && (
-        <p role="alert" id={ERROR_ID} tabIndex={-1} ref={errorRef}>
-          {error}
-        </p>
-      )}
+      {step === "email" && errorText}
     </div>
   );
 }

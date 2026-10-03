@@ -265,6 +265,10 @@ export const TEST_EMAILS = {
   /** #128: after a successful verify, "Verify and sign in" never re-enables before the redirect. */
   e2eVerifyStaysDisabled:
     "delivered+e2e-verify-stays-disabled+e2e-test@resend.dev",
+  /** #128: a wrong code shows the error above the code field and clears the boxes. */
+  e2eWrongCodeClears: "delivered+e2e-wrong-code-clears+e2e-test@resend.dev",
+  /** #128: "Request a new code" goes back to a blank email step. */
+  e2eRequestNewCode: "delivered+e2e-request-new-code+e2e-test@resend.dev",
   /** #113: add an Idea with a Tag checked, see the Tag listed with it. */
   e2eAddIdeaWithTag: "delivered+e2e-add-idea-with-tag+e2e-test@resend.dev",
   /** #113: change an Idea's Tags via edit mode, see the new Tags listed. */

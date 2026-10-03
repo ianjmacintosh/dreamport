@@ -235,6 +235,14 @@ test("log out from /terms: the page falls back to the signed-out Header", async 
   await expect(page.getByRole("button", { name: email })).toHaveCount(0);
 });
 
+test("the sign-in page loads with the email field focused", async ({
+  page,
+}) => {
+  await gotoLoginFromHomepage(page);
+
+  await expect(page.getByLabel("Email address")).toBeFocused();
+});
+
 test("advancing to the code step moves focus to the code field", async ({
   page,
 }) => {
@@ -252,7 +260,7 @@ test("advancing to the code step moves focus to the code field", async ({
   ).toBeFocused();
 });
 
-test("a failed verification moves focus to the error text", async ({
+test("a failed verification shows the error and moves focus to the first code box", async ({
   page,
 }) => {
   await gotoLoginFromHomepage(page);
@@ -271,9 +279,73 @@ test("a failed verification moves focus to the error text", async ({
   // The sixth digit submits the form on its own (`autoSubmit`, #128).
   await page.getByRole("textbox", { name: "Six-digit code" }).fill("111111");
 
+  await expect(page.getByRole("alert")).toBeVisible();
+  // The boxes are cleared, so the retry starts typing straight into the
+  // first one (#128); the alert role still announces the error.
+  await expect(
+    page.getByRole("textbox", { name: "Six-digit code" }),
+  ).toBeFocused();
+});
+
+test("a wrong code shows the error above the code field and clears the boxes", async ({
+  page,
+}) => {
+  await gotoLoginFromHomepage(page);
+  await page.getByLabel("Email address").fill(TEST_EMAILS.e2eWrongCodeClears);
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
+    /.+/,
+    { timeout: 15_000 },
+  );
+  await page.getByRole("button", { name: "Send code" }).click();
+
+  // The fixed test code is "000000" — anything else is wrong.
+  await page.getByRole("textbox", { name: "Six-digit code" }).fill("111111");
+
   const alert = page.getByRole("alert");
   await expect(alert).toBeVisible();
-  await expect(alert).toBeFocused();
+
+  // Between the "We sent a six-digit code to …" line and the field's label.
+  const sentLine = await page
+    .getByText(/We sent a six-digit code to/)
+    .boundingBox();
+  const alertBox = await alert.boundingBox();
+  const label = await page
+    .getByText("Six-digit code", { exact: true })
+    .boundingBox();
+  expect(alertBox!.y).toBeGreaterThan(sentLine!.y);
+  expect(alertBox!.y).toBeLessThan(label!.y);
+
+  const boxes = page
+    .getByRole("group", { name: "Six-digit code" })
+    .getByRole("textbox");
+  await expect(boxes).toHaveCount(6);
+  for (const box of await boxes.all()) {
+    await expect(box).toHaveValue("");
+  }
+});
+
+test('"Request a new code" links back to a blank email step', async ({
+  page,
+}) => {
+  await gotoLoginFromHomepage(page);
+  await page.getByLabel("Email address").fill(TEST_EMAILS.e2eRequestNewCode);
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
+    /.+/,
+    { timeout: 15_000 },
+  );
+  await page.getByRole("button", { name: "Send code" }).click();
+
+  const requestNewCode = page.getByRole("link", { name: "Request a new code" });
+  await expect(requestNewCode).toHaveAttribute("href", "/login");
+  await requestNewCode.click();
+
+  // Back on the email step with the address to type again, so a typo in it
+  // gets a second look.
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByLabel("Email address")).toHaveValue("");
+  await expect(
+    page.getByRole("textbox", { name: "Six-digit code" }),
+  ).toHaveCount(0);
 });
 
 test("the send-code button disables and relabels while the request is in flight", async ({

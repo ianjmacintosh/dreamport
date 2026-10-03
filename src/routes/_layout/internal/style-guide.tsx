@@ -340,18 +340,6 @@ function StyleGuide() {
         <Snippet
           code={`<Link href="/privacy" className="link-quiet">\n  Privacy Policy\n</Link>`}
         />
-        <p className="sg-note">
-          Email never arrived?{" "}
-          <button type="button" className="button-link">
-            Request a new code
-          </button>{" "}
-          — a quiet button is the same look on a <code>&lt;button&gt;</code>,
-          for a secondary action that changes state instead of navigating and
-          shouldn&apos;t compete with the form&apos;s real button.
-        </p>
-        <Snippet
-          code={`<button type="button" className="button-link">\n  Request a new code\n</button>`}
-        />
       </Section>
 
       <Section id="wordmark" label="Wordmark — Motif">
