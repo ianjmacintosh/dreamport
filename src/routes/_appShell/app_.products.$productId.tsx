@@ -202,9 +202,9 @@ const CONNECTION_FAILED =
  * Journey (#137) is its own `<h2>` section between the description and the
  * Ideas — plain markup, no new CSS, by sign-off: the Path's name and
  * methodology note, then an `<ol>` of its Milestones in order. Before
- * starting, every Milestone shows its name and description, so the User can
- * read the whole route before committing, followed by a line saying what
- * starting does and "Start Journey". Once started, each Milestone is led by
+ * starting, just their names — the whole route at a glance without filling
+ * the viewport — followed by a line saying what starting does and "Start
+ * Journey". Once started, each Milestone is led by
  * its status as text ("Done" / "Current" / "Future"); the current one is
  * bold, marked `aria-current="step"`, and the only one showing its
  * description and "Done when" line. A styled stepper or real tabs would be
@@ -358,12 +358,7 @@ function ProductHome() {
       <ol aria-labelledby="journey-heading">
         {journeyState.path.milestones.map((milestone, index) => {
           if (!journey) {
-            return (
-              <li key={milestone.id}>
-                <strong>{milestone.name}</strong>
-                <p>{milestone.description}</p>
-              </li>
-            );
+            return <li key={milestone.id}>{milestone.name}</li>;
           }
           const status = milestoneStatus(index, currentIndex);
           return index === currentIndex ? (
