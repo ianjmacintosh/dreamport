@@ -53,13 +53,13 @@ test("sign in, open a Product, learn about its Journey, start it, and see Milest
   await expect(page).toHaveURL(/\/app\/products\/.+\/journey$/);
 
   // Every Milestone is there to read before committing to the Journey,
-  // none of them current yet, with a line saying what starting does.
+  // none of them current yet, with the line inviting them to start.
   const milestones = page.getByRole("list", { name: "Milestones" });
   await expect(milestones.getByRole("listitem")).toHaveCount(7);
   await expect(milestones).toContainText("Real Talk");
   await expect(milestones.locator('[aria-current="step"]')).toHaveCount(0);
   await expect(
-    page.getByText("Starting puts this Product on Milestone 1"),
+    page.getByText("Start by describing your solution."),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Start Journey" }).click();

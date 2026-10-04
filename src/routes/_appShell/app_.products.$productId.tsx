@@ -300,9 +300,7 @@ function ProductHome() {
           {currentIndex + 1} of {path.milestones.length})
         </p>
       ) : (
-        <p>
-          Follow the {path.name} from idea to growth, one Milestone at a time.
-        </p>
+        <p>Looking for some structure? Follow a marked path to success.</p>
       )}
       <p>
         <Link
