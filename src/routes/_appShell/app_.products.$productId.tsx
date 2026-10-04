@@ -74,25 +74,36 @@ interface Idea {
 }
 
 /** A Milestone as `/api/products/:productId/journey` returns it (see `src/worker/journeys.ts`). */
-interface JourneyMilestone {
+interface Milestone {
   id: string;
   name: string;
   description: string;
   doneWhen: string;
-  status: "done" | "current" | "future";
 }
 
-/** `/api/products/:productId/journey`'s response (#137): the Path, and the Journey once started. */
+/**
+ * `/api/products/:productId/journey`'s response (#137): the Path with its
+ * Milestones in order, and the Journey once started.
+ */
 interface JourneyState {
-  path: { id: string; name: string; methodology: string };
-  journey: { startedAt: string; milestones: JourneyMilestone[] } | null;
+  path: {
+    id: string;
+    name: string;
+    methodology: string;
+    milestones: Milestone[];
+  };
+  journey: { startedAt: string; currentMilestoneId: string } | null;
 }
 
-const MILESTONE_STATUS_LABELS = {
-  done: "Done",
-  current: "Current",
-  future: "Future",
-} satisfies Record<JourneyMilestone["status"], string>;
+/**
+ * A started Journey's Milestone status, by position: before the current
+ * one done, after it future (strict sequencing, see CONTEXT.md's Journey).
+ */
+function milestoneStatus(index: number, currentIndex: number): string {
+  if (index < currentIndex) return "Done";
+  if (index === currentIndex) return "Current";
+  return "Future";
+}
 
 /**
  * Mirrors `IDEA_NAME_MAX_LENGTH` in `src/worker/ideas.ts` — the client
@@ -189,13 +200,15 @@ const CONNECTION_FAILED =
  * no multi-line text component exists yet (see #112).
  *
  * Journey (#137) is its own `<h2>` section between the description and the
- * Ideas — plain markup, no new CSS, by sign-off: before starting, the
- * Path's name and methodology note plus "Start Journey"; once started, an
- * `<ol>` of every Milestone in order, each led by its status as text
- * ("Done" / "Current" / "Future"). The current one is bold, marked
- * `aria-current="step"`, and the only one showing its description and
- * "Done when" line. A styled stepper or real tabs would be their own design
- * decision.
+ * Ideas — plain markup, no new CSS, by sign-off: the Path's name and
+ * methodology note, then an `<ol>` of its Milestones in order. Before
+ * starting, every Milestone shows its name and description, so the User can
+ * read the whole route before committing, followed by a line saying what
+ * starting does and "Start Journey". Once started, each Milestone is led by
+ * its status as text ("Done" / "Current" / "Future"); the current one is
+ * bold, marked `aria-current="step"`, and the only one showing its
+ * description and "Done when" line. A styled stepper or real tabs would be
+ * their own design decision.
  *
  * Ends with a plain `<Link href="/app">Back to Products</Link>` — this page
  * otherwise had no way back to the Products list. Same markup
@@ -214,6 +227,12 @@ function ProductHome() {
   const [journeyState, setJourneyState] =
     useState<JourneyState>(initialJourney);
   const [isStartingJourney, setIsStartingJourney] = useState(false);
+  const { journey } = journeyState;
+  const currentIndex = journey
+    ? journeyState.path.milestones.findIndex(
+        (milestone) => milestone.id === journey.currentMilestoneId,
+      )
+    : -1;
   const [product, setProduct] = useState<Product>(initialProduct);
   const [error, setError] = useState("");
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -336,35 +355,50 @@ function ProductHome() {
       <p>
         {journeyState.path.name} · {journeyState.path.methodology}
       </p>
-      {journeyState.journey ? (
-        <ol aria-labelledby="journey-heading">
-          {journeyState.journey.milestones.map((milestone) =>
-            milestone.status === "current" ? (
-              <li key={milestone.id} aria-current="step">
-                <strong>
-                  {MILESTONE_STATUS_LABELS.current}: {milestone.name}
-                </strong>
-                <p>{milestone.description}</p>
-                <p>Done when: {milestone.doneWhen}</p>
-              </li>
-            ) : (
+      <ol aria-labelledby="journey-heading">
+        {journeyState.path.milestones.map((milestone, index) => {
+          if (!journey) {
+            return (
               <li key={milestone.id}>
-                {MILESTONE_STATUS_LABELS[milestone.status]}: {milestone.name}
+                <strong>{milestone.name}</strong>
+                <p>{milestone.description}</p>
               </li>
-            ),
-          )}
-        </ol>
-      ) : (
-        <p>
-          <Button
-            disabled={isStartingJourney}
-            state={isStartingJourney ? "pending" : "ready"}
-            onClick={() => void startJourney()}
-          >
-            <Button.State name="ready">Start Journey</Button.State>
-            <Button.State name="pending">Starting…</Button.State>
-          </Button>
-        </p>
+            );
+          }
+          const status = milestoneStatus(index, currentIndex);
+          return index === currentIndex ? (
+            <li key={milestone.id} aria-current="step">
+              <strong>
+                {status}: {milestone.name}
+              </strong>
+              <p>{milestone.description}</p>
+              <p>Done when: {milestone.doneWhen}</p>
+            </li>
+          ) : (
+            <li key={milestone.id}>
+              {status}: {milestone.name}
+            </li>
+          );
+        })}
+      </ol>
+      {!journey && (
+        <>
+          <p>
+            Starting puts this Product on Milestone 1,{" "}
+            {journeyState.path.milestones[0]?.name}. It doesn't change your
+            Ideas or description.
+          </p>
+          <p>
+            <Button
+              disabled={isStartingJourney}
+              state={isStartingJourney ? "pending" : "ready"}
+              onClick={() => void startJourney()}
+            >
+              <Button.State name="ready">Start Journey</Button.State>
+              <Button.State name="pending">Starting…</Button.State>
+            </Button>
+          </p>
+        </>
       )}
       <ProductIdeas
         productId={product.id}

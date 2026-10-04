@@ -2061,7 +2061,7 @@ const STARTER_MILESTONE_NAMES = [
 type JourneyResponse = Awaited<ReturnType<typeof starterJourneyState>>;
 
 describe("/api/products/:productId/journey (#137)", () => {
-  it("starts with no Journey, then starts one on Milestone 1 of the starter Path", async () => {
+  it("lists the starter Path's Milestones before any Journey, then starts one on Milestone 1", async () => {
     const cookie = await signIn(TEST_EMAILS.journeysStart);
     const created = await addProduct(cookie, "A phone-scale app");
     const { product } = (await created.json()) as { product: { id: string } };
@@ -2071,27 +2071,22 @@ describe("/api/products/:productId/journey (#137)", () => {
     ).json()) as JourneyResponse;
     expect(before.journey).toBeNull();
     expect(before.path.methodology).toBe("Based on Running Lean");
+    expect(before.path.milestones.map((m) => m.name)).toEqual(
+      STARTER_MILESTONE_NAMES,
+    );
+    expect(before.path.milestones[0]).toMatchObject({
+      description: expect.stringMatching(/^Define your product in plain terms/),
+      doneWhen:
+        "Someone else can read it, say it in their own words, and you'll agree",
+    });
 
     const started = await startJourney(product.id, cookie);
     expect(started.status).toBe(201);
     const after = (await started.json()) as JourneyResponse;
     expect(after.path).toEqual(before.path);
-
-    const milestones = after.journey!.milestones;
-    expect(milestones.map((m) => m.name)).toEqual(STARTER_MILESTONE_NAMES);
-    expect(milestones.map((m) => m.status)).toEqual([
-      "current",
-      "future",
-      "future",
-      "future",
-      "future",
-      "future",
-      "future",
-    ]);
-    expect(milestones[0]).toMatchObject({
-      description: expect.stringMatching(/^Define your product in plain terms/),
-      doneWhen:
-        "Someone else can read it, say it in their own words, and you'll agree",
+    expect(after.journey).toEqual({
+      startedAt: expect.any(String),
+      currentMilestoneId: before.path.milestones[0].id,
     });
 
     expect(await (await getJourney(product.id, cookie)).json()).toEqual(after);

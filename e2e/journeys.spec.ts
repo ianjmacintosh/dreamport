@@ -3,8 +3,8 @@ import { test, expect, type Page } from "@playwright/test";
 import { TEST_EMAILS } from "../test/emails";
 import { exemptFromRateLimits } from "./rate-limit-exemption";
 
-// Journeys (issue #137): sign in, open a Product, start its Journey, see
-// Milestone 1 current. Signs in the same way `ideas.spec.ts` does (fixed
+// Journeys (issue #137): sign in, open a Product, read the Path's Milestones,
+// start its Journey, see Milestone 1 current. Signs in the same way `ideas.spec.ts` does (fixed
 // `+e2e-test@` code, see docs/adr/0009).
 
 /** See `exemptFromRateLimits` for why rate-limited auth calls go out as one exempt IP. */
@@ -46,9 +46,18 @@ test("sign in, open a Product, start its Journey, and see Milestone 1 current", 
   await page.getByRole("link", { name: productName }).click();
   await expect(page.getByRole("heading", { name: productName })).toBeVisible();
 
+  // Every Milestone is there to read before committing to the Journey,
+  // none of them current yet, with a line saying what starting does.
+  const milestones = page.getByRole("list", { name: "Journey", exact: true });
+  await expect(milestones.getByRole("listitem")).toHaveCount(7);
+  await expect(milestones).toContainText("Real Talk");
+  await expect(milestones.locator('[aria-current="step"]')).toHaveCount(0);
+  await expect(
+    page.getByText("Starting puts this Product on Milestone 1"),
+  ).toBeVisible();
+
   await page.getByRole("button", { name: "Start Journey" }).click();
 
-  const milestones = page.getByRole("list", { name: "Journey", exact: true });
   await expect(milestones.getByRole("listitem")).toHaveCount(7);
   await expect(milestones.locator('[aria-current="step"]')).toContainText(
     "Rough One-Pager",

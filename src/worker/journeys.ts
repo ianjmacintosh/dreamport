@@ -10,27 +10,30 @@
  * already will have, via `getProduct`.
  */
 
+export interface Milestone {
+  id: string;
+  name: string;
+  description: string;
+  doneWhen: string;
+}
+
 export interface Path {
   id: string;
   name: string;
   /** Free-text note on what the Path is based on — not a modeled entity. */
   methodology: string;
+  /** Every Milestone on the Path, in order. */
+  milestones: Milestone[];
 }
 
-export type MilestoneStatus = "done" | "current" | "future";
-
-export interface JourneyMilestone {
-  id: string;
-  name: string;
-  description: string;
-  doneWhen: string;
-  status: MilestoneStatus;
-}
-
+/**
+ * A Product's progress on one Path. Strictly sequenced: every Milestone
+ * before `currentMilestoneId` (in the Path's order) is done, every one
+ * after it future.
+ */
 export interface Journey {
   startedAt: string;
-  /** Every Milestone on the Journey's Path, in order. */
-  milestones: JourneyMilestone[];
+  currentMilestoneId: string;
 }
 
 /**
@@ -39,56 +42,38 @@ export interface Journey {
  */
 export const STARTER_PATH_ID = "starter";
 
+/** A Path with its Milestones in order — shown whether or not a Journey has started. */
 export async function getPath(db: D1Database, pathId: string): Promise<Path> {
-  const path = await db
-    .prepare('SELECT "id", "name", "methodology" FROM "paths" WHERE "id" = ?')
-    .bind(pathId)
-    .first<Path>();
+  const [path, { results: milestones }] = await Promise.all([
+    db
+      .prepare('SELECT "id", "name", "methodology" FROM "paths" WHERE "id" = ?')
+      .bind(pathId)
+      .first<Omit<Path, "milestones">>(),
+    db
+      .prepare(
+        'SELECT "id", "name", "description", "doneWhen" FROM "milestones" WHERE "pathId" = ? ORDER BY "position" ASC',
+      )
+      .bind(pathId)
+      .all<Milestone>(),
+  ]);
   if (!path) {
     throw new Error(`Path ${pathId} is not seeded`);
   }
-  return path;
+  return { ...path, milestones };
 }
 
-/**
- * A Product's Journey on `pathId`, or `null` if it hasn't started one.
- * Each Milestone's status comes from its position relative to the current
- * one: before it done, after it future.
- */
+/** A Product's Journey on `pathId`, or `null` if it hasn't started one. */
 export async function getJourney(
   db: D1Database,
   productId: string,
   pathId: string,
 ): Promise<Journey | null> {
-  const journey = await db
+  return db
     .prepare(
-      'SELECT "j"."startedAt", "m"."position" AS "currentPosition" FROM "journeys" "j" JOIN "milestones" "m" ON "m"."id" = "j"."currentMilestoneId" WHERE "j"."productId" = ? AND "j"."pathId" = ?',
+      'SELECT "startedAt", "currentMilestoneId" FROM "journeys" WHERE "productId" = ? AND "pathId" = ?',
     )
     .bind(productId, pathId)
-    .first<{ startedAt: string; currentPosition: number }>();
-  if (!journey) {
-    return null;
-  }
-
-  const { results } = await db
-    .prepare(
-      'SELECT "id", "name", "description", "doneWhen", "position" FROM "milestones" WHERE "pathId" = ? ORDER BY "position" ASC',
-    )
-    .bind(pathId)
-    .all<Omit<JourneyMilestone, "status"> & { position: number }>();
-
-  return {
-    startedAt: journey.startedAt,
-    milestones: results.map(({ position, ...milestone }) => ({
-      ...milestone,
-      status:
-        position < journey.currentPosition
-          ? "done"
-          : position === journey.currentPosition
-            ? "current"
-            : "future",
-    })),
-  };
+    .first<Journey>();
 }
 
 /**
@@ -112,8 +97,9 @@ export async function startJourney(
 }
 
 /**
- * What `/api/products/:productId/journey` answers with: the starter Path,
- * and the Product's Journey on it (`null` until started).
+ * What `/api/products/:productId/journey` answers with: the starter Path
+ * with its Milestones, and the Product's Journey on it (`null` until
+ * started).
  */
 export async function starterJourneyState(
   db: D1Database,
