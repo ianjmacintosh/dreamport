@@ -226,9 +226,7 @@ function ProductJourney() {
                 Start simple by describing your product and the problem it
                 solves, adapt as you learn more about your audience and their
                 problem with guided exercises, and use that knowledge to make
-                better decisions. By doing the work to understand the problem
-                better than anyone, you&apos;ll be able to solve it better than
-                anyone.
+                better decisions.
               </p>
               <p>
                 Instead of spending months building something and hoping someone
