@@ -49,6 +49,29 @@ per Idea per Question. What actually appears as the Idea's own detail once
 a Question has been answered.
 _Avoid_: response, reply
 
+**Path**:
+A fixed, Dreamport-authored route a Product can follow, made of ordered
+Milestones — not something a User creates. Dreamport ships one Path for
+now: the free starter Path, based on Running Lean. A Path can carry a
+free-text note on the methodology it's based on; the methodology itself
+isn't modeled.
+_Avoid_: methodology (as the entity), plan, program, kit
+
+**Milestone**:
+One ordered step on a Path (e.g. "Rough One-Pager", then "Real Talk"),
+with a one-line description of what it asks and a "done when" line for
+knowing it's finished. Fixed content that ships with its Path.
+_Avoid_: stage, phase, step
+
+**Journey**:
+One Product's progress following one Path — started by the User, at the
+Path's first Milestone. Strictly sequenced: exactly one current Milestone,
+everything before it done, everything after it future. A Product has at
+most one Journey per Path, so following a different Path later wouldn't
+overwrite progress on the first. The Product page's section showing it is
+just "the Journey," the same way its Ideas section is "Ideas."
+_Avoid_: progress, roadmap, track
+
 **User**:
 A person with an account and a Private space of their own Products.
 Identified by an email address.

@@ -209,6 +209,18 @@ export const TEST_EMAILS = {
   /** Tags an Idea id that was never created; expects a 404. */
   ideasTagsNonexistent: "delivered+ideas-tags-nonexistent@resend.dev",
 
+  // --- Seam 1: /api/products/:productId/journey (#137) ---
+  /** Starts a Journey on a fresh Product and reads back its Milestones. */
+  journeysStart: "delivered+journeys-start@resend.dev",
+  /** Starts a Journey twice; the second start leaves Milestone 1 current. */
+  journeysStartTwice: "delivered+journeys-start-twice@resend.dev",
+  /** Rejects a start from an untrusted origin, starting nothing. */
+  journeysUntrusted: "delivered+journeys-untrusted@resend.dev",
+  /** Owner side of the Journey ownership boundary check. */
+  journeysOwnerA: "delivered+journeys-owner-a@resend.dev",
+  /** Other User whose read or start of A's Journey must 404. */
+  journeysOwnerB: "delivered+journeys-owner-b@resend.dev",
+
   // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
   // Every address below carries the `+e2e-test@` marker (issue #39): the
   // `+<scenario>` label sits ahead of it, so e.g. "e2e-happy" tags the
@@ -275,6 +287,8 @@ export const TEST_EMAILS = {
   e2eEditIdeaTags: "delivered+e2e-edit-idea-tags+e2e-test@resend.dev",
   /** #113: an Idea with every Tag shows "+N" on desktop and every pill on a phone. */
   e2eIdeaTagOverflow: "delivered+e2e-idea-tag-overflow+e2e-test@resend.dev",
+  /** #137: open a Product, start its Journey, see Milestone 1 current. */
+  e2eStartJourney: "delivered+e2e-start-journey+e2e-test@resend.dev",
   /** #112: set a Product's description, see it persist across a reload, then clear it. */
   e2eProductDescription:
     "delivered+e2e-product-description+e2e-test@resend.dev",

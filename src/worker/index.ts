@@ -33,6 +33,7 @@ import {
   listIdeas,
   renameIdea,
 } from "./ideas";
+import { getJourney, getPath, startJourney, STARTER_PATH_ID } from "./journeys";
 import { listTags, listTagsByIdea, setIdeaTags } from "./tags";
 import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
@@ -688,6 +689,74 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     return c.json({ tags }, 200);
+  });
+
+  /**
+   * Journeys (issue #137): a Product's Journey on the starter Path — the
+   * only Path Phase 1 ships, so there's no Path in the URL. Same session gate
+   * and `getProduct` ownership check as the Ideas routes: a stranger's
+   * Product reads identically to a nonexistent one, always 404, never 403.
+   * `journey` is `null` until the User starts one; `path` is always there so
+   * the page can name what starting would mean.
+   */
+  app.get("/api/products/:productId/journey", async (c) => {
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const [path, journey] = await Promise.all([
+      getPath(c.env.DB, STARTER_PATH_ID),
+      getJourney(c.env.DB, product.id, STARTER_PATH_ID),
+    ]);
+    return c.json({ path, journey });
+  });
+
+  /**
+   * Start a Product's Journey on the starter Path, at Milestone 1. Same
+   * origin check as the other row-creating routes (this one sits outside
+   * `auth.handler` too). A repeat start is harmless: it leaves the existing
+   * Journey's progress as it was and answers 200 rather than 201.
+   */
+  app.post("/api/products/:productId/journey", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const started = await startJourney(c.env.DB, product.id, STARTER_PATH_ID);
+    const [path, journey] = await Promise.all([
+      getPath(c.env.DB, STARTER_PATH_ID),
+      getJourney(c.env.DB, product.id, STARTER_PATH_ID),
+    ]);
+    return c.json({ path, journey }, started ? 201 : 200);
   });
 
   /**

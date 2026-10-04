@@ -2028,3 +2028,154 @@ describe("createAuth", () => {
     expect(createAuth(env)).not.toBe(createAuth(env));
   });
 });
+
+/** Shared by the Journey describe block below. */
+function getJourney(productId: string, cookie?: string) {
+  return fetchWorker(`/api/products/${productId}/journey`, {
+    headers: cookie ? { cookie } : {},
+  });
+}
+
+/** Shared by the Journey describe block below. */
+function startJourney(productId: string, cookie?: string) {
+  return fetchWorker(`/api/products/${productId}/journey`, {
+    method: "POST",
+    headers: cookie
+      ? { origin: TRUSTED_ORIGIN, cookie }
+      : { origin: TRUSTED_ORIGIN },
+  });
+}
+
+/** The seeded starter Path's Milestones, in order (#133's own wording). */
+const STARTER_MILESTONE_NAMES = [
+  "Rough One-Pager",
+  "Real Talk",
+  "Solution Matchmaking",
+  "Make It Real",
+  "Observe & Refine",
+  "Open Enrollment",
+  "Growth",
+];
+
+interface JourneyMilestone {
+  name: string;
+  description: string;
+  doneWhen: string;
+  status: "done" | "current" | "future";
+}
+
+interface JourneyResponse {
+  path: { id: string; name: string; methodology: string };
+  journey: { startedAt: string; milestones: JourneyMilestone[] } | null;
+}
+
+describe("/api/products/:productId/journey (#137)", () => {
+  it("starts with no Journey, then starts one on Milestone 1 of the starter Path", async () => {
+    const cookie = await signIn(TEST_EMAILS.journeysStart);
+    const created = await addProduct(cookie, "A phone-scale app");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    const before = (await (
+      await getJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    expect(before.journey).toBeNull();
+    expect(before.path.methodology).toBe("Based on Running Lean");
+
+    const started = await startJourney(product.id, cookie);
+    expect(started.status).toBe(201);
+    const after = (await started.json()) as JourneyResponse;
+    expect(after.path).toEqual(before.path);
+
+    const milestones = after.journey!.milestones;
+    expect(milestones.map((m) => m.name)).toEqual(STARTER_MILESTONE_NAMES);
+    expect(milestones.map((m) => m.status)).toEqual([
+      "current",
+      "future",
+      "future",
+      "future",
+      "future",
+      "future",
+      "future",
+    ]);
+    expect(milestones[0]).toMatchObject({
+      description: expect.stringMatching(/^Define your product in plain terms/),
+      doneWhen:
+        "Someone else can read it, say it in their own words, and you'll agree",
+    });
+
+    expect(await (await getJourney(product.id, cookie)).json()).toEqual(after);
+  });
+
+  it("leaves an already-started Journey as it was on a repeat start", async () => {
+    const cookie = await signIn(TEST_EMAILS.journeysStartTwice);
+    const created = await addProduct(cookie, "Started-twice Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    const first = (await (
+      await startJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+
+    const again = await startJourney(product.id, cookie);
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(first);
+  });
+
+  it("rejects a request with no session", async () => {
+    const res = await getJourney("some-id");
+    expect(res.status).toBe(401);
+
+    const start = await startJourney("some-id");
+    expect(start.status).toBe(401);
+  });
+
+  it("rejects a start from an untrusted origin, starting nothing", async () => {
+    const cookie = await signIn(TEST_EMAILS.journeysUntrusted);
+    const created = await addProduct(cookie, "Untrusted-origin Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    const res = await fetchWorker(`/api/products/${product.id}/journey`, {
+      method: "POST",
+      headers: { origin: "https://evil.example.com", cookie },
+    });
+
+    expect(res.status).toBe(403);
+    const after = (await (
+      await getJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    expect(after.journey).toBeNull();
+  });
+
+  it("404s a stranger's read or start of another User's Journey, never touching it", async () => {
+    const cookieA = await signIn(TEST_EMAILS.journeysOwnerA);
+    const cookieB = await signIn(TEST_EMAILS.journeysOwnerB);
+    const createdA = await addProduct(cookieA, "Owner A's started Product");
+    const { product: started } = (await createdA.json()) as {
+      product: { id: string };
+    };
+    await startJourney(started.id, cookieA);
+    const createdUnstarted = await addProduct(cookieA, "Owner A's unstarted");
+    const { product: unstarted } = (await createdUnstarted.json()) as {
+      product: { id: string };
+    };
+
+    const read = await getJourney(started.id, cookieB);
+    expect(read.status).toBe(404);
+    expect(await read.json()).toEqual({ error: "Not found" });
+
+    const start = await startJourney(unstarted.id, cookieB);
+    expect(start.status).toBe(404);
+    expect(await start.json()).toEqual({ error: "Not found" });
+
+    const asA = (await (
+      await getJourney(unstarted.id, cookieA)
+    ).json()) as JourneyResponse;
+    expect(asA.journey).toBeNull();
+  });
+
+  it("404s a nonexistent productId, never a 403", async () => {
+    const cookie = await signIn(TEST_EMAILS.journeysOwnerA);
+
+    expect((await getJourney("not-a-real-id", cookie)).status).toBe(404);
+    expect((await startJourney("not-a-real-id", cookie)).status).toBe(404);
+  });
+});

@@ -42,6 +42,11 @@ state.
 by the Tag's own name, seeded with the six starter Tags, plus an `idea_tags`
 join table cascading off `ideas` on delete.
 
+`0007_journeys.sql` adds Journeys (issue #137): the `paths` and
+`milestones` catalog, seeded with the one starter Path and its seven
+Milestones, plus a `journeys` table (one row per Product per Path, holding
+its current Milestone) cascading off `products` on delete.
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order

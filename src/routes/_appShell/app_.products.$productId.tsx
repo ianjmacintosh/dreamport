@@ -73,6 +73,27 @@ interface Idea {
   tags: string[];
 }
 
+/** A Milestone as `/api/products/:productId/journey` returns it (see `src/worker/journeys.ts`). */
+interface JourneyMilestone {
+  id: string;
+  name: string;
+  description: string;
+  doneWhen: string;
+  status: "done" | "current" | "future";
+}
+
+/** `/api/products/:productId/journey`'s response (#137): the Path, and the Journey once started. */
+interface JourneyState {
+  path: { id: string; name: string; methodology: string };
+  journey: { startedAt: string; milestones: JourneyMilestone[] } | null;
+}
+
+const MILESTONE_STATUS_LABELS = {
+  done: "Done",
+  current: "Current",
+  future: "Future",
+} satisfies Record<JourneyMilestone["status"], string>;
+
 /**
  * Mirrors `IDEA_NAME_MAX_LENGTH` in `src/worker/ideas.ts` — the client
  * bundle doesn't import worker code, so this is a client-side `maxLength`
@@ -95,12 +116,21 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
     // (not signed in, not this User's Product, offline, a transient error)
     // redirects to `/app` rather than a dedicated not-found page.
     // The Tag catalog (#113) is fetched alongside — it's needed for the
-    // add-Idea form's `TagPicker`, and goes through the same redirect.
-    const [res, tagsRes] = await Promise.all([
+    // add-Idea form's `TagPicker` — and so is the Product's Journey (#137);
+    // both go through the same redirect.
+    const [res, tagsRes, journeyRes] = await Promise.all([
       fetch(`/api/products/${params.productId}/ideas`).catch(() => null),
       fetch("/api/tags").catch(() => null),
+      fetch(`/api/products/${params.productId}/journey`).catch(() => null),
     ]);
-    if (!res || !res.ok || !tagsRes || !tagsRes.ok) {
+    if (
+      !res ||
+      !res.ok ||
+      !tagsRes ||
+      !tagsRes.ok ||
+      !journeyRes ||
+      !journeyRes.ok
+    ) {
       throw redirect({ to: "/app" });
     }
     const { product, ideas } = (await res.json()) as {
@@ -108,7 +138,8 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
       ideas: Idea[];
     };
     const { tags } = (await tagsRes.json()) as { tags: string[] };
-    return { product, ideas, tagCatalog: tags };
+    const journey = (await journeyRes.json()) as JourneyState;
+    return { product, ideas, tagCatalog: tags, journey };
   },
   component: ProductIdeas,
 });
@@ -138,6 +169,8 @@ const DELETE_IDEA_FAILED = "We couldn't delete that. Try again in a moment.";
 const SAVE_IDEA_FAILED = "We couldn't save that. Try again in a moment.";
 const ADD_IDEA_TAGS_FAILED =
   "We added that, but couldn't save its tags. Edit it to try again.";
+const START_JOURNEY_FAILED =
+  "We couldn't start the journey. Try again in a moment.";
 const SAVE_DESCRIPTION_FAILED =
   "We couldn't save the description. Try again in a moment.";
 const CONNECTION_FAILED =
@@ -183,13 +216,26 @@ const CONNECTION_FAILED =
  * pills (`TagList`) in a fixed-width column between the name and the
  * actions — as many as fit, then "+N". Tags are saved with their own PUT,
  * after the Idea's create (POST) or rename (PATCH) succeeds.
+ *
+ * Journey (#137) is its own `<h2>` section between the description and the
+ * Ideas form — plain markup, no new CSS, by sign-off: before starting, the
+ * Path's name and methodology note plus "Start journey"; once started, an
+ * `<ol>` of every Milestone in order, each led by its status as text
+ * ("Done" / "Current" / "Future"). The current one is bold, marked
+ * `aria-current="step"`, and the only one showing its description and
+ * "Done when" line. A styled stepper or real tabs would be their own design
+ * decision.
  */
 function ProductIdeas() {
   const {
     product: initialProduct,
     ideas: initialIdeas,
     tagCatalog,
+    journey: initialJourney,
   } = Route.useRouteContext();
+  const [journeyState, setJourneyState] =
+    useState<JourneyState>(initialJourney);
+  const [isStartingJourney, setIsStartingJourney] = useState(false);
   const [product, setProduct] = useState<Product>(initialProduct);
   const [error, setError] = useState("");
   const [ideas, setIdeas] = useState<Idea[]>(initialIdeas);
@@ -339,6 +385,32 @@ function ProductIdeas() {
     }
   }
 
+  async function startJourney() {
+    setError("");
+    setIsStartingJourney(true);
+    try {
+      const started = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(
+          `/api/products/${product.id}/journey`,
+          { method: "POST" },
+        );
+        if (!res.ok) {
+          return null;
+        }
+        return (await res.json()) as JourneyState;
+      });
+      if (!started) {
+        setError(START_JOURNEY_FAILED);
+        return;
+      }
+      setJourneyState(started);
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setIsStartingJourney(false);
+    }
+  }
+
   function startEditingDescription() {
     setError("");
     setDescriptionDraft(product.description ?? "");
@@ -424,6 +496,40 @@ function ProductIdeas() {
             </Button>
           </p>
         </>
+      )}
+      <h2 id="journey-heading">Journey</h2>
+      <p>
+        {journeyState.path.name} · {journeyState.path.methodology}
+      </p>
+      {journeyState.journey ? (
+        <ol aria-labelledby="journey-heading">
+          {journeyState.journey.milestones.map((milestone) =>
+            milestone.status === "current" ? (
+              <li key={milestone.id} aria-current="step">
+                <strong>
+                  {MILESTONE_STATUS_LABELS.current}: {milestone.name}
+                </strong>
+                <p>{milestone.description}</p>
+                <p>Done when: {milestone.doneWhen}</p>
+              </li>
+            ) : (
+              <li key={milestone.id}>
+                {MILESTONE_STATUS_LABELS[milestone.status]}: {milestone.name}
+              </li>
+            ),
+          )}
+        </ol>
+      ) : (
+        <p>
+          <Button
+            disabled={isStartingJourney}
+            state={isStartingJourney ? "pending" : "ready"}
+            onClick={() => void startJourney()}
+          >
+            <Button.State name="ready">Start journey</Button.State>
+            <Button.State name="pending">Starting…</Button.State>
+          </Button>
+        </p>
       )}
       <form
         className="form-section"
