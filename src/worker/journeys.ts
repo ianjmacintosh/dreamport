@@ -110,3 +110,18 @@ export async function startJourney(
     .run();
   return meta.changes > 0;
 }
+
+/**
+ * What `/api/products/:productId/journey` answers with: the starter Path,
+ * and the Product's Journey on it (`null` until started).
+ */
+export async function starterJourneyState(
+  db: D1Database,
+  productId: string,
+): Promise<{ path: Path; journey: Journey | null }> {
+  const [path, journey] = await Promise.all([
+    getPath(db, STARTER_PATH_ID),
+    getJourney(db, productId, STARTER_PATH_ID),
+  ]);
+  return { path, journey };
+}

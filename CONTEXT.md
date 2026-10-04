@@ -55,7 +55,7 @@ Milestones — not something a User creates. Dreamport ships one Path for
 now: the free starter Path, based on Running Lean. A Path can carry a
 free-text note on the methodology it's based on; the methodology itself
 isn't modeled.
-_Avoid_: methodology (as the entity), plan, program, kit
+_Avoid_: methodology (as the entity), plan, program
 
 **Milestone**:
 One ordered step on a Path (e.g. "Rough One-Pager", then "Real Talk"),

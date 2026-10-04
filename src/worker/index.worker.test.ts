@@ -7,6 +7,7 @@ import { network } from "../../test/msw-network";
 import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 import { createApp } from "./index";
+import { starterJourneyState } from "./journeys";
 import { recordDailySend } from "./otp-send-throttle";
 import { PRODUCT_DESCRIPTION_MAX_LENGTH } from "./products";
 import { E2E_RATE_LIMIT_EXEMPT_IP } from "./rate-limit-exemption";
@@ -2057,17 +2058,7 @@ const STARTER_MILESTONE_NAMES = [
   "Growth",
 ];
 
-interface JourneyMilestone {
-  name: string;
-  description: string;
-  doneWhen: string;
-  status: "done" | "current" | "future";
-}
-
-interface JourneyResponse {
-  path: { id: string; name: string; methodology: string };
-  journey: { startedAt: string; milestones: JourneyMilestone[] } | null;
-}
+type JourneyResponse = Awaited<ReturnType<typeof starterJourneyState>>;
 
 describe("/api/products/:productId/journey (#137)", () => {
   it("starts with no Journey, then starts one on Milestone 1 of the starter Path", async () => {

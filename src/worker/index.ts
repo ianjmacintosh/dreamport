@@ -33,7 +33,7 @@ import {
   listIdeas,
   renameIdea,
 } from "./ideas";
-import { getJourney, getPath, startJourney, STARTER_PATH_ID } from "./journeys";
+import { STARTER_PATH_ID, startJourney, starterJourneyState } from "./journeys";
 import { listTags, listTagsByIdea, setIdeaTags } from "./tags";
 import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
@@ -714,11 +714,7 @@ export function createApp(deps: AppDeps = {}) {
       return c.json({ error: "Not found" }, 404);
     }
 
-    const [path, journey] = await Promise.all([
-      getPath(c.env.DB, STARTER_PATH_ID),
-      getJourney(c.env.DB, product.id, STARTER_PATH_ID),
-    ]);
-    return c.json({ path, journey });
+    return c.json(await starterJourneyState(c.env.DB, product.id));
   });
 
   /**
@@ -752,11 +748,10 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     const started = await startJourney(c.env.DB, product.id, STARTER_PATH_ID);
-    const [path, journey] = await Promise.all([
-      getPath(c.env.DB, STARTER_PATH_ID),
-      getJourney(c.env.DB, product.id, STARTER_PATH_ID),
-    ]);
-    return c.json({ path, journey }, started ? 201 : 200);
+    return c.json(
+      await starterJourneyState(c.env.DB, product.id),
+      started ? 201 : 200,
+    );
   });
 
   /**
