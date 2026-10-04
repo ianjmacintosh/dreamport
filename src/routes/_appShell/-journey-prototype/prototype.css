@@ -5,7 +5,7 @@
 
    Shared (all variants)
      1. .journey-big-picture  — the "Milestone N of 7 · Next · Ends at" line
-     2. .journey-slot         — dashed placeholder where #139/#140 slot in
+     2. (dropped) dashed #139/#140 placeholder: dev-only, not for production
      3. (dropped) done Milestones are no longer dimmed: muted text failed AA
 
    A — Document
@@ -17,7 +17,8 @@
    B — Route map
      8. .journey-b-panel      — tinted panel holding pitch + invitation + button
      9. .journey-route (+ -stop, -dot, -name, -outcome)
-                              — vertical line with numbered dots
+                              — vertical line with numbered dots; done ones
+                                gray with a check
     10. .journey-b-split      — route | panel, two columns; <640px the panel
                                 stacks above the route
     11. .journey-b-work       — current work on a tinted panel
@@ -39,14 +40,6 @@
 
 .journey-big-picture {
   font-size: var(--text-lg);
-}
-
-.journey-slot {
-  padding: var(--space-4);
-  border: 2px dashed var(--color-border);
-  border-radius: var(--space-2);
-  color: var(--color-text-primary);
-  font-style: italic;
 }
 
 /* ── A: Document ────────────────────────────────────────────── */
@@ -145,9 +138,11 @@
   grid-area: outcome;
 }
 
+/* Done: a gray filled circle with a Phosphor check in place of the
+   number. */
 .journey-route-stop[data-status="done"] .journey-route-dot {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-border);
+  background: var(--color-border);
   color: var(--color-accent-text);
 }
 

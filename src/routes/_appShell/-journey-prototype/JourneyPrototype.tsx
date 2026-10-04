@@ -31,7 +31,11 @@
  */
 import { useEffect, type ReactNode } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react";
+import {
+  CaretLeftIcon,
+  CaretRightIcon,
+  CheckIcon,
+} from "@phosphor-icons/react";
 
 import Button from "../../../components/Button";
 import Link from "../../../components/Link";
@@ -115,9 +119,6 @@ function CurrentWork({
       <p>{milestone.description}</p>
       <p>
         <strong>Done when:</strong> {milestone.doneWhen}
-      </p>
-      <p className="journey-slot">
-        #139&apos;s Worksheet and #140&apos;s Tasks go here.
       </p>
     </>
   );
@@ -210,7 +211,7 @@ function RouteMap({
             aria-current={status === "current" ? "step" : undefined}
           >
             <span className="journey-route-dot" aria-hidden="true">
-              {i + 1}
+              {status === "done" ? <CheckIcon weight="bold" /> : i + 1}
             </span>
             <span className="journey-route-name">{m.name}</span>
             {(!compact || status === "current") && (
