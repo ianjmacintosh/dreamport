@@ -21,6 +21,10 @@
  *                   read left to right; the button sits in a sticky aside.
  *                   After: a progress bar, the track, the work full-width.
  *
+ * D  Route map, both states — Ian's pick from round 1: B's after-start
+ *                   split for both states. Before starting, the right panel
+ *                   holds the pitch, the invitation and a big Start Journey.
+ *
  * All copy is placeholder at the brief's lengths — Ian writes the real
  * thing. Every new class lives in `prototype.css`, listed at its top.
  */
@@ -324,12 +328,47 @@ function VariantC(props: ViewProps) {
   );
 }
 
+// ── D: Route map, both states ───────────────────────────────────────────
+
+function VariantD(props: ViewProps) {
+  const { product, milestones, currentIndex, onStart } = props;
+  const started = currentIndex >= 0;
+  return (
+    <>
+      <h1>{product.name}</h1>
+      <h2>Journey</h2>
+      {started && <BigPicture {...props} />}
+      <div className="journey-b-split">
+        <RouteMap {...props} compact={started} />
+        <section className="journey-b-work">
+          {started ? (
+            <CurrentWork
+              milestone={milestones[currentIndex]}
+              index={currentIndex}
+            />
+          ) : (
+            <>
+              <p className="text-xl">{PITCH}</p>
+              <p>{invitation(milestones[0].name)}</p>
+              <Button className="journey-d-cta" onClick={onStart}>
+                Start Journey
+              </Button>
+            </>
+          )}
+        </section>
+      </div>
+      <BackLink {...props} />
+    </>
+  );
+}
+
 // ── Switching ────────────────────────────────────────────────────────────
 
 const VARIANTS = [
   { key: "A", name: "Document", Component: VariantA },
   { key: "B", name: "Route map", Component: VariantB },
   { key: "C", name: "Destination", Component: VariantC },
+  { key: "D", name: "Route map, both states", Component: VariantD },
 ];
 
 interface ProtoSearch {

@@ -30,6 +30,9 @@
     16. .journey-c-progress   — progress line + native <progress>
     17. .journey-c-work       — current work under a top rule
 
+   D — Route map, both states (reuses 9–11 from B)
+    18. .journey-d-cta        — a bigger Start Journey button
+
    Not on the list: .proto-switcher* (the prototype's own controls). */
 
 /* ── Shared ─────────────────────────────────────────────────── */
@@ -186,6 +189,13 @@
     grid-template-columns: minmax(0, 1fr);
     row-gap: var(--space-6);
   }
+}
+
+/* ── D: Route map, both states ──────────────────────────────── */
+
+.journey-d-cta.button {
+  padding: var(--space-4) var(--space-8);
+  font-size: var(--text-xl);
 }
 
 /* ── C: Destination ─────────────────────────────────────────── */
