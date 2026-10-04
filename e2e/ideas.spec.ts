@@ -410,6 +410,9 @@ test("an Idea with every Tag shows +N on desktop and every pill on a phone", asy
   const addForm = page.locator("form", { has: page.getByLabel("Idea name") });
   await page.getByLabel("Idea name").fill(ideaName);
   await tagPickerTrigger(addForm).click();
+  // `allTextContents` doesn't wait — without this it can read the menu
+  // before it opens and get nothing.
+  await expect(page.getByRole("menuitemcheckbox").first()).toBeVisible();
   const catalog = await page.getByRole("menuitemcheckbox").allTextContents();
   expect(catalog.length).toBeGreaterThan(3);
   for (const tag of catalog) {
