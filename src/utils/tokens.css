@@ -49,6 +49,11 @@
   --color-border: var(--sol-base1);
   --color-text-primary: var(--sol-base01);
   --color-text-muted: var(--sol-base1);
+  /* A finished step's marker (a done Milestone's circle on the Journey
+     page, #137), with --color-accent-text drawn on it. base00, the one
+     Solarized grey that clears 3:1 for a graphic against cream from either
+     side (~4.13:1); base1/--color-border only reaches ~2.48:1. */
+  --color-done: var(--sol-base00);
   /* --color-text-primary/muted both fail AA on --color-surface (4.39:1 and
      2.18:1) — base2 is darker than base3, so text tuned for the page
      background isn't automatically safe on the surface background too.

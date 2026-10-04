@@ -34,6 +34,9 @@
 
    D — Route map, both states: no CSS of its own, reuses 9–11 from B
 
+   Token (tokens.css)
+    T1. --color-done          — base00, a done Milestone's circle
+
    Not on the list: .proto-switcher* (the prototype's own controls). */
 
 /* ── Shared ─────────────────────────────────────────────────── */
@@ -139,10 +142,10 @@
 }
 
 /* Done: a gray filled circle with a Phosphor check in place of the
-   number. */
+   number. --color-done (new token, base00) so the check clears 3:1. */
 .journey-route-stop[data-status="done"] .journey-route-dot {
-  border-color: var(--color-border);
-  background: var(--color-border);
+  border-color: var(--color-done);
+  background: var(--color-done);
   color: var(--color-accent-text);
 }
 

@@ -210,8 +210,14 @@ function RouteMap({
             data-status={status}
             aria-current={status === "current" ? "step" : undefined}
           >
-            <span className="journey-route-dot" aria-hidden="true">
-              {status === "done" ? <CheckIcon weight="bold" /> : i + 1}
+            {/* The <ol> already numbers each stop for screen readers, so
+                the number is hidden; a done stop's check reads "Done". */}
+            <span className="journey-route-dot">
+              {status === "done" ? (
+                <CheckIcon weight="bold" role="img" aria-label="Done" />
+              ) : (
+                <span aria-hidden="true">{i + 1}</span>
+              )}
             </span>
             <span className="journey-route-name">{m.name}</span>
             {(!compact || status === "current") && (
