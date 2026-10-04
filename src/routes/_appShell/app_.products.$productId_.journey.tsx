@@ -225,10 +225,11 @@ function ProductJourney() {
                 adapt as you learn more about your audience and their problem
                 with guided exercises, and use that knowledge to make better
                 decisions. By doing the work to understand the problem better
-                than anyone else, you&apos;ll be able to solve it better than
-                everyone else. Instead of spending months building something and
-                hoping someone will want to buy it, {path.name} bakes pricing
-                into the product from the start.
+                than anyone, you&apos;ll be able to solve it better than anyone.
+                Instead of spending months building something and hoping someone
+                will want to buy it, {path.name} bakes pricing into the product
+                from the start. When you finish the last step, you&apos;ll have
+                a product people love and a sustainable path to growth.
               </p>
               <p>
                 Starting puts this Product on Milestone 1,{" "}
