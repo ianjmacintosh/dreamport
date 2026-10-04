@@ -332,7 +332,6 @@ function VariantD(props: ViewProps) {
     <>
       <h1>{product.name}</h1>
       <h2>Journey</h2>
-      {started && <BigPicture {...props} />}
       <div className="journey-b-split">
         <RouteMap {...props} compact={started} />
         <section className="journey-b-work">
