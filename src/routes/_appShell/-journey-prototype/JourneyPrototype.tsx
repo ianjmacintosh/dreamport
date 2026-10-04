@@ -23,7 +23,8 @@
  *
  * D  Route map, both states — Ian's pick from round 1: B's after-start
  *                   split for both states. Before starting, the right panel
- *                   holds the pitch, the invitation and a big Start Journey.
+ *                   opens with a heading, then the pitch, the invitation
+ *                   and Start Journey, all at body size.
  *
  * All copy is placeholder at the brief's lengths — Ian writes the real
  * thing. Every new class lives in `prototype.css`, listed at its top.
@@ -58,7 +59,7 @@ interface ViewProps extends ProtoProps {
 
 /** Sales paragraph: 2–4 sentences. */
 const PITCH =
-  "Placeholder sales paragraph, two to four sentences long. It connects the idea you have today with a product that grows and makes money. The seven steps below are the route between the two. It talks about what you want, not about our method.";
+  "Placeholder sales paragraph, two to four sentences long. It connects the idea you have today with a product that grows and makes money. The seven steps are the route between the two. It talks about what you want, not about our method.";
 
 /** Outcome lines: 8 words or fewer each, one per Milestone. */
 const OUTCOMES = [
@@ -348,11 +349,10 @@ function VariantD(props: ViewProps) {
             />
           ) : (
             <>
-              <p className="text-xl">{PITCH}</p>
+              <h3>Placeholder heading for the pitch</h3>
+              <p>{PITCH}</p>
               <p>{invitation(milestones[0].name)}</p>
-              <Button className="journey-d-cta" onClick={onStart}>
-                Start Journey
-              </Button>
+              <StartButton onStart={onStart} />
             </>
           )}
         </section>
