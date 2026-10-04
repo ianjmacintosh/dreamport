@@ -50,8 +50,9 @@ a Question has been answered.
 _Avoid_: response, reply
 
 **Path**:
-A fixed, Dreamport-authored route a Product can follow, made of ordered
-Milestones — not something a User creates. Dreamport ships one Path for
+A fixed, Dreamport-authored route a Product can follow from idea to a
+growing, profitable product, made of ordered Milestones — not something a
+User creates. Dreamport ships one Path for
 now: the free starter Path, based on Running Lean. A Path can carry a
 free-text note on the methodology it's based on; the methodology itself
 isn't modeled.
@@ -68,8 +69,9 @@ One Product's progress following one Path — started by the User, at the
 Path's first Milestone. Strictly sequenced: exactly one current Milestone,
 everything before it done, everything after it future. A Product has at
 most one Journey per Path, so following a different Path later wouldn't
-overwrite progress on the first. The Product page's section showing it is
-just "the Journey," the same way its Ideas section is "Ideas."
+overwrite progress on the first. A Journey always belongs to its Product
+— it's "Tarot's Journey," never a Journey called "Tarot." Its page is just
+"the Journey," the same way the Product's Ideas section is "Ideas."
 _Avoid_: progress, roadmap, track
 
 **User**:
