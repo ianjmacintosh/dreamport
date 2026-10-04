@@ -2064,11 +2064,16 @@ describe("/api/products/:productId/journey (#137)", () => {
   it("lists the starter Path's Milestones before any Journey, then starts one on Milestone 1", async () => {
     const cookie = await signIn(TEST_EMAILS.journeysStart);
     const created = await addProduct(cookie, "A phone-scale app");
-    const { product } = (await created.json()) as { product: { id: string } };
+    const { product } = (await created.json()) as {
+      product: { id: string; name: string };
+    };
 
     const before = (await (
       await getJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
+    ).json()) as JourneyResponse & { product: { id: string; name: string } };
+    // Bundled for the Journey page's own heading, the same way the Ideas
+    // list bundles it.
+    expect(before.product).toEqual(product);
     expect(before.journey).toBeNull();
     expect(before.path.methodology).toBe("Based on Running Lean");
     expect(before.path.milestones.map((m) => m.name)).toEqual(
@@ -2089,7 +2094,10 @@ describe("/api/products/:productId/journey (#137)", () => {
       currentMilestoneId: before.path.milestones[0].id,
     });
 
-    expect(await (await getJourney(product.id, cookie)).json()).toEqual(after);
+    expect(await (await getJourney(product.id, cookie)).json()).toEqual({
+      product,
+      ...after,
+    });
   });
 
   it("leaves an already-started Journey as it was on a repeat start", async () => {

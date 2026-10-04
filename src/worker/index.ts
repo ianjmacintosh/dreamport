@@ -697,7 +697,8 @@ export function createApp(deps: AppDeps = {}) {
    * and `getProduct` ownership check as the Ideas routes: a stranger's
    * Product reads identically to a nonexistent one, always 404, never 403.
    * `journey` is `null` until the User starts one; `path` is always there so
-   * the page can name what starting would mean.
+   * the page can name what starting would mean. Bundles the Product itself,
+   * as the Ideas list does, for the Journey page's heading.
    */
   app.get("/api/products/:productId/journey", async (c) => {
     const session = await currentSession(c);
@@ -714,7 +715,10 @@ export function createApp(deps: AppDeps = {}) {
       return c.json({ error: "Not found" }, 404);
     }
 
-    return c.json(await starterJourneyState(c.env.DB, product.id));
+    return c.json({
+      product,
+      ...(await starterJourneyState(c.env.DB, product.id)),
+    });
   });
 
   /**

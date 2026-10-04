@@ -73,36 +73,14 @@ interface Idea {
   tags: string[];
 }
 
-/** A Milestone as `/api/products/:productId/journey` returns it (see `src/worker/journeys.ts`). */
-interface Milestone {
-  id: string;
-  name: string;
-  description: string;
-  doneWhen: string;
-}
-
 /**
- * `/api/products/:productId/journey`'s response (#137): the Path with its
- * Milestones in order, and the Journey once started.
+ * The parts of `/api/products/:productId/journey`'s response (#137) the
+ * Product home's Journey line needs — the full shape lives with the Journey
+ * page (`app_.products.$productId_.journey.tsx`).
  */
-interface JourneyState {
-  path: {
-    id: string;
-    name: string;
-    methodology: string;
-    milestones: Milestone[];
-  };
-  journey: { startedAt: string; currentMilestoneId: string } | null;
-}
-
-/**
- * A started Journey's Milestone status, by position: before the current
- * one done, after it future (strict sequencing, see CONTEXT.md's Journey).
- */
-function milestoneStatus(index: number, currentIndex: number): string {
-  if (index < currentIndex) return "Done";
-  if (index === currentIndex) return "Current";
-  return "Future";
+interface JourneySummary {
+  path: { name: string; milestones: { id: string; name: string }[] };
+  journey: { currentMilestoneId: string } | null;
 }
 
 /**
@@ -149,7 +127,7 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
       ideas: Idea[];
     };
     const { tags } = (await tagsRes.json()) as { tags: string[] };
-    const journey = (await journeyRes.json()) as JourneyState;
+    const journey = (await journeyRes.json()) as JourneySummary;
     return { product, ideas, tagCatalog: tags, journey };
   },
   component: ProductHome,
@@ -180,8 +158,6 @@ const DELETE_IDEA_FAILED = "We couldn't delete that. Try again in a moment.";
 const SAVE_IDEA_FAILED = "We couldn't save that. Try again in a moment.";
 const ADD_IDEA_TAGS_FAILED =
   "We added that, but couldn't save its tags. Edit it to try again.";
-const START_JOURNEY_FAILED =
-  "We couldn't start the journey. Try again in a moment.";
 const SAVE_DESCRIPTION_FAILED =
   "We couldn't save the description. Try again in a moment.";
 const CONNECTION_FAILED =
@@ -199,16 +175,11 @@ const CONNECTION_FAILED =
  * in-place edit shape an Idea row's rename uses. Single-line on purpose:
  * no multi-line text component exists yet (see #112).
  *
- * Journey (#137) is its own `<h2>` section between the description and the
- * Ideas — plain markup, no new CSS, by sign-off: the Path's name and
- * methodology note, then an `<ol>` of its Milestones in order. Before
- * starting, just their names — the whole route at a glance without filling
- * the viewport — followed by a line saying what starting does and "Start
- * Journey". Once started, each Milestone is led by
- * its status as text ("Done" / "Current" / "Future"); the current one is
- * bold, marked `aria-current="step"`, and the only one showing its
- * description and "Done when" line. A styled stepper or real tabs would be
- * their own design decision.
+ * Journey (#137) is a short `<h2>` section between the description and
+ * the Ideas: one line — what the Path offers before starting, the current
+ * Milestone after — and a link styled as a button ("Learn More" / "View
+ * Journey") to the Product's own Journey page, which holds the Milestones
+ * and "Start Journey".
  *
  * Ends with a plain `<Link href="/app">Back to Products</Link>` — this page
  * otherwise had no way back to the Products list. Same markup
@@ -224,12 +195,9 @@ function ProductHome() {
     tagCatalog,
     journey: initialJourney,
   } = Route.useRouteContext();
-  const [journeyState, setJourneyState] =
-    useState<JourneyState>(initialJourney);
-  const [isStartingJourney, setIsStartingJourney] = useState(false);
-  const { journey } = journeyState;
+  const { path, journey } = initialJourney;
   const currentIndex = journey
-    ? journeyState.path.milestones.findIndex(
+    ? path.milestones.findIndex(
         (milestone) => milestone.id === journey.currentMilestoneId,
       )
     : -1;
@@ -238,32 +206,6 @@ function ProductHome() {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [isSavingDescription, setIsSavingDescription] = useState(false);
-
-  async function startJourney() {
-    setError("");
-    setIsStartingJourney(true);
-    try {
-      const started = await withMinimumDuration(async () => {
-        const res = await fetchWithTimeout(
-          `/api/products/${product.id}/journey`,
-          { method: "POST" },
-        );
-        if (!res.ok) {
-          return null;
-        }
-        return (await res.json()) as JourneyState;
-      });
-      if (!started) {
-        setError(START_JOURNEY_FAILED);
-        return;
-      }
-      setJourneyState(started);
-    } catch {
-      setError(CONNECTION_FAILED);
-    } finally {
-      setIsStartingJourney(false);
-    }
-  }
 
   function startEditingDescription() {
     setError("");
@@ -351,50 +293,25 @@ function ProductHome() {
           </p>
         </>
       )}
-      <h2 id="journey-heading">Journey</h2>
-      <p>
-        {journeyState.path.name} · {journeyState.path.methodology}
-      </p>
-      <ol aria-labelledby="journey-heading">
-        {journeyState.path.milestones.map((milestone, index) => {
-          if (!journey) {
-            return <li key={milestone.id}>{milestone.name}</li>;
-          }
-          const status = milestoneStatus(index, currentIndex);
-          return index === currentIndex ? (
-            <li key={milestone.id} aria-current="step">
-              <strong>
-                {status}: {milestone.name}
-              </strong>
-              <p>{milestone.description}</p>
-              <p>Done when: {milestone.doneWhen}</p>
-            </li>
-          ) : (
-            <li key={milestone.id}>
-              {status}: {milestone.name}
-            </li>
-          );
-        })}
-      </ol>
-      {!journey && (
-        <>
-          <p>
-            Starting puts this Product on Milestone 1,{" "}
-            {journeyState.path.milestones[0]?.name}. It doesn't change your
-            Ideas or description.
-          </p>
-          <p>
-            <Button
-              disabled={isStartingJourney}
-              state={isStartingJourney ? "pending" : "ready"}
-              onClick={() => void startJourney()}
-            >
-              <Button.State name="ready">Start Journey</Button.State>
-              <Button.State name="pending">Starting…</Button.State>
-            </Button>
-          </p>
-        </>
+      <h2>Journey</h2>
+      {journey ? (
+        <p>
+          Current Milestone: {path.milestones[currentIndex]?.name} (
+          {currentIndex + 1} of {path.milestones.length})
+        </p>
+      ) : (
+        <p>
+          Follow the {path.name} from idea to growth, one Milestone at a time.
+        </p>
       )}
+      <p>
+        <Link
+          href={`/app/products/${product.id}/journey`}
+          className="button button--secondary"
+        >
+          {journey ? "View Journey" : "Learn More"}
+        </Link>
+      </p>
       <ProductIdeas
         productId={product.id}
         initialIdeas={initialIdeas}
