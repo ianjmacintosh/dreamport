@@ -23,6 +23,7 @@
     10. .journey-b-split      — route | panel, two columns; <640px the panel
                                 stacks above the route
     11. .journey-b-work       — current work on a tinted panel
+                                (not used by D: Ian dropped the panel)
 
    C — Destination
     12. .journey-c-destination — big "Ends at: Growth" line
@@ -188,7 +189,7 @@
     row-gap: var(--space-6);
   }
 
-  .journey-b-work {
+  .journey-b-split > section {
     grid-row: 1;
   }
 }

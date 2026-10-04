@@ -334,7 +334,7 @@ function VariantD(props: ViewProps) {
       <h2>Journey</h2>
       <div className="journey-b-split">
         <RouteMap {...props} compact={started} />
-        <section className="journey-b-work">
+        <section>
           {started ? (
             <CurrentWork milestone={milestones[currentIndex]} />
           ) : (
