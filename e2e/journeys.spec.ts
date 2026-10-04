@@ -20,7 +20,7 @@ async function signIn(page: Page, email: string): Promise<void> {
     { timeout: 15_000 },
   );
 
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByRole("button", { name: "Send Code" }).click();
 
   await expect(
     page.getByRole("textbox", { name: "Six-digit code" }),
@@ -42,18 +42,18 @@ test("sign in, open a Product, start its Journey, and see Milestone 1 current", 
   await signIn(page, TEST_EMAILS.e2eStartJourney);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await page.getByRole("link", { name: productName }).click();
   await expect(page.getByRole("heading", { name: productName })).toBeVisible();
 
-  await page.getByRole("button", { name: "Start journey" }).click();
+  await page.getByRole("button", { name: "Start Journey" }).click();
 
   const milestones = page.getByRole("list", { name: "Journey", exact: true });
   await expect(milestones.getByRole("listitem")).toHaveCount(7);
   await expect(milestones.locator('[aria-current="step"]')).toContainText(
     "Rough One-Pager",
   );
-  await expect(page.getByRole("button", { name: "Start journey" })).toHaveCount(
+  await expect(page.getByRole("button", { name: "Start Journey" })).toHaveCount(
     0,
   );
 

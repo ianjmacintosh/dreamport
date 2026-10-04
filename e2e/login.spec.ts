@@ -50,7 +50,7 @@ async function signIn(page: Page, email: string): Promise<void> {
     { timeout: 15_000 },
   );
 
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByRole("button", { name: "Send Code" }).click();
 
   await expect(
     page.getByRole("textbox", { name: "Six-digit code" }),
@@ -131,7 +131,7 @@ test("the send-code button stays disabled, with a status label, until the challe
   // exists even with the always-pass test key, since it still round-trips
   // through the widget's script.
   const button = page.getByRole("button", {
-    name: "Verifying you're human…",
+    name: "Verifying You're Human…",
   });
   await expect(button).toBeVisible();
   await expect(button).toBeDisabled();
@@ -141,7 +141,7 @@ test("the send-code button stays disabled, with a status label, until the challe
     { timeout: 15_000 },
   );
 
-  await expect(page.getByRole("button", { name: "Send code" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Send Code" })).toBeEnabled();
 });
 
 test("logged out: visiting /app with no session redirects to /login", async ({
@@ -253,7 +253,7 @@ test("advancing to the code step moves focus to the code field", async ({
     /.+/,
     { timeout: 15_000 },
   );
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByRole("button", { name: "Send Code" }).click();
 
   await expect(
     page.getByRole("textbox", { name: "Six-digit code" }),
@@ -270,7 +270,7 @@ test("a failed verification shows the error and moves focus to the first code bo
     /.+/,
     { timeout: 15_000 },
   );
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByRole("button", { name: "Send Code" }).click();
 
   await expect(
     page.getByRole("textbox", { name: "Six-digit code" }),
@@ -296,7 +296,7 @@ test("a wrong code shows the error above the code field and clears the boxes", a
     /.+/,
     { timeout: 15_000 },
   );
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByRole("button", { name: "Send Code" }).click();
 
   // The fixed test code is "000000" — anything else is wrong.
   await page.getByRole("textbox", { name: "Six-digit code" }).fill("111111");
@@ -333,7 +333,7 @@ test('"Request a new code" links back to a blank email step', async ({
     /.+/,
     { timeout: 15_000 },
   );
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByRole("button", { name: "Send Code" }).click();
 
   const requestNewCode = page.getByRole("link", { name: "Request a new code" });
   await expect(requestNewCode).toHaveAttribute("href", "/login");
@@ -371,7 +371,7 @@ test("the send-code button disables and relabels while the request is in flight"
     },
   );
 
-  const sendButton = page.getByRole("button", { name: "Send code" });
+  const sendButton = page.getByRole("button", { name: "Send Code" });
   await sendButton.click();
 
   await expect(page.getByRole("button", { name: "Sending…" })).toBeDisabled();
@@ -393,8 +393,8 @@ test("delete account from /app/settings: confirm, follow the emailed link, sessi
   await openAccountMenu(page, email);
   await page.getByRole("menuitem", { name: "Settings" }).click();
   await expect(page).toHaveURL(/\/app\/settings$/);
-  await page.getByRole("button", { name: "Delete account" }).click();
-  await page.getByRole("button", { name: "Email me a deletion link" }).click();
+  await page.getByRole("button", { name: "Delete Account" }).click();
+  await page.getByRole("button", { name: "Email Me a Deletion Link" }).click();
   await expect(page.getByText(/Check your email/)).toBeVisible();
 
   // Read the confirmation link the mock sender was handed, the same way the
@@ -425,7 +425,7 @@ test("after a successful verify, the verify button stays disabled until /app loa
     /.+/,
     { timeout: 15_000 },
   );
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByRole("button", { name: "Send Code" }).click();
   await expect(
     page.getByRole("textbox", { name: "Six-digit code" }),
   ).toBeVisible();

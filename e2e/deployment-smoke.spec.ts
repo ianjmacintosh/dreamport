@@ -63,7 +63,7 @@ test.describe("deployed Turnstile smoke", () => {
     ).toHaveValue(/.+/, { timeout: 30_000 });
 
     await page.getByLabel("Email address").fill(TEST_EMAILS.deploySmoke);
-    await page.getByRole("button", { name: "Send code" }).click();
+    await page.getByRole("button", { name: "Send Code" }).click();
 
     // Reaching the code step means the Worker verified the token (so
     // TURNSTILE_SECRET_KEY is set and the key pair matches) and Better Auth

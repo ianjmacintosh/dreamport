@@ -82,7 +82,7 @@ const ERROR_ID = "login-error";
  *
  * The code step is Base UI's `OTPField` — one `.input.otp-field-input` box per
  * digit, with paste-splitting and arrow/backspace movement between boxes —
- * stacked above "Verify and sign in" (#128). `autoSubmit` submits the form
+ * stacked above "Verify and Sign In" (#128). `autoSubmit` submits the form
  * the moment the last digit lands, so typing or pasting the code is enough;
  * a wrong code clears the boxes for another try, with the error shown
  * above them. "Request a new code" is a quiet link (`.link-quiet`) to
@@ -92,8 +92,8 @@ const ERROR_ID = "login-error";
  *
  * The email step's submit button sits beside the email field (`.field-row`)
  * rather than below the widget, and stays disabled — with a label explaining
- * why — until Turnstile actually resolves: "Verifying you're human…" while
- * the challenge is still loading, "Send code" once a token exists. That's a
+ * why — until Turnstile actually resolves: "Verifying You're Human…" while
+ * the challenge is still loading, "Send Code" once a token exists. That's a
  * native `disabled`, the same mechanism already used for the in-flight
  * pending state, not `aria-disabled` — the label itself carries the reason,
  * so there's nothing an `aria-describedby` would add, and it avoids a second
@@ -269,9 +269,9 @@ function Login() {
               }
             >
               <Button.State name="verifying">
-                Verifying you're human…
+                Verifying You're Human…
               </Button.State>
-              <Button.State name="ready">Send code</Button.State>
+              <Button.State name="ready">Send Code</Button.State>
               <Button.State name="pending">Sending…</Button.State>
             </Button>
           </div>
@@ -336,7 +336,7 @@ function Login() {
             disabled={isSubmitting}
             state={isSubmitting ? "pending" : "ready"}
           >
-            <Button.State name="ready">Verify and sign in</Button.State>
+            <Button.State name="ready">Verify and Sign In</Button.State>
             <Button.State name="pending">Verifying…</Button.State>
           </Button>
           <p className="login-resend">

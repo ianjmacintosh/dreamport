@@ -22,8 +22,8 @@ function HomepageMockup() {
           place, so planning feels like part of the adventure.
         </p>
         <div>
-          <Button variant="primary">Get started</Button>{" "}
-          <Button variant="secondary">See how it works</Button>
+          <Button variant="primary">Get Started</Button>{" "}
+          <Button variant="secondary">See How It Works</Button>
         </div>
       </section>
 
@@ -36,7 +36,7 @@ function HomepageMockup() {
         <form onSubmit={(event) => event.preventDefault()}>
           <TextInput id="hp-signup-email" label="Email" type="email" />
           <Button variant="primary" type="submit">
-            Join the waitlist
+            Join the Waitlist
           </Button>
         </form>
       </section>

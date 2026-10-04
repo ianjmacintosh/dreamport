@@ -183,14 +183,14 @@ const CONNECTION_FAILED =
  * heading/paragraph primitives in plain document order.
  *
  * The Product's own description (#112) sits under the heading — its text,
- * or "No description yet." — with an "Edit description" button that swaps
+ * or "No description yet." — with an "Edit Description" button that swaps
  * it for a pre-filled `TextInput` + Save / Cancel `.field-row`, the same
  * in-place edit shape an Idea row's rename uses. Single-line on purpose:
  * no multi-line text component exists yet (see #112).
  *
  * Journey (#137) is its own `<h2>` section between the description and the
  * Ideas — plain markup, no new CSS, by sign-off: before starting, the
- * Path's name and methodology note plus "Start journey"; once started, an
+ * Path's name and methodology note plus "Start Journey"; once started, an
  * `<ol>` of every Milestone in order, each led by its status as text
  * ("Done" / "Current" / "Future"). The current one is bold, marked
  * `aria-current="step"`, and the only one showing its description and
@@ -327,7 +327,7 @@ function ProductHome() {
           <p>{product.description ?? "No description yet."}</p>
           <p>
             <Button variant="secondary" onClick={startEditingDescription}>
-              Edit description
+              Edit Description
             </Button>
           </p>
         </>
@@ -361,7 +361,7 @@ function ProductHome() {
             state={isStartingJourney ? "pending" : "ready"}
             onClick={() => void startJourney()}
           >
-            <Button.State name="ready">Start journey</Button.State>
+            <Button.State name="ready">Start Journey</Button.State>
             <Button.State name="pending">Starting…</Button.State>
           </Button>
         </p>
@@ -386,7 +386,7 @@ function ProductHome() {
  * section stands apart from the description and Journey above it.
  *
  * The add-Idea form puts its name field and its `TagPicker` side by side
- * (`.field-pair`, 3:1), then "Add idea" below both, so the Tags read as part
+ * (`.field-pair`, 3:1), then "Add Idea" below both, so the Tags read as part
  * of the form (#113); `.form-section` sets it apart from the list under it.
  * The list itself is a real `<ul>`/`<li>` — free correctness, not
  * design-system elaboration, the same tier as `<h1>` over a styled `<div>`
@@ -593,7 +593,7 @@ function ProductIdeas({
           disabled={isAdding}
           state={isAdding ? "pending" : "ready"}
         >
-          <Button.State name="ready">Add idea</Button.State>
+          <Button.State name="ready">Add Idea</Button.State>
           <Button.State name="pending">Adding…</Button.State>
         </Button>
       </form>

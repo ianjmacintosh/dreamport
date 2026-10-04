@@ -251,7 +251,7 @@ a.button {
 }
 
 /* ── Primitives: stable-width button label ─────────────────── */
-/* A button whose label swaps between states (e.g. "Send code" ->
+/* A button whose label swaps between states (e.g. "Send Code" ->
    "Sending…") resizing along with the swap reads as a jump, not a state
    change (#90). Stacking every possible label in the same Grid cell (all
    sharing `grid-area: 1 / 1`) makes the button's own intrinsic width
@@ -313,7 +313,7 @@ a.button {
 }
 
 /* A labelled field paired with its own action button, side by side (e.g. the
-   email field + "Send code") instead of stacked. Two explicit rows — the
+   email field + "Send Code") instead of stacked. Two explicit rows — the
    label alone, then the input beside the button — so the button's own top
    and bottom edges land flush with the input's, not with the label-plus-
    input stack as a whole. `.input-group` (TextInput's own wrapper) is set to

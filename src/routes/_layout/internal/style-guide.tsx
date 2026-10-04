@@ -140,7 +140,7 @@ function ButtonLabelStackDemo() {
           setTimeout(() => setIsSubmitting(false), 1200);
         }}
       >
-        <Button.State name="ready">Send code</Button.State>
+        <Button.State name="ready">Send Code</Button.State>
         <Button.State name="pending">Sending…</Button.State>
       </Button>
     </div>
@@ -407,7 +407,7 @@ function StyleGuide() {
       <Section id="button-label-stack" label="Button label stack">
         <ButtonLabelStackDemo />
         <Snippet
-          code={`<Button disabled={isSubmitting} state={isSubmitting ? "pending" : "ready"}>\n  <Button.State name="ready">Send code</Button.State>\n  <Button.State name="pending">Sending…</Button.State>\n</Button>`}
+          code={`<Button disabled={isSubmitting} state={isSubmitting ? "pending" : "ready"}>\n  <Button.State name="ready">Send Code</Button.State>\n  <Button.State name="pending">Sending…</Button.State>\n</Button>`}
         />
         <p className="sg-note">
           Pass <code>state</code> plus one{" "}
@@ -605,22 +605,22 @@ function StyleGuide() {
         <div className="sg-field-row-demo">
           <div className="field-row">
             <TextInput id="sg-field-row-input" label="Email address" />
-            <Button variant="primary">Send code</Button>
+            <Button variant="primary">Send Code</Button>
           </div>
         </div>
         <Snippet
-          code={`<div className="field-row">\n  <TextInput id="email" label="Email address" />\n  <Button>Send code</Button>\n</div>`}
+          code={`<div className="field-row">\n  <TextInput id="email" label="Email address" />\n  <Button>Send Code</Button>\n</div>`}
         />
         <p className="sg-note">
           Use <code>.field-row</code> whenever a labelled field has exactly one
-          action attached to it (e.g. an email field + "Send code"), instead of
+          action attached to it (e.g. an email field + "Send Code"), instead of
           stacking the button below. Its button sits flush with the input&apos;s
           own top and bottom edges, not the label — verified pixel-for-pixel,
           not eyeballed (docs/adr/0012). It's for a single field with a single
           action — for two or more buttons with no field attached, use{" "}
           <code>.button-group</code> above instead. Below 640px (
           <code>--breakpoint-sm</code>) it stacks to a single column instead — a
-          button's own widest label (e.g. "Verifying you're human…") was
+          button's own widest label (e.g. "Verifying You're Human…") was
           squeezing the input down to almost nothing on a narrow screen
           otherwise (#90); resize the window to see it.
         </p>

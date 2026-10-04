@@ -81,7 +81,7 @@ function Settings() {
             setDeleteStep("confirming");
           }}
         >
-          Delete account
+          Delete Account
         </Button>
       )}
       {deleteStep === "confirming" && (
@@ -91,7 +91,7 @@ function Settings() {
             email you a link to confirm.
           </p>
           <Button variant="primary" onClick={() => void requestDeletion()}>
-            Email me a deletion link
+            Email Me a Deletion Link
           </Button>
           <Button
             variant="secondary"

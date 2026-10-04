@@ -13,7 +13,7 @@
 }
 
 /* The code step's "Email never arrived? Request a new code" line sits below
-   "Verify and sign in" with the same breathing room the form's fields
+   "Verify and Sign In" with the same breathing room the form's fields
    leave (#128). */
 .login-resend {
   margin-top: var(--space-4);
