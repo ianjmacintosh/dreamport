@@ -3,6 +3,11 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
 import Link from "../../components/Link";
+// PROTOTYPE (#137) — throwaway; remove with the -journey-prototype folder.
+import {
+  JourneyPrototype,
+  usePrototypeVariant,
+} from "./-journey-prototype/JourneyPrototype";
 
 /**
  * Plain `fetch` never times out on its own — if the server accepts the TCP
@@ -136,6 +141,7 @@ function ProductJourney() {
     useState<JourneyState>(initialJourneyState);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState("");
+  const protoVariant = usePrototypeVariant();
   const { path, journey } = journeyState;
   const currentIndex = journey
     ? path.milestones.findIndex(
@@ -167,6 +173,17 @@ function ProductJourney() {
     } finally {
       setIsStarting(false);
     }
+  }
+
+  if (protoVariant) {
+    return (
+      <JourneyPrototype
+        variant={protoVariant}
+        product={product}
+        milestones={path.milestones}
+        realCurrentIndex={currentIndex}
+      />
+    );
   }
 
   return (
