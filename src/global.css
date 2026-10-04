@@ -1191,3 +1191,87 @@ button.tag-more[data-popup-open] {
 .tag-picker-placeholder {
   color: var(--color-text-primary);
 }
+
+/* ── Components: Journey route ─────────────────────────────── */
+/* A Product's Journey page (#137, picked from a prototype on branch
+   `prototype/journey-ux`): the Milestones as a route down the left —
+   numbered dots joined by a line — beside the content for where you are
+   (before starting, what starting does; after, the current Milestone's
+   work). Below 640px the content stacks above the route, so Start Journey
+   or the current work isn't under all seven stops. */
+.journey-split {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  column-gap: var(--space-8);
+  align-items: start;
+}
+
+.journey-route {
+  display: grid;
+  list-style: none;
+  padding: 0;
+}
+
+.journey-route-stop {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  column-gap: var(--space-4);
+  padding-bottom: var(--space-5);
+}
+
+/* The line joining each dot to the next. */
+.journey-route-stop:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: calc(1rem - 1px);
+  top: 2rem;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border);
+}
+
+.journey-route-dot {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-page-bg);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.journey-route-name {
+  align-self: center;
+  font-weight: 700;
+}
+
+/* Done: a grey filled circle, a check in place of the number. */
+.journey-route-stop[data-status="done"] .journey-route-dot {
+  border-color: var(--color-done);
+  background: var(--color-done);
+  color: var(--color-accent-text);
+}
+
+.journey-route-stop[data-status="current"] .journey-route-dot {
+  border-color: var(--color-heading);
+  background: var(--color-heading);
+  color: var(--color-accent-text);
+}
+
+.journey-route-stop[data-status="current"] .journey-route-name {
+  color: var(--color-heading);
+}
+
+@media (max-width: 640px) {
+  .journey-split {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-6);
+  }
+
+  .journey-split > section {
+    grid-row: 1;
+  }
+}

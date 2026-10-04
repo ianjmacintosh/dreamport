@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { CheckIcon } from "@phosphor-icons/react";
 
 import Button from "../../components/Button";
 import Link from "../../components/Link";
@@ -69,13 +70,17 @@ interface JourneyState {
 }
 
 /**
- * A started Journey's Milestone status, by position: before the current
- * one done, after it future (strict sequencing, see CONTEXT.md's Journey).
+ * A Milestone's status, by position: before the current one done, after it
+ * future (strict sequencing, see CONTEXT.md's Journey). Before starting
+ * there's no current one, so every Milestone is future.
  */
-function milestoneStatus(index: number, currentIndex: number): string {
-  if (index < currentIndex) return "Done";
-  if (index === currentIndex) return "Current";
-  return "Future";
+function milestoneStatus(
+  index: number,
+  currentIndex: number,
+): "done" | "current" | "future" {
+  if (currentIndex < 0 || index > currentIndex) return "future";
+  if (index === currentIndex) return "current";
+  return "done";
 }
 
 const START_JOURNEY_FAILED =
@@ -114,14 +119,16 @@ export const Route = createFileRoute(
  * Product home ("Learn More" before starting, "View Journey" after). Its
  * own page so the Product home only needs a line about it.
  *
- * Plain markup, no new CSS, by sign-off: the Path's name and methodology
- * note, then an `<ol>` of its Milestones in order. Before starting, just
- * their names — the whole route at a glance — followed by a line saying
- * what starting does and "Start Journey". Once started, each Milestone is
- * led by its status as text ("Done" / "Current" / "Future"); the current
- * one is bold, marked `aria-current="step"`, and the only one showing its
- * description and "Done when" line. A styled stepper would be its own
- * design decision.
+ * The Product's name is the h1 and "Journey" the h2, so the page reads as
+ * part of the Product. Below them, `.journey-split` (see global.css): the
+ * Milestones as a route on the left, the content for where you are on the
+ * right — before starting, what starting does and "Start Journey"; after,
+ * the current Milestone's name, description and "Done when" line. Picked
+ * from the prototype on branch `prototype/journey-ux` (#137).
+ *
+ * The route is an `<ol>`, so screen readers already number each stop; the
+ * dot's visible number is hidden from them. A done stop's dot shows a check
+ * instead, labelled "Done", and the current one is `aria-current="step"`.
  *
  * Ends with a plain "Back to {Product}" link, the same shape as the
  * Product home's own "Back to Products" (see #109 for whether that grows
@@ -169,53 +176,64 @@ function ProductJourney() {
     }
   }
 
+  const currentMilestone = path.milestones[currentIndex];
+
   return (
     <>
-      <h1>Journey: {product.name}</h1>
-      <p>
-        {path.name} · {path.methodology}
-      </p>
-      <ol aria-label="Milestones">
-        {path.milestones.map((milestone, index) => {
-          if (!journey) {
-            return <li key={milestone.id}>{milestone.name}</li>;
-          }
-          const status = milestoneStatus(index, currentIndex);
-          return index === currentIndex ? (
-            <li key={milestone.id} aria-current="step">
-              <strong>
-                {status}: {milestone.name}
-              </strong>
-              <p>{milestone.description}</p>
-              <p>Done when: {milestone.doneWhen}</p>
-            </li>
+      <h1>{product.name}</h1>
+      <h2>Journey</h2>
+      <div className="journey-split">
+        <ol aria-label="Milestones" className="journey-route">
+          {path.milestones.map((milestone, index) => {
+            const status = milestoneStatus(index, currentIndex);
+            return (
+              <li
+                key={milestone.id}
+                className="journey-route-stop"
+                data-status={status}
+                aria-current={status === "current" ? "step" : undefined}
+              >
+                <span className="journey-route-dot">
+                  {status === "done" ? (
+                    <CheckIcon weight="bold" role="img" aria-label="Done" />
+                  ) : (
+                    <span aria-hidden="true">{index + 1}</span>
+                  )}
+                </span>
+                <span className="journey-route-name">{milestone.name}</span>
+              </li>
+            );
+          })}
+        </ol>
+        <section>
+          {currentMilestone ? (
+            <>
+              <h3>{currentMilestone.name}</h3>
+              <p>{currentMilestone.description}</p>
+              <p>
+                <strong>Done when:</strong> {currentMilestone.doneWhen}
+              </p>
+            </>
           ) : (
-            <li key={milestone.id}>
-              {status}: {milestone.name}
-            </li>
-          );
-        })}
-      </ol>
-      {!journey && (
-        <>
-          <p>
-            Starting puts this Product on Milestone 1,{" "}
-            {path.milestones[0]?.name}. It doesn't change your Ideas or
-            description.
-          </p>
-          <p>
-            <Button
-              disabled={isStarting}
-              state={isStarting ? "pending" : "ready"}
-              onClick={() => void startJourney()}
-            >
-              <Button.State name="ready">Start Journey</Button.State>
-              <Button.State name="pending">Starting…</Button.State>
-            </Button>
-          </p>
-        </>
-      )}
-      {error && <p role="alert">{error}</p>}
+            <>
+              <p>
+                Starting puts this Product on Milestone 1,{" "}
+                {path.milestones[0]?.name}. It doesn&apos;t change your Ideas or
+                description.
+              </p>
+              <Button
+                disabled={isStarting}
+                state={isStarting ? "pending" : "ready"}
+                onClick={() => void startJourney()}
+              >
+                <Button.State name="ready">Start Journey</Button.State>
+                <Button.State name="pending">Starting…</Button.State>
+              </Button>
+            </>
+          )}
+          {error && <p role="alert">{error}</p>}
+        </section>
+      </div>
 
       <p>
         <Link href={`/app/products/${product.id}`} current={false}>
