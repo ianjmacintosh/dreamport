@@ -141,7 +141,7 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
     const journey = (await journeyRes.json()) as JourneyState;
     return { product, ideas, tagCatalog: tags, journey };
   },
-  component: ProductIdeas,
+  component: ProductHome,
 });
 
 /** PUT an Idea's whole Tag set (#113); the stored set, or `null` on failure. */
@@ -177,34 +177,10 @@ const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
 /**
- * A single Product's own flat list of Ideas (#99) — add one, see them all.
- * Reached from `/app` via a link on the Product's own name.
- *
- * Composed from `TextInput`/`Button` plus heading/paragraph primitives in
- * plain document order, same minimal treatment `/app`'s own Products list
- * had at #88. The add-Idea form puts its name field and its `TagPicker` side
- * by side (`.field-pair`, 3:1), then "Add idea" below both, so the Tags read
- * as part of the form (#113); `.form-section` sets it apart from the list
- * under it. The list itself is a real `<ul>`/`<li>` —
- * free correctness, not design-system elaboration, the same tier as
- * `<h1>` over a styled `<div>` — with `aria-labelledby` pointing at its own
- * "Ideas" `<h2>` rather than the page's `<h1>`, so it's announced as
- * "Ideas, list," not "Product: {name}, list" (#101).
- *
- * Ends with a plain `<Link href="/app">Back to Products</Link>` — this page
- * otherwise had no way back to the Products list. Same markup
- * `/app/settings` already uses for its own "Back to Products" link, not a
- * new component; whether this grows into a dedicated nav/breadcrumb
- * component (here and retrofitted onto Settings) is its own sign-off
- * question, tracked in #109.
- *
- * Rename (#102) swaps a row in place, one row at a time. Resting, a row's
- * actions are Edit / Delete. Editing, the row becomes a form laid out like the
- * add form (#113) — a pre-filled "Rename" `TextInput` beside a `TagPicker`,
- * then Save / Cancel / Delete as a `.button-group` — on a tinted panel
- * (`.list-row--editing`). Clicking Delete (from either)
- * shows Edit / Delete / Cancel — the confirming button keeps the action's own
- * verb, "Delete," rather than a generic "Confirm" (#101).
+ * A single Product's home page, reached from `/app` via a link on the
+ * Product's own name: its description, its Journey, and its Ideas
+ * (`ProductIdeas`, below). Composed from existing components plus
+ * heading/paragraph primitives in plain document order.
  *
  * The Product's own description (#112) sits under the heading — its text,
  * or "No description yet." — with an "Edit description" button that swaps
@@ -212,21 +188,23 @@ const CONNECTION_FAILED =
  * in-place edit shape an Idea row's rename uses. Single-line on purpose:
  * no multi-line text component exists yet (see #112).
  *
- * Tags (#113): a resting row (`.list-row--tagged`) shows its Idea's Tags as
- * pills (`TagList`) in a fixed-width column between the name and the
- * actions — as many as fit, then "+N". Tags are saved with their own PUT,
- * after the Idea's create (POST) or rename (PATCH) succeeds.
- *
  * Journey (#137) is its own `<h2>` section between the description and the
- * Ideas form — plain markup, no new CSS, by sign-off: before starting, the
+ * Ideas — plain markup, no new CSS, by sign-off: before starting, the
  * Path's name and methodology note plus "Start journey"; once started, an
  * `<ol>` of every Milestone in order, each led by its status as text
  * ("Done" / "Current" / "Future"). The current one is bold, marked
  * `aria-current="step"`, and the only one showing its description and
  * "Done when" line. A styled stepper or real tabs would be their own design
  * decision.
+ *
+ * Ends with a plain `<Link href="/app">Back to Products</Link>` — this page
+ * otherwise had no way back to the Products list. Same markup
+ * `/app/settings` already uses for its own "Back to Products" link, not a
+ * new component; whether this grows into a dedicated nav/breadcrumb
+ * component (here and retrofitted onto Settings) is its own sign-off
+ * question, tracked in #109.
  */
-function ProductIdeas() {
+function ProductHome() {
   const {
     product: initialProduct,
     ideas: initialIdeas,
@@ -238,152 +216,9 @@ function ProductIdeas() {
   const [isStartingJourney, setIsStartingJourney] = useState(false);
   const [product, setProduct] = useState<Product>(initialProduct);
   const [error, setError] = useState("");
-  const [ideas, setIdeas] = useState<Idea[]>(initialIdeas);
-  const [ideaName, setIdeaName] = useState("");
-  const [ideaTags, setIdeaTags] = useState<string[]>([]);
-  const [isAdding, setIsAdding] = useState(false);
-  // Only ever one row's delete in flight, and one row confirming, at a time
-  // — no bulk delete — so a single id each (rather than a set) is enough to
-  // track them.
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  // Same single-id convention for rename (#102): one row editing at a time.
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editTags, setEditTags] = useState<string[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [isSavingDescription, setIsSavingDescription] = useState(false);
-
-  async function addIdea() {
-    setError("");
-    setIsAdding(true);
-    try {
-      const res = await fetch(`/api/products/${product.id}/ideas`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: ideaName }),
-      });
-      if (!res.ok) {
-        setError(ADD_IDEA_FAILED);
-        return;
-      }
-      const { idea } = (await res.json()) as { idea: Idea };
-      // The Idea exists now whether or not its Tags save — so it's listed
-      // either way, and a Tag failure gets its own message.
-      const tags =
-        ideaTags.length > 0
-          ? await putIdeaTags(product.id, idea.id, ideaTags).catch(() => null)
-          : [];
-      // Reflect the new Idea immediately — no full page reload or refetch
-      // needed for a list this size.
-      setIdeas((prev) => [...prev, { ...idea, tags: tags ?? [] }]);
-      setIdeaName("");
-      setIdeaTags([]);
-      if (!tags) {
-        setError(ADD_IDEA_TAGS_FAILED);
-      }
-    } catch {
-      setError(CONNECTION_FAILED);
-    } finally {
-      setIsAdding(false);
-    }
-  }
-
-  async function deleteIdea(id: string) {
-    setError("");
-    setConfirmingId(null);
-    setDeletingId(id);
-    try {
-      // The row itself carries the pending button, so removing it has to
-      // wait for the same floor `withMinimumDuration` enforces — done
-      // inside the callback, the removal would unmount the row (and its
-      // "Deleting…" button) the instant the request resolves, cutting the
-      // pending state short exactly the way the timeout was meant to fix.
-      const ok = await withMinimumDuration(async () => {
-        const res = await fetchWithTimeout(
-          `/api/products/${product.id}/ideas/${id}`,
-          {
-            method: "DELETE",
-          },
-        );
-        return res.ok;
-      });
-      if (!ok) {
-        setError(DELETE_IDEA_FAILED);
-        return;
-      }
-      setIdeas((prev) => prev.filter((idea) => idea.id !== id));
-    } catch {
-      setError(CONNECTION_FAILED);
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
-  // Editing and confirming a delete are mutually exclusive across the whole
-  // list — entering either one leaves the other.
-  function startEditing(idea: Idea) {
-    setError("");
-    setConfirmingId(null);
-    setEditingId(idea.id);
-    setEditName(idea.name);
-    setEditTags(idea.tags);
-  }
-
-  function startConfirmingDelete(id: string) {
-    setError("");
-    setEditingId(null);
-    setConfirmingId(id);
-  }
-
-  async function saveIdea(id: string) {
-    setError("");
-    setIsSaving(true);
-    try {
-      const saved = await withMinimumDuration(async () => {
-        const res = await fetchWithTimeout(
-          `/api/products/${product.id}/ideas/${id}`,
-          {
-            method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ name: editName }),
-          },
-        );
-        if (!res.ok) {
-          return null;
-        }
-        const renamed = ((await res.json()) as { idea: Idea }).idea;
-        const tags = await putIdeaTags(product.id, id, editTags).catch(
-          () => null,
-        );
-        // A failed Tag save still keeps the rename that did land.
-        return { renamed, tags };
-      });
-      if (!saved) {
-        setError(SAVE_IDEA_FAILED);
-        return;
-      }
-      // The server's copies, not `editName`/`editTags` — the trimmed,
-      // stored name and the deduplicated, sorted Tags.
-      const { renamed, tags } = saved;
-      setIdeas((prev) =>
-        prev.map((idea) =>
-          idea.id === id ? { ...renamed, tags: tags ?? renamed.tags } : idea,
-        ),
-      );
-      if (!tags) {
-        setError(SAVE_IDEA_FAILED);
-        return;
-      }
-      setEditingId(null);
-    } catch {
-      setError(CONNECTION_FAILED);
-    } finally {
-      setIsSaving(false);
-    }
-  }
 
   async function startJourney() {
     setError("");
@@ -449,7 +284,7 @@ function ProductIdeas() {
 
   return (
     <>
-      <h1 id="ideas-heading">Product: {product.name}</h1>
+      <h1>Product: {product.name}</h1>
       {isEditingDescription ? (
         <form
           className="field-row"
@@ -531,6 +366,203 @@ function ProductIdeas() {
           </Button>
         </p>
       )}
+      <ProductIdeas
+        productId={product.id}
+        initialIdeas={initialIdeas}
+        tagCatalog={tagCatalog}
+      />
+      {error && <p role="alert">{error}</p>}
+
+      <p>
+        <Link href="/app">Back to Products</Link>
+      </p>
+    </>
+  );
+}
+
+/**
+ * A Product's own flat list of Ideas (#99) — add one, see them all. A child
+ * of `ProductHome`, with its own state and its own error line, so the Ideas
+ * section stands apart from the description and Journey above it.
+ *
+ * The add-Idea form puts its name field and its `TagPicker` side by side
+ * (`.field-pair`, 3:1), then "Add idea" below both, so the Tags read as part
+ * of the form (#113); `.form-section` sets it apart from the list under it.
+ * The list itself is a real `<ul>`/`<li>` — free correctness, not
+ * design-system elaboration, the same tier as `<h1>` over a styled `<div>`
+ * — with `aria-labelledby` pointing at its own "Ideas" `<h2>` rather than
+ * the page's `<h1>`, so it's announced as "Ideas, list," not
+ * "Product: {name}, list" (#101).
+ *
+ * Rename (#102) swaps a row in place, one row at a time. Resting, a row's
+ * actions are Edit / Delete. Editing, the row becomes a form laid out like the
+ * add form (#113) — a pre-filled "Rename" `TextInput` beside a `TagPicker`,
+ * then Save / Cancel / Delete as a `.button-group` — on a tinted panel
+ * (`.list-row--editing`). Clicking Delete (from either)
+ * shows Edit / Delete / Cancel — the confirming button keeps the action's own
+ * verb, "Delete," rather than a generic "Confirm" (#101).
+ *
+ * Tags (#113): a resting row (`.list-row--tagged`) shows its Idea's Tags as
+ * pills (`TagList`) in a fixed-width column between the name and the
+ * actions — as many as fit, then "+N". Tags are saved with their own PUT,
+ * after the Idea's create (POST) or rename (PATCH) succeeds.
+ */
+function ProductIdeas({
+  productId,
+  initialIdeas,
+  tagCatalog,
+}: {
+  productId: string;
+  initialIdeas: Idea[];
+  tagCatalog: string[];
+}) {
+  const [error, setError] = useState("");
+  const [ideas, setIdeas] = useState<Idea[]>(initialIdeas);
+  const [ideaName, setIdeaName] = useState("");
+  const [ideaTags, setIdeaTags] = useState<string[]>([]);
+  const [isAdding, setIsAdding] = useState(false);
+  // Only ever one row's delete in flight, and one row confirming, at a time
+  // — no bulk delete — so a single id each (rather than a set) is enough to
+  // track them.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  // Same single-id convention for rename (#102): one row editing at a time.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function addIdea() {
+    setError("");
+    setIsAdding(true);
+    try {
+      const res = await fetch(`/api/products/${productId}/ideas`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: ideaName }),
+      });
+      if (!res.ok) {
+        setError(ADD_IDEA_FAILED);
+        return;
+      }
+      const { idea } = (await res.json()) as { idea: Idea };
+      // The Idea exists now whether or not its Tags save — so it's listed
+      // either way, and a Tag failure gets its own message.
+      const tags =
+        ideaTags.length > 0
+          ? await putIdeaTags(productId, idea.id, ideaTags).catch(() => null)
+          : [];
+      // Reflect the new Idea immediately — no full page reload or refetch
+      // needed for a list this size.
+      setIdeas((prev) => [...prev, { ...idea, tags: tags ?? [] }]);
+      setIdeaName("");
+      setIdeaTags([]);
+      if (!tags) {
+        setError(ADD_IDEA_TAGS_FAILED);
+      }
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setIsAdding(false);
+    }
+  }
+
+  async function deleteIdea(id: string) {
+    setError("");
+    setConfirmingId(null);
+    setDeletingId(id);
+    try {
+      // The row itself carries the pending button, so removing it has to
+      // wait for the same floor `withMinimumDuration` enforces — done
+      // inside the callback, the removal would unmount the row (and its
+      // "Deleting…" button) the instant the request resolves, cutting the
+      // pending state short exactly the way the timeout was meant to fix.
+      const ok = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(
+          `/api/products/${productId}/ideas/${id}`,
+          {
+            method: "DELETE",
+          },
+        );
+        return res.ok;
+      });
+      if (!ok) {
+        setError(DELETE_IDEA_FAILED);
+        return;
+      }
+      setIdeas((prev) => prev.filter((idea) => idea.id !== id));
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  // Editing and confirming a delete are mutually exclusive across the whole
+  // list — entering either one leaves the other.
+  function startEditing(idea: Idea) {
+    setError("");
+    setConfirmingId(null);
+    setEditingId(idea.id);
+    setEditName(idea.name);
+    setEditTags(idea.tags);
+  }
+
+  function startConfirmingDelete(id: string) {
+    setError("");
+    setEditingId(null);
+    setConfirmingId(id);
+  }
+
+  async function saveIdea(id: string) {
+    setError("");
+    setIsSaving(true);
+    try {
+      const saved = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(
+          `/api/products/${productId}/ideas/${id}`,
+          {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ name: editName }),
+          },
+        );
+        if (!res.ok) {
+          return null;
+        }
+        const renamed = ((await res.json()) as { idea: Idea }).idea;
+        const tags = await putIdeaTags(productId, id, editTags).catch(
+          () => null,
+        );
+        // A failed Tag save still keeps the rename that did land.
+        return { renamed, tags };
+      });
+      if (!saved) {
+        setError(SAVE_IDEA_FAILED);
+        return;
+      }
+      // The server's copies, not `editName`/`editTags` — the trimmed,
+      // stored name and the deduplicated, sorted Tags.
+      const { renamed, tags } = saved;
+      setIdeas((prev) =>
+        prev.map((idea) =>
+          idea.id === id ? { ...renamed, tags: tags ?? renamed.tags } : idea,
+        ),
+      );
+      if (!tags) {
+        setError(SAVE_IDEA_FAILED);
+        return;
+      }
+      setEditingId(null);
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <>
       <form
         className="form-section"
         onSubmit={(e) => {
@@ -695,10 +727,6 @@ function ProductIdeas() {
         </ul>
       )}
       {error && <p role="alert">{error}</p>}
-
-      <p>
-        <Link href="/app">Back to Products</Link>
-      </p>
     </>
   );
 }
