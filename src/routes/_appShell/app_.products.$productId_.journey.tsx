@@ -122,7 +122,8 @@ export const Route = createFileRoute(
  * The Product's name is the h1 and "Journey" the h2, so the page reads as
  * part of the Product. Below them, `.journey-split` (see global.css): the
  * Milestones as a route on the left, the content for where you are on the
- * right — before starting, what starting does and "Start Journey"; after,
+ * right — before starting, the Path's name, Ian's pitch for it, what
+ * starting does and "Start Journey"; after,
  * the current Milestone's name, description and "Done when" line. Picked
  * from the prototype on branch `prototype/journey-ux` (#137).
  *
@@ -216,6 +217,19 @@ function ProductJourney() {
             </>
           ) : (
             <>
+              <h3>{path.name}</h3>
+              <p>
+                Follow our &ldquo;{path.name}&rdquo; path to take your product
+                all the way from a rough idea to a profitable success. Start
+                simple by describing your product and the problem it solves,
+                adapt as you learn more about your audience and their problem
+                with guided exercises, and use that knowledge to make better
+                decisions. By doing the work to understand the problem better
+                than anyone else, you&apos;ll be able to solve it better than
+                everyone else. Instead of spending months building something and
+                hoping someone will want to buy it, {path.name} bakes pricing
+                into the product from the start.
+              </p>
               <p>
                 Starting puts this Product on Milestone 1,{" "}
                 {path.milestones[0]?.name}. It doesn&apos;t change your Ideas or

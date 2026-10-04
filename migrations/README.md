@@ -47,6 +47,9 @@ join table cascading off `ideas` on delete.
 Milestones, plus a `journeys` table (one row per Product per Path, holding
 its current Milestone) cascading off `products` on delete.
 
+`0008_dream_sequence.sql` renames that Path from "Starter Path" to "Dream
+Sequence" (issue #137).
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order
