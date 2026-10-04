@@ -103,19 +103,15 @@ function BigPicture({ milestones, currentIndex }: ViewProps) {
 
 function CurrentWork({
   milestone,
-  index,
   heading = "h3",
 }: {
   milestone: Milestone;
-  index: number;
   heading?: "h3" | "h2";
 }) {
   const H = heading;
   return (
     <>
-      <H>
-        Now: {index + 1}. {milestone.name}
-      </H>
+      <H>{milestone.name}</H>
       <p>{milestone.description}</p>
       <p>
         <strong>Done when:</strong> {milestone.doneWhen}
@@ -177,10 +173,7 @@ function VariantA(props: ViewProps) {
         })}
       </ol>
       {started ? (
-        <CurrentWork
-          milestone={milestones[currentIndex]}
-          index={currentIndex}
-        />
+        <CurrentWork milestone={milestones[currentIndex]} />
       ) : (
         <div className="journey-a-invite">
           <p>{invitation(milestones[0].name)}</p>
@@ -243,10 +236,7 @@ function VariantB(props: ViewProps) {
           <div className="journey-b-split">
             <RouteMap {...props} compact />
             <section className="journey-b-work">
-              <CurrentWork
-                milestone={milestones[currentIndex]}
-                index={currentIndex}
-              />
+              <CurrentWork milestone={milestones[currentIndex]} />
             </section>
           </div>
         </>
@@ -309,10 +299,7 @@ function VariantC(props: ViewProps) {
           </div>
           <Track {...props} />
           <section className="journey-c-work">
-            <CurrentWork
-              milestone={milestones[currentIndex]}
-              index={currentIndex}
-            />
+            <CurrentWork milestone={milestones[currentIndex]} />
           </section>
         </>
       ) : (
@@ -350,10 +337,7 @@ function VariantD(props: ViewProps) {
         <RouteMap {...props} compact={started} />
         <section className="journey-b-work">
           {started ? (
-            <CurrentWork
-              milestone={milestones[currentIndex]}
-              index={currentIndex}
-            />
+            <CurrentWork milestone={milestones[currentIndex]} />
           ) : (
             <>
               <h3>Placeholder heading for the pitch</h3>
