@@ -66,16 +66,30 @@ _Avoid_: stage, phase, step
 
 **Journey**:
 One Product's progress following one Path — started by the User, at the
-Path's first Milestone, advanced one Milestone at a time as the User is
-ready. Strictly sequenced: exactly one current Milestone, everything
-before it done, everything after it future. Advancing past the last
-Milestone finishes the Journey instead of moving further — a finished
-state, not staying on the last Milestone forever. A Product has at most
-one Journey per Path, so following a different Path later wouldn't
+Path's first Milestone. Strictly sequenced: exactly one current Milestone,
+everything before it done, everything after it future. A Product has at
+most one Journey per Path, so following a different Path later wouldn't
 overwrite progress on the first. A Journey always belongs to its Product
 — it's "Tarot's Journey," never a Journey called "Tarot." Its page is just
 "the Journey," the same way the Product's Ideas section is "Ideas."
 _Avoid_: progress, roadmap, track
+
+**Advance**:
+Move a Journey's current Milestone forward by one, something the User
+does whenever they're ready — not automatic, and not gated on anything
+the User hasn't themselves judged done. Advancing past the last Milestone
+finishes the Journey instead of moving further — a finished state, not
+staying on the last Milestone forever. The mirror of Return.
+_Avoid_: progress, complete (as a verb for this), next
+
+**Return**:
+Move a Journey's current Milestone backward by one — the mirror of
+Advance, for a User who wants to revisit a Milestone they've already
+passed (misread its "done when," did too little, or just wants another
+look). Returning from a finished Journey un-finishes it. Never
+destructive: nothing is deleted, since a Milestone is fixed content, not
+something a User's own work is attached to.
+_Avoid_: step back, go back, revert, undo, retreat
 
 **User**:
 A person with an account and a Private space of their own Products.

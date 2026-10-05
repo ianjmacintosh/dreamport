@@ -2057,6 +2057,16 @@ function advanceJourney(productId: string, cookie?: string) {
   });
 }
 
+/** Shared by the Journey return describe block below. */
+function returnJourney(productId: string, cookie?: string) {
+  return fetchWorker(`/api/products/${productId}/journey/return`, {
+    method: "POST",
+    headers: cookie
+      ? { origin: TRUSTED_ORIGIN, cookie }
+      : { origin: TRUSTED_ORIGIN },
+  });
+}
+
 /** The seeded default Path's Milestones, in order (#133's own wording). */
 const DEFAULT_PATH_MILESTONE_NAMES = [
   "Rough One-Pager",
@@ -2298,6 +2308,125 @@ describe("/api/products/:productId/journey/advance (#138)", () => {
     const advance = await advanceJourney(product.id, cookieB);
     expect(advance.status).toBe(404);
     expect(await advance.json()).toEqual({ error: "Not found" });
+
+    const after = (await (
+      await getJourney(product.id, cookieA)
+    ).json()) as JourneyResponse;
+    expect(after.journey).toEqual(before);
+  });
+});
+
+describe("/api/products/:productId/journey/return", () => {
+  it("un-finishes a finished Journey first, then returns one Milestone at a time back to Milestone 1", async () => {
+    const cookie = await signIn(TEST_EMAILS.journeysReturn);
+    const created = await addProduct(cookie, "Returned-through Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+    const { path } = (await (
+      await startJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    const milestoneIds = path.milestones.map((m) => m.id);
+    for (let i = 0; i < 7; i++) {
+      await advanceJourney(product.id, cookie);
+    }
+
+    // The mirror of finishing: advancing from Growth only set `finishedAt`,
+    // so the first Return only clears it, leaving Growth current (CONTEXT.md's
+    // Return).
+    const unfinished = await returnJourney(product.id, cookie);
+    expect(unfinished.status).toBe(200);
+    expect(((await unfinished.json()) as JourneyResponse).journey).toEqual({
+      startedAt: expect.any(String),
+      currentMilestoneId: milestoneIds[6],
+      finishedAt: null,
+    });
+
+    // Each Return after that moves back exactly one Milestone, 6 down to 1.
+    for (const milestoneId of milestoneIds.slice(0, 6).reverse()) {
+      const returned = await returnJourney(product.id, cookie);
+      expect(returned.status).toBe(200);
+      const { journey } = (await returned.json()) as JourneyResponse;
+      expect(journey).toEqual({
+        startedAt: expect.any(String),
+        currentMilestoneId: milestoneId,
+        finishedAt: null,
+      });
+    }
+
+    // What the Product home reads, too: stored, not just answered.
+    expect(
+      ((await (await getJourney(product.id, cookie)).json()) as JourneyResponse)
+        .journey,
+    ).toEqual({
+      startedAt: expect.any(String),
+      currentMilestoneId: milestoneIds[0],
+      finishedAt: null,
+    });
+  });
+
+  it("leaves a Journey on Milestone 1 as it was on a return", async () => {
+    const cookie = await signIn(TEST_EMAILS.journeysReturnAtFirst);
+    const created = await addProduct(cookie, "Return-at-first Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+    const started = (await (
+      await startJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+
+    // The Journey page hides Return here; a request anyway has nothing
+    // before Milestone 1 to move to.
+    const res = await returnJourney(product.id, cookie);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(started);
+  });
+
+  it("404s returning a Journey that hasn't started", async () => {
+    const cookie = await signIn(TEST_EMAILS.journeysReturnUnstarted);
+    const created = await addProduct(cookie, "Unstarted-return Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    expect((await returnJourney(product.id, cookie)).status).toBe(404);
+  });
+
+  it("rejects a return with no session", async () => {
+    expect((await returnJourney("some-id")).status).toBe(401);
+  });
+
+  it("rejects a return from an untrusted origin, returning nothing", async () => {
+    const cookie = await signIn(TEST_EMAILS.journeysReturnUntrusted);
+    const created = await addProduct(cookie, "Untrusted-return Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+    await startJourney(product.id, cookie);
+    const { journey: before } = (await (
+      await advanceJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+
+    const res = await fetchWorker(
+      `/api/products/${product.id}/journey/return`,
+      {
+        method: "POST",
+        headers: { origin: "https://evil.example.com", cookie },
+      },
+    );
+
+    expect(res.status).toBe(403);
+    const after = (await (
+      await getJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    expect(after.journey).toEqual(before);
+  });
+
+  it("404s a stranger's return of another User's Journey, never touching it", async () => {
+    const cookieA = await signIn(TEST_EMAILS.journeysReturnOwnerA);
+    const cookieB = await signIn(TEST_EMAILS.journeysReturnOwnerB);
+    const created = await addProduct(cookieA, "Owner A's returned Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+    await startJourney(product.id, cookieA);
+    const { journey: before } = (await (
+      await advanceJourney(product.id, cookieA)
+    ).json()) as JourneyResponse;
+
+    const res = await returnJourney(product.id, cookieB);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Not found" });
 
     const after = (await (
       await getJourney(product.id, cookieA)

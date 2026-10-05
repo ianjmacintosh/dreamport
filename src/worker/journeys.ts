@@ -160,6 +160,56 @@ export async function advanceJourney(
 }
 
 /**
+ * Return a Product's Journey on `pathId` by exactly one Milestone — the
+ * mirror of `advanceJourney` (see CONTEXT.md's Return). `null` means
+ * there's no Journey to return (hasn't started).
+ *
+ * Mirrors finishing exactly: advancing from the last Milestone only set
+ * `finishedAt`, leaving that Milestone current, so returning from a
+ * finished Journey only clears `finishedAt` — it takes a second Return to
+ * move back to the Milestone before it.
+ *
+ * On Milestone 1 there's no previous Milestone, so this is a no-op, the
+ * same way `advanceJourney` is once finished. The Journey page hides
+ * Return there; a request anyway just hands back the Journey as it was.
+ *
+ * One atomic `UPDATE` for the same race reason `advanceJourney` gives.
+ * SQLite evaluates every `SET` expression against the row as it was before
+ * the update, so the `CASE` sees the old `finishedAt` even though the same
+ * statement clears it.
+ */
+export async function returnJourney(
+  db: D1Database,
+  productId: string,
+  pathId: string,
+): Promise<Journey | null> {
+  await db
+    .prepare(
+      `UPDATE "journeys" SET
+         "currentMilestoneId" = CASE
+           WHEN "finishedAt" IS NOT NULL THEN "currentMilestoneId"
+           ELSE COALESCE(
+             (
+               SELECT "id" FROM "milestones" AS "previous"
+               WHERE "previous"."pathId" = "journeys"."pathId"
+                 AND "previous"."position" = (
+                   SELECT "position" - 1 FROM "milestones"
+                   WHERE "id" = "journeys"."currentMilestoneId"
+                 )
+             ),
+             "currentMilestoneId"
+           )
+         END,
+         "finishedAt" = NULL
+       WHERE "productId" = ? AND "pathId" = ?`,
+    )
+    .bind(productId, pathId)
+    .run();
+
+  return getJourney(db, productId, pathId);
+}
+
+/**
  * What `/api/products/:productId/journey` answers with: the default Path
  * with its Milestones, and the Product's Journey on it (`null` until
  * started).

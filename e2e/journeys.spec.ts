@@ -6,7 +6,8 @@ import { exemptFromRateLimits } from "./rate-limit-exemption";
 // Journeys (issue #137): sign in, open a Product, follow "Learn More" to its
 // Journey page, read the Path's Milestones, start the Journey, see
 // Milestone 1 current — then back on the Product home, see it named there.
-// Also covers advancing from Milestone 1 to Milestone 2 (issue #138).
+// Also covers advancing from Milestone 1 to Milestone 2 (issue #138), and
+// returning to Milestone 1 and advancing again.
 // Signs in the same way `ideas.spec.ts` does (fixed `+e2e-test@` code, see
 // docs/adr/0009).
 
@@ -81,8 +82,29 @@ test("sign in, open a Product, learn about its Journey, start it, and see Milest
     "Rough One-Pager",
   );
 
+  // Nothing comes before Milestone 1, so there's no Return yet.
+  const returnButton = page.getByRole("button", {
+    name: "Return to Previous Milestone",
+  });
+  await expect(returnButton).toHaveCount(0);
+
   // Advancing (#138) moves current to exactly the next Milestone.
-  await page.getByRole("button", { name: "Advance to Next Milestone" }).click();
+  const advanceButton = page.getByRole("button", {
+    name: "Advance to Next Milestone",
+  });
+  await advanceButton.click();
+  await expect(milestones.locator('[aria-current="step"]')).toContainText(
+    "Real Talk",
+  );
+
+  // Returning moves it back one, and Return goes away again on Milestone 1.
+  await returnButton.click();
+  await expect(milestones.locator('[aria-current="step"]')).toContainText(
+    "Rough One-Pager",
+  );
+  await expect(returnButton).toHaveCount(0);
+
+  await advanceButton.click();
   await expect(milestones.locator('[aria-current="step"]')).toContainText(
     "Real Talk",
   );
@@ -93,4 +115,55 @@ test("sign in, open a Product, learn about its Journey, start it, and see Milest
     page.getByText("Current Milestone: Real Talk (2 of 7)"),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "View Journey" })).toBeVisible();
+});
+
+test("finish a Journey, then Return: un-finished with Growth still current, and the Product home agrees", async ({
+  page,
+}) => {
+  const productName = `A finished app ${Date.now()}`;
+
+  await signIn(page, TEST_EMAILS.e2eReturnFromFinished);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add Product" }).click();
+  await page.getByRole("link", { name: productName }).click();
+  await page.getByRole("link", { name: "Learn More" }).click();
+  await page.getByRole("button", { name: "Start Journey" }).click();
+
+  const milestones = page.getByRole("list", { name: "Milestones" });
+  const current = milestones.locator('[aria-current="step"]');
+  const advanceButton = page.getByRole("button", {
+    name: "Advance to Next Milestone",
+  });
+  // Six advances take Milestone 1 to Growth, the last one.
+  for (const name of [
+    "Real Talk",
+    "Solution Matchmaking",
+    "Make It Real",
+    "Observe & Refine",
+    "Open Enrollment",
+    "Growth",
+  ]) {
+    await advanceButton.click();
+    await expect(current).toContainText(name);
+  }
+  await page.getByRole("button", { name: "Finish Journey" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Dream Sequence complete" }),
+  ).toBeVisible();
+
+  // Returning from finished mirrors finishing: it only un-finishes, so
+  // Growth is current again rather than the Milestone before it.
+  await page
+    .getByRole("button", { name: "Return to Previous Milestone" })
+    .click();
+  await expect(current).toContainText("Growth");
+  await expect(
+    page.getByRole("button", { name: "Finish Journey" }),
+  ).toBeVisible();
+
+  await page.getByRole("link", { name: `Back to ${productName}` }).click();
+  await expect(
+    page.getByText("Current Milestone: Growth (7 of 7)"),
+  ).toBeVisible();
 });

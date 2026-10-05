@@ -88,8 +88,16 @@ function milestoneStatus(
 
 const START_JOURNEY_FAILED =
   "We couldn't start the journey. Try again in a moment.";
-const ADVANCE_JOURNEY_FAILED =
-  "We couldn't advance the journey. Try again in a moment.";
+/**
+ * Advance or Return (CONTEXT.md) — also each one's endpoint under
+ * `/api/products/:productId/journey/`.
+ */
+type JourneyMove = "advance" | "return";
+
+const MOVE_JOURNEY_FAILED: Record<JourneyMove, string> = {
+  advance: "We couldn't advance the journey. Try again in a moment.",
+  return: "We couldn't return the journey. Try again in a moment.",
+};
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -152,7 +160,8 @@ function ProductJourney() {
   const [journeyState, setJourneyState] =
     useState<JourneyState>(initialJourneyState);
   const [isStarting, setIsStarting] = useState(false);
-  const [isAdvancing, setIsAdvancing] = useState(false);
+  /** Which way the Journey is mid-move, if it is — one move at a time. */
+  const [moving, setMoving] = useState<JourneyMove | null>(null);
   const [error, setError] = useState("");
   const { path, journey } = journeyState;
   const currentIndex = journey
@@ -166,6 +175,9 @@ function ProductJourney() {
   const isFinished = journey?.finishedAt != null;
   const currentMilestone = path.milestones[currentIndex];
   const isLastMilestone = currentIndex === path.milestones.length - 1;
+  // Nothing comes before Milestone 1, so Return is hidden there rather than
+  // disabled — unlike Advance, there's nothing else for it to do instead.
+  const canReturn = currentIndex > 0 || isFinished;
 
   async function startJourney() {
     setError("");
@@ -193,14 +205,18 @@ function ProductJourney() {
     }
   }
 
-  /** Advance to the next Milestone, or finish the Journey from the last one (#138). */
-  async function advanceJourney() {
+  /**
+   * Advance to the next Milestone, or finish the Journey from the last one
+   * (#138); or Return to the previous one, or un-finish it (CONTEXT.md's
+   * Return). Each is the same POST to its own endpoint.
+   */
+  async function moveJourney(direction: JourneyMove) {
     setError("");
-    setIsAdvancing(true);
+    setMoving(direction);
     try {
-      const advanced = await withMinimumDuration(async () => {
+      const moved = await withMinimumDuration(async () => {
         const res = await fetchWithTimeout(
-          `/api/products/${product.id}/journey/advance`,
+          `/api/products/${product.id}/journey/${direction}`,
           { method: "POST" },
         );
         if (!res.ok) {
@@ -208,17 +224,29 @@ function ProductJourney() {
         }
         return (await res.json()) as JourneyState;
       });
-      if (!advanced) {
-        setError(ADVANCE_JOURNEY_FAILED);
+      if (!moved) {
+        setError(MOVE_JOURNEY_FAILED[direction]);
         return;
       }
-      setJourneyState(advanced);
+      setJourneyState(moved);
     } catch {
       setError(CONNECTION_FAILED);
     } finally {
-      setIsAdvancing(false);
+      setMoving(null);
     }
   }
+
+  const returnButton = canReturn && (
+    <Button
+      variant="secondary"
+      disabled={moving !== null}
+      state={moving === "return" ? "pending" : "ready"}
+      onClick={() => void moveJourney("return")}
+    >
+      <Button.State name="ready">Return to Previous Milestone</Button.State>
+      <Button.State name="pending">Returning…</Button.State>
+    </Button>
+  );
 
   return (
     <>
@@ -266,6 +294,7 @@ function ProductJourney() {
                 You&apos;ve worked all the way through {path.name}&rsquo;s
                 Milestones, ending with {currentMilestone.name}. Nice work!
               </p>
+              {returnButton}
             </>
           ) : hasStarted ? (
             <>
@@ -274,18 +303,21 @@ function ProductJourney() {
               <p>
                 <strong>Done when:</strong> {currentMilestone.doneWhen}
               </p>
-              <Button
-                disabled={isAdvancing}
-                state={isAdvancing ? "pending" : "ready"}
-                onClick={() => void advanceJourney()}
-              >
-                <Button.State name="ready">
-                  {isLastMilestone
-                    ? "Finish Journey"
-                    : "Advance to Next Milestone"}
-                </Button.State>
-                <Button.State name="pending">Advancing…</Button.State>
-              </Button>
+              <div className="button-group">
+                {returnButton}
+                <Button
+                  disabled={moving !== null}
+                  state={moving === "advance" ? "pending" : "ready"}
+                  onClick={() => void moveJourney("advance")}
+                >
+                  <Button.State name="ready">
+                    {isLastMilestone
+                      ? "Finish Journey"
+                      : "Advance to Next Milestone"}
+                  </Button.State>
+                  <Button.State name="pending">Advancing…</Button.State>
+                </Button>
+              </div>
             </>
           ) : (
             <>
