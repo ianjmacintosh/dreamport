@@ -22,10 +22,9 @@ const ATTRIBUTIONS: { title: string; credit: ReactNode }[] = [
         <Link href="https://creativecommons.org/licenses/by-sa/3.0/" external>
           CC BY-SA 3.0
         </Link>
-        . Dreamport rewords the canvasDreamport rewords the canvas&apos;s boxes
-        as questions and uses sevenapos;s boxes in its own words and uses seven
-        of its nine (leaving out key metrics and unfair advantage). The Rough
-        One-Pager worksheet is shared under the same license.
+        . Dreamport puts the canvas&apos;s boxes in its own words and uses seven
+        of the nine, leaving out key metrics and unfair advantage. The worksheet
+        is shared under CC BY-SA 3.0 too.
       </>
     ),
   },
@@ -48,25 +47,26 @@ function Copyright() {
           Dreamport&apos;s{" "}
           <Link href="https://github.com/ianjmacintosh/dreamport" external>
             source code
-          </Link>{" "}
-          — including its styles and the text built into the app — is free
-          software under the{" "}
+          </Link>
+          , including its styles and the text built into the app, is © 2026
+          Dreamport and published under the{" "}
           <Link href="https://www.gnu.org/licenses/gpl-3.0.html" external>
             GNU General Public License, version 3
           </Link>
-          , except for the material credited below.
+          , except for the adapted work in section 2.
         </p>
         <p className="text-2xl">
-          The Dreamport name and branding are © 2026 Dreamport. All rights
-          reserved.
+          That license covers the code, not the Dreamport name. Please
+          don&apos;t use the name for your own product, or in a way that
+          suggests Dreamport endorses you.
         </p>
       </section>
 
       <section>
         <h2>2. Others&apos; work</h2>
         <p className="text-2xl">
-          Some of Dreamport is adapted from other people&apos;s work, used under
-          the licenses below.
+          Parts of Dreamport adapt other people&apos;s work, under the licenses
+          below.
         </p>
         {ATTRIBUTIONS.map(({ title, credit }) => (
           <section key={title}>
