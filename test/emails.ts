@@ -251,7 +251,7 @@ export const TEST_EMAILS = {
   journeysReturnOwnerB: "delivered+journeys-return-owner-b@resend.dev",
 
   // --- Seam 1d: /api/products/:productId/worksheets/:worksheetId (#139) ---
-  /** Starting a Journey creates one Rough One-Pager instance, never two. */
+  /** Starting a Journey creates one Product Summary instance, never two. */
   worksheetsSingleton: "delivered+worksheets-singleton@resend.dev",
   /** Saves one-pager answers on one Milestone, reads them back on another. */
   worksheetsAnswers: "delivered+worksheets-answers@resend.dev",
@@ -337,7 +337,7 @@ export const TEST_EMAILS = {
   /** Finish a Journey, then Return from finished: un-finished, Growth still current. */
   e2eReturnFromFinished:
     "delivered+e2e-return-from-finished+e2e-test@resend.dev",
-  /** #139: fill out the Rough One-Pager from the Journey page, see it saved. */
+  /** #139: fill out the Product Summary from the Journey page, see it saved. */
   e2eFillOnePager: "delivered+e2e-fill-one-pager+e2e-test@resend.dev",
   /** #112: set a Product's description, see it persist across a reload, then clear it. */
   e2eProductDescription:

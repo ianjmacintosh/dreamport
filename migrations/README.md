@@ -64,8 +64,8 @@ when a Journey advances past its last Milestone.
 `worksheet_fields` and `milestone_worksheets` catalog, plus
 `worksheet_instances` (one filled-in copy per Product per Path, at most one
 for a singleton Worksheet) and `worksheet_answers`, cascading off
-`products` on delete. `0014_rough_one_pager_seed.sql` seeds the Rough
-One-Pager on Milestones 1-4 — split so the seed half is re-runnable.
+`products` on delete. `0014_product_summary_seed.sql` seeds the Product
+Summary on Milestones 1-4 — split so the seed half is re-runnable.
 
 ## Conventions
 

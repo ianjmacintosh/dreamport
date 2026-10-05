@@ -8,7 +8,7 @@
  * `journeys.ts` has. Nothing here re-checks that `productId` belongs to the
  * caller — the route already will have, via `getProduct`.
  *
- * Only singleton Worksheets have any content yet (the Rough One-Pager), so
+ * Only singleton Worksheets have any content yet (the Product Summary), so
  * reading and saving answers addresses a Worksheet's one copy by
  * (Product, Path, Worksheet). A repeatable Worksheet's copies will need
  * their own ids in the URL once one is authored.

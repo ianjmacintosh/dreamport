@@ -567,8 +567,51 @@ a.button {
 
 .input-helper {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  /* The label's own color, not --color-text-muted: base1 fails AA on cream
+     (~2.48:1) and on white (~2.7:1), and no lighter Solarized grey clears
+     4.5:1 on white (base00 ~4.45:1) (#139). */
+  color: var(--color-text-primary);
   margin-top: var(--space-1);
+}
+
+/* ── Primitives: lined text area ──────────────────────────── */
+/* `TextArea` (#139): a multi-line answer written on ruled lines, like
+   notebook paper — no box, a rule under every line of text. Three lines
+   tall to start, growing a line at a time with its content where the
+   browser supports `field-sizing` (Chrome, Safari); never hand-resizable.
+   The line height is pinned to the rule spacing so text sits on the
+   rules. Its helper text goes between the label and the lines, so a
+   question reads question → prompt → answer. */
+.textarea {
+  --textarea-rule: 1.75rem;
+  display: block;
+  width: 100%;
+  min-height: calc(3 * var(--textarea-rule));
+  field-sizing: content;
+  resize: none;
+  border: 0;
+  padding: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  line-height: var(--textarea-rule);
+  background-color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    transparent calc(var(--textarea-rule) - 1px),
+    var(--color-border) calc(var(--textarea-rule) - 1px)
+  );
+  background-size: 100% var(--textarea-rule);
+  background-attachment: local;
+}
+
+.textarea:focus-visible {
+  outline-offset: 4px;
+}
+
+/* Only `TextArea` puts its helper straight after the label. */
+.input-label + .input-helper {
+  margin-top: 0;
+  margin-bottom: var(--space-2);
 }
 
 /* ── Primitives: one-time code input ──────────────────────── */
@@ -1190,6 +1233,50 @@ button.tag-more[data-popup-open] {
 
 .tag-picker-placeholder {
   color: var(--color-text-primary);
+}
+
+/* ── Components: sheet ─────────────────────────────────────── */
+/* A Worksheet drawn as a sheet of paper (#139, picked from a prototype on
+   branch `prototype/worksheet-design`): white (`--color-sheet`) on the
+   cream page, square corners, no border and no shadow. Full content
+   width. Its title is an h2, then the numbered questions, the Save button,
+   and any credit right-aligned in italics in the bottom corner. */
+.sheet {
+  display: grid;
+  gap: var(--space-6);
+  background-color: var(--color-sheet);
+  padding: var(--space-8) var(--space-8) var(--space-6);
+}
+
+.sheet > h2 {
+  margin: 0;
+}
+
+.sheet form {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.sheet .input-label {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.sheet .button {
+  justify-self: start;
+}
+
+.sheet-credit {
+  justify-self: end;
+  text-align: right;
+  font-size: var(--text-sm);
+  font-style: italic;
+}
+
+@media (max-width: 640px) {
+  .sheet {
+    padding: var(--space-5) var(--space-4) var(--space-4);
+  }
 }
 
 /* ── Components: Journey route ─────────────────────────────── */

@@ -10,6 +10,7 @@ import Header from "../../../components/Header";
 import Link from "../../../components/Link";
 import TagList from "../../../components/TagList";
 import TagPicker from "../../../components/TagPicker";
+import TextArea from "../../../components/TextArea";
 import TextInput from "../../../components/TextInput";
 
 import "./style-guide.css";
@@ -174,6 +175,7 @@ function StyleGuide() {
         <a href="#header-bars">Header bars</a>
         <a href="#footers">Footers</a>
         <a href="#text-inputs">Text inputs</a>
+        <a href="#sheet">Sheet</a>
         <a href="#field-row">Field with action</a>
         <a href="#tags">Tags</a>
         <a href="#list-row">Row with action</a>
@@ -598,6 +600,33 @@ function StyleGuide() {
           Use the <code>&lt;TextInput&gt;</code> component — it pairs an{" "}
           <code>.input</code> with an accessible <code>.input-label</code> and
           optional <code>.input-helper</code> text.
+        </p>
+      </Section>
+
+      <Section id="sheet" label="Sheet">
+        <article className="sheet">
+          <h2>Product Summary</h2>
+          <TextArea
+            id="sg-sheet-problem"
+            label="1. Problem"
+            helperText="What problem does your product solve?"
+          />
+          <p className="sheet-credit">
+            Credit: Adapted from Lean Canvas by Ash Maurya (
+            <a href="#sheet">CC BY-SA 3.0</a>)
+          </p>
+        </article>
+        <Snippet
+          code={`<article className="sheet">\n  <h2>Product Summary</h2>\n  <TextArea\n    id="problem"\n    label="1. Problem"\n    helperText="What problem does your product solve?"\n  />\n  <p className="sheet-credit">Credit: …</p>\n</article>`}
+        />
+        <p className="sg-note">
+          A Worksheet drawn as a sheet of paper: <code>.sheet</code> is white (
+          <code>--color-sheet</code>) on the cream page, square, with no border
+          or shadow. Its answers are <code>&lt;TextArea&gt;</code>s — ruled
+          lines with the prompt between the question and the lines, three lines
+          tall and growing as you type. A credit for adapted work goes last, in{" "}
+          <code>.sheet-credit</code> (see <code>docs/design-decisions.md</code>
+          ).
         </p>
       </Section>
 

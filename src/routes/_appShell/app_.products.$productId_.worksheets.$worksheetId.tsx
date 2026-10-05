@@ -3,7 +3,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
 import Link from "../../components/Link";
-import TextInput from "../../components/TextInput";
+import TextArea from "../../components/TextArea";
 
 /**
  * Plain `fetch` never times out on its own — if the server accepts the TCP
@@ -63,21 +63,18 @@ const CC_BY_SA_3_URL = "https://creativecommons.org/licenses/by-sa/3.0/";
 /**
  * The credit a Worksheet adapted from someone else's work carries, by
  * Worksheet id. CC BY-SA 3.0 asks for credit, a note that it was changed
- * and a link to the license; the Copyright page carries the full credit and
- * the list of changes (#139, #145).
+ * and a link to the license; "Adapted" is the note here, and the Copyright
+ * page (linked from the footer) carries the full credit and the list of
+ * changes (#139, #145).
  */
 const ATTRIBUTIONS: Record<string, ReactNode> = {
-  "rough-one-pager": (
+  "product-summary": (
     <>
-      Adapted from Lean Canvas (
-      <Link href={CC_BY_SA_3_URL} external className="link-quiet">
+      Credit: Adapted from Lean Canvas by Ash Maurya (
+      <Link href={CC_BY_SA_3_URL} external>
         CC BY-SA 3.0
       </Link>
-      ).{" "}
-      <Link href="/copyright" className="link-quiet">
-        Credits
-      </Link>
-      .
+      )
     </>
   ),
 };
@@ -114,25 +111,23 @@ export const Route = createFileRoute(
  * Milestone's content on the Journey page, on every Milestone and once
  * finished.
  *
- * The Product's name is the h1 and the Worksheet's the h2, the same shape
- * as the Journey page. Below them, how many fields are filled in (as
- * saved, not as typed), then one `TextInput` per field with its prompt as
- * helper text, and one Save button for the lot. A blank field is just an
- * empty input.
- *
- * Ends with the Worksheet's credit, if it's adapted from someone else's
- * work, in small text with quiet links, then "Back to Journey".
+ * The Product's name is the h1, then "Back to Journey", then the
+ * Worksheet drawn as a sheet of paper (`.sheet`, picked from a prototype on
+ * branch `prototype/worksheet-design`): its name as the sheet's h2, one
+ * numbered `TextArea` per field with its prompt as helper text, one Save
+ * button for the lot, and the Worksheet's credit, if it's adapted from
+ * someone else's work, in the bottom corner. No "N of 7 filled in" line
+ * here — the sheet is the paper, and the Journey page's link carries the
+ * count.
  */
 function ProductWorksheet() {
   const { product, worksheetState } = Route.useRouteContext();
   const { worksheet } = worksheetState;
-  const [answers, setAnswers] = useState(worksheetState.answers);
   const [drafts, setDrafts] = useState(worksheetState.answers);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const attribution = ATTRIBUTIONS[worksheet.id];
-  const filled = worksheet.fields.filter((field) => answers[field.id]).length;
 
   async function save() {
     setError("");
@@ -158,7 +153,6 @@ function ProductWorksheet() {
         return;
       }
       // The server's copy — trimmed, blanks dropped.
-      setAnswers(result.answers);
       setDrafts(result.answers);
       setSaved(true);
     } catch {
@@ -171,49 +165,47 @@ function ProductWorksheet() {
   return (
     <>
       <h1>{product.name}</h1>
-      <h2>{worksheet.name}</h2>
-      <p>
-        {filled} of {worksheet.fields.length} filled in
-      </p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
-        {worksheet.fields.map((field) => (
-          <TextInput
-            key={field.id}
-            id={`worksheet-${field.id}`}
-            label={field.name}
-            helperText={field.prompt}
-            value={drafts[field.id] ?? ""}
-            onChange={(e) => {
-              setSaved(false);
-              setDrafts({ ...drafts, [field.id]: e.target.value });
-            }}
-            maxLength={WORKSHEET_ANSWER_MAX_LENGTH}
-            disabled={isSaving}
-          />
-        ))}
-        <Button
-          type="submit"
-          disabled={isSaving}
-          state={isSaving ? "saving" : "ready"}
-        >
-          <Button.State name="ready">Save {worksheet.name}</Button.State>
-          <Button.State name="saving">Saving…</Button.State>
-        </Button>
-      </form>
-      {saved && <p role="status">Saved.</p>}
-      {error && <p role="alert">{error}</p>}
-
-      {attribution && <p className="text-sm">{attribution}</p>}
       <p>
         <Link href={`/app/products/${product.id}/journey`} current={false}>
           Back to Journey
         </Link>
       </p>
+      <article className="sheet">
+        <h2>{worksheet.name}</h2>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+        >
+          {worksheet.fields.map((field, i) => (
+            <TextArea
+              key={field.id}
+              id={`worksheet-${field.id}`}
+              label={`${i + 1}. ${field.name}`}
+              helperText={field.prompt}
+              value={drafts[field.id] ?? ""}
+              onChange={(e) => {
+                setSaved(false);
+                setDrafts({ ...drafts, [field.id]: e.target.value });
+              }}
+              maxLength={WORKSHEET_ANSWER_MAX_LENGTH}
+              disabled={isSaving}
+            />
+          ))}
+          <Button
+            type="submit"
+            disabled={isSaving}
+            state={isSaving ? "saving" : "ready"}
+          >
+            <Button.State name="ready">Save {worksheet.name}</Button.State>
+            <Button.State name="saving">Saving…</Button.State>
+          </Button>
+        </form>
+        {saved && <p role="status">Saved.</p>}
+        {error && <p role="alert">{error}</p>}
+        {attribution && <p className="sheet-credit">{attribution}</p>}
+      </article>
     </>
   );
 }

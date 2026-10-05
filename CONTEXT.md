@@ -93,10 +93,10 @@ _Avoid_: step back, go back, revert, undo, retreat
 
 **Worksheet**:
 A fixed, Dreamport-authored set of ordered fields, each asking one thing
-in plain words (e.g. the "Rough One-Pager": problem, customer, value
+in plain words (e.g. the "Product Summary": problem, customer, value
 proposition, solution, channels, revenue, costs), that a Path's Milestones
 hold for the User to fill in about their Product. One Worksheet can sit on
-several Milestones (the Rough One-Pager is on Milestones 1 to 4) — the
+several Milestones (the Product Summary is on Milestones 1 to 4) — the
 ones whose "done when" checks it — but its answers can be changed at any
 point in the Journey. Each
 filled-in copy is an instance. A **singleton** Worksheet has exactly one

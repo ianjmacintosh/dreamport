@@ -211,3 +211,20 @@ Add an entry only once a sign-off conversation resolves something repeatable
   tinted panel. Below 640px the content stacks above the route. No "N of
   7 · Next · Ends at" line: the route already says it. Picked from a
   prototype on branch `prototype/journey-ux` (decided in #137).
+
+- A Worksheet's page puts the Product's name in the h1, then "Back to
+  Journey", then the Worksheet drawn as a sheet of paper (`.sheet`): white
+  (`--color-sheet`, an acknowledged addition to Solarized Light) on the
+  cream page, full content width, square corners, no border, no shadow.
+  On the sheet: the Worksheet's name as its h2, numbered questions ("1.
+  Problem") as lined `TextArea`s — prompt between question and lines,
+  three lines tall and growing, not hand-resizable — one Save button, and
+  any credit right-aligned in italics in the bottom corner ("Credit:
+  Adapted from … (CC BY-SA 3.0)", only the license linked). No "N of 7
+  filled in" line on the sheet; the Journey page's link carries the count.
+  Picked from a prototype on branch `prototype/worksheet-design` (decided
+  in #139).
+
+- Helper text (`.input-helper`) is `--color-text-primary`, the label's own
+  color, at `--text-sm` — never `--color-text-muted`, which fails AA on
+  both cream and white (decided in #139).
