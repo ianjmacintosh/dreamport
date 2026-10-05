@@ -15,7 +15,7 @@
 insert into "worksheets" ("id", "name", "cardinality") values ('product-summary', 'Product Summary', 'singleton') on conflict do nothing;
 
 insert into "worksheet_fields" ("worksheetId", "id", "position", "name", "prompt") values
-('product-summary', 'problem', 1, 'Problem', 'What problem does your product solve? If multiple, list the most important.'),
+('product-summary', 'problem', 1, 'Problem', 'What problem does your product solve? If it solves multiple problems, list the most important two or three.'),
 ('product-summary', 'customer', 2, 'Customer', 'Whose problem is it? Who is most eager to solve it?'),
 ('product-summary', 'solution', 3, 'Solution', 'How does your product solve the problem?'),
 ('product-summary', 'value-proposition', 4, 'Value Proposition', 'What are people doing instead of using your product? Why would they choose yours?'),
