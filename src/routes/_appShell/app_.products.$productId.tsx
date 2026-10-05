@@ -80,7 +80,10 @@ interface Idea {
  */
 interface JourneySummary {
   path: { name: string; milestones: { id: string; name: string }[] };
-  journey: { currentMilestoneId: string } | null;
+  journey: {
+    currentMilestoneId: string;
+    finishedAt: string | null;
+  } | null;
 }
 
 /**
@@ -296,8 +299,11 @@ function ProductHome() {
       <h2>Journey</h2>
       {journey ? (
         <p>
-          Current Milestone: {path.milestones[currentIndex]?.name} (
-          {currentIndex + 1} of {path.milestones.length})
+          {journey.finishedAt
+            ? `${path.name} complete`
+            : `Current Milestone: ${path.milestones[currentIndex]?.name} (${
+                currentIndex + 1
+              } of ${path.milestones.length})`}
         </p>
       ) : (
         <p>Looking for some structure? Follow a marked path to success.</p>

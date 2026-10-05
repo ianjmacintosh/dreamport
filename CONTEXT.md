@@ -66,9 +66,12 @@ _Avoid_: stage, phase, step
 
 **Journey**:
 One Product's progress following one Path — started by the User, at the
-Path's first Milestone. Strictly sequenced: exactly one current Milestone,
-everything before it done, everything after it future. A Product has at
-most one Journey per Path, so following a different Path later wouldn't
+Path's first Milestone, advanced one Milestone at a time as the User is
+ready. Strictly sequenced: exactly one current Milestone, everything
+before it done, everything after it future. Advancing past the last
+Milestone finishes the Journey instead of moving further — a finished
+state, not staying on the last Milestone forever. A Product has at most
+one Journey per Path, so following a different Path later wouldn't
 overwrite progress on the first. A Journey always belongs to its Product
 — it's "Tarot's Journey," never a Journey called "Tarot." Its page is just
 "the Journey," the same way the Product's Ideas section is "Ideas."

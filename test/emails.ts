@@ -221,6 +221,21 @@ export const TEST_EMAILS = {
   /** Other User whose read or start of A's Journey must 404. */
   journeysOwnerB: "delivered+journeys-owner-b@resend.dev",
 
+  // --- Seam 1b: /api/products/:productId/journey/advance (#138) ---
+  /** Advances a fresh Journey through every Milestone, then finishes it. */
+  journeysAdvance: "delivered+journeys-advance@resend.dev",
+  /** Advancing a Journey that hasn't started yet 404s. */
+  journeysAdvanceUnstarted: "delivered+journeys-advance-unstarted@resend.dev",
+  /** Advancing an already-finished Journey is a harmless no-op. */
+  journeysAdvanceAlreadyFinished:
+    "delivered+journeys-advance-already-finished@resend.dev",
+  /** Rejects an advance from an untrusted origin, advancing nothing. */
+  journeysAdvanceUntrusted: "delivered+journeys-advance-untrusted@resend.dev",
+  /** Owner side of the advance ownership boundary check. */
+  journeysAdvanceOwnerA: "delivered+journeys-advance-owner-a@resend.dev",
+  /** Other User whose advance of A's Journey must 404, not succeed. */
+  journeysAdvanceOwnerB: "delivered+journeys-advance-owner-b@resend.dev",
+
   // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
   // Every address below carries the `+e2e-test@` marker (issue #39): the
   // `+<scenario>` label sits ahead of it, so e.g. "e2e-happy" tags the

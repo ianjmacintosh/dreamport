@@ -6,6 +6,7 @@ import { exemptFromRateLimits } from "./rate-limit-exemption";
 // Journeys (issue #137): sign in, open a Product, follow "Learn More" to its
 // Journey page, read the Path's Milestones, start the Journey, see
 // Milestone 1 current — then back on the Product home, see it named there.
+// Also covers advancing from Milestone 1 to Milestone 2 (issue #138).
 // Signs in the same way `ideas.spec.ts` does (fixed `+e2e-test@` code, see
 // docs/adr/0009).
 
@@ -80,10 +81,16 @@ test("sign in, open a Product, learn about its Journey, start it, and see Milest
     "Rough One-Pager",
   );
 
+  // Advancing (#138) moves current to exactly the next Milestone.
+  await page.getByRole("button", { name: "Advance to Next Milestone" }).click();
+  await expect(milestones.locator('[aria-current="step"]')).toContainText(
+    "Real Talk",
+  );
+
   // Back on the Product home, the Journey section now names where it's at.
   await page.getByRole("link", { name: `Back to ${productName}` }).click();
   await expect(
-    page.getByText("Current Milestone: Rough One-Pager (1 of 7)"),
+    page.getByText("Current Milestone: Real Talk (2 of 7)"),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "View Journey" })).toBeVisible();
 });

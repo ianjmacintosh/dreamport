@@ -33,7 +33,12 @@ import {
   listIdeas,
   renameIdea,
 } from "./ideas";
-import { DEFAULT_PATH_ID, startJourney, journeyState } from "./journeys";
+import {
+  DEFAULT_PATH_ID,
+  startJourney,
+  advanceJourney,
+  journeyState,
+} from "./journeys";
 import { listTags, listTagsByIdea, setIdeaTags } from "./tags";
 import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
@@ -756,6 +761,49 @@ export function createApp(deps: AppDeps = {}) {
       await journeyState(c.env.DB, product.id),
       started ? 201 : 200,
     );
+  });
+
+  /**
+   * Advance a Product's Journey one Milestone (issue #138). Same origin,
+   * session and ownership checks as starting a Journey. 404s when there's
+   * no Journey to advance — the Journey page only ever shows this action
+   * once one's started, so reaching this with none is a stranger/stale
+   * request, not a real "nothing to do" case worth a 200 for.
+   */
+  app.post("/api/products/:productId/journey/advance", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const advanced = await advanceJourney(
+      c.env.DB,
+      product.id,
+      DEFAULT_PATH_ID,
+    );
+    if (!advanced) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json(await journeyState(c.env.DB, product.id), 200);
   });
 
   /**

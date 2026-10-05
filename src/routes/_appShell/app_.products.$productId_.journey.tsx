@@ -66,7 +66,11 @@ interface JourneyState {
     name: string;
     milestones: Milestone[];
   };
-  journey: { startedAt: string; currentMilestoneId: string } | null;
+  journey: {
+    startedAt: string;
+    currentMilestoneId: string;
+    finishedAt: string | null;
+  } | null;
 }
 
 /**
@@ -84,6 +88,8 @@ function milestoneStatus(
 
 const START_JOURNEY_FAILED =
   "We couldn't start the journey. Try again in a moment.";
+const ADVANCE_JOURNEY_FAILED =
+  "We couldn't advance the journey. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -146,6 +152,7 @@ function ProductJourney() {
   const [journeyState, setJourneyState] =
     useState<JourneyState>(initialJourneyState);
   const [isStarting, setIsStarting] = useState(false);
+  const [isAdvancing, setIsAdvancing] = useState(false);
   const [error, setError] = useState("");
   const { path, journey } = journeyState;
   const currentIndex = journey
@@ -156,7 +163,9 @@ function ProductJourney() {
   // Before starting, every Milestone is future and the content column shows
   // the pitch instead of a current Milestone.
   const hasStarted = currentIndex >= 0;
+  const isFinished = journey?.finishedAt != null;
   const currentMilestone = path.milestones[currentIndex];
+  const isLastMilestone = currentIndex === path.milestones.length - 1;
 
   async function startJourney() {
     setError("");
@@ -184,6 +193,33 @@ function ProductJourney() {
     }
   }
 
+  /** Advance to the next Milestone, or finish the Journey from the last one (#138). */
+  async function advanceJourney() {
+    setError("");
+    setIsAdvancing(true);
+    try {
+      const advanced = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(
+          `/api/products/${product.id}/journey/advance`,
+          { method: "POST" },
+        );
+        if (!res.ok) {
+          return null;
+        }
+        return (await res.json()) as JourneyState;
+      });
+      if (!advanced) {
+        setError(ADVANCE_JOURNEY_FAILED);
+        return;
+      }
+      setJourneyState(advanced);
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setIsAdvancing(false);
+    }
+  }
+
   return (
     <>
       <h1>{product.name}</h1>
@@ -191,9 +227,13 @@ function ProductJourney() {
       <div className="journey-split">
         <ol aria-label="Milestones" className="journey-route">
           {path.milestones.map((milestone, index) => {
-            const status = hasStarted
-              ? milestoneStatus(index, currentIndex)
-              : "future";
+            // Finished: nothing is current any more, every stop (including
+            // the last) reads as done.
+            const status = !hasStarted
+              ? "future"
+              : isFinished
+                ? "done"
+                : milestoneStatus(index, currentIndex);
             return (
               <li
                 key={milestone.id}
@@ -219,13 +259,33 @@ function ProductJourney() {
           })}
         </ol>
         <section>
-          {hasStarted ? (
+          {isFinished ? (
+            <>
+              <h3>{path.name} complete</h3>
+              <p>
+                You&apos;ve worked all the way through {path.name}&rsquo;s
+                Milestones, ending with {currentMilestone.name}. Nice work!
+              </p>
+            </>
+          ) : hasStarted ? (
             <>
               <h3>{currentMilestone.name}</h3>
               <p>{currentMilestone.description}</p>
               <p>
                 <strong>Done when:</strong> {currentMilestone.doneWhen}
               </p>
+              <Button
+                disabled={isAdvancing}
+                state={isAdvancing ? "pending" : "ready"}
+                onClick={() => void advanceJourney()}
+              >
+                <Button.State name="ready">
+                  {isLastMilestone
+                    ? "Finish Journey"
+                    : "Advance to Next Milestone"}
+                </Button.State>
+                <Button.State name="pending">Advancing…</Button.State>
+              </Button>
             </>
           ) : (
             <>

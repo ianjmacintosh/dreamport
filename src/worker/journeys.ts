@@ -29,11 +29,15 @@ export interface Path {
 /**
  * A Product's progress on one Path. Strictly sequenced: every Milestone
  * before `currentMilestoneId` (in the Path's order) is done, every one
- * after it future.
+ * after it future. `finishedAt` stays `null` until the Journey advances
+ * past the last Milestone (issue #138) — `currentMilestoneId` then keeps
+ * pointing at that last Milestone, since there's no Milestone after it to
+ * take its place.
  */
 export interface Journey {
   startedAt: string;
   currentMilestoneId: string;
+  finishedAt: string | null;
 }
 
 /**
@@ -71,7 +75,7 @@ export async function getJourney(
 ): Promise<Journey | null> {
   return db
     .prepare(
-      'SELECT "startedAt", "currentMilestoneId" FROM "journeys" WHERE "productId" = ? AND "pathId" = ?',
+      'SELECT "startedAt", "currentMilestoneId", "finishedAt" FROM "journeys" WHERE "productId" = ? AND "pathId" = ?',
     )
     .bind(productId, pathId)
     .first<Journey>();
@@ -95,6 +99,64 @@ export async function startJourney(
     .bind(crypto.randomUUID(), productId, new Date().toISOString(), pathId)
     .run();
   return meta.changes > 0;
+}
+
+/**
+ * Advance a Product's Journey on `pathId` by exactly one Milestone.
+ * `null` means there's no Journey to advance (hasn't started). Once
+ * finished, this is a no-op — repeat calls just hand back the finished
+ * Journey as it was, the same "repeat is harmless" shape `startJourney`
+ * has.
+ *
+ * Advancing from the last Milestone (Growth) has no next Milestone to move
+ * to, so it sets `finishedAt` instead (issue #138, confirmed on #133:
+ * finished state, not staying on the last Milestone forever).
+ *
+ * One atomic `UPDATE` — same reasoning as `startJourney`'s single
+ * `INSERT ... ON CONFLICT`: D1 has no multi-statement transactions, so a
+ * read-then-write split here (read the current Milestone, decide the next
+ * one, write it) would race two near-simultaneous advances into computing
+ * the same "next" from the same stale read and silently dropping one of
+ * them. Every value the write depends on — whether there's a next
+ * Milestone, whether the Journey is already finished — is looked up
+ * in-statement against the row as it is at write time instead.
+ */
+export async function advanceJourney(
+  db: D1Database,
+  productId: string,
+  pathId: string,
+): Promise<Journey | null> {
+  await db
+    .prepare(
+      `UPDATE "journeys" SET
+         "currentMilestoneId" = COALESCE(
+           (
+             SELECT "id" FROM "milestones" AS "next"
+             WHERE "next"."pathId" = "journeys"."pathId"
+               AND "next"."position" = (
+                 SELECT "position" + 1 FROM "milestones"
+                 WHERE "id" = "journeys"."currentMilestoneId"
+               )
+           ),
+           "currentMilestoneId"
+         ),
+         "finishedAt" = CASE
+           WHEN EXISTS (
+             SELECT 1 FROM "milestones" AS "next"
+             WHERE "next"."pathId" = "journeys"."pathId"
+               AND "next"."position" = (
+                 SELECT "position" + 1 FROM "milestones"
+                 WHERE "id" = "journeys"."currentMilestoneId"
+               )
+           ) THEN "finishedAt"
+           ELSE ?
+         END
+       WHERE "productId" = ? AND "pathId" = ? AND "finishedAt" IS NULL`,
+    )
+    .bind(new Date().toISOString(), productId, pathId)
+    .run();
+
+  return getJourney(db, productId, pathId);
 }
 
 /**

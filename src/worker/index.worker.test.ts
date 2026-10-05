@@ -2047,6 +2047,16 @@ function startJourney(productId: string, cookie?: string) {
   });
 }
 
+/** Shared by the Journey advance describe block below (#138). */
+function advanceJourney(productId: string, cookie?: string) {
+  return fetchWorker(`/api/products/${productId}/journey/advance`, {
+    method: "POST",
+    headers: cookie
+      ? { origin: TRUSTED_ORIGIN, cookie }
+      : { origin: TRUSTED_ORIGIN },
+  });
+}
+
 /** The seeded default Path's Milestones, in order (#133's own wording). */
 const DEFAULT_PATH_MILESTONE_NAMES = [
   "Rough One-Pager",
@@ -2092,6 +2102,7 @@ describe("/api/products/:productId/journey (#137)", () => {
     expect(after.journey).toEqual({
       startedAt: expect.any(String),
       currentMilestoneId: before.path.milestones[0].id,
+      finishedAt: null,
     });
 
     expect(await (await getJourney(product.id, cookie)).json()).toEqual({
@@ -2171,5 +2182,126 @@ describe("/api/products/:productId/journey (#137)", () => {
 
     expect((await getJourney("not-a-real-id", cookie)).status).toBe(404);
     expect((await startJourney("not-a-real-id", cookie)).status).toBe(404);
+  });
+});
+
+describe("/api/products/:productId/journey/advance (#138)", () => {
+  it("advances one Milestone at a time through Milestones 1 to 7, then finishes on the next advance", async () => {
+    const cookie = await signIn(TEST_EMAILS.journeysAdvance);
+    const created = await addProduct(cookie, "Sequentially-advanced Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    const { path } = (await (
+      await startJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    const milestoneIds = path.milestones.map((m) => m.id);
+    expect(milestoneIds).toHaveLength(7);
+
+    // Milestone 1 is current from the start; each advance moves to exactly
+    // the next Milestone in the Path's order, Milestones 2 through 7.
+    for (const milestoneId of milestoneIds.slice(1)) {
+      const advanced = await advanceJourney(product.id, cookie);
+      expect(advanced.status).toBe(200);
+      const { journey } = (await advanced.json()) as JourneyResponse;
+      expect(journey).toEqual({
+        startedAt: expect.any(String),
+        currentMilestoneId: milestoneId,
+        finishedAt: null,
+      });
+    }
+
+    // Milestone 7 (Growth) is current and last — advancing from it has no
+    // next Milestone, so it finishes the Journey instead, leaving Growth
+    // current rather than moving past it (#133).
+    const finished = await advanceJourney(product.id, cookie);
+    expect(finished.status).toBe(200);
+    const { journey: finishedJourney } =
+      (await finished.json()) as JourneyResponse;
+    expect(finishedJourney).toEqual({
+      startedAt: expect.any(String),
+      currentMilestoneId: milestoneIds[6],
+      finishedAt: expect.any(String),
+    });
+
+    expect(
+      ((await (await getJourney(product.id, cookie)).json()) as JourneyResponse)
+        .journey,
+    ).toEqual(finishedJourney);
+  });
+
+  it("leaves an already-finished Journey as it was on a repeat advance", async () => {
+    const cookie = await signIn(TEST_EMAILS.journeysAdvanceAlreadyFinished);
+    const created = await addProduct(cookie, "Already-finished Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+    await startJourney(product.id, cookie);
+    for (let i = 0; i < 7; i++) {
+      await advanceJourney(product.id, cookie);
+    }
+    const finished = (await (
+      await getJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    expect(finished.journey?.finishedAt).not.toBeNull();
+
+    const again = await advanceJourney(product.id, cookie);
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual({
+      path: finished.path,
+      journey: finished.journey,
+    });
+  });
+
+  it("404s advancing a Journey that hasn't started", async () => {
+    const cookie = await signIn(TEST_EMAILS.journeysAdvanceUnstarted);
+    const created = await addProduct(cookie, "Unstarted Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    const res = await advanceJourney(product.id, cookie);
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects an advance with no session", async () => {
+    expect((await advanceJourney("some-id")).status).toBe(401);
+  });
+
+  it("rejects an advance from an untrusted origin, advancing nothing", async () => {
+    const cookie = await signIn(TEST_EMAILS.journeysAdvanceUntrusted);
+    const created = await addProduct(cookie, "Untrusted-advance Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+    const { journey: before } = (await (
+      await startJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+
+    const res = await fetchWorker(
+      `/api/products/${product.id}/journey/advance`,
+      {
+        method: "POST",
+        headers: { origin: "https://evil.example.com", cookie },
+      },
+    );
+
+    expect(res.status).toBe(403);
+    const after = (await (
+      await getJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    expect(after.journey).toEqual(before);
+  });
+
+  it("404s a stranger's advance of another User's Journey, never touching it", async () => {
+    const cookieA = await signIn(TEST_EMAILS.journeysAdvanceOwnerA);
+    const cookieB = await signIn(TEST_EMAILS.journeysAdvanceOwnerB);
+    const created = await addProduct(cookieA, "Owner A's advanced Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+    const { journey: before } = (await (
+      await startJourney(product.id, cookieA)
+    ).json()) as JourneyResponse;
+
+    const advance = await advanceJourney(product.id, cookieB);
+    expect(advance.status).toBe(404);
+    expect(await advance.json()).toEqual({ error: "Not found" });
+
+    const after = (await (
+      await getJourney(product.id, cookieA)
+    ).json()) as JourneyResponse;
+    expect(after.journey).toEqual(before);
   });
 });
