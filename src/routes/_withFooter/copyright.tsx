@@ -15,6 +15,9 @@ const CC_BY_SA_3_URL = "https://creativecommons.org/licenses/by-sa/3.0/";
 
 const ATTRIBUTIONS: { title: string; credit: ReactNode }[] = [
   {
+    // The "Changes" sentence must match the Rough One-Pager worksheet's
+    // actual fields (#139); CC BY-SA 3.0 requires the change note to be
+    // accurate. Update it whenever a field is added, dropped or reworded.
     title: "Lean Canvas",
     credit: (
       <>
