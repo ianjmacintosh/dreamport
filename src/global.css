@@ -1262,6 +1262,12 @@ button.tag-more[data-popup-open] {
   font-weight: 700;
 }
 
+/* A question's prompt is part of the question here, not fine print, so it
+   reads at body size rather than `.input-helper`'s usual --text-sm. */
+.sheet .input-helper {
+  font-size: var(--text-base);
+}
+
 .sheet .button {
   justify-self: start;
 }

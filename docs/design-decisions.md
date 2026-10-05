@@ -217,8 +217,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
   (`--color-sheet`, an acknowledged addition to Solarized Light) on the
   cream page, full content width, square corners, no border, no shadow.
   On the sheet: the Worksheet's name as its h2, numbered questions ("1.
-  Problem") as lined `TextArea`s — prompt between question and lines,
-  three lines tall and growing, not hand-resizable — one Save button, and
+  Problem") as lined `TextArea`s — three lines tall and growing, not
+  hand-resizable, with the prompt between question and lines at body size
+  (`--text-base`, not helper text's usual `--text-sm`) — one Save button, and
   any credit right-aligned in italics in the bottom corner ("Credit:
   Adapted from … (CC BY-SA 3.0)", only the license linked). No "N of M
   filled in" line on the sheet; the Journey page's link carries the count.
