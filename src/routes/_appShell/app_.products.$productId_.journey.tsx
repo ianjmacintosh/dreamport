@@ -64,22 +64,20 @@ interface JourneyState {
   path: {
     id: string;
     name: string;
-    methodology: string;
     milestones: Milestone[];
   };
   journey: { startedAt: string; currentMilestoneId: string } | null;
 }
 
 /**
- * A Milestone's status, by position: before the current one done, after it
- * future (strict sequencing, see CONTEXT.md's Journey). Before starting
- * there's no current one, so every Milestone is future.
+ * A started Journey's Milestone status, by position: before the current one
+ * done, after it future (strict sequencing, see CONTEXT.md's Journey).
  */
 function milestoneStatus(
   index: number,
   currentIndex: number,
 ): "done" | "current" | "future" {
-  if (currentIndex < 0 || index > currentIndex) return "future";
+  if (index > currentIndex) return "future";
   if (index === currentIndex) return "current";
   return "done";
 }
@@ -155,6 +153,10 @@ function ProductJourney() {
         (milestone) => milestone.id === journey.currentMilestoneId,
       )
     : -1;
+  // Before starting, every Milestone is future and the content column shows
+  // the pitch instead of a current Milestone.
+  const hasStarted = currentIndex >= 0;
+  const currentMilestone = path.milestones[currentIndex];
 
   async function startJourney() {
     setError("");
@@ -182,8 +184,6 @@ function ProductJourney() {
     }
   }
 
-  const currentMilestone = path.milestones[currentIndex];
-
   return (
     <>
       <h1>{product.name}</h1>
@@ -191,7 +191,9 @@ function ProductJourney() {
       <div className="journey-split">
         <ol aria-label="Milestones" className="journey-route">
           {path.milestones.map((milestone, index) => {
-            const status = milestoneStatus(index, currentIndex);
+            const status = hasStarted
+              ? milestoneStatus(index, currentIndex)
+              : "future";
             return (
               <li
                 key={milestone.id}
@@ -207,7 +209,7 @@ function ProductJourney() {
                   )}
                 </span>
                 <span className="journey-route-name">{milestone.name}</span>
-                {(!journey || status === "current") && (
+                {(!hasStarted || status === "current") && (
                   <span className="journey-route-outcome">
                     {milestone.outcome}
                   </span>
@@ -217,7 +219,7 @@ function ProductJourney() {
           })}
         </ol>
         <section>
-          {currentMilestone ? (
+          {hasStarted ? (
             <>
               <h3>{currentMilestone.name}</h3>
               <p>{currentMilestone.description}</p>

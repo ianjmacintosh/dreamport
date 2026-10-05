@@ -52,16 +52,16 @@ _Avoid_: response, reply
 **Path**:
 A fixed, Dreamport-authored route a Product can follow from idea to a
 growing, profitable product, made of ordered Milestones — not something a
-User creates. Dreamport ships one Path for
-now: the free starter Path, based on Running Lean. A Path can carry a
-free-text note on the methodology it's based on; the methodology itself
-isn't modeled.
-_Avoid_: methodology (as the entity), plan, program
+User creates. Dreamport ships one Path for now: Dream Sequence, the free
+Path every Journey starts on, based on Running Lean.
+_Avoid_: methodology, plan, program
 
 **Milestone**:
 One ordered step on a Path (e.g. "Rough One-Pager", then "Real Talk"),
-with a one-line description of what it asks and a "done when" line for
-knowing it's finished. Fixed content that ships with its Path.
+with a one-line description of what it asks, a "done when" line for
+knowing it's finished, and a short outcome line — a few words on what it
+gets you, shown under its name on the Journey page. Fixed content that
+ships with its Path.
 _Avoid_: stage, phase, step
 
 **Journey**:

@@ -7,7 +7,7 @@ import { network } from "../../test/msw-network";
 import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 import { createApp } from "./index";
-import { starterJourneyState } from "./journeys";
+import { journeyState } from "./journeys";
 import { recordDailySend } from "./otp-send-throttle";
 import { PRODUCT_DESCRIPTION_MAX_LENGTH } from "./products";
 import { E2E_RATE_LIMIT_EXEMPT_IP } from "./rate-limit-exemption";
@@ -2047,8 +2047,8 @@ function startJourney(productId: string, cookie?: string) {
   });
 }
 
-/** The seeded starter Path's Milestones, in order (#133's own wording). */
-const STARTER_MILESTONE_NAMES = [
+/** The seeded default Path's Milestones, in order (#133's own wording). */
+const DEFAULT_PATH_MILESTONE_NAMES = [
   "Rough One-Pager",
   "Real Talk",
   "Solution Matchmaking",
@@ -2058,10 +2058,10 @@ const STARTER_MILESTONE_NAMES = [
   "Growth",
 ];
 
-type JourneyResponse = Awaited<ReturnType<typeof starterJourneyState>>;
+type JourneyResponse = Awaited<ReturnType<typeof journeyState>>;
 
 describe("/api/products/:productId/journey (#137)", () => {
-  it("lists the starter Path's Milestones before any Journey, then starts one on Milestone 1", async () => {
+  it("lists the default Path's Milestones before any Journey, then starts one on Milestone 1", async () => {
     const cookie = await signIn(TEST_EMAILS.journeysStart);
     const created = await addProduct(cookie, "A phone-scale app");
     const { product } = (await created.json()) as {
@@ -2075,9 +2075,8 @@ describe("/api/products/:productId/journey (#137)", () => {
     // list bundles it.
     expect(before.product).toEqual(product);
     expect(before.journey).toBeNull();
-    expect(before.path.methodology).toBe("Based on Running Lean");
     expect(before.path.milestones.map((m) => m.name)).toEqual(
-      STARTER_MILESTONE_NAMES,
+      DEFAULT_PATH_MILESTONE_NAMES,
     );
     expect(before.path.milestones[0]).toMatchObject({
       description: expect.stringMatching(/^Define your product in plain terms/),

@@ -203,8 +203,10 @@ Add an entry only once a sign-off conversation resolves something repeatable
 - A Product's Journey page puts the Product's name in the h1 and "Journey"
   in the h2, then two columns (`.journey-split`): the Milestones as a
   route on the left (`.journey-route` — numbered dots on a line, bold
-  names; done ones a `--color-done` grey circle with a Phosphor check
-  labelled "Done", the current one violet and `aria-current="step"`), and
+  names, each with its outcome line under it in plain text color
+  (`.journey-route-outcome`; once started, only the current one's); done
+  ones a `--color-done` grey circle with a Phosphor check labelled
+  "Done", the current one violet and `aria-current="step"`), and
   the content for where you are on the right, as plain page text — no
   tinted panel. Below 640px the content stacks above the route. No "N of
   7 · Next · Ends at" line: the route already says it. Picked from a

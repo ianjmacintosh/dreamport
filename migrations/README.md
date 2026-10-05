@@ -50,8 +50,12 @@ its current Milestone) cascading off `products` on delete.
 `0008_dream_sequence.sql` renames that Path from "Starter Path" to "Dream
 Sequence" (issue #137).
 
-`0009_milestone_outcome.sql` adds each Milestone's `outcome` line (issue
-#137), seeded for the seven Dream Sequence Milestones.
+`0009_milestone_outcome.sql` adds each Milestone's `outcome` column (issue
+#137), and `0010_milestone_outcome_seed.sql` seeds it for the seven Dream
+Sequence Milestones — split so the seed half is re-runnable on its own.
+
+`0011_drop_path_methodology.sql` drops `paths.methodology` (issue #137):
+nothing reads it now the Journey page doesn't show it.
 
 ## Conventions
 

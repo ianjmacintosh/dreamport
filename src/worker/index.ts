@@ -33,7 +33,7 @@ import {
   listIdeas,
   renameIdea,
 } from "./ideas";
-import { STARTER_PATH_ID, startJourney, starterJourneyState } from "./journeys";
+import { DEFAULT_PATH_ID, startJourney, journeyState } from "./journeys";
 import { listTags, listTagsByIdea, setIdeaTags } from "./tags";
 import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
@@ -692,7 +692,7 @@ export function createApp(deps: AppDeps = {}) {
   });
 
   /**
-   * Journeys (issue #137): a Product's Journey on the starter Path — the
+   * Journeys (issue #137): a Product's Journey on the default Path — the
    * only Path Phase 1 ships, so there's no Path in the URL. Same session gate
    * and `getProduct` ownership check as the Ideas routes: a stranger's
    * Product reads identically to a nonexistent one, always 404, never 403.
@@ -717,12 +717,12 @@ export function createApp(deps: AppDeps = {}) {
 
     return c.json({
       product,
-      ...(await starterJourneyState(c.env.DB, product.id)),
+      ...(await journeyState(c.env.DB, product.id)),
     });
   });
 
   /**
-   * Start a Product's Journey on the starter Path, at Milestone 1. Same
+   * Start a Product's Journey on the default Path, at Milestone 1. Same
    * origin check as the other row-creating routes (this one sits outside
    * `auth.handler` too). A repeat start is harmless: it leaves the existing
    * Journey's progress as it was and answers 200 rather than 201.
@@ -751,9 +751,9 @@ export function createApp(deps: AppDeps = {}) {
       return c.json({ error: "Not found" }, 404);
     }
 
-    const started = await startJourney(c.env.DB, product.id, STARTER_PATH_ID);
+    const started = await startJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
     return c.json(
-      await starterJourneyState(c.env.DB, product.id),
+      await journeyState(c.env.DB, product.id),
       started ? 201 : 200,
     );
   });

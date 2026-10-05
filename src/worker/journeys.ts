@@ -22,8 +22,6 @@ export interface Milestone {
 export interface Path {
   id: string;
   name: string;
-  /** Free-text note on what the Path is based on — not a modeled entity. */
-  methodology: string;
   /** Every Milestone on the Path, in order. */
   milestones: Milestone[];
 }
@@ -39,16 +37,17 @@ export interface Journey {
 }
 
 /**
- * The one Path Phase 1 ships (seeded in `0007`). There's no "choose your
- * Path" step yet, so every Journey starts on this one.
+ * The one Path Phase 1 ships (seeded in `0007`, named Dream Sequence in
+ * `0008`). There's no "choose your Path" step yet, so every Journey starts
+ * on this one.
  */
-export const STARTER_PATH_ID = "starter";
+export const DEFAULT_PATH_ID = "starter";
 
 /** A Path with its Milestones in order — shown whether or not a Journey has started. */
 export async function getPath(db: D1Database, pathId: string): Promise<Path> {
   const [path, { results: milestones }] = await Promise.all([
     db
-      .prepare('SELECT "id", "name", "methodology" FROM "paths" WHERE "id" = ?')
+      .prepare('SELECT "id", "name" FROM "paths" WHERE "id" = ?')
       .bind(pathId)
       .first<Omit<Path, "milestones">>(),
     db
@@ -99,17 +98,17 @@ export async function startJourney(
 }
 
 /**
- * What `/api/products/:productId/journey` answers with: the starter Path
+ * What `/api/products/:productId/journey` answers with: the default Path
  * with its Milestones, and the Product's Journey on it (`null` until
  * started).
  */
-export async function starterJourneyState(
+export async function journeyState(
   db: D1Database,
   productId: string,
 ): Promise<{ path: Path; journey: Journey | null }> {
   const [path, journey] = await Promise.all([
-    getPath(db, STARTER_PATH_ID),
-    getJourney(db, productId, STARTER_PATH_ID),
+    getPath(db, DEFAULT_PATH_ID),
+    getJourney(db, productId, DEFAULT_PATH_ID),
   ]);
   return { path, journey };
 }
