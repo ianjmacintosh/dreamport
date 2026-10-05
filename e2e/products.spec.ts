@@ -23,7 +23,7 @@ async function signIn(page: Page, email: string): Promise<void> {
     { timeout: 15_000 },
   );
 
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByRole("button", { name: "Send Code" }).click();
 
   await expect(
     page.getByRole("textbox", { name: "Six-digit code" }),
@@ -48,7 +48,7 @@ test("sign in, add a Product, and see it in the list", async ({ page }) => {
   await expect(page.getByText(productName)).not.toBeVisible();
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
 
   await expect(page.getByText(productName)).toBeVisible();
   // No full page reload: the field clears and is ready for the next entry
@@ -56,7 +56,7 @@ test("sign in, add a Product, and see it in the list", async ({ page }) => {
   await expect(page.getByLabel("Product name")).toHaveValue("");
 });
 
-test("the Add product button disables and relabels while the request is in flight", async ({
+test("the Add Product button disables and relabels while the request is in flight", async ({
   page,
 }) => {
   const email = TEST_EMAILS.e2eAddProductPending;
@@ -74,7 +74,7 @@ test("the Add product button disables and relabels while the request is in fligh
   });
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
 
   await expect(page.getByRole("button", { name: "Adding…" })).toBeDisabled();
   await expect(page.getByText(productName)).toBeVisible({ timeout: 10_000 });
@@ -89,7 +89,7 @@ test("sign in, add a Product, delete it, and confirm it's gone", async ({
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await expect(page.getByText(productName)).toBeVisible();
 
   const row = page.getByText(productName).locator("..");
@@ -108,7 +108,7 @@ test("clicking Delete reveals a confirming Delete/Cancel without deleting, and C
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await expect(page.getByText(productName)).toBeVisible();
 
   const row = page.getByText(productName).locator("..");
@@ -135,7 +135,7 @@ test("the Delete button disables and relabels while the request is in flight", a
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await expect(page.getByText(productName)).toBeVisible();
 
   // Slow the delete down so the pending state has a real window to observe
@@ -166,7 +166,7 @@ test("even a near-instant delete holds the pending row for a minimum duration", 
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await expect(page.getByText(productName)).toBeVisible();
 
   // Deliberately no artificial delay: local D1 resolves this in a handful
@@ -199,7 +199,7 @@ test("confirming one Product row leaves every other row's layout unchanged", asy
   await signIn(page, email);
   for (const name of names) {
     await page.getByLabel("Product name").fill(name);
-    await page.getByRole("button", { name: "Add product" }).click();
+    await page.getByRole("button", { name: "Add Product" }).click();
     await expect(page.getByText(name)).toBeVisible();
   }
 
@@ -225,13 +225,13 @@ test("set a Product's description, see it persist across a reload, then clear it
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await page.getByRole("link", { name: productName }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+/);
 
   await expect(page.getByText("No description yet.")).toBeVisible();
 
-  await page.getByRole("button", { name: "Edit description" }).click();
+  await page.getByRole("button", { name: "Edit Description" }).click();
   await expect(page.getByLabel("Description")).toHaveValue("");
   await page.getByLabel("Description").fill(description);
   await page.getByRole("button", { name: "Save" }).click();
@@ -243,7 +243,7 @@ test("set a Product's description, see it persist across a reload, then clear it
   await expect(page.getByText(description)).toBeVisible();
 
   // Editing starts from the stored description; saving it empty clears it.
-  await page.getByRole("button", { name: "Edit description" }).click();
+  await page.getByRole("button", { name: "Edit Description" }).click();
   await expect(page.getByLabel("Description")).toHaveValue(description);
   await page.getByLabel("Description").fill("");
   await page.getByRole("button", { name: "Save" }).click();

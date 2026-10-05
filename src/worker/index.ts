@@ -33,6 +33,13 @@ import {
   listIdeas,
   renameIdea,
 } from "./ideas";
+import {
+  DEFAULT_PATH_ID,
+  startJourney,
+  advanceJourney,
+  returnJourney,
+  journeyState,
+} from "./journeys";
 import { listTags, listTagsByIdea, setIdeaTags } from "./tags";
 import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
@@ -688,6 +695,154 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     return c.json({ tags }, 200);
+  });
+
+  /**
+   * Journeys (issue #137): a Product's Journey on the default Path — the
+   * only Path Phase 1 ships, so there's no Path in the URL. Same session gate
+   * and `getProduct` ownership check as the Ideas routes: a stranger's
+   * Product reads identically to a nonexistent one, always 404, never 403.
+   * `journey` is `null` until the User starts one; `path` is always there so
+   * the page can name what starting would mean. Bundles the Product itself,
+   * as the Ideas list does, for the Journey page's heading.
+   */
+  app.get("/api/products/:productId/journey", async (c) => {
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json({
+      product,
+      ...(await journeyState(c.env.DB, product.id)),
+    });
+  });
+
+  /**
+   * Start a Product's Journey on the default Path, at Milestone 1. Same
+   * origin check as the other row-creating routes (this one sits outside
+   * `auth.handler` too). A repeat start is harmless: it leaves the existing
+   * Journey's progress as it was and answers 200 rather than 201.
+   */
+  app.post("/api/products/:productId/journey", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const started = await startJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
+    return c.json(
+      await journeyState(c.env.DB, product.id),
+      started ? 201 : 200,
+    );
+  });
+
+  /**
+   * Advance a Product's Journey one Milestone (issue #138). Same origin,
+   * session and ownership checks as starting a Journey. 404s when there's
+   * no Journey to advance — the Journey page only ever shows this action
+   * once one's started, so reaching this with none is a stranger/stale
+   * request, not a real "nothing to do" case worth a 200 for.
+   */
+  app.post("/api/products/:productId/journey/advance", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const advanced = await advanceJourney(
+      c.env.DB,
+      product.id,
+      DEFAULT_PATH_ID,
+    );
+    if (!advanced) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json(await journeyState(c.env.DB, product.id), 200);
+  });
+
+  /**
+   * Return the caller's own Product's Journey by one Milestone, or
+   * un-finish it if it's finished — see `returnJourney`. Same origin,
+   * session and ownership checks as advancing, and the same 404 when
+   * there's no Journey to return.
+   */
+  app.post("/api/products/:productId/journey/return", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const returned = await returnJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
+    if (!returned) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json(await journeyState(c.env.DB, product.id), 200);
   });
 
   /**

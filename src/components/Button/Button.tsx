@@ -25,7 +25,7 @@ interface ButtonStateProps {
  * Chosen over a flat `readyLabel`/`pendingLabel`-style prop pair: that
  * shape hard-codes exactly two states into the prop list, and needs a new
  * prop for every future one (a `submittedLabel` for "Sent!", ADR-0012's
- * pre-Turnstile "Verifying you're human…" on `/login`, …). A `Button.State`
+ * pre-Turnstile "Verifying You're Human…" on `/login`, …). A `Button.State`
  * per state scales to any number without changing `Button`'s own props,
  * and each one can hold arbitrary content (an icon + text), not just a
  * string.

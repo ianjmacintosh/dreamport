@@ -23,7 +23,7 @@ async function signIn(page: Page, email: string): Promise<void> {
     { timeout: 15_000 },
   );
 
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByRole("button", { name: "Send Code" }).click();
 
   await expect(
     page.getByRole("textbox", { name: "Six-digit code" }),
@@ -47,7 +47,7 @@ test("sign in, add a Product, open it, add an Idea, and see it in the list", asy
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await expect(page.getByText(productName)).toBeVisible();
 
   await page.getByRole("link", { name: productName }).click();
@@ -57,7 +57,7 @@ test("sign in, add a Product, open it, add an Idea, and see it in the list", asy
   await expect(page.getByText(ideaName)).not.toBeVisible();
 
   await page.getByLabel("Idea name").fill(ideaName);
-  await page.getByRole("button", { name: "Add idea" }).click();
+  await page.getByRole("button", { name: "Add Idea" }).click();
 
   await expect(page.getByText(ideaName)).toBeVisible();
   // The list is named by its own "Ideas" heading, not the page's h1 (#101)
@@ -86,14 +86,14 @@ test("sign in, add a Product, add an Idea, delete it, and confirm it's gone", as
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await expect(page.getByText(productName)).toBeVisible();
 
   await page.getByRole("link", { name: productName }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+/);
 
   await page.getByLabel("Idea name").fill(ideaName);
-  await page.getByRole("button", { name: "Add idea" }).click();
+  await page.getByRole("button", { name: "Add Idea" }).click();
   await expect(page.getByText(ideaName)).toBeVisible();
 
   // Click the Delete button to reveal the confirming Delete/Cancel
@@ -127,14 +127,14 @@ test("sign in, add a Product, add an Idea, click Delete to reveal a confirming D
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await expect(page.getByText(productName)).toBeVisible();
 
   await page.getByRole("link", { name: productName }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+/);
 
   await page.getByLabel("Idea name").fill(ideaName);
-  await page.getByRole("button", { name: "Add idea" }).click();
+  await page.getByRole("button", { name: "Add Idea" }).click();
   await expect(page.getByText(ideaName)).toBeVisible();
 
   // Click the Delete button to reveal the confirming Delete/Cancel
@@ -176,12 +176,12 @@ test("sign in, add a Product, add an Idea, rename it, and see the new name", asy
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await page.getByRole("link", { name: productName }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+/);
 
   await page.getByLabel("Idea name").fill(ideaName);
-  await page.getByRole("button", { name: "Add idea" }).click();
+  await page.getByRole("button", { name: "Add Idea" }).click();
   await expect(page.getByText(ideaName)).toBeVisible();
 
   const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
@@ -212,12 +212,12 @@ test("sign in, add a Product, add an Idea, click Edit, then Cancel backs out wit
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await page.getByRole("link", { name: productName }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+/);
 
   await page.getByLabel("Idea name").fill(ideaName);
-  await page.getByRole("button", { name: "Add idea" }).click();
+  await page.getByRole("button", { name: "Add Idea" }).click();
   await expect(page.getByText(ideaName)).toBeVisible();
 
   const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
@@ -250,12 +250,12 @@ test("editing or confirming one Idea row leaves every other row's layout unchang
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await page.getByRole("link", { name: productName }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+/);
   for (const name of ideaNames) {
     await page.getByLabel("Idea name").fill(name);
-    await page.getByRole("button", { name: "Add idea" }).click();
+    await page.getByRole("button", { name: "Add Idea" }).click();
     await expect(page.getByText(name)).toBeVisible();
   }
 
@@ -323,7 +323,7 @@ test("sign in, add a Product, add an Idea with a Tag, and see the Tag listed", a
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await page.getByRole("link", { name: productName }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+/);
 
@@ -332,7 +332,7 @@ test("sign in, add a Product, add an Idea with a Tag, and see the Tag listed", a
   await toggleTags(page, addForm, ["Pricing"]);
   // The chosen Tag shows in the form before submitting.
   await expect(tagPickerTrigger(addForm)).toHaveAccessibleName("Tags: Pricing");
-  await page.getByRole("button", { name: "Add idea" }).click();
+  await page.getByRole("button", { name: "Add Idea" }).click();
 
   await expect(restingTags(page, ideaName)).toHaveText(["Pricing"]);
   // The add form resets for the next Idea, Tags included.
@@ -356,14 +356,14 @@ test("sign in, add a Product, add an Idea, change its Tags in edit mode, and see
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await page.getByRole("link", { name: productName }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+/);
 
   const addForm = page.locator("form", { has: page.getByLabel("Idea name") });
   await page.getByLabel("Idea name").fill(ideaName);
   await toggleTags(page, addForm, ["Design"]);
-  await page.getByRole("button", { name: "Add idea" }).click();
+  await page.getByRole("button", { name: "Add Idea" }).click();
   await expect(restingTags(page, ideaName)).toHaveText(["Design"]);
 
   const ideaListItem = page.locator("li", { has: page.getByText(ideaName) });
@@ -403,13 +403,16 @@ test("an Idea with every Tag shows +N on desktop and every pill on a phone", asy
   await signIn(page, email);
 
   await page.getByLabel("Product name").fill(productName);
-  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add Product" }).click();
   await page.getByRole("link", { name: productName }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+/);
 
   const addForm = page.locator("form", { has: page.getByLabel("Idea name") });
   await page.getByLabel("Idea name").fill(ideaName);
   await tagPickerTrigger(addForm).click();
+  // `allTextContents` doesn't wait — without this it can read the menu
+  // before it opens and get nothing.
+  await expect(page.getByRole("menuitemcheckbox").first()).toBeVisible();
   const catalog = await page.getByRole("menuitemcheckbox").allTextContents();
   expect(catalog.length).toBeGreaterThan(3);
   for (const tag of catalog) {
@@ -422,7 +425,7 @@ test("an Idea with every Tag shows +N on desktop and every pill on a phone", asy
   const pickerBox = await tagPickerTrigger(addForm).boundingBox();
   expect(Math.round(pickerBox!.height)).toBe(Math.round(nameBox!.height));
 
-  await page.getByRole("button", { name: "Add idea" }).click();
+  await page.getByRole("button", { name: "Add Idea" }).click();
 
   const row = page.locator("li", { has: page.getByText(ideaName) });
   const more = row.getByRole("button", { name: /^Show \d+ more tags?$/ });

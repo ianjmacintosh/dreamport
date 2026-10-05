@@ -126,7 +126,7 @@ async function withMinimumDuration<T>(
  * flicker the button through its pending state. Add-Product's label swap
  * goes through `Button`'s `state`/`Button.State` composition (#90), same as
  * `/login`'s submit buttons, so the button's own width doesn't jump between
- * "Add product" and "Adding…"; the field disables alongside it so its
+ * "Add Product" and "Adding…"; the field disables alongside it so its
  * submitted value can't change out from under the in-flight request. Delete
  * itself is a two-step inline reveal (#90, Q7) — the same resting/confirming
  * shape `/app/settings`'s delete-account flow already uses, just per-row
@@ -231,7 +231,7 @@ function App() {
             disabled={isAdding}
             state={isAdding ? "pending" : "ready"}
           >
-            <Button.State name="ready">Add product</Button.State>
+            <Button.State name="ready">Add Product</Button.State>
             <Button.State name="pending">Adding…</Button.State>
           </Button>
         </div>

@@ -17,11 +17,20 @@ Add an entry only once a sign-off conversation resolves something repeatable
 ## Rules
 
 - A form consisting of a single labelled field and a single attached action
-  (e.g. an email field + "Send code") uses the `.field-row` pattern —
+  (e.g. an email field + "Send Code") uses the `.field-row` pattern —
   the button sits beside the field, flush with its top/bottom edges, not
   stacked below it. Two or more buttons with no field attached use
   `.button-group` instead. See the style guide's "Field with action"
   section and docs/adr/0012 (decided in #28).
+
+- Button labels are in Title Case ("Add Product", "Start Journey",
+  "Verify and Sign In"): capitalize every word except short articles,
+  conjunctions and prepositions ("a", "and", "the", "to"…) that aren't
+  first. Pending labels follow suit ("Verifying You're Human…"). Written
+  into the label text, not a CSS `text-transform` — `capitalize` can't
+  leave the small words lowercase, and would also capitalize the email
+  in `AppNav`'s account trigger. Covers anything styled `.button`
+  (decided in #137).
 
 - A button that starts a request needing server confirmation (add, delete,
   any create/update/destroy action) disables and relabels to a
@@ -77,7 +86,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
   instead of a modal/dialog. A stray click can't trigger the irreversible
   step, and no dialog component is needed. The confirming step keeps the
   action's own verb rather than a generic "Confirm" — delete-account's own
-  confirming step is "Email me a deletion link," not "Confirm" — so the
+  confirming step is "Email Me a Deletion Link," not "Confirm" — so the
   button never says less than what it's about to do. Decided for
   delete-account in #26, reaffirmed generally (one confirming state per
   row, not just per page) for Product delete in #90; #90's own
@@ -123,7 +132,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
   - A pill too wide for its space on its own is cut off with "…"; the full
     name stays in the popover and the dropdown.
   - The add-Idea form puts its name and its `TagPicker` side by side
-    (`.field-pair`, 3:1), with "Add idea" below both, so the Tags read as
+    (`.field-pair`, 3:1), with "Add Idea" below both, so the Tags read as
     part of the form — and never as a filter on the list below.
     `.form-section` leaves clear room between the form and that list.
 
@@ -190,3 +199,15 @@ Add an entry only once a sign-off conversation resolves something repeatable
   `--color-bar-*` tokens. Picked over flat-violet and dark-grey-with-accent-
   line alternatives in a prototype round; its sub-AA contrast is an accepted
   trade-off recorded in `tokens.css` (decided in #118).
+
+- A Product's Journey page puts the Product's name in the h1 and "Journey"
+  in the h2, then two columns (`.journey-split`): the Milestones as a
+  route on the left (`.journey-route` — numbered dots on a line, bold
+  names, each with its outcome line under it in plain text color
+  (`.journey-route-outcome`; once started, only the current one's); done
+  ones a `--color-done` grey circle with a Phosphor check labelled
+  "Done", the current one violet and `aria-current="step"`), and
+  the content for where you are on the right, as plain page text — no
+  tinted panel. Below 640px the content stacks above the route. No "N of
+  7 · Next · Ends at" line: the route already says it. Picked from a
+  prototype on branch `prototype/journey-ux` (decided in #137).

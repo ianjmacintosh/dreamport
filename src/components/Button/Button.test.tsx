@@ -28,7 +28,7 @@ describe("Button", () => {
       state: "pending",
       children: [
         <Button.State key="ready" name="ready">
-          Send code
+          Send Code
         </Button.State>,
         <Button.State key="pending" name="pending">
           Sending…
@@ -43,7 +43,7 @@ describe("Button", () => {
     ) as ReactElement<{ children?: unknown; "data-active"?: unknown }>[];
 
     expect(stateSpans.map((span) => span.props.children)).toEqual([
-      "Send code",
+      "Send Code",
       "Sending…",
     ]);
     expect(stateSpans[0].props["data-active"]).toBe(undefined);
