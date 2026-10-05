@@ -146,7 +146,8 @@ export const Route = createFileRoute(
  * right — before starting, the Path's name, the pitch for it, an
  * invitation and "Start Journey"; after,
  * the current Milestone's name, description and "Done when" line, then a
- * link to each Worksheet on it with how much is filled in (#139). Picked
+ * link to each of the Path's Worksheets with how much is filled in (#139),
+ * which the finished state keeps too. Picked
  * from the prototype on branch `prototype/journey-ux` (#137).
  *
  * Before starting, every stop shows its outcome line under its name; once
@@ -184,13 +185,6 @@ function ProductJourney() {
   const isFinished = journey?.finishedAt != null;
   const currentMilestone = path.milestones[currentIndex];
   const isLastMilestone = currentIndex === path.milestones.length - 1;
-  // The current Milestone's Worksheets — none once finished, since nothing
-  // is current then.
-  const currentWorksheets = isFinished
-    ? []
-    : journeyState.worksheets.filter((worksheet) =>
-        worksheet.milestoneIds.includes(currentMilestone?.id),
-      );
   // Nothing comes before Milestone 1, so Return is hidden there rather than
   // disabled — unlike Advance, there's nothing else for it to do instead.
   const canReturn = currentIndex > 0 || isFinished;
@@ -252,6 +246,18 @@ function ProductJourney() {
     }
   }
 
+  // Every Worksheet on the Path stays a click away on every Milestone, and
+  // once finished: the Milestones a Worksheet is on are where it's checked,
+  // not the only places it can change (#139).
+  const worksheetLinks = journeyState.worksheets.map((worksheet) => (
+    <p key={worksheet.id}>
+      <Link href={`/app/products/${product.id}/worksheets/${worksheet.id}`}>
+        Fill out your {worksheet.name}
+      </Link>{" "}
+      ({worksheet.filled} of {worksheet.total} filled in)
+    </p>
+  ));
+
   const returnButton = canReturn && (
     <Button
       variant="secondary"
@@ -310,6 +316,7 @@ function ProductJourney() {
                 You&apos;ve worked all the way through {path.name}&rsquo;s
                 Milestones, ending with {currentMilestone.name}. Nice work!
               </p>
+              {worksheetLinks}
               {returnButton}
             </>
           ) : hasStarted ? (
@@ -319,16 +326,7 @@ function ProductJourney() {
               <p>
                 <strong>Done when:</strong> {currentMilestone.doneWhen}
               </p>
-              {currentWorksheets.map((worksheet) => (
-                <p key={worksheet.id}>
-                  <Link
-                    href={`/app/products/${product.id}/worksheets/${worksheet.id}`}
-                  >
-                    Fill out your {worksheet.name}
-                  </Link>{" "}
-                  ({worksheet.filled} of {worksheet.total} filled in)
-                </p>
-              ))}
+              {worksheetLinks}
               <div className="button-group">
                 {returnButton}
                 <Button

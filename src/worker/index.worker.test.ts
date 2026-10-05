@@ -2527,7 +2527,6 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
       path.milestones.slice(0, 4).map((m) => m.id),
     );
     expect(body.answers).toEqual({});
-    expect(body.editable).toBe(true);
 
     // A repeat start, and saving from later linked Milestones, all reuse it.
     await startJourney(product.id, cookie);
@@ -2594,9 +2593,9 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
     ]);
   });
 
-  it("only saves while the Journey is on a Milestone the Worksheet is on, keeping answers readable after", async () => {
-    const cookie = await signIn(TEST_EMAILS.worksheetsNotEditable);
-    const created = await addProduct(cookie, "Not-editable Product");
+  it("404s before a Journey starts, then saves on any Milestone, even past the ones it's on and once finished", async () => {
+    const cookie = await signIn(TEST_EMAILS.worksheetsAnyMilestone);
+    const created = await addProduct(cookie, "Any-Milestone Product");
     const { product } = (await created.json()) as { product: { id: string } };
 
     // No Journey yet: nothing to read or save.
@@ -2609,33 +2608,30 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
     ).toBe(404);
 
     await startJourney(product.id, cookie);
-    await saveWorksheet(product.id, ONE_PAGER, { problem: "Kept" }, cookie);
     for (let i = 0; i < 4; i++) {
       await advanceJourney(product.id, cookie);
     }
 
-    // Milestone 5: the product is the evidence now, not the one-pager.
-    const onFive = (await (
-      await getWorksheet(product.id, ONE_PAGER, cookie)
-    ).json()) as WorksheetResponse;
-    expect(onFive.editable).toBe(false);
-    expect(onFive.answers).toEqual({ problem: "Kept" });
-    const refused = await saveWorksheet(
+    // Milestone 5: past the Milestones the one-pager is on, but still the
+    // User's to change (#139).
+    const onFive = await saveWorksheet(
       product.id,
       ONE_PAGER,
-      { problem: "Changed" },
+      { problem: "On five" },
       cookie,
     );
-    expect(refused.status).toBe(409);
+    expect(onFive.status).toBe(200);
 
-    // Finished: same.
     for (let i = 0; i < 3; i++) {
       await advanceJourney(product.id, cookie);
     }
-    expect(
-      (await saveWorksheet(product.id, ONE_PAGER, { problem: "x" }, cookie))
-        .status,
-    ).toBe(409);
+    const finished = await saveWorksheet(
+      product.id,
+      ONE_PAGER,
+      { problem: "Finished" },
+      cookie,
+    );
+    expect(finished.status).toBe(200);
 
     expect(
       (
@@ -2643,7 +2639,7 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
           await getWorksheet(product.id, ONE_PAGER, cookie)
         ).json()) as WorksheetResponse
       ).answers,
-    ).toEqual({ problem: "Kept" });
+    ).toEqual({ problem: "Finished" });
   });
 
   it("rejects an unknown field, a non-string answer, an over-cap answer or a non-object body, saving nothing", async () => {

@@ -848,9 +848,8 @@ export function createApp(deps: AppDeps = {}) {
   });
 
   /**
-   * Worksheets (issue #139): a Product's copy of one Worksheet on the
-   * default Path — the Worksheet, its answers, and whether they can be
-   * changed right now (only on a Milestone the Worksheet is on). Same
+   * Worksheets (issue #139): a Product's instance of one Worksheet on the
+   * default Path — the Worksheet and its answers. Same
    * session gate and `getProduct` ownership check as the Journey routes.
    * 404s when there's no such Worksheet or the Product hasn't started its
    * Journey. Bundles the Product for the Worksheet page's heading.
@@ -870,13 +869,15 @@ export function createApp(deps: AppDeps = {}) {
       return c.json({ error: "Not found" }, 404);
     }
 
-    const state = await worksheetState(
-      c.env.DB,
-      product.id,
-      DEFAULT_PATH_ID,
-      c.req.param("worksheetId"),
-      await getJourney(c.env.DB, product.id, DEFAULT_PATH_ID),
-    );
+    const journey = await getJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
+    const state =
+      journey &&
+      (await worksheetState(
+        c.env.DB,
+        product.id,
+        DEFAULT_PATH_ID,
+        c.req.param("worksheetId"),
+      ));
     if (!state) {
       return c.json({ error: "Not found" }, 404);
     }
@@ -887,8 +888,8 @@ export function createApp(deps: AppDeps = {}) {
   /**
    * Save a Product's answers on one Worksheet, replacing every field (one
    * left out reads as blank). Same origin, session and ownership checks as
-   * the Journey moves. 409s when the Journey isn't on a Milestone the
-   * Worksheet is on — the Worksheet page only offers saving when it is.
+   * the Journey moves, and the same 404s as reading it. Saving works at
+   * any point in the Journey, finished or not.
    */
   app.put("/api/products/:productId/worksheets/:worksheetId", async (c) => {
     if (
@@ -915,13 +916,15 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     const worksheetId = c.req.param("worksheetId");
-    const state = await worksheetState(
-      c.env.DB,
-      product.id,
-      DEFAULT_PATH_ID,
-      worksheetId,
-      await getJourney(c.env.DB, product.id, DEFAULT_PATH_ID),
-    );
+    const journey = await getJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
+    const state =
+      journey &&
+      (await worksheetState(
+        c.env.DB,
+        product.id,
+        DEFAULT_PATH_ID,
+        worksheetId,
+      ));
     if (!state) {
       return c.json({ error: "Not found" }, 404);
     }
@@ -935,12 +938,6 @@ export function createApp(deps: AppDeps = {}) {
       return c.json(
         { error: "answers must map this Worksheet's fields to text" },
         400,
-      );
-    }
-    if (!state.editable) {
-      return c.json(
-        { error: "This Worksheet can't be changed on this Milestone" },
-        409,
       );
     }
 

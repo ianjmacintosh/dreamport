@@ -255,8 +255,8 @@ export const TEST_EMAILS = {
   worksheetsSingleton: "delivered+worksheets-singleton@resend.dev",
   /** Saves one-pager answers on one Milestone, reads them back on another. */
   worksheetsAnswers: "delivered+worksheets-answers@resend.dev",
-  /** Saving off Milestones 1-4 (unstarted, Milestone 5, finished) is refused. */
-  worksheetsNotEditable: "delivered+worksheets-not-editable@resend.dev",
+  /** 404s before a Journey starts, then saves on Milestone 5 and once finished. */
+  worksheetsAnyMilestone: "delivered+worksheets-any-milestone@resend.dev",
   /** Rejects bad answer bodies: unknown field, non-string, over the cap. */
   worksheetsInvalid: "delivered+worksheets-invalid@resend.dev",
   /** Saving from an untrusted origin changes nothing. */

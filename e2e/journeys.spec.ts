@@ -149,9 +149,17 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
     await advanceButton.click();
     await expect(current).toContainText(name);
   }
+  // The one-pager stays a click away past the Milestones it's on (#139).
+  await expect(
+    page.getByRole("link", { name: "Fill out your Rough One-Pager" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Finish Journey" }).click();
   await expect(
     page.getByRole("heading", { name: "Dream Sequence complete" }),
+  ).toBeVisible();
+  // …and once finished.
+  await expect(
+    page.getByRole("link", { name: "Fill out your Rough One-Pager" }),
   ).toBeVisible();
 
   // Returning from finished mirrors finishing: it only un-finishes, so

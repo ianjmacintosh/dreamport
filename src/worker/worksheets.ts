@@ -14,8 +14,6 @@
  * their own ids in the URL once one is authored.
  */
 
-import type { Journey } from "./journeys";
-
 /** Longest answer a Worksheet field takes, in characters. */
 export const WORKSHEET_ANSWER_MAX_LENGTH = 1000;
 
@@ -227,26 +225,17 @@ export async function worksheetSummaries(
 
 /**
  * What `/api/products/:productId/worksheets/:worksheetId` answers with: the
- * Worksheet, the Product's answers on it, and whether they can be changed
- * right now — only while the Journey's current Milestone is one the
- * Worksheet is on (#139: the one-pager is editable on Milestones 1-4, not
- * once the product itself is the evidence). `null` when there's no such
- * Worksheet or no Journey to fill it in on.
+ * Worksheet and the Product's answers on it, or `null` if there's no such
+ * Worksheet. The answers can be changed at any point in the Journey, not
+ * just on the Milestones the Worksheet is on — those are only where it's
+ * checked (#139).
  */
 export async function worksheetState(
   db: D1Database,
   productId: string,
   pathId: string,
   worksheetId: string,
-  journey: Journey | null,
-): Promise<{
-  worksheet: Worksheet;
-  answers: WorksheetAnswers;
-  editable: boolean;
-} | null> {
-  if (!journey) {
-    return null;
-  }
+): Promise<{ worksheet: Worksheet; answers: WorksheetAnswers } | null> {
   const [worksheet, answers] = await Promise.all([
     getWorksheet(db, worksheetId),
     getAnswers(db, productId, pathId, worksheetId),
@@ -254,10 +243,7 @@ export async function worksheetState(
   if (!worksheet) {
     return null;
   }
-  const editable =
-    journey.finishedAt === null &&
-    worksheet.milestoneIds.includes(journey.currentMilestoneId);
-  return { worksheet, answers, editable };
+  return { worksheet, answers };
 }
 
 /**

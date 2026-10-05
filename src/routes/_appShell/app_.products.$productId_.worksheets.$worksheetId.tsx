@@ -56,7 +56,6 @@ interface WorksheetState {
   };
   /** Filled-in fields by field id; a blank field is absent. */
   answers: Record<string, string>;
-  editable: boolean;
 }
 
 const CC_BY_SA_3_URL = "https://creativecommons.org/licenses/by-sa/3.0/";
@@ -105,23 +104,15 @@ export const Route = createFileRoute(
     const { product, ...worksheetState } = (await res.json()) as {
       product: { id: string; name: string };
     } & WorksheetState;
-    // The Journey page only links here on a Milestone the Worksheet is on;
-    // anywhere else, its answers can't be changed, so go back there.
-    if (!worksheetState.editable) {
-      throw redirect({
-        to: "/app/products/$productId/journey",
-        params: { productId: product.id },
-      });
-    }
     return { product, worksheetState };
   },
   component: ProductWorksheet,
 });
 
 /**
- * One of a Product's Worksheets (#139), reached from the Journey page while
- * the Journey is on a Milestone the Worksheet is on — for the Rough
- * One-Pager, Milestones 1-4.
+ * One of a Product's Worksheets (#139), reached from the current
+ * Milestone's content on the Journey page, on every Milestone and once
+ * finished.
  *
  * The Product's name is the h1 and the Worksheet's the h2, the same shape
  * as the Journey page. Below them, how many fields are filled in (as
