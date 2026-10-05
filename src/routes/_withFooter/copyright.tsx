@@ -42,8 +42,9 @@ function Copyright() {
       <section>
         <h2>1. Dreamport&apos;s own work</h2>
         <p className="text-2xl">
-          Dreamport&apos;s text and design are © 2026 Ian J. MacIntosh. All
-          rights reserved, except for the material credited below.
+          Dreamport is owned and operated by Ian J. MacIntosh. Dreamport&apos;s
+          text and design are © 2026 Dreamport. All rights reserved, except for
+          the material credited below.
         </p>
         <p className="text-2xl">
           Dreamport&apos;s{" "}
