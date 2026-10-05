@@ -49,7 +49,6 @@ function Copyright() {
 
       <section>
         <h2>1. Dreamport&apos;s own work</h2>
-        <p className="text-2xl">Copyright 2026 Dreamport.</p>
         <p className="text-2xl">
           Dreamport is owned and operated by Ian J. MacIntosh.
         </p>
@@ -58,9 +57,9 @@ function Copyright() {
           <Link href="https://github.com/ianjmacintosh/dreamport" external>
             source code
           </Link>
-          , including its styles and the text built into the app, is free
-          software: you can redistribute it and/or modify it under the terms of
-          the{" "}
+          , including its styles and the text built into the app, is copyright
+          2026 Dreamport. It is free software: you can redistribute it and/or
+          modify it under the terms of the{" "}
           <Link href="https://www.gnu.org/licenses/gpl-3.0.html" external>
             GNU General Public License, version 3
           </Link>
