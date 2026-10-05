@@ -17,6 +17,7 @@ import {
   STAGING_HOSTS,
 } from "./trusted-origins";
 import type { TurnstileVerifier } from "./turnstile";
+import { WORKSHEET_ANSWER_MAX_LENGTH, worksheetState } from "./worksheets";
 
 /**
  * Seam 1 — the Worker's HTTP boundary.
@@ -2257,6 +2258,7 @@ describe("/api/products/:productId/journey/advance (#138)", () => {
     expect(await again.json()).toEqual({
       path: finished.path,
       journey: finished.journey,
+      worksheets: finished.worksheets,
     });
   });
 
@@ -2432,5 +2434,322 @@ describe("/api/products/:productId/journey/return", () => {
       await getJourney(product.id, cookieA)
     ).json()) as JourneyResponse;
     expect(after.journey).toEqual(before);
+  });
+});
+
+/** Shared by the Worksheet describe block below (#139). */
+function getWorksheet(productId: string, worksheetId: string, cookie?: string) {
+  return fetchWorker(`/api/products/${productId}/worksheets/${worksheetId}`, {
+    headers: cookie ? { cookie } : {},
+  });
+}
+
+/** Shared by the Worksheet describe block below (#139). */
+function saveWorksheet(
+  productId: string,
+  worksheetId: string,
+  answers: unknown,
+  cookie?: string,
+) {
+  return fetchWorker(`/api/products/${productId}/worksheets/${worksheetId}`, {
+    method: "PUT",
+    headers: {
+      ...json,
+      origin: TRUSTED_ORIGIN,
+      ...(cookie ? { cookie } : {}),
+    },
+    body: JSON.stringify({ answers }),
+  });
+}
+
+/** How many filled-in copies of a Worksheet a Product has (#139). */
+async function countWorksheetInstances(productId: string, worksheetId: string) {
+  const row = await env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM "worksheet_instances" WHERE "productId" = ? AND "worksheetId" = ?',
+  )
+    .bind(productId, worksheetId)
+    .first<{ n: number }>();
+  return row?.n;
+}
+
+const ONE_PAGER = "rough-one-pager";
+
+/** The Rough One-Pager's fields, in order (#139). */
+const ONE_PAGER_FIELD_IDS = [
+  "problem",
+  "customer",
+  "value-proposition",
+  "solution",
+  "channels",
+  "revenue",
+  "costs",
+];
+
+type WorksheetResponse = NonNullable<
+  Awaited<ReturnType<typeof worksheetState>>
+> & {
+  product: { id: string; name: string };
+};
+
+describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
+  /** Sign in, add a Product and start its Journey. */
+  async function withStartedJourney(email: string) {
+    const cookie = await signIn(email);
+    const created = await addProduct(cookie, "A phone-scale app");
+    const { product } = (await created.json()) as {
+      product: { id: string; name: string };
+    };
+    const { path } = (await (
+      await startJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    return { cookie, product, path };
+  }
+
+  it("creates exactly one Rough One-Pager when a Journey starts, reused on every Milestone it's on", async () => {
+    const { cookie, product, path } = await withStartedJourney(
+      TEST_EMAILS.worksheetsSingleton,
+    );
+    expect(await countWorksheetInstances(product.id, ONE_PAGER)).toBe(1);
+
+    const res = await getWorksheet(product.id, ONE_PAGER, cookie);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as WorksheetResponse;
+    expect(body.product).toEqual(product);
+    expect(body.worksheet).toMatchObject({
+      id: ONE_PAGER,
+      name: "Rough One-Pager",
+      cardinality: "singleton",
+    });
+    expect(body.worksheet.fields.map((f) => f.id)).toEqual(ONE_PAGER_FIELD_IDS);
+    // Attached to Milestones 1-4 (#133: the one-pager is checked again at
+    // the end of Milestones 2-4).
+    expect(body.worksheet.milestoneIds).toEqual(
+      path.milestones.slice(0, 4).map((m) => m.id),
+    );
+    expect(body.answers).toEqual({});
+    expect(body.editable).toBe(true);
+
+    // A repeat start, and saving from later linked Milestones, all reuse it.
+    await startJourney(product.id, cookie);
+    await saveWorksheet(product.id, ONE_PAGER, { problem: "M1" }, cookie);
+    await advanceJourney(product.id, cookie);
+    await saveWorksheet(product.id, ONE_PAGER, { problem: "M2" }, cookie);
+    await advanceJourney(product.id, cookie);
+    await getWorksheet(product.id, ONE_PAGER, cookie);
+    expect(await countWorksheetInstances(product.id, ONE_PAGER)).toBe(1);
+  });
+
+  it("saves answers (trimmed, blanks dropped) and reads them back on a later Milestone", async () => {
+    const { cookie, product } = await withStartedJourney(
+      TEST_EMAILS.worksheetsAnswers,
+    );
+
+    const saved = await saveWorksheet(
+      product.id,
+      ONE_PAGER,
+      { problem: "  Kitchen scales are clunky  ", customer: "Home bakers" },
+      cookie,
+    );
+    expect(saved.status).toBe(200);
+    expect(((await saved.json()) as WorksheetResponse).answers).toEqual({
+      problem: "Kitchen scales are clunky",
+      customer: "Home bakers",
+    });
+
+    await advanceJourney(product.id, cookie);
+    const onTwo = (await (
+      await getWorksheet(product.id, ONE_PAGER, cookie)
+    ).json()) as WorksheetResponse;
+    expect(onTwo.answers).toEqual({
+      problem: "Kitchen scales are clunky",
+      customer: "Home bakers",
+    });
+
+    // A save replaces every field: one left out or blank reads as blank.
+    const resaved = (await (
+      await saveWorksheet(
+        product.id,
+        ONE_PAGER,
+        { problem: "Scales are clunky", customer: "   ", solution: "An app" },
+        cookie,
+      )
+    ).json()) as WorksheetResponse;
+    expect(resaved.answers).toEqual({
+      problem: "Scales are clunky",
+      solution: "An app",
+    });
+
+    // The Journey page's link counts what's filled.
+    const { worksheets } = (await (
+      await getJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    expect(worksheets).toEqual([
+      {
+        id: ONE_PAGER,
+        name: "Rough One-Pager",
+        milestoneIds: onTwo.worksheet.milestoneIds,
+        filled: 2,
+        total: 7,
+      },
+    ]);
+  });
+
+  it("only saves while the Journey is on a Milestone the Worksheet is on, keeping answers readable after", async () => {
+    const cookie = await signIn(TEST_EMAILS.worksheetsNotEditable);
+    const created = await addProduct(cookie, "Not-editable Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    // No Journey yet: nothing to read or save.
+    expect((await getWorksheet(product.id, ONE_PAGER, cookie)).status).toBe(
+      404,
+    );
+    expect(
+      (await saveWorksheet(product.id, ONE_PAGER, { problem: "x" }, cookie))
+        .status,
+    ).toBe(404);
+
+    await startJourney(product.id, cookie);
+    await saveWorksheet(product.id, ONE_PAGER, { problem: "Kept" }, cookie);
+    for (let i = 0; i < 4; i++) {
+      await advanceJourney(product.id, cookie);
+    }
+
+    // Milestone 5: the product is the evidence now, not the one-pager.
+    const onFive = (await (
+      await getWorksheet(product.id, ONE_PAGER, cookie)
+    ).json()) as WorksheetResponse;
+    expect(onFive.editable).toBe(false);
+    expect(onFive.answers).toEqual({ problem: "Kept" });
+    const refused = await saveWorksheet(
+      product.id,
+      ONE_PAGER,
+      { problem: "Changed" },
+      cookie,
+    );
+    expect(refused.status).toBe(409);
+
+    // Finished: same.
+    for (let i = 0; i < 3; i++) {
+      await advanceJourney(product.id, cookie);
+    }
+    expect(
+      (await saveWorksheet(product.id, ONE_PAGER, { problem: "x" }, cookie))
+        .status,
+    ).toBe(409);
+
+    expect(
+      (
+        (await (
+          await getWorksheet(product.id, ONE_PAGER, cookie)
+        ).json()) as WorksheetResponse
+      ).answers,
+    ).toEqual({ problem: "Kept" });
+  });
+
+  it("rejects an unknown field, a non-string answer, an over-cap answer or a non-object body, saving nothing", async () => {
+    const { cookie, product } = await withStartedJourney(
+      TEST_EMAILS.worksheetsInvalid,
+    );
+    await saveWorksheet(product.id, ONE_PAGER, { problem: "Kept" }, cookie);
+
+    for (const answers of [
+      { problem: "x", "unfair-advantage": "x" },
+      { problem: 42 },
+      { problem: "x".repeat(WORKSHEET_ANSWER_MAX_LENGTH + 1) },
+      ["x"],
+      "x",
+      null,
+    ]) {
+      const res = await saveWorksheet(product.id, ONE_PAGER, answers, cookie);
+      expect(res.status).toBe(400);
+    }
+
+    expect(
+      (
+        (await (
+          await getWorksheet(product.id, ONE_PAGER, cookie)
+        ).json()) as WorksheetResponse
+      ).answers,
+    ).toEqual({ problem: "Kept" });
+  });
+
+  it("rejects a request with no session", async () => {
+    expect((await getWorksheet("some-id", ONE_PAGER)).status).toBe(401);
+    expect(
+      (await saveWorksheet("some-id", ONE_PAGER, { problem: "x" })).status,
+    ).toBe(401);
+  });
+
+  it("rejects a save from an untrusted origin, saving nothing", async () => {
+    const { cookie, product } = await withStartedJourney(
+      TEST_EMAILS.worksheetsUntrusted,
+    );
+
+    const res = await fetchWorker(
+      `/api/products/${product.id}/worksheets/${ONE_PAGER}`,
+      {
+        method: "PUT",
+        headers: { ...json, origin: "https://evil.example.com", cookie },
+        body: JSON.stringify({ answers: { problem: "x" } }),
+      },
+    );
+
+    expect(res.status).toBe(403);
+    expect(
+      (
+        (await (
+          await getWorksheet(product.id, ONE_PAGER, cookie)
+        ).json()) as WorksheetResponse
+      ).answers,
+    ).toEqual({});
+  });
+
+  it("404s a stranger's read or save of another User's Worksheet, never touching it", async () => {
+    const { cookie: cookieA, product } = await withStartedJourney(
+      TEST_EMAILS.worksheetsOwnerA,
+    );
+    const cookieB = await signIn(TEST_EMAILS.worksheetsOwnerB);
+    await saveWorksheet(product.id, ONE_PAGER, { problem: "A's own" }, cookieA);
+
+    const read = await getWorksheet(product.id, ONE_PAGER, cookieB);
+    expect(read.status).toBe(404);
+    expect(await read.json()).toEqual({ error: "Not found" });
+
+    const save = await saveWorksheet(
+      product.id,
+      ONE_PAGER,
+      { problem: "B was here" },
+      cookieB,
+    );
+    expect(save.status).toBe(404);
+    expect(await save.json()).toEqual({ error: "Not found" });
+
+    expect(
+      (
+        (await (
+          await getWorksheet(product.id, ONE_PAGER, cookieA)
+        ).json()) as WorksheetResponse
+      ).answers,
+    ).toEqual({ problem: "A's own" });
+  });
+
+  it("404s a Worksheet that doesn't exist", async () => {
+    const { cookie, product } = await withStartedJourney(
+      TEST_EMAILS.worksheetsOwnerA,
+    );
+
+    expect(
+      (await getWorksheet(product.id, "not-a-worksheet", cookie)).status,
+    ).toBe(404);
+    expect(
+      (
+        await saveWorksheet(
+          product.id,
+          "not-a-worksheet",
+          { problem: "x" },
+          cookie,
+        )
+      ).status,
+    ).toBe(404);
   });
 });

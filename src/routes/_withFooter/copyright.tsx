@@ -16,8 +16,9 @@ const CC_BY_SA_3_URL = "https://creativecommons.org/licenses/by-sa/3.0/";
 const ATTRIBUTIONS: { title: string; credit: ReactNode }[] = [
   {
     // The "Changes" sentence must match the Rough One-Pager worksheet's
-    // actual fields (#139); CC BY-SA 3.0 requires the change note to be
-    // accurate. Update it whenever a field is added, dropped or reworded.
+    // actual fields, seeded in `migrations/0014_rough_one_pager_seed.sql`
+    // (#139); CC BY-SA 3.0 requires the change note to be accurate. Update
+    // it whenever a field is added, dropped or reworded.
     title: "Lean Canvas",
     credit: (
       <>
@@ -33,9 +34,10 @@ const ATTRIBUTIONS: { title: string; credit: ReactNode }[] = [
         <Link href={CC_BY_SA_3_URL} external>
           CC BY-SA 3.0
         </Link>
-        . Changes: the canvas&apos;s boxes are reworded, and two of its nine
-        boxes (key metrics and unfair advantage) are omitted. The &quot;Rough
-        One-Pager&quot; worksheet is licensed under{" "}
+        . Changes: seven of the canvas&apos;s nine boxes are kept, with their
+        prompts rewritten and some names shortened; the other two (key metrics
+        and unfair advantage) are omitted. The &quot;Rough One-Pager&quot;
+        worksheet is licensed under{" "}
         <Link href={CC_BY_SA_3_URL} external>
           CC BY-SA 3.0
         </Link>{" "}

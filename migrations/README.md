@@ -57,6 +57,16 @@ Sequence Milestones — split so the seed half is re-runnable on its own.
 `0011_drop_path_methodology.sql` drops `paths.methodology` (issue #137):
 nothing reads it now the Journey page doesn't show it.
 
+`0012_journey_finished_at.sql` adds `journeys.finishedAt` (issue #138), set
+when a Journey advances past its last Milestone.
+
+`0013_worksheets.sql` adds Worksheets (issue #139): the `worksheets`,
+`worksheet_fields` and `milestone_worksheets` catalog, plus
+`worksheet_instances` (one filled-in copy per Product per Path, at most one
+for a singleton Worksheet) and `worksheet_answers`, cascading off
+`products` on delete. `0014_rough_one_pager_seed.sql` seeds the Rough
+One-Pager on Milestones 1-4 — split so the seed half is re-runnable.
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order

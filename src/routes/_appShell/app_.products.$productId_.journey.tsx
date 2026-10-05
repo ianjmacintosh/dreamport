@@ -71,6 +71,14 @@ interface JourneyState {
     currentMilestoneId: string;
     finishedAt: string | null;
   } | null;
+  /** The Worksheets on the Path's Milestones, with how much is filled in (#139). */
+  worksheets: {
+    id: string;
+    name: string;
+    milestoneIds: string[];
+    filled: number;
+    total: number;
+  }[];
 }
 
 /**
@@ -137,7 +145,8 @@ export const Route = createFileRoute(
  * Milestones as a route on the left, the content for where you are on the
  * right — before starting, the Path's name, the pitch for it, an
  * invitation and "Start Journey"; after,
- * the current Milestone's name, description and "Done when" line. Picked
+ * the current Milestone's name, description and "Done when" line, then a
+ * link to each Worksheet on it with how much is filled in (#139). Picked
  * from the prototype on branch `prototype/journey-ux` (#137).
  *
  * Before starting, every stop shows its outcome line under its name; once
@@ -175,6 +184,13 @@ function ProductJourney() {
   const isFinished = journey?.finishedAt != null;
   const currentMilestone = path.milestones[currentIndex];
   const isLastMilestone = currentIndex === path.milestones.length - 1;
+  // The current Milestone's Worksheets — none once finished, since nothing
+  // is current then.
+  const currentWorksheets = isFinished
+    ? []
+    : journeyState.worksheets.filter((worksheet) =>
+        worksheet.milestoneIds.includes(currentMilestone?.id),
+      );
   // Nothing comes before Milestone 1, so Return is hidden there rather than
   // disabled — unlike Advance, there's nothing else for it to do instead.
   const canReturn = currentIndex > 0 || isFinished;
@@ -303,6 +319,16 @@ function ProductJourney() {
               <p>
                 <strong>Done when:</strong> {currentMilestone.doneWhen}
               </p>
+              {currentWorksheets.map((worksheet) => (
+                <p key={worksheet.id}>
+                  <Link
+                    href={`/app/products/${product.id}/worksheets/${worksheet.id}`}
+                  >
+                    Fill out your {worksheet.name}
+                  </Link>{" "}
+                  ({worksheet.filled} of {worksheet.total} filled in)
+                </p>
+              ))}
               <div className="button-group">
                 {returnButton}
                 <Button

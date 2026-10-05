@@ -10,6 +10,12 @@
  * already will have, via `getProduct`.
  */
 
+import {
+  createSingletonInstances,
+  worksheetSummaries,
+  type WorksheetSummary,
+} from "./worksheets";
+
 export interface Milestone {
   id: string;
   name: string;
@@ -82,10 +88,12 @@ export async function getJourney(
 }
 
 /**
- * Start a Product's Journey on `pathId` at its first Milestone. Returns
- * whether a Journey was actually started — `false` means one already
- * existed, and it's left exactly as it was (a repeat start never resets
- * progress).
+ * Start a Product's Journey on `pathId` at its first Milestone, with its
+ * one copy of each singleton Worksheet on the Path (#139). Returns whether
+ * a Journey was actually started — `false` means one already existed, and
+ * it's left exactly as it was (a repeat start never resets progress). A
+ * repeat start still creates any singleton copy that's missing, which a
+ * Journey started before #139 would be.
  */
 export async function startJourney(
   db: D1Database,
@@ -98,6 +106,7 @@ export async function startJourney(
     )
     .bind(crypto.randomUUID(), productId, new Date().toISOString(), pathId)
     .run();
+  await createSingletonInstances(db, productId, pathId);
   return meta.changes > 0;
 }
 
@@ -211,16 +220,22 @@ export async function returnJourney(
 
 /**
  * What `/api/products/:productId/journey` answers with: the default Path
- * with its Milestones, and the Product's Journey on it (`null` until
- * started).
+ * with its Milestones, the Product's Journey on it (`null` until started),
+ * and the Worksheets on its Milestones with how much of each is filled in
+ * (#139).
  */
 export async function journeyState(
   db: D1Database,
   productId: string,
-): Promise<{ path: Path; journey: Journey | null }> {
-  const [path, journey] = await Promise.all([
+): Promise<{
+  path: Path;
+  journey: Journey | null;
+  worksheets: WorksheetSummary[];
+}> {
+  const [path, journey, worksheets] = await Promise.all([
     getPath(db, DEFAULT_PATH_ID),
     getJourney(db, productId, DEFAULT_PATH_ID),
+    worksheetSummaries(db, productId, DEFAULT_PATH_ID),
   ]);
-  return { path, journey };
+  return { path, journey, worksheets };
 }

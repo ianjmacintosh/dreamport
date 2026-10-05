@@ -7,7 +7,9 @@ import { exemptFromRateLimits } from "./rate-limit-exemption";
 // Journey page, read the Path's Milestones, start the Journey, see
 // Milestone 1 current — then back on the Product home, see it named there.
 // Also covers advancing from Milestone 1 to Milestone 2 (issue #138), and
-// returning to Milestone 1 and advancing again.
+// returning to Milestone 1 and advancing again, and filling out the Rough
+// One-Pager Worksheet on Milestone 1 and finding it kept on Milestone 2
+// (issue #139).
 // Signs in the same way `ideas.spec.ts` does (fixed `+e2e-test@` code, see
 // docs/adr/0009).
 
@@ -166,4 +168,59 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
   await expect(
     page.getByText("Current Milestone: Growth (7 of 7)"),
   ).toBeVisible();
+});
+
+test("fill out the Rough One-Pager from Milestone 1, then see it kept on Milestone 2", async ({
+  page,
+}) => {
+  const productName = `A one-pager app ${Date.now()}`;
+
+  await signIn(page, TEST_EMAILS.e2eFillOnePager);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add Product" }).click();
+  await page.getByRole("link", { name: productName }).click();
+  await page.getByRole("link", { name: "Learn More" }).click();
+  await page.getByRole("button", { name: "Start Journey" }).click();
+
+  // Milestone 1 holds the one-pager (#139), nothing filled in yet.
+  await expect(page.getByText("(0 of 7 filled in)")).toBeVisible();
+  await page
+    .getByRole("link", { name: "Fill out your Rough One-Pager" })
+    .click();
+  await expect(page).toHaveURL(/\/worksheets\/rough-one-pager$/);
+  await expect(
+    page.getByRole("heading", { name: "Rough One-Pager" }),
+  ).toBeVisible();
+  await expect(page.getByText("0 of 7 filled in")).toBeVisible();
+  // Credited to Lean Canvas, linking the license and the Copyright page.
+  await expect(page.getByRole("link", { name: "CC BY-SA 3.0" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Credits" })).toHaveAttribute(
+    "href",
+    "/copyright",
+  );
+
+  await page.getByLabel("Problem").fill("Kitchen scales are clunky");
+  await page.getByLabel("Customer").fill("Home bakers");
+  await page.getByRole("button", { name: "Save Rough One-Pager" }).click();
+  await expect(page.getByRole("status")).toHaveText("Saved.");
+  await expect(page.getByText("2 of 7 filled in")).toBeVisible();
+
+  // Kept across a reload, and still there to edit on Milestone 2.
+  await page.reload();
+  await expect(page.getByLabel("Problem")).toHaveValue(
+    "Kitchen scales are clunky",
+  );
+  await page.getByRole("link", { name: "Back to Journey" }).click();
+  await page.getByRole("button", { name: "Advance to Next Milestone" }).click();
+  await expect(
+    page
+      .getByRole("list", { name: "Milestones" })
+      .locator('[aria-current="step"]'),
+  ).toContainText("Real Talk");
+  await expect(page.getByText("(2 of 7 filled in)")).toBeVisible();
+  await page
+    .getByRole("link", { name: "Fill out your Rough One-Pager" })
+    .click();
+  await expect(page.getByLabel("Customer")).toHaveValue("Home bakers");
 });

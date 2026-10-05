@@ -250,6 +250,22 @@ export const TEST_EMAILS = {
   /** Other User whose return of A's Journey must 404, not succeed. */
   journeysReturnOwnerB: "delivered+journeys-return-owner-b@resend.dev",
 
+  // --- Seam 1d: /api/products/:productId/worksheets/:worksheetId (#139) ---
+  /** Starting a Journey creates one Rough One-Pager instance, never two. */
+  worksheetsSingleton: "delivered+worksheets-singleton@resend.dev",
+  /** Saves one-pager answers on one Milestone, reads them back on another. */
+  worksheetsAnswers: "delivered+worksheets-answers@resend.dev",
+  /** Saving off Milestones 1-4 (unstarted, Milestone 5, finished) is refused. */
+  worksheetsNotEditable: "delivered+worksheets-not-editable@resend.dev",
+  /** Rejects bad answer bodies: unknown field, non-string, over the cap. */
+  worksheetsInvalid: "delivered+worksheets-invalid@resend.dev",
+  /** Saving from an untrusted origin changes nothing. */
+  worksheetsUntrusted: "delivered+worksheets-untrusted@resend.dev",
+  /** Owner side of the Worksheet ownership boundary check. */
+  worksheetsOwnerA: "delivered+worksheets-owner-a@resend.dev",
+  /** Other User whose read or save of A's one-pager must 404. */
+  worksheetsOwnerB: "delivered+worksheets-owner-b@resend.dev",
+
   // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
   // Every address below carries the `+e2e-test@` marker (issue #39): the
   // `+<scenario>` label sits ahead of it, so e.g. "e2e-happy" tags the
@@ -321,6 +337,8 @@ export const TEST_EMAILS = {
   /** Finish a Journey, then Return from finished: un-finished, Growth still current. */
   e2eReturnFromFinished:
     "delivered+e2e-return-from-finished+e2e-test@resend.dev",
+  /** #139: fill out the Rough One-Pager from the Journey page, see it saved. */
+  e2eFillOnePager: "delivered+e2e-fill-one-pager+e2e-test@resend.dev",
   /** #112: set a Product's description, see it persist across a reload, then clear it. */
   e2eProductDescription:
     "delivered+e2e-product-description+e2e-test@resend.dev",

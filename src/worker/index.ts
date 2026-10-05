@@ -39,7 +39,9 @@ import {
   advanceJourney,
   returnJourney,
   journeyState,
+  getJourney,
 } from "./journeys";
+import { parseAnswers, saveAnswers, worksheetState } from "./worksheets";
 import { listTags, listTagsByIdea, setIdeaTags } from "./tags";
 import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
@@ -843,6 +845,113 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     return c.json(await journeyState(c.env.DB, product.id), 200);
+  });
+
+  /**
+   * Worksheets (issue #139): a Product's copy of one Worksheet on the
+   * default Path — the Worksheet, its answers, and whether they can be
+   * changed right now (only on a Milestone the Worksheet is on). Same
+   * session gate and `getProduct` ownership check as the Journey routes.
+   * 404s when there's no such Worksheet or the Product hasn't started its
+   * Journey. Bundles the Product for the Worksheet page's heading.
+   */
+  app.get("/api/products/:productId/worksheets/:worksheetId", async (c) => {
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const state = await worksheetState(
+      c.env.DB,
+      product.id,
+      DEFAULT_PATH_ID,
+      c.req.param("worksheetId"),
+      await getJourney(c.env.DB, product.id, DEFAULT_PATH_ID),
+    );
+    if (!state) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json({ product, ...state });
+  });
+
+  /**
+   * Save a Product's answers on one Worksheet, replacing every field (one
+   * left out reads as blank). Same origin, session and ownership checks as
+   * the Journey moves. 409s when the Journey isn't on a Milestone the
+   * Worksheet is on — the Worksheet page only offers saving when it is.
+   */
+  app.put("/api/products/:productId/worksheets/:worksheetId", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const worksheetId = c.req.param("worksheetId");
+    const state = await worksheetState(
+      c.env.DB,
+      product.id,
+      DEFAULT_PATH_ID,
+      worksheetId,
+      await getJourney(c.env.DB, product.id, DEFAULT_PATH_ID),
+    );
+    if (!state) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const body = await c.req.json().catch(() => null);
+    const answers = parseAnswers(
+      state.worksheet,
+      body && typeof body === "object" ? body.answers : null,
+    );
+    if (!answers) {
+      return c.json(
+        { error: "answers must map this Worksheet's fields to text" },
+        400,
+      );
+    }
+    if (!state.editable) {
+      return c.json(
+        { error: "This Worksheet can't be changed on this Milestone" },
+        409,
+      );
+    }
+
+    await saveAnswers(
+      c.env.DB,
+      product.id,
+      DEFAULT_PATH_ID,
+      worksheetId,
+      answers,
+    );
+    return c.json({ product, ...state, answers }, 200);
   });
 
   /**
