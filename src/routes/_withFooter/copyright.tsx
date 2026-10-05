@@ -42,20 +42,23 @@ function Copyright() {
       <section>
         <h2>1. Dreamport&apos;s own work</h2>
         <p className="text-2xl">
-          Dreamport is owned and operated by Ian J. MacIntosh. Dreamport&apos;s
-          text and design are © 2026 Dreamport. All rights reserved, except for
-          the material credited below.
+          Dreamport is owned and operated by Ian J. MacIntosh.
         </p>
         <p className="text-2xl">
           Dreamport&apos;s{" "}
           <Link href="https://github.com/ianjmacintosh/dreamport" external>
             source code
           </Link>{" "}
-          is free software under the{" "}
+          — including its styles and the text built into the app — is free
+          software under the{" "}
           <Link href="https://www.gnu.org/licenses/gpl-3.0.html" external>
             GNU General Public License, version 3
           </Link>
-          .
+          , except for the material credited below.
+        </p>
+        <p className="text-2xl">
+          The Dreamport name and branding are © 2026 Dreamport. All rights
+          reserved.
         </p>
       </section>
 
