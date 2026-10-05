@@ -76,8 +76,12 @@ describe("signed-out info pages", () => {
     expect(hrefs).toContain("https://www.gnu.org/licenses/gpl-3.0.html");
   });
 
-  test("/copyright links CC BY-SA 3.0 for the Lean Canvas adaptation", () => {
+  test("/copyright links CC BY-SA 3.0 for both the source and the adaptation", () => {
     const hrefs = linksOf(CopyrightRoute).map(([, href]) => href);
-    expect(hrefs).toContain("https://creativecommons.org/licenses/by-sa/3.0/");
+    expect(
+      hrefs.filter(
+        (href) => href === "https://creativecommons.org/licenses/by-sa/3.0/",
+      ),
+    ).toHaveLength(2);
   });
 });
