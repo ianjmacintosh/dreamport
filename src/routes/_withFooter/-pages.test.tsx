@@ -84,4 +84,11 @@ describe("signed-out info pages", () => {
       ),
     ).toHaveLength(2);
   });
+
+  test("/copyright links the Business Model Canvas to Strategyzer's licensed PDF", () => {
+    expect(linksOf(CopyrightRoute)).toContainEqual([
+      "Business Model Canvas",
+      "https://assets.strategyzer.com/assets/resources/the-business-model-canvas.pdf",
+    ]);
+  });
 });

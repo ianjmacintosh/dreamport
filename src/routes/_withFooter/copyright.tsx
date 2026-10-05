@@ -22,8 +22,14 @@ const ATTRIBUTIONS: { title: string; credit: ReactNode }[] = [
     credit: (
       <>
         The &quot;Rough One-Pager&quot; worksheet is adapted from &quot;Lean
-        Canvas&quot; by Ash Maurya (itself adapted from &quot;Business Model
-        Canvas&quot; by Alexander Osterwalder), used under{" "}
+        Canvas&quot; by Ash Maurya (itself adapted from &quot;
+        <Link
+          href="https://assets.strategyzer.com/assets/resources/the-business-model-canvas.pdf"
+          external
+        >
+          Business Model Canvas
+        </Link>
+        &quot; by Strategyzer AG), used under{" "}
         <Link href={CC_BY_SA_3_URL} external>
           CC BY-SA 3.0
         </Link>
