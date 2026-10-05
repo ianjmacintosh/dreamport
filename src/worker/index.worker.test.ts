@@ -2520,7 +2520,9 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
       name: "Product Summary",
       cardinality: "singleton",
     });
-    expect(body.worksheet.fields.map((f) => f.id)).toEqual(PRODUCT_SUMMARY_FIELD_IDS);
+    expect(body.worksheet.fields.map((f) => f.id)).toEqual(
+      PRODUCT_SUMMARY_FIELD_IDS,
+    );
     // Attached to Milestones 1-4 (#133: the one-pager is checked again at
     // the end of Milestones 2-4).
     expect(body.worksheet.milestoneIds).toEqual(
@@ -2599,12 +2601,18 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
     const { product } = (await created.json()) as { product: { id: string } };
 
     // No Journey yet: nothing to read or save.
-    expect((await getWorksheet(product.id, PRODUCT_SUMMARY, cookie)).status).toBe(
-      404,
-    );
     expect(
-      (await saveWorksheet(product.id, PRODUCT_SUMMARY, { problem: "x" }, cookie))
-        .status,
+      (await getWorksheet(product.id, PRODUCT_SUMMARY, cookie)).status,
+    ).toBe(404);
+    expect(
+      (
+        await saveWorksheet(
+          product.id,
+          PRODUCT_SUMMARY,
+          { problem: "x" },
+          cookie,
+        )
+      ).status,
     ).toBe(404);
 
     await startJourney(product.id, cookie);
@@ -2646,7 +2654,12 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
     const { cookie, product } = await withStartedJourney(
       TEST_EMAILS.worksheetsInvalid,
     );
-    await saveWorksheet(product.id, PRODUCT_SUMMARY, { problem: "Kept" }, cookie);
+    await saveWorksheet(
+      product.id,
+      PRODUCT_SUMMARY,
+      { problem: "Kept" },
+      cookie,
+    );
 
     for (const answers of [
       { problem: "x", "unfair-advantage": "x" },
@@ -2656,7 +2669,12 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
       "x",
       null,
     ]) {
-      const res = await saveWorksheet(product.id, PRODUCT_SUMMARY, answers, cookie);
+      const res = await saveWorksheet(
+        product.id,
+        PRODUCT_SUMMARY,
+        answers,
+        cookie,
+      );
       expect(res.status).toBe(400);
     }
 
@@ -2672,7 +2690,8 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
   it("rejects a request with no session", async () => {
     expect((await getWorksheet("some-id", PRODUCT_SUMMARY)).status).toBe(401);
     expect(
-      (await saveWorksheet("some-id", PRODUCT_SUMMARY, { problem: "x" })).status,
+      (await saveWorksheet("some-id", PRODUCT_SUMMARY, { problem: "x" }))
+        .status,
     ).toBe(401);
   });
 
@@ -2705,7 +2724,12 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
       TEST_EMAILS.worksheetsOwnerA,
     );
     const cookieB = await signIn(TEST_EMAILS.worksheetsOwnerB);
-    await saveWorksheet(product.id, PRODUCT_SUMMARY, { problem: "A's own" }, cookieA);
+    await saveWorksheet(
+      product.id,
+      PRODUCT_SUMMARY,
+      { problem: "A's own" },
+      cookieA,
+    );
 
     const read = await getWorksheet(product.id, PRODUCT_SUMMARY, cookieB);
     expect(read.status).toBe(404);
