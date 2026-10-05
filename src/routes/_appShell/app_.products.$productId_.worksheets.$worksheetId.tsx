@@ -1,6 +1,7 @@
-// PROTOTYPE (prototype/worksheet-design): four variants of the worksheet
-// sheet, switchable via `?variant=A|B|C|D` and the floating bar —
-// frame (shadow card / bordered panel) × answers (boxed / ruled lines).
+// PROTOTYPE (prototype/worksheet-design), round 2: four variants of the
+// worksheet sheet, switchable via `?variant=A|B|C|D` and the floating bar —
+// corners (square / rounded) × edge (border / none). Every variant has
+// ruled-line answers, no progress line, and the sheet's own title.
 import { useState, type ReactNode } from "react";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
@@ -11,31 +12,16 @@ import TextArea from "../../components/TextArea";
 import "../../prototype/worksheet-design.css";
 
 const VARIANTS = [
-  {
-    key: "A",
-    name: "Shadow card, boxed answers",
-    frame: "shadow",
-    answers: "boxed",
-  },
-  {
-    key: "B",
-    name: "Shadow card, ruled lines",
-    frame: "shadow",
-    answers: "ruled",
-  },
-  {
-    key: "C",
-    name: "Bordered panel, boxed answers",
-    frame: "bordered",
-    answers: "boxed",
-  },
-  {
-    key: "D",
-    name: "Bordered panel, ruled lines",
-    frame: "bordered",
-    answers: "ruled",
-  },
+  { key: "A", name: "Square, bordered", corners: "square", edge: "bordered" },
+  { key: "B", name: "Square, no border", corners: "square", edge: "plain" },
+  { key: "C", name: "Rounded, bordered", corners: "rounded", edge: "bordered" },
+  { key: "D", name: "Rounded, no border", corners: "rounded", edge: "plain" },
 ];
+
+/** PROTOTYPE: the title printed on the sheet, by Worksheet id — "Rough One-Pager" is what we call it, not what the paper says. */
+const SHEET_TITLES: Record<string, string> = {
+  "rough-one-pager": "One-Pager",
+};
 
 /**
  * Plain `fetch` never times out on its own — if the server accepts the TCP
@@ -159,13 +145,12 @@ function ProductWorksheet() {
   const { variant: variantKey = "A" } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const variant = VARIANTS.find((v) => v.key === variantKey) ?? VARIANTS[0];
-  const [answers, setAnswers] = useState(worksheetState.answers);
   const [drafts, setDrafts] = useState(worksheetState.answers);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const attribution = ATTRIBUTIONS[worksheet.id];
-  const filled = worksheet.fields.filter((field) => answers[field.id]).length;
+  const sheetTitle = SHEET_TITLES[worksheet.id] ?? worksheet.name;
 
   async function save() {
     setError("");
@@ -191,7 +176,6 @@ function ProductWorksheet() {
         return;
       }
       // The server's copy — trimmed, blanks dropped.
-      setAnswers(result.answers);
       setDrafts(result.answers);
       setSaved(true);
     } catch {
@@ -210,14 +194,9 @@ function ProductWorksheet() {
         </Link>
       </p>
       <article
-        className={`ws-sheet ws-sheet--${variant.frame} ws-sheet--${variant.answers}`}
+        className={`ws-sheet ws-sheet--${variant.corners} ws-sheet--${variant.edge}`}
       >
-        <header>
-          <h2>{worksheet.name}</h2>
-          <p>
-            {filled} of {worksheet.fields.length} filled in
-          </p>
-        </header>
+        <h2>{sheetTitle}</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -244,7 +223,7 @@ function ProductWorksheet() {
             disabled={isSaving}
             state={isSaving ? "saving" : "ready"}
           >
-            <Button.State name="ready">Save {worksheet.name}</Button.State>
+            <Button.State name="ready">Save {sheetTitle}</Button.State>
             <Button.State name="saving">Saving…</Button.State>
           </Button>
         </form>

@@ -51,34 +51,31 @@
   margin: var(--space-4) 0 0;
 }
 
-/* Frame: a shadowed card, like paper lifted off the page. */
-.ws-sheet--shadow {
-  border-radius: 4px;
-  box-shadow:
-    0 1px 2px rgb(0 43 54 / 0.12),
-    0 6px 20px rgb(0 43 54 / 0.12);
+/* Corners: square, like a cut sheet, or the app's usual 6px rounding. */
+.ws-sheet--square {
+  border-radius: 0;
 }
 
-/* Frame: a flat panel with a hairline border. */
-.ws-sheet--bordered {
-  border: 1px solid var(--color-border);
+.ws-sheet--rounded {
   border-radius: 6px;
 }
 
-/* Answers: boxed — the stock `.input` box, on white. */
-.ws-sheet--boxed .input {
-  background-color: var(--color-sheet);
+/* Edge: a hairline border, or none — just white on cream. */
+.ws-sheet--bordered {
+  border: 1px solid var(--color-border);
 }
 
 /* Answers: ruled lines, like notebook paper — no box, a line under every
-   row of text. The line height is pinned so the rules and text agree. */
-.ws-sheet--ruled .input {
+   row of text, growing with the answer and not hand-resizable. The line
+   height is pinned so the rules and text agree. */
+.ws-sheet .input {
   --rule: 1.75rem;
   border: 0;
   border-radius: 0;
   padding: 0;
   line-height: var(--rule);
   min-height: calc(3 * var(--rule));
+  resize: none;
   background-color: transparent;
   background-image: linear-gradient(
     to bottom,
@@ -89,7 +86,7 @@
   background-attachment: local;
 }
 
-.ws-sheet--ruled .input:focus-visible {
+.ws-sheet .input:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 4px;
 }
