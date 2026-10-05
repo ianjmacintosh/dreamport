@@ -57,6 +57,9 @@ test("sign in, open a Product, learn about its Journey, start it, and see Milest
   const milestones = page.getByRole("list", { name: "Milestones" });
   await expect(milestones.getByRole("listitem")).toHaveCount(7);
   await expect(milestones).toContainText("Real Talk");
+  await expect(milestones).toContainText(
+    "Learn from future customers by hearing their perspective",
+  );
   await expect(milestones.locator('[aria-current="step"]')).toHaveCount(0);
   await expect(
     page.getByText("Start by describing your solution."),

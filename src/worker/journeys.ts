@@ -15,6 +15,8 @@ export interface Milestone {
   name: string;
   description: string;
   doneWhen: string;
+  /** A few words on the Milestone, shown under its name on the route. */
+  outcome: string;
 }
 
 export interface Path {
@@ -51,7 +53,7 @@ export async function getPath(db: D1Database, pathId: string): Promise<Path> {
       .first<Omit<Path, "milestones">>(),
     db
       .prepare(
-        'SELECT "id", "name", "description", "doneWhen" FROM "milestones" WHERE "pathId" = ? ORDER BY "position" ASC',
+        'SELECT "id", "name", "description", "doneWhen", "outcome" FROM "milestones" WHERE "pathId" = ? ORDER BY "position" ASC',
       )
       .bind(pathId)
       .all<Milestone>(),

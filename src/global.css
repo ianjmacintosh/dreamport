@@ -1248,6 +1248,12 @@ button.tag-more[data-popup-open] {
   font-weight: 700;
 }
 
+/* Under the name, in the text's own color: the bold name carries the
+   hierarchy (a muted grey failed AA). */
+.journey-route-outcome {
+  grid-column: 2;
+}
+
 /* Done: a grey filled circle, a check in place of the number. */
 .journey-route-stop[data-status="done"] .journey-route-dot {
   border-color: var(--color-done);

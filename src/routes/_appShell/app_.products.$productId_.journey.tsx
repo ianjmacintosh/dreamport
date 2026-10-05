@@ -52,6 +52,7 @@ interface Milestone {
   name: string;
   description: string;
   doneWhen: string;
+  outcome: string;
 }
 
 /**
@@ -126,6 +127,10 @@ export const Route = createFileRoute(
  * invitation and "Start Journey"; after,
  * the current Milestone's name, description and "Done when" line. Picked
  * from the prototype on branch `prototype/journey-ux` (#137).
+ *
+ * Before starting, every stop shows its outcome line under its name; once
+ * started, only the current one does, so the route stays short beside the
+ * work.
  *
  * The route is an `<ol>`, so screen readers already number each stop; the
  * dot's visible number is hidden from them. A done stop's dot shows a check
@@ -202,6 +207,11 @@ function ProductJourney() {
                   )}
                 </span>
                 <span className="journey-route-name">{milestone.name}</span>
+                {(!journey || status === "current") && (
+                  <span className="journey-route-outcome">
+                    {milestone.outcome}
+                  </span>
+                )}
               </li>
             );
           })}

@@ -50,6 +50,9 @@ its current Milestone) cascading off `products` on delete.
 `0008_dream_sequence.sql` renames that Path from "Starter Path" to "Dream
 Sequence" (issue #137).
 
+`0009_milestone_outcome.sql` adds each Milestone's `outcome` line (issue
+#137), seeded for the seven Dream Sequence Milestones.
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order
