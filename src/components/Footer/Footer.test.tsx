@@ -54,7 +54,7 @@ function headings(props: Parameters<typeof Footer>[0] = {}) {
 }
 
 describe("Footer", () => {
-  test("app: copyright plus Privacy Policy and Terms of Service, no headings", () => {
+  test("app: copyright plus Privacy Policy, Terms of Service and Copyright, no headings", () => {
     const elements = footerElements({ variant: "app" });
     expect(elements.some((el) => el.props.children === COPYRIGHT)).toBe(true);
     expect(
@@ -65,13 +65,14 @@ describe("Footer", () => {
     ).toEqual([
       ["Privacy Policy", "/privacy"],
       ["Terms of Service", "/terms"],
+      ["Copyright", "/copyright"],
     ]);
     expect(headings({ variant: "app" })).toEqual([]);
   });
 
   test("app: its links use the quiet link treatment", () => {
     expect(listLinks({ variant: "app" }).map((l) => l.props.className)).toEqual(
-      ["link-quiet", "link-quiet"],
+      ["link-quiet", "link-quiet", "link-quiet"],
     );
   });
 
@@ -87,7 +88,7 @@ describe("Footer", () => {
     expect(Footer()).toEqual(Footer({ variant: "app" }));
   });
 
-  test("marketing: Log In, About, Contact, Privacy, Terms in that order", () => {
+  test("marketing: Log In, About, Contact, Privacy, Terms, Copyright in that order", () => {
     expect(
       listLinks({ variant: "marketing" }).map((l) => [
         l.props.children,
@@ -99,6 +100,7 @@ describe("Footer", () => {
       ["Contact", "https://ianjmacintosh.com/contact"],
       ["Privacy Policy", "/privacy"],
       ["Terms of Service", "/terms"],
+      ["Copyright", "/copyright"],
     ]);
   });
 
