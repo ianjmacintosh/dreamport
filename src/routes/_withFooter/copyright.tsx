@@ -34,10 +34,11 @@ const ATTRIBUTIONS: { title: string; credit: ReactNode }[] = [
         <Link href={CC_BY_SA_3_URL} external>
           CC BY-SA 3.0
         </Link>
-        . Changes: seven of the canvas&apos;s nine boxes are kept, with their
-        prompts rewritten and some names shortened; the other two (key metrics
-        and unfair advantage) are omitted. The &quot;Product Summary&quot;
-        worksheet is licensed under{" "}
+        . Changes: eight of the canvas&apos;s nine boxes are kept and reordered,
+        with their prompts rewritten and some of their names changed; existing
+        alternatives are asked about under Value Proposition rather than
+        Problem; the ninth box (key metrics) is omitted. The &quot;Product
+        Summary&quot; worksheet is licensed under{" "}
         <Link href={CC_BY_SA_3_URL} external>
           CC BY-SA 3.0
         </Link>{" "}

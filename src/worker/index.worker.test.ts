@@ -2478,10 +2478,11 @@ const PRODUCT_SUMMARY = "product-summary";
 const PRODUCT_SUMMARY_FIELD_IDS = [
   "problem",
   "customer",
-  "value-proposition",
   "solution",
-  "channels",
-  "revenue",
+  "value-proposition",
+  "unfair-advantage",
+  "channel",
+  "pricing",
   "costs",
 ];
 
@@ -2590,7 +2591,7 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
         name: "Product Summary",
         milestoneIds: onTwo.worksheet.milestoneIds,
         filled: 2,
-        total: 7,
+        total: 8,
       },
     ]);
   });
@@ -2662,7 +2663,7 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
     );
 
     for (const answers of [
-      { problem: "x", "unfair-advantage": "x" },
+      { problem: "x", "key-metrics": "x" },
       { problem: 42 },
       { problem: "x".repeat(WORKSHEET_ANSWER_MAX_LENGTH + 1) },
       ["x"],

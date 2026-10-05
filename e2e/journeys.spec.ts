@@ -192,7 +192,7 @@ test("fill out the Product Summary from Milestone 1, then see it kept on Milesto
   await page.getByRole("button", { name: "Start Journey" }).click();
 
   // Milestone 1 holds the Product Summary (#139), nothing filled in yet.
-  await expect(page.getByText("(0 of 7 filled in)")).toBeVisible();
+  await expect(page.getByText("(0 of 8 filled in)")).toBeVisible();
   await page
     .getByRole("link", { name: "Fill out your Product Summary" })
     .click();
@@ -223,7 +223,7 @@ test("fill out the Product Summary from Milestone 1, then see it kept on Milesto
       .getByRole("list", { name: "Milestones" })
       .locator('[aria-current="step"]'),
   ).toContainText("Real Talk");
-  await expect(page.getByText("(2 of 7 filled in)")).toBeVisible();
+  await expect(page.getByText("(2 of 8 filled in)")).toBeVisible();
   await page
     .getByRole("link", { name: "Fill out your Product Summary" })
     .click();

@@ -220,7 +220,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
   Problem") as lined `TextArea`s — prompt between question and lines,
   three lines tall and growing, not hand-resizable — one Save button, and
   any credit right-aligned in italics in the bottom corner ("Credit:
-  Adapted from … (CC BY-SA 3.0)", only the license linked). No "N of 7
+  Adapted from … (CC BY-SA 3.0)", only the license linked). No "N of M
   filled in" line on the sheet; the Journey page's link carries the count.
   Picked from a prototype on branch `prototype/worksheet-design` (decided
   in #139).

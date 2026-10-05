@@ -116,7 +116,7 @@ export const Route = createFileRoute(
  * branch `prototype/worksheet-design`): its name as the sheet's h2, one
  * numbered `TextArea` per field with its prompt as helper text, one Save
  * button for the lot, and the Worksheet's credit, if it's adapted from
- * someone else's work, in the bottom corner. No "N of 7 filled in" line
+ * someone else's work, in the bottom corner. No "N of M filled in" line
  * here — the sheet is the paper, and the Journey page's link carries the
  * count.
  */
