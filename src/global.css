@@ -567,8 +567,18 @@ a.button {
 
 .input-helper {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  /* Same color as the label: --color-text-muted (base1) fails AA on cream
+     (~2.48:1) and on white, and no lighter Solarized grey clears 4.5:1. */
+  color: var(--color-text-primary);
   margin-top: var(--space-1);
+}
+
+/* A multi-line `.input` (`TextArea`): starts three lines tall and grows
+   with its content where the browser supports `field-sizing`. */
+.input--multiline {
+  field-sizing: content;
+  min-height: calc(3lh + 2 * var(--space-2) + 2px);
+  resize: vertical;
 }
 
 /* ── Primitives: one-time code input ──────────────────────── */

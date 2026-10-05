@@ -1,9 +1,41 @@
+// PROTOTYPE (prototype/worksheet-design): four variants of the worksheet
+// sheet, switchable via `?variant=A|B|C|D` and the floating bar —
+// frame (shadow card / bordered panel) × answers (boxed / ruled lines).
 import { useState, type ReactNode } from "react";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
 import Link from "../../components/Link";
-import TextInput from "../../components/TextInput";
+import PrototypeSwitcher from "../../components/PrototypeSwitcher";
+import TextArea from "../../components/TextArea";
+import "../../prototype/worksheet-design.css";
+
+const VARIANTS = [
+  {
+    key: "A",
+    name: "Shadow card, boxed answers",
+    frame: "shadow",
+    answers: "boxed",
+  },
+  {
+    key: "B",
+    name: "Shadow card, ruled lines",
+    frame: "shadow",
+    answers: "ruled",
+  },
+  {
+    key: "C",
+    name: "Bordered panel, boxed answers",
+    frame: "bordered",
+    answers: "boxed",
+  },
+  {
+    key: "D",
+    name: "Bordered panel, ruled lines",
+    frame: "bordered",
+    answers: "ruled",
+  },
+];
 
 /**
  * Plain `fetch` never times out on its own — if the server accepts the TCP
@@ -69,15 +101,11 @@ const CC_BY_SA_3_URL = "https://creativecommons.org/licenses/by-sa/3.0/";
 const ATTRIBUTIONS: Record<string, ReactNode> = {
   "rough-one-pager": (
     <>
-      Adapted from Lean Canvas (
-      <Link href={CC_BY_SA_3_URL} external className="link-quiet">
+      Credit: Adapted from Lean Canvas by Ash Maurya (
+      <Link href={CC_BY_SA_3_URL} external>
         CC BY-SA 3.0
       </Link>
-      ).{" "}
-      <Link href="/copyright" className="link-quiet">
-        Credits
-      </Link>
-      .
+      )
     </>
   ),
 };
@@ -92,6 +120,8 @@ const CONNECTION_FAILED =
 export const Route = createFileRoute(
   "/_appShell/app_/products/$productId_/worksheets/$worksheetId",
 )({
+  validateSearch: (search: Record<string, unknown>): { variant?: string } =>
+    typeof search.variant === "string" ? { variant: search.variant } : {},
   beforeLoad: async ({ params }) => {
     const res = await fetch(
       `/api/products/${params.productId}/worksheets/${params.worksheetId}`,
@@ -126,6 +156,9 @@ export const Route = createFileRoute(
 function ProductWorksheet() {
   const { product, worksheetState } = Route.useRouteContext();
   const { worksheet } = worksheetState;
+  const { variant: variantKey = "A" } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const variant = VARIANTS.find((v) => v.key === variantKey) ?? VARIANTS[0];
   const [answers, setAnswers] = useState(worksheetState.answers);
   const [drafts, setDrafts] = useState(worksheetState.answers);
   const [isSaving, setIsSaving] = useState(false);
@@ -171,49 +204,61 @@ function ProductWorksheet() {
   return (
     <>
       <h1>{product.name}</h1>
-      <h2>{worksheet.name}</h2>
-      <p>
-        {filled} of {worksheet.fields.length} filled in
-      </p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
-        {worksheet.fields.map((field) => (
-          <TextInput
-            key={field.id}
-            id={`worksheet-${field.id}`}
-            label={field.name}
-            helperText={field.prompt}
-            value={drafts[field.id] ?? ""}
-            onChange={(e) => {
-              setSaved(false);
-              setDrafts({ ...drafts, [field.id]: e.target.value });
-            }}
-            maxLength={WORKSHEET_ANSWER_MAX_LENGTH}
-            disabled={isSaving}
-          />
-        ))}
-        <Button
-          type="submit"
-          disabled={isSaving}
-          state={isSaving ? "saving" : "ready"}
-        >
-          <Button.State name="ready">Save {worksheet.name}</Button.State>
-          <Button.State name="saving">Saving…</Button.State>
-        </Button>
-      </form>
-      {saved && <p role="status">Saved.</p>}
-      {error && <p role="alert">{error}</p>}
-
-      {attribution && <p className="text-sm">{attribution}</p>}
       <p>
         <Link href={`/app/products/${product.id}/journey`} current={false}>
           Back to Journey
         </Link>
       </p>
+      <article
+        className={`ws-sheet ws-sheet--${variant.frame} ws-sheet--${variant.answers}`}
+      >
+        <header>
+          <h2>{worksheet.name}</h2>
+          <p>
+            {filled} of {worksheet.fields.length} filled in
+          </p>
+        </header>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+        >
+          {worksheet.fields.map((field, i) => (
+            <TextArea
+              key={field.id}
+              id={`worksheet-${field.id}`}
+              label={`${i + 1}. ${field.name}`}
+              helperText={field.prompt}
+              value={drafts[field.id] ?? ""}
+              onChange={(e) => {
+                setSaved(false);
+                setDrafts({ ...drafts, [field.id]: e.target.value });
+              }}
+              maxLength={WORKSHEET_ANSWER_MAX_LENGTH}
+              disabled={isSaving}
+            />
+          ))}
+          <Button
+            type="submit"
+            disabled={isSaving}
+            state={isSaving ? "saving" : "ready"}
+          >
+            <Button.State name="ready">Save {worksheet.name}</Button.State>
+            <Button.State name="saving">Saving…</Button.State>
+          </Button>
+        </form>
+        {saved && <p role="status">Saved.</p>}
+        {error && <p role="alert">{error}</p>}
+        {attribution && <p className="ws-credit">{attribution}</p>}
+      </article>
+      <PrototypeSwitcher
+        variants={VARIANTS}
+        current={variant.key}
+        onChange={(key) =>
+          void navigate({ search: { variant: key }, replace: true })
+        }
+      />
     </>
   );
 }

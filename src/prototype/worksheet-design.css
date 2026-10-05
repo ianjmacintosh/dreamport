@@ -1,0 +1,95 @@
+/* PROTOTYPE — throwaway worksheet-design variants (#139). Lives on
+   prototype/worksheet-design only; the winner gets rewritten properly
+   into global.css. */
+
+.ws-sheet {
+  display: grid;
+  gap: var(--space-4);
+  background-color: var(--color-sheet);
+  padding: var(--space-8) var(--space-8) var(--space-6);
+  margin-block: var(--space-4) var(--space-10);
+}
+
+@media (max-width: 640px) {
+  .ws-sheet {
+    padding: var(--space-5) var(--space-4) var(--space-4);
+  }
+}
+
+.ws-sheet h2 {
+  margin: 0;
+}
+
+.ws-sheet form {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.ws-sheet .input {
+  margin-bottom: 0;
+}
+
+.ws-sheet .input-label {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.ws-sheet .input-helper {
+  margin-top: 0;
+  margin-bottom: var(--space-2);
+}
+
+.ws-sheet .button {
+  justify-self: start;
+}
+
+.ws-credit {
+  justify-self: end;
+  text-align: right;
+  font-style: italic;
+  font-size: var(--text-sm);
+  margin: var(--space-4) 0 0;
+}
+
+/* Frame: a shadowed card, like paper lifted off the page. */
+.ws-sheet--shadow {
+  border-radius: 4px;
+  box-shadow:
+    0 1px 2px rgb(0 43 54 / 0.12),
+    0 6px 20px rgb(0 43 54 / 0.12);
+}
+
+/* Frame: a flat panel with a hairline border. */
+.ws-sheet--bordered {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+/* Answers: boxed — the stock `.input` box, on white. */
+.ws-sheet--boxed .input {
+  background-color: var(--color-sheet);
+}
+
+/* Answers: ruled lines, like notebook paper — no box, a line under every
+   row of text. The line height is pinned so the rules and text agree. */
+.ws-sheet--ruled .input {
+  --rule: 1.75rem;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  line-height: var(--rule);
+  min-height: calc(3 * var(--rule));
+  background-color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    transparent calc(var(--rule) - 1px),
+    var(--color-border) calc(var(--rule) - 1px)
+  );
+  background-size: 100% var(--rule);
+  background-attachment: local;
+}
+
+.ws-sheet--ruled .input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 4px;
+}
