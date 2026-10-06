@@ -40,6 +40,8 @@
  *                   Tag pill; the Rough One-Pager's Tasks reworded.
  *                   Round 4: a Worksheet says "Complete" / "Incomplete",
  *                   right-aligned in italics, not "n of m filled".
+ *                   Round 5: Return/Advance right-aligned; hovering a Task
+ *                   card outlines its box the way a button's hover does.
  *
  * Every variant: an `EVENT: ` title loses its prefix and gets an Event
  * pill with a calendar icon instead (display only — the data is
@@ -579,7 +581,9 @@ function VariantD(props: ColumnProps) {
       <h4 className="proto-d-heading">Done When</h4>
       <p>{milestone.doneWhen}</p>
 
-      <MoveButtons {...props} />
+      <div className="proto-d-moves">
+        <MoveButtons {...props} />
+      </div>
     </section>
   );
 }

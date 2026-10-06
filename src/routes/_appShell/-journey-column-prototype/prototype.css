@@ -40,6 +40,9 @@
     17. .proto-d-event        — the plain .tag pill with a calendar icon
     18. .proto-d-status       — a Worksheet's "Complete" / "Incomplete",
                                 right-aligned italics
+    19. .proto-d-card:hover   — outlines the card's check box like a
+                                button's hover outline
+    20. .proto-d-moves        — Return / Advance right-aligned
 
    Not on the list: .proto-switcher* (the prototype's own controls). */
 
@@ -339,6 +342,22 @@
 
 .proto-d-card[data-done="true"] {
   color: var(--color-done);
+}
+
+/* Hovering anywhere on a Task card outlines its box — the same outline
+   `.button:hover` gets — since the whole card is the click target. */
+.proto-d-card:hover .proto-check > input {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Return / Advance at the column's right edge, Advance last. */
+.proto-d-moves {
+  margin-top: var(--space-6);
+}
+
+.proto-d-moves > .button-group {
+  justify-content: end;
 }
 
 /* A Worksheet's "Complete" / "Incomplete", right-aligned in italics. */
