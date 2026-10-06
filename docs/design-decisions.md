@@ -222,9 +222,10 @@ Add an entry only once a sign-off conversation resolves something repeatable
   (`--text-base`, not helper text's usual `--text-sm`) — one Save button, and
   any credit right-aligned in italics in the bottom corner ("Credit:
   Adapted from … (CC BY-SA 3.0)", only the license linked). No "N of M
-  filled in" line on the sheet; the Journey page's link carries the count.
-  Picked from a prototype on branch `prototype/worksheet-design` (decided
-  in #139).
+  filled in" line on the sheet. Saving goes back to the Journey page, which
+  links each Worksheet above the "Done when" line as "Complete your
+  Product Summary", only the Worksheet's name linked. Picked from a
+  prototype on branch `prototype/worksheet-design` (decided in #139).
 
 - Helper text (`.input-helper`) is `--color-text-primary`, the label's own
   color, at `--text-sm` — never `--color-text-muted`, which fails AA on

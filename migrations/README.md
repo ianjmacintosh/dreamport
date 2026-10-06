@@ -67,6 +67,10 @@ for a singleton Worksheet) and `worksheet_answers`, cascading off
 `products` on delete. `0014_product_summary_seed.sql` seeds the Product
 Summary on Milestones 1-4 — split so the seed half is re-runnable.
 
+`0015_milestone_done_when_copy.sql` edits the Milestones' "done when"
+lines (issue #139): the Rough One-Pager's is reworded, and every line ends
+with a full stop.
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order

@@ -145,9 +145,9 @@ export const Route = createFileRoute(
  * Milestones as a route on the left, the content for where you are on the
  * right — before starting, the Path's name, the pitch for it, an
  * invitation and "Start Journey"; after,
- * the current Milestone's name, description and "Done when" line, then a
- * link to each of the Path's Worksheets with how much is filled in (#139),
- * which the finished state keeps too. Picked
+ * the current Milestone's name and description, a "Complete your
+ * {Worksheet}" line for each of the Path's Worksheets (#139), then its
+ * "Done when" line. The finished state keeps the Worksheet lines too. Picked
  * from the prototype on branch `prototype/journey-ux` (#137).
  *
  * Before starting, every stop shows its outcome line under its name; once
@@ -251,10 +251,10 @@ function ProductJourney() {
   // not the only places it can change (#139).
   const worksheetLinks = journeyState.worksheets.map((worksheet) => (
     <p key={worksheet.id}>
+      Complete your{" "}
       <Link href={`/app/products/${product.id}/worksheets/${worksheet.id}`}>
-        Fill out your {worksheet.name}
-      </Link>{" "}
-      ({worksheet.filled} of {worksheet.total} filled in)
+        {worksheet.name}
+      </Link>
     </p>
   ));
 
@@ -323,10 +323,10 @@ function ProductJourney() {
             <>
               <h3>{currentMilestone.name}</h3>
               <p>{currentMilestone.description}</p>
+              {worksheetLinks}
               <p>
                 <strong>Done when:</strong> {currentMilestone.doneWhen}
               </p>
-              {worksheetLinks}
               <div className="button-group">
                 {returnButton}
                 <Button

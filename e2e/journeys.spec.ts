@@ -151,7 +151,7 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
   }
   // The Product Summary stays a click away past the Milestones it's on (#139).
   await expect(
-    page.getByRole("link", { name: "Fill out your Product Summary" }),
+    page.getByRole("link", { name: "Product Summary", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Finish Journey" }).click();
   await expect(
@@ -159,7 +159,7 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
   ).toBeVisible();
   // …and once finished.
   await expect(
-    page.getByRole("link", { name: "Fill out your Product Summary" }),
+    page.getByRole("link", { name: "Product Summary", exact: true }),
   ).toBeVisible();
 
   // Returning from finished mirrors finishing: it only un-finishes, so
@@ -178,7 +178,7 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
   ).toBeVisible();
 });
 
-test("fill out the Product Summary from Milestone 1, then see it kept on Milestone 2", async ({
+test("fill out the Product Summary from Milestone 1, land back on the Journey, then see it kept on Milestone 2", async ({
   page,
 }) => {
   const productName = `A summarized app ${Date.now()}`;
@@ -191,10 +191,11 @@ test("fill out the Product Summary from Milestone 1, then see it kept on Milesto
   await page.getByRole("link", { name: "Learn More" }).click();
   await page.getByRole("button", { name: "Start Journey" }).click();
 
-  // Milestone 1 holds the Product Summary (#139), nothing filled in yet.
-  await expect(page.getByText("(0 of 8 filled in)")).toBeVisible();
+  // Milestone 1 holds the Product Summary (#139), linked above its "Done
+  // when" line.
+  await expect(page.getByText("Complete your Product Summary")).toBeVisible();
   await page
-    .getByRole("link", { name: "Fill out your Product Summary" })
+    .getByRole("link", { name: "Product Summary", exact: true })
     .click();
   await expect(page).toHaveURL(/\/worksheets\/product-summary$/);
   await expect(
@@ -208,24 +209,22 @@ test("fill out the Product Summary from Milestone 1, then see it kept on Milesto
 
   await page.getByLabel("1. Problem").fill("Kitchen scales are clunky");
   await page.getByLabel("2. Customer").fill("Home bakers");
+  // Saving drops you back on the Journey page.
   await page.getByRole("button", { name: "Save Product Summary" }).click();
-  await expect(page.getByRole("status")).toHaveText("Saved.");
+  await expect(page).toHaveURL(/\/journey$/);
 
-  // Kept across a reload, and still there to edit on Milestone 2.
-  await page.reload();
-  await expect(page.getByLabel("1. Problem")).toHaveValue(
-    "Kitchen scales are clunky",
-  );
-  await page.getByRole("link", { name: "Back to Journey" }).click();
+  // Kept, and still there to edit on Milestone 2.
   await page.getByRole("button", { name: "Advance to Next Milestone" }).click();
   await expect(
     page
       .getByRole("list", { name: "Milestones" })
       .locator('[aria-current="step"]'),
   ).toContainText("Real Talk");
-  await expect(page.getByText("(2 of 8 filled in)")).toBeVisible();
   await page
-    .getByRole("link", { name: "Fill out your Product Summary" })
+    .getByRole("link", { name: "Product Summary", exact: true })
     .click();
+  await expect(page.getByLabel("1. Problem")).toHaveValue(
+    "Kitchen scales are clunky",
+  );
   await expect(page.getByLabel("2. Customer")).toHaveValue("Home bakers");
 });

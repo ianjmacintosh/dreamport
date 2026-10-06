@@ -2102,7 +2102,7 @@ describe("/api/products/:productId/journey (#137)", () => {
     expect(before.path.milestones[0]).toMatchObject({
       description: expect.stringMatching(/^Define your product in plain terms/),
       doneWhen:
-        "Someone else can read it, say it in their own words, and you'll agree",
+        "Someone else can read it, say it in their own words, and you agree.",
       outcome: "Make a one-page summary of your understanding",
     });
 

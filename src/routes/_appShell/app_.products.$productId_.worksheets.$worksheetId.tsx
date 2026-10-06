@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
 import Link from "../../components/Link";
@@ -115,10 +115,10 @@ export const Route = createFileRoute(
  * Worksheet drawn as a sheet of paper (`.sheet`, picked from a prototype on
  * branch `prototype/worksheet-design`): its name as the sheet's h2, one
  * numbered `TextArea` per field with its prompt as helper text, one Save
- * button for the lot, and the Worksheet's credit, if it's adapted from
+ * button for the lot (a successful save goes back to the Journey page),
+ * and the Worksheet's credit, if it's adapted from
  * someone else's work, in the bottom corner. No "N of M filled in" line
- * here — the sheet is the paper, and the Journey page's link carries the
- * count.
+ * here — the sheet is the paper.
  */
 function ProductWorksheet() {
   const { product, worksheetState } = Route.useRouteContext();
@@ -126,35 +126,32 @@ function ProductWorksheet() {
   const [drafts, setDrafts] = useState(worksheetState.answers);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState(false);
+  const navigate = useNavigate();
   const attribution = ATTRIBUTIONS[worksheet.id];
 
   async function save() {
     setError("");
-    setSaved(false);
     setIsSaving(true);
     try {
-      const result = await withMinimumDuration(async () => {
-        const res = await fetchWithTimeout(
+      const res = await withMinimumDuration(() =>
+        fetchWithTimeout(
           `/api/products/${product.id}/worksheets/${worksheet.id}`,
           {
             method: "PUT",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ answers: drafts }),
           },
-        );
-        if (!res.ok) {
-          return null;
-        }
-        return (await res.json()) as WorksheetState;
-      });
-      if (!result) {
+        ),
+      );
+      if (!res.ok) {
         setError(SAVE_FAILED);
         return;
       }
-      // The server's copy — trimmed, blanks dropped.
-      setDrafts(result.answers);
-      setSaved(true);
+      // Saved: back to the Journey, where the work goes on.
+      await navigate({
+        to: "/app/products/$productId/journey",
+        params: { productId: product.id },
+      });
     } catch {
       setError(CONNECTION_FAILED);
     } finally {
@@ -186,7 +183,6 @@ function ProductWorksheet() {
               helperText={field.prompt}
               value={drafts[field.id] ?? ""}
               onChange={(e) => {
-                setSaved(false);
                 setDrafts({ ...drafts, [field.id]: e.target.value });
               }}
               maxLength={WORKSHEET_ANSWER_MAX_LENGTH}
@@ -202,7 +198,6 @@ function ProductWorksheet() {
             <Button.State name="saving">Saving…</Button.State>
           </Button>
         </form>
-        {saved && <p role="status">Saved.</p>}
         {error && <p role="alert">{error}</p>}
         {attribution && <p className="sheet-credit">{attribution}</p>}
       </article>
