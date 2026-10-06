@@ -67,6 +67,12 @@
   --color-accent-hover: var(--sol-cyan);
   --color-accent-text: var(--sol-base3);
 
+  /* The paper a Worksheet is drawn on (`.sheet`, #139). True white, not a
+     Solarized swatch — an acknowledged addition on top of Solarized Light,
+     so the sheet reads as paper laid on the cream page. Text on it:
+     base01 ~5.4:1. */
+  --color-sheet: #ffffff;
+
   --color-selection-bg: var(--sol-magenta);
   /* True white, not a Solarized swatch — no in-palette color clears
      AA (4.5:1) against magenta from either direction: base3 (the

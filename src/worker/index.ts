@@ -39,7 +39,9 @@ import {
   advanceJourney,
   returnJourney,
   journeyState,
+  getJourney,
 } from "./journeys";
+import { parseAnswers, saveAnswers, worksheetState } from "./worksheets";
 import { listTags, listTagsByIdea, setIdeaTags } from "./tags";
 import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
@@ -843,6 +845,110 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     return c.json(await journeyState(c.env.DB, product.id), 200);
+  });
+
+  /**
+   * Worksheets (issue #139): a Product's instance of one Worksheet on the
+   * default Path — the Worksheet and its answers. Same
+   * session gate and `getProduct` ownership check as the Journey routes.
+   * 404s when there's no such Worksheet or the Product hasn't started its
+   * Journey. Bundles the Product for the Worksheet page's heading.
+   */
+  app.get("/api/products/:productId/worksheets/:worksheetId", async (c) => {
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const journey = await getJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
+    const state =
+      journey &&
+      (await worksheetState(
+        c.env.DB,
+        product.id,
+        DEFAULT_PATH_ID,
+        c.req.param("worksheetId"),
+      ));
+    if (!state) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json({ product, ...state });
+  });
+
+  /**
+   * Save a Product's answers on one Worksheet, replacing every field (one
+   * left out reads as blank). Same origin, session and ownership checks as
+   * the Journey moves, and the same 404s as reading it. Saving works at
+   * any point in the Journey, finished or not.
+   */
+  app.put("/api/products/:productId/worksheets/:worksheetId", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const worksheetId = c.req.param("worksheetId");
+    const journey = await getJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
+    const state =
+      journey &&
+      (await worksheetState(
+        c.env.DB,
+        product.id,
+        DEFAULT_PATH_ID,
+        worksheetId,
+      ));
+    if (!state) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const body = await c.req.json().catch(() => null);
+    const answers = parseAnswers(
+      state.worksheet,
+      body && typeof body === "object" ? body.answers : null,
+    );
+    if (!answers) {
+      return c.json(
+        { error: "answers must map this Worksheet's fields to text" },
+        400,
+      );
+    }
+
+    await saveAnswers(
+      c.env.DB,
+      product.id,
+      DEFAULT_PATH_ID,
+      worksheetId,
+      answers,
+    );
+    return c.json({ product, ...state, answers }, 200);
   });
 
   /**

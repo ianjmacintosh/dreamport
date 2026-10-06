@@ -71,6 +71,14 @@ interface JourneyState {
     currentMilestoneId: string;
     finishedAt: string | null;
   } | null;
+  /** The Worksheets on the Path's Milestones, with how much is filled in (#139). */
+  worksheets: {
+    id: string;
+    name: string;
+    milestoneIds: string[];
+    filled: number;
+    total: number;
+  }[];
 }
 
 /**
@@ -137,7 +145,9 @@ export const Route = createFileRoute(
  * Milestones as a route on the left, the content for where you are on the
  * right — before starting, the Path's name, the pitch for it, an
  * invitation and "Start Journey"; after,
- * the current Milestone's name, description and "Done when" line. Picked
+ * the current Milestone's name and description, a "Complete your
+ * {Worksheet}" line for each of the Path's Worksheets (#139), then its
+ * "Done when" line. The finished state keeps the Worksheet lines too. Picked
  * from the prototype on branch `prototype/journey-ux` (#137).
  *
  * Before starting, every stop shows its outcome line under its name; once
@@ -236,6 +246,18 @@ function ProductJourney() {
     }
   }
 
+  // Every Worksheet on the Path stays a click away on every Milestone, and
+  // once finished: the Milestones a Worksheet is on are where it's checked,
+  // not the only places it can change (#139).
+  const worksheetLinks = journeyState.worksheets.map((worksheet) => (
+    <p key={worksheet.id}>
+      Complete your{" "}
+      <Link href={`/app/products/${product.id}/worksheets/${worksheet.id}`}>
+        {worksheet.name}
+      </Link>
+    </p>
+  ));
+
   const returnButton = canReturn && (
     <Button
       variant="secondary"
@@ -294,12 +316,14 @@ function ProductJourney() {
                 You&apos;ve worked all the way through {path.name}&rsquo;s
                 Milestones, ending with {currentMilestone.name}. Nice work!
               </p>
+              {worksheetLinks}
               {returnButton}
             </>
           ) : hasStarted ? (
             <>
               <h3>{currentMilestone.name}</h3>
               <p>{currentMilestone.description}</p>
+              {worksheetLinks}
               <p>
                 <strong>Done when:</strong> {currentMilestone.doneWhen}
               </p>

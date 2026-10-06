@@ -2,8 +2,8 @@ import Link from "../Link";
 
 interface FooterProps {
   /** `"app"` (the default) is the quiet footer every `_appShell` page
-   * gets — copyright on one end, Privacy Policy/Terms of Service on the
-   * other, on the page color. `"marketing"` is the dark footer for the
+   * gets — copyright on one end, Privacy Policy/Terms of Service/Copyright
+   * on the other, on the page color. `"marketing"` is the dark footer for the
    * signed-out pages under `_withFooter`: a Dreamport description beside a
    * stacked "Learn More" link list, copyright below (#121). */
   variant?: "app" | "marketing";
@@ -44,6 +44,9 @@ export function Footer({ variant = "app" }: FooterProps = {}) {
               <li>
                 <Link href="/terms">Terms of Service</Link>
               </li>
+              <li>
+                <Link href="/copyright">Copyright</Link>
+              </li>
             </ul>
           </div>
           <p className="footer-copyright">{COPYRIGHT}</p>
@@ -65,6 +68,11 @@ export function Footer({ variant = "app" }: FooterProps = {}) {
           <li>
             <Link href="/terms" className="link-quiet">
               Terms of Service
+            </Link>
+          </li>
+          <li>
+            <Link href="/copyright" className="link-quiet">
+              Copyright
             </Link>
           </li>
         </ul>

@@ -91,6 +91,24 @@ destructive: nothing is deleted, since a Milestone is fixed content, not
 something a User's own work is attached to.
 _Avoid_: step back, go back, revert, undo, retreat
 
+**Worksheet**:
+A fixed, Dreamport-authored set of ordered fields, each asking one thing
+in plain words (e.g. the "Product Summary": problem, customer, solution,
+value proposition, unfair advantage, channel, pricing, costs), that a
+Path's Milestones hold for the User to fill in about their Product. One
+Worksheet can sit on several Milestones (the Product Summary is on
+Milestones 1 to 4) — the
+ones whose "done when" checks it — but its answers can be changed at any
+point in the Journey. Each
+filled-in copy is an instance. A **singleton** Worksheet has exactly one
+instance per Product per Path, the same one on every Milestone it's on; a
+**repeatable** Worksheet (e.g. one per customer interview) can be filled
+in any number of times, each instance separate. Instances belong to the
+Journey's Path, so a different Path later starts fresh. Distinct from
+Question: a Question is one prompt answered against an Idea; a Worksheet
+is a whole set of fields filled in along a Journey.
+_Avoid_: form, template, canvas, questionnaire
+
 **User**:
 A person with an account and a Private space of their own Products.
 Identified by an email address.

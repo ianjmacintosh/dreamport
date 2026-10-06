@@ -7,7 +7,9 @@ import { exemptFromRateLimits } from "./rate-limit-exemption";
 // Journey page, read the Path's Milestones, start the Journey, see
 // Milestone 1 current — then back on the Product home, see it named there.
 // Also covers advancing from Milestone 1 to Milestone 2 (issue #138), and
-// returning to Milestone 1 and advancing again.
+// returning to Milestone 1 and advancing again, and filling out the
+// Product Summary Worksheet on Milestone 1 and finding it kept on
+// Milestone 2 (issue #139).
 // Signs in the same way `ideas.spec.ts` does (fixed `+e2e-test@` code, see
 // docs/adr/0009).
 
@@ -147,9 +149,17 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
     await advanceButton.click();
     await expect(current).toContainText(name);
   }
+  // The Product Summary stays a click away past the Milestones it's on (#139).
+  await expect(
+    page.getByRole("link", { name: "Product Summary", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Finish Journey" }).click();
   await expect(
     page.getByRole("heading", { name: "Dream Sequence complete" }),
+  ).toBeVisible();
+  // …and once finished.
+  await expect(
+    page.getByRole("link", { name: "Product Summary", exact: true }),
   ).toBeVisible();
 
   // Returning from finished mirrors finishing: it only un-finishes, so
@@ -166,4 +176,55 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
   await expect(
     page.getByText("Current Milestone: Growth (7 of 7)"),
   ).toBeVisible();
+});
+
+test("fill out the Product Summary from Milestone 1, land back on the Journey, then see it kept on Milestone 2", async ({
+  page,
+}) => {
+  const productName = `A summarized app ${Date.now()}`;
+
+  await signIn(page, TEST_EMAILS.e2eFillOnePager);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add Product" }).click();
+  await page.getByRole("link", { name: productName }).click();
+  await page.getByRole("link", { name: "Learn More" }).click();
+  await page.getByRole("button", { name: "Start Journey" }).click();
+
+  // Milestone 1 holds the Product Summary (#139), linked above its "Done
+  // when" line.
+  await expect(page.getByText("Complete your Product Summary")).toBeVisible();
+  await page
+    .getByRole("link", { name: "Product Summary", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/worksheets\/product-summary$/);
+  await expect(
+    page.getByRole("heading", { name: "Product Summary" }),
+  ).toBeVisible();
+  // Credited to Lean Canvas, linking the license.
+  await expect(
+    page.getByText("Credit: Adapted from Lean Canvas by Ash Maurya"),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "CC BY-SA 3.0" })).toBeVisible();
+
+  await page.getByLabel("1. Problem").fill("Kitchen scales are clunky");
+  await page.getByLabel("2. Customer").fill("Home bakers");
+  // Saving drops you back on the Journey page.
+  await page.getByRole("button", { name: "Save Product Summary" }).click();
+  await expect(page).toHaveURL(/\/journey$/);
+
+  // Kept, and still there to edit on Milestone 2.
+  await page.getByRole("button", { name: "Advance to Next Milestone" }).click();
+  await expect(
+    page
+      .getByRole("list", { name: "Milestones" })
+      .locator('[aria-current="step"]'),
+  ).toContainText("Real Talk");
+  await page
+    .getByRole("link", { name: "Product Summary", exact: true })
+    .click();
+  await expect(page.getByLabel("1. Problem")).toHaveValue(
+    "Kitchen scales are clunky",
+  );
+  await expect(page.getByLabel("2. Customer")).toHaveValue("Home bakers");
 });

@@ -10,6 +10,7 @@ for (const [name, path, heading] of [
   ["About Dreamport", "/about", "About Dreamport"],
   ["Privacy Policy", "/privacy", "Privacy Policy"],
   ["Terms of Service", "/terms", "Terms of Service"],
+  ["Copyright", "/copyright", "Copyright"],
 ] as const) {
   test(`homepage footer: ${name} opens ${path}`, async ({ page }) => {
     await page.goto("/");
