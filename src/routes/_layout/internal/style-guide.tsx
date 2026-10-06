@@ -108,6 +108,7 @@ const TYPE_SCALE = [
   { token: "--text-h1", sample: "Heading 1", tag: "h1" },
   { token: "--text-h2", sample: "Heading 2", tag: "h2" },
   { token: "--text-h3", sample: "Heading 3", tag: "h3" },
+  { token: "--text-h4", sample: "Heading 4", tag: "h4" },
   { token: "--text-2xl", sample: "2XL text", tag: "p" },
   { token: "--text-xl", sample: "XL text", tag: "p" },
   { token: "--text-lg", sample: "Large text", tag: "p" },
@@ -154,9 +155,10 @@ function StyleGuide() {
       <header className="sg-header">
         <h1>Style Guide</h1>
         <p className="sg-header-sub">
-          Headings: Funnel Display. Body: Nunito. Colors: Solarized Light. See
-          the README&apos;s Quick Start steps for what&apos;s still open. See
-          the <Link href="/internal/pattern-library">pattern library</Link> for
+          Headings: Funnel Display (h4: Nunito). Body: Nunito. Colors: Solarized
+          Light. See the README&apos;s Quick Start steps for what&apos;s still
+          open. See the{" "}
+          <Link href="/internal/pattern-library">pattern library</Link> for
           full-page mockups built from these primitives.
         </p>
       </header>
@@ -268,17 +270,21 @@ function StyleGuide() {
           <h1>Heading level 1</h1>
           <h2>Heading level 2</h2>
           <h3>Heading level 3</h3>
+          <h4>Heading level 4</h4>
         </div>
         <Snippet
-          code={`<h1>Heading level 1</h1>\n<h2>Heading level 2</h2>\n<h3>Heading level 3</h3>`}
+          code={`<h1>Heading level 1</h1>\n<h2>Heading level 2</h2>\n<h3>Heading level 3</h3>\n<h4>Heading level 4</h4>`}
         />
         <p className="sg-note">
-          Use a real <code>&lt;h1&gt;</code>–<code>&lt;h3&gt;</code> — size
-          follows the tag automatically. When the visual size needs to diverge
-          from the semantic level (say, an <code>&lt;h2&gt;</code> that should
-          look like an <code>&lt;h3&gt;</code>), override just the size with a{" "}
-          <code>.text-h1</code>/<code>.text-h2</code>/<code>.text-h3</code>{" "}
-          class — never change the tag just to change how it looks.
+          Use a real <code>&lt;h1&gt;</code>–<code>&lt;h4&gt;</code> — size
+          follows the tag automatically. <code>&lt;h4&gt;</code> is set in the
+          body face (Nunito), bold and tracked in, since Funnel Display
+          doesn&apos;t read well that small. When the visual size needs to
+          diverge from the semantic level (say, an <code>&lt;h2&gt;</code> that
+          should look like an <code>&lt;h3&gt;</code>), override just the size
+          with a <code>.text-h1</code>/<code>.text-h2</code>/
+          <code>.text-h3</code> class — never change the tag just to change how
+          it looks.
         </p>
         <div className="sg-heading-stack">
           <h2 className="text-h3">
