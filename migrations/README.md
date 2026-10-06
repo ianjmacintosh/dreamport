@@ -69,7 +69,9 @@ Summary on Milestones 1-4 — split so the seed half is re-runnable.
 
 `0015_milestone_done_when_copy.sql` edits the Milestones' "done when"
 lines (issue #139): the Rough One-Pager's is reworded, and every line ends
-with a full stop.
+with a full stop. `0016_milestone_copy_edits.sql` swaps "one-pager" for
+"Product Summary" in the three "done when" lines that named it, and fixes
+grammar and punctuation in the descriptions.
 
 ## Conventions
 
