@@ -32,7 +32,9 @@
                                 a hint, then Return/Advance
 
    D — Sections + cards: A's 5–6 + B's 10–11, nothing new of its own
-    14. .proto-d-heading      — section headings, no rule under them
+    14. .proto-d-heading      — section headings, no rule under them;
+                                round 6: Nunito bold at --text-xl (the
+                                proposed system-wide h4)
     15. .proto-d-progress     — the progress line's spacing under a heading
     16. .proto-d-card(s)      — a to-do card on the Worksheet page's white
                                 (round 3: replaces B's bordered card; the
@@ -308,8 +310,15 @@
 /* Reuses A's .proto-a-* and B's .proto-b-* classes; only the progress
    line's top margin changes, since it sits right under a heading. */
 
+/* Round 6: the proposed h4 — Nunito (the body face, which reads better
+   small than Funnel Display), bold, heading color, --text-xl. If
+   approved, this becomes a plain `h4` rule in global.css + the style
+   guide rather than a class. */
 .proto-d-heading {
   margin-top: var(--space-8);
+  font-family: var(--font-body);
+  font-size: var(--text-xl);
+  line-height: 1.3;
 }
 
 .proto-d-progress {
