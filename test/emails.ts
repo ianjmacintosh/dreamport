@@ -266,6 +266,20 @@ export const TEST_EMAILS = {
   /** Other User whose read or save of A's one-pager must 404. */
   worksheetsOwnerB: "delivered+worksheets-owner-b@resend.dev",
 
+  // --- Seam 1e: /api/products/:productId/tasks/:taskId (#140) ---
+  /** Checks and unchecks a standalone Task; the state persists. */
+  tasksToggle: "delivered+tasks-toggle@resend.dev",
+  /** Advances and returns with Tasks checked and unchecked alike. */
+  tasksNotGating: "delivered+tasks-not-gating@resend.dev",
+  /** 404s before a Journey starts or for an unknown Task; 400s a bad body. */
+  tasksInvalid: "delivered+tasks-invalid@resend.dev",
+  /** Toggling from an untrusted origin changes nothing. */
+  tasksUntrusted: "delivered+tasks-untrusted@resend.dev",
+  /** Owner side of the Task ownership boundary check. */
+  tasksOwnerA: "delivered+tasks-owner-a@resend.dev",
+  /** Other User whose toggle of A's Task must 404. */
+  tasksOwnerB: "delivered+tasks-owner-b@resend.dev",
+
   // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
   // Every address below carries the `+e2e-test@` marker (issue #39): the
   // `+<scenario>` label sits ahead of it, so e.g. "e2e-happy" tags the

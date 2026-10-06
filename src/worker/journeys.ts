@@ -15,6 +15,7 @@ import {
   worksheetSummaries,
   type WorksheetSummary,
 } from "./worksheets";
+import { taskSummaries, type TaskSummary } from "./tasks";
 
 export interface Milestone {
   id: string;
@@ -221,8 +222,8 @@ export async function returnJourney(
 /**
  * What `/api/products/:productId/journey` answers with: the default Path
  * with its Milestones, the Product's Journey on it (`null` until started),
- * and the Worksheets on its Milestones with how much of each is filled in
- * (#139).
+ * the Worksheets on its Milestones with how much of each is filled in
+ * (#139), and the Tasks on them with whether each is checked off (#140).
  */
 export async function journeyState(
   db: D1Database,
@@ -231,11 +232,13 @@ export async function journeyState(
   path: Path;
   journey: Journey | null;
   worksheets: WorksheetSummary[];
+  tasks: TaskSummary[];
 }> {
-  const [path, journey, worksheets] = await Promise.all([
+  const [path, journey, worksheets, tasks] = await Promise.all([
     getPath(db, DEFAULT_PATH_ID),
     getJourney(db, productId, DEFAULT_PATH_ID),
     worksheetSummaries(db, productId, DEFAULT_PATH_ID),
+    taskSummaries(db, productId, DEFAULT_PATH_ID),
   ]);
-  return { path, journey, worksheets };
+  return { path, journey, worksheets, tasks };
 }

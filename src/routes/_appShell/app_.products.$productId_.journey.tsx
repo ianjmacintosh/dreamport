@@ -79,6 +79,13 @@ interface JourneyState {
     filled: number;
     total: number;
   }[];
+  /** The Tasks on the Path's Milestones, each checked off or not (#140). */
+  tasks: {
+    id: string;
+    title: string;
+    milestoneIds: string[];
+    done: boolean;
+  }[];
 }
 
 /**
@@ -106,6 +113,7 @@ const MOVE_JOURNEY_FAILED: Record<JourneyMove, string> = {
   advance: "We couldn't advance the journey. Try again in a moment.",
   return: "We couldn't return the journey. Try again in a moment.",
 };
+const SET_TASK_FAILED = "We couldn't save that task. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -146,8 +154,9 @@ export const Route = createFileRoute(
  * right — before starting, the Path's name, the pitch for it, an
  * invitation and "Start Journey"; after,
  * the current Milestone's name and description, a "Complete your
- * {Worksheet}" line for each of the Path's Worksheets (#139), then its
- * "Done when" line. The finished state keeps the Worksheet lines too. Picked
+ * {Worksheet}" line for each of the Path's Worksheets (#139), a checkbox
+ * for each of the Milestone's Tasks (#140), then its "Done when" line. The
+ * finished state keeps the Worksheet lines too, but no Tasks. Picked
  * from the prototype on branch `prototype/journey-ux` (#137).
  *
  * Before starting, every stop shows its outcome line under its name; once
@@ -172,6 +181,8 @@ function ProductJourney() {
   const [isStarting, setIsStarting] = useState(false);
   /** Which way the Journey is mid-move, if it is — one move at a time. */
   const [moving, setMoving] = useState<JourneyMove | null>(null);
+  /** The Task mid-save, if one is — shown as already toggled until it lands. */
+  const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const { path, journey } = journeyState;
   const currentIndex = journey
@@ -245,6 +256,54 @@ function ProductJourney() {
       setMoving(null);
     }
   }
+
+  /**
+   * Check off or uncheck one of the current Milestone's Tasks (#140). Purely
+   * informational: it never changes what Advance does.
+   */
+  async function setTaskDone(taskId: string, done: boolean) {
+    setError("");
+    setSavingTaskId(taskId);
+    try {
+      const res = await fetchWithTimeout(
+        `/api/products/${product.id}/tasks/${taskId}`,
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ done }),
+        },
+      );
+      if (!res.ok) {
+        setError(SET_TASK_FAILED);
+        return;
+      }
+      setJourneyState((await res.json()) as JourneyState);
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setSavingTaskId(null);
+    }
+  }
+
+  // Only the current Milestone's Tasks: unlike a Worksheet, a Task is about
+  // one Milestone's work, not something carried along the whole Path.
+  const taskChecks =
+    currentMilestone &&
+    journeyState.tasks
+      .filter((task) => task.milestoneIds.includes(currentMilestone.id))
+      .map((task) => (
+        <p key={task.id}>
+          <label>
+            <input
+              type="checkbox"
+              checked={savingTaskId === task.id ? !task.done : task.done}
+              disabled={savingTaskId !== null}
+              onChange={() => void setTaskDone(task.id, !task.done)}
+            />{" "}
+            {task.title}
+          </label>
+        </p>
+      ));
 
   // Every Worksheet on the Path stays a click away on every Milestone, and
   // once finished: the Milestones a Worksheet is on are where it's checked,
@@ -324,6 +383,7 @@ function ProductJourney() {
               <h3>{currentMilestone.name}</h3>
               <p>{currentMilestone.description}</p>
               {worksheetLinks}
+              {taskChecks}
               <p>
                 <strong>Done when:</strong> {currentMilestone.doneWhen}
               </p>

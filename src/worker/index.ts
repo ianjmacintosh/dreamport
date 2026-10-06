@@ -43,6 +43,7 @@ import {
 } from "./journeys";
 import { parseAnswers, saveAnswers, worksheetState } from "./worksheets";
 import { listTags, listTagsByIdea, setIdeaTags } from "./tags";
+import { setTaskDone } from "./tasks";
 import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
@@ -949,6 +950,63 @@ export function createApp(deps: AppDeps = {}) {
       answers,
     );
     return c.json({ product, ...state, answers }, 200);
+  });
+
+  /**
+   * Tasks (issue #140): check off or uncheck one of the Product's Tasks on
+   * the default Path, with `{ "done": true | false }`. Same origin, session
+   * and ownership checks as saving a Worksheet, and the same 404s when the
+   * Product hasn't started its Journey or there's no such Task on the Path.
+   * Works on any Task, not just the current Milestone's, and never moves
+   * the Journey. Answers with the Journey's state, like Advance and Return.
+   */
+  app.put("/api/products/:productId/tasks/:taskId", async (c) => {
+    if (
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+
+    const session = await currentSession(c);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const product = await getProduct(
+      c.env.DB,
+      session.user.id,
+      c.req.param("productId"),
+    );
+    if (!product) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const journey = await getJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
+    if (!journey) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    const body = await c.req.json().catch(() => null);
+    const done = body && typeof body === "object" ? body.done : null;
+    if (typeof done !== "boolean") {
+      return c.json({ error: "done must be true or false" }, 400);
+    }
+
+    const found = await setTaskDone(
+      c.env.DB,
+      product.id,
+      DEFAULT_PATH_ID,
+      c.req.param("taskId"),
+      done,
+    );
+    if (!found) {
+      return c.json({ error: "Not found" }, 404);
+    }
+
+    return c.json(await journeyState(c.env.DB, product.id), 200);
   });
 
   /**
