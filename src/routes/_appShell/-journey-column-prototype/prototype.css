@@ -34,7 +34,10 @@
    D — Sections + cards: A's 5–6 + B's 10–11, nothing new of its own
     14. .proto-d-heading      — section headings, no rule under them
     15. .proto-d-progress     — the progress line's spacing under a heading
-    16. .proto-d-sheet(-fill) — a Worksheet card with its own fill bar
+    16. .proto-d-card(s)      — a to-do card on the Worksheet page's white
+                                (round 3: replaces B's bordered card; the
+                                progress and fill bars are gone)
+    17. .proto-d-event        — the plain .tag pill with a calendar icon
 
    Not on the list: .proto-switcher* (the prototype's own controls). */
 
@@ -308,25 +311,60 @@
   margin-top: var(--space-3);
 }
 
-/* A Worksheet card: icon, name and caret on one line, its own fill bar and
-   count under the name — a Worksheet fills up, it doesn't tick. */
-.proto-d-sheet {
-  grid-auto-flow: row;
-  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
-  row-gap: var(--space-2);
-}
-
-.proto-d-sheet > svg {
-  grid-column: 3;
-  grid-row: 1;
-}
-
-.proto-d-sheet-fill {
-  grid-column: 2 / span 2;
+/* Round 3: a card is the Worksheet page's own white (`.sheet`'s
+   --color-sheet), square and borderless — no card style of its own. */
+.proto-d-cards {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  row-gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.proto-d-card {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  grid-auto-columns: auto;
   column-gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-4);
+  background-color: var(--color-sheet);
+  color: var(--color-text-primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.proto-d-card[data-done="true"] {
+  color: var(--color-done);
+}
+
+/* The Tag pill as-is; only the icon needs lining up with its text. */
+.proto-d-event > svg {
+  display: inline-block;
+  vertical-align: -0.125em;
+}
+
+@media (max-width: 640px) {
+  .proto-d-card {
+    grid-auto-flow: row;
+    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+    row-gap: var(--space-1);
+  }
+  .proto-d-card > .tag,
+  .proto-d-card > .proto-muted {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+  }
+  .proto-d-card > svg {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+  .proto-d-card > .proto-check,
+  .proto-d-card > .proto-sheet-icon {
+    grid-row: 1 / span 2;
+  }
 }
 
 /* Below 640px a card's extras (the Event pill, the "n of m filled" count)

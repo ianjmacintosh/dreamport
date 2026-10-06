@@ -34,6 +34,10 @@
  *                   Worksheets and Tasks get a section each, a Worksheet
  *                   card carrying its own fill bar instead of reading as
  *                   a Task; headings in Title Case ("Done When").
+ *                   Round 3: no outcome line (the route already shows
+ *                   it), no progress bars, cards on the Worksheet page's
+ *                   own white with no border, the Event pill is the plain
+ *                   Tag pill; the Rough One-Pager's Tasks reworded.
  *
  * Every variant: an `EVENT: ` title loses its prefix and gets an Event
  * pill with a calendar icon instead (display only — the data is
@@ -111,6 +115,19 @@ const MANY_TASKS: { id: string; title: string }[] = [
   { id: "f7", title: "Rewrite the parts they got wrong" },
   { id: "f8", title: "Pick a rough price, even if it's a guess" },
   { id: "f9", title: "EVENT: Block 30 minutes to review it next week" },
+];
+
+/**
+ * D, round 3 (Ian): the Rough One-Pager's Tasks as they'd be reworded —
+ * "Complete the Product Summary" first, the Event renamed and marked
+ * optional second. Prototype-only; the seeded Tasks are unchanged.
+ */
+const ROUGH_ONE_PAGER_TASKS: { id: string; title: string }[] = [
+  { id: "complete-product-summary", title: "Complete the Product Summary" },
+  {
+    id: "event-write-product-summary",
+    title: "EVENT: Schedule time to write the Product Summary (optional)",
+  },
 ];
 
 interface ProtoSearch {
@@ -191,7 +208,9 @@ export function JourneyColumnPrototype({
     .map((w) => ({ kind: "worksheet", ...w }));
   const taskSource = proto.many
     ? MANY_TASKS
-    : tasks.filter((t) => t.milestoneIds.includes(milestone.id));
+    : milestone.id === "rough-one-pager" && proto.variant.toUpperCase() === "D"
+      ? ROUGH_ONE_PAGER_TASKS
+      : tasks.filter((t) => t.milestoneIds.includes(milestone.id));
   const taskToDos: ToDo[] = taskSource.map((t) => {
     const isEvent = t.title.startsWith(EVENT_PREFIX);
     return {
@@ -502,38 +521,27 @@ function VariantD(props: ColumnProps) {
   const { milestone, toDos, productId, onToggle } = props;
   const sheets = toDos.filter((t) => t.kind === "worksheet");
   const tasks = toDos.filter((t) => t.kind === "task");
-  const doneCount = tasks.filter((t) => t.done).length;
   return (
-    <section className="proto-a">
+    <section>
       <h3>{milestone.name}</h3>
-      <p className="proto-a-lede">{milestone.outcome}</p>
       <p>{milestone.description}</p>
 
       {sheets.length > 0 && (
         <>
           <h4 className="proto-d-heading">Worksheets</h4>
-          <ul className="proto-b-cards">
+          <ul className="proto-d-cards">
             {sheets.map((sheet) => (
               <li key={sheet.id}>
                 <a
-                  className="proto-b-card proto-d-sheet"
+                  className="proto-d-card"
                   href={`/app/products/${productId}/worksheets/${sheet.id}`}
                 >
                   <SheetIcon />
                   <span className="proto-b-card-title">{sheet.name}</span>
-                  <CaretRightIcon weight="bold" aria-hidden="true" />
-                  <span className="proto-d-sheet-fill">
-                    <span className="proto-b-bar" aria-hidden="true">
-                      <span
-                        style={{
-                          width: `${(sheet.filled / sheet.total) * 100}%`,
-                        }}
-                      />
-                    </span>
-                    <span className="proto-muted">
-                      {sheet.filled} of {sheet.total} filled
-                    </span>
+                  <span className="proto-muted">
+                    {sheet.filled} of {sheet.total} filled
                   </span>
+                  <CaretRightIcon weight="bold" aria-hidden="true" />
                 </a>
               </li>
             ))}
@@ -544,24 +552,21 @@ function VariantD(props: ColumnProps) {
       {tasks.length > 0 && (
         <>
           <h4 className="proto-d-heading">Tasks</h4>
-          <div className="proto-b-progress proto-d-progress">
-            <span>
-              {doneCount} of {tasks.length} done
-            </span>
-            <span className="proto-b-bar" aria-hidden="true">
-              <span style={{ width: `${(doneCount / tasks.length) * 100}%` }} />
-            </span>
-          </div>
-          <ul className="proto-b-cards">
+          <ul className="proto-d-cards">
             {tasks.map((task) => (
               <li key={task.id}>
-                <label className="proto-b-card" data-done={task.done}>
+                <label className="proto-d-card" data-done={task.done}>
                   <CheckBox
                     checked={task.done}
                     onChange={() => onToggle(task.id)}
                   />
                   <span className="proto-b-card-title">{task.title}</span>
-                  {task.isEvent && <EventPill />}
+                  {task.isEvent && (
+                    <span className="tag proto-d-event">
+                      <CalendarBlankIcon weight="bold" aria-hidden="true" />{" "}
+                      Event
+                    </span>
+                  )}
                 </label>
               </li>
             ))}
