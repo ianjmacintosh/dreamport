@@ -4,6 +4,11 @@ import { CheckIcon } from "@phosphor-icons/react";
 
 import Button from "../../components/Button";
 import Link from "../../components/Link";
+// PROTOTYPE (#140) — throwaway; remove with the -journey-column-prototype folder.
+import {
+  JourneyColumnPrototype,
+  usePrototypeColumn,
+} from "./-journey-column-prototype/JourneyColumnPrototype";
 
 /**
  * Plain `fetch` never times out on its own — if the server accepts the TCP
@@ -185,15 +190,18 @@ function ProductJourney() {
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const { path, journey } = journeyState;
-  const currentIndex = journey
+  const realCurrentIndex = journey
     ? path.milestones.findIndex(
         (milestone) => milestone.id === journey.currentMilestoneId,
       )
     : -1;
+  // PROTOTYPE (#140): `?variant=` fakes the current Milestone from `?m=`.
+  const proto = usePrototypeColumn(realCurrentIndex, path.milestones.length);
+  const currentIndex = proto ? proto.m - 1 : realCurrentIndex;
   // Before starting, every Milestone is future and the content column shows
   // the pitch instead of a current Milestone.
   const hasStarted = currentIndex >= 0;
-  const isFinished = journey?.finishedAt != null;
+  const isFinished = !proto && journey?.finishedAt != null;
   const currentMilestone = path.milestones[currentIndex];
   const isLastMilestone = currentIndex === path.milestones.length - 1;
   // Nothing comes before Milestone 1, so Return is hidden there rather than
@@ -373,76 +381,88 @@ function ProductJourney() {
             );
           })}
         </ol>
-        <section>
-          {isFinished ? (
-            <>
-              <h3>{path.name} complete</h3>
-              <p>
-                You&apos;ve worked all the way through {path.name}&rsquo;s
-                Milestones, ending with {currentMilestone.name}. Nice work!
-              </p>
-              {worksheetLinks}
-              {returnButton}
-            </>
-          ) : hasStarted ? (
-            <>
-              <h3>{currentMilestone.name}</h3>
-              <p>{currentMilestone.description}</p>
-              {worksheetLinks}
-              {taskChecks}
-              <p>
-                <strong>Done when:</strong> {currentMilestone.doneWhen}
-              </p>
-              <div className="button-group">
+        {proto ? (
+          <JourneyColumnPrototype
+            key={`${proto.m}-${proto.many}`}
+            proto={proto}
+            productId={product.id}
+            milestones={path.milestones}
+            worksheets={journeyState.worksheets}
+            tasks={journeyState.tasks}
+          />
+        ) : (
+          <section>
+            {isFinished ? (
+              <>
+                <h3>{path.name} complete</h3>
+                <p>
+                  You&apos;ve worked all the way through {path.name}&rsquo;s
+                  Milestones, ending with {currentMilestone.name}. Nice work!
+                </p>
+                {worksheetLinks}
                 {returnButton}
+              </>
+            ) : hasStarted ? (
+              <>
+                <h3>{currentMilestone.name}</h3>
+                <p>{currentMilestone.description}</p>
+                {worksheetLinks}
+                {taskChecks}
+                <p>
+                  <strong>Done when:</strong> {currentMilestone.doneWhen}
+                </p>
+                <div className="button-group">
+                  {returnButton}
+                  <Button
+                    disabled={moving !== null}
+                    state={moving === "advance" ? "pending" : "ready"}
+                    onClick={() => void moveJourney("advance")}
+                  >
+                    <Button.State name="ready">
+                      {isLastMilestone
+                        ? "Finish Journey"
+                        : "Advance to Next Milestone"}
+                    </Button.State>
+                    <Button.State name="pending">Advancing…</Button.State>
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3>{path.name}</h3>
+                <p>
+                  Follow our &ldquo;{path.name}&rdquo; path to take your product
+                  all the way from a rough idea to a profitable success.
+                </p>
+                <p>
+                  Start simple by describing your product and the problem it
+                  solves, adapt as you learn more about your audience and their
+                  problem with guided exercises, and use that knowledge to make
+                  better decisions.
+                </p>
+                <p>
+                  Instead of spending months building something and hoping
+                  someone will want to buy it, {path.name} bakes pricing into
+                  the product from the start. When you finish the last step,
+                  you&apos;ll have a product people love and a sustainable path
+                  to growth.
+                </p>
+                <p>
+                  Start by describing your solution. What problem does it solve?
+                </p>
                 <Button
-                  disabled={moving !== null}
-                  state={moving === "advance" ? "pending" : "ready"}
-                  onClick={() => void moveJourney("advance")}
+                  disabled={isStarting}
+                  state={isStarting ? "pending" : "ready"}
+                  onClick={() => void startJourney()}
                 >
-                  <Button.State name="ready">
-                    {isLastMilestone
-                      ? "Finish Journey"
-                      : "Advance to Next Milestone"}
-                  </Button.State>
-                  <Button.State name="pending">Advancing…</Button.State>
+                  <Button.State name="ready">Start Journey</Button.State>
+                  <Button.State name="pending">Starting…</Button.State>
                 </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h3>{path.name}</h3>
-              <p>
-                Follow our &ldquo;{path.name}&rdquo; path to take your product
-                all the way from a rough idea to a profitable success.
-              </p>
-              <p>
-                Start simple by describing your product and the problem it
-                solves, adapt as you learn more about your audience and their
-                problem with guided exercises, and use that knowledge to make
-                better decisions.
-              </p>
-              <p>
-                Instead of spending months building something and hoping someone
-                will want to buy it, {path.name} bakes pricing into the product
-                from the start. When you finish the last step, you&apos;ll have
-                a product people love and a sustainable path to growth.
-              </p>
-              <p>
-                Start by describing your solution. What problem does it solve?
-              </p>
-              <Button
-                disabled={isStarting}
-                state={isStarting ? "pending" : "ready"}
-                onClick={() => void startJourney()}
-              >
-                <Button.State name="ready">Start Journey</Button.State>
-                <Button.State name="pending">Starting…</Button.State>
-              </Button>
-            </>
-          )}
-          {error && <p role="alert">{error}</p>}
-        </section>
+              </>
+            )}
+            {error && <p role="alert">{error}</p>}
+          </section>
+        )}
       </div>
 
       <p>

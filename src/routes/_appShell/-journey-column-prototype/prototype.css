@@ -1,0 +1,347 @@
+/* PROTOTYPE — throwaway, #140. Never merge.
+
+   New CSS for Ian to approve or reject, one by one (AGENTS.md sign-off).
+   Only approved items get folded into the real Journey page.
+
+   Shared (all variants)
+     1. .proto-check          — a 1.5rem check box: a real checkbox,
+                                restyled; fills with the accent and shows a
+                                bold check when ticked
+     2. .proto-event-pill     — an Event Task's pill: calendar icon + "Event",
+                                the Tag pill's shape in the heading color
+     3. .proto-sheet-icon     — a Worksheet to-do's document icon, in the
+                                same 1.5rem slot as the check box
+     4. [data-done] rows      — a ticked to-do's title goes muted
+
+   A — Sections
+     5. .proto-a-lede         — the outcome line under the name, larger
+     6. .proto-a-heading      — "What to do" / "Done when" section headings,
+                                with a quiet "n of m done" count
+     7. .proto-a-list/-row    — to-do rows: box + title, a hover tint on the
+                                whole row, which is all clickable
+
+   B — Checklist
+     8. .proto-b-goal         — "Done when" up top, as the goal
+     9. .proto-b-about        — description folded into a <details>
+    10. .proto-b-progress     — "n of m done" with a thin bar
+    11. .proto-b-card(s)      — each to-do a bordered card, all clickable
+
+   C — Finish line
+    12. .proto-c-list/-row    — compact to-do rows
+    13. .proto-c-finish       — tinted block: flag + "Done when", the line,
+                                a hint, then Return/Advance
+
+   Not on the list: .proto-switcher* (the prototype's own controls). */
+
+/* ── Shared ─────────────────────────────────────────────────── */
+
+.proto-check {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.proto-check > input {
+  appearance: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0;
+  border: 2px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-page-bg);
+  cursor: pointer;
+}
+
+.proto-check > input:hover {
+  border-color: var(--color-accent);
+}
+
+.proto-check > input:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.proto-check > input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.proto-check-mark {
+  position: absolute;
+  color: var(--color-accent-text);
+  font-size: 1rem;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.proto-check > input:checked + .proto-check-mark {
+  opacity: 1;
+}
+
+.proto-event-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: 4px;
+  background-color: var(--color-heading);
+  color: var(--color-accent-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+  vertical-align: 0.1em;
+}
+
+.proto-sheet-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--color-heading);
+  font-size: 1.375rem;
+}
+
+.proto-muted {
+  color: var(--color-done);
+  font-size: var(--text-sm);
+}
+
+[data-done="true"] {
+  color: var(--color-done);
+}
+
+/* ── A: Sections ────────────────────────────────────────────── */
+
+.proto-a-lede {
+  font-size: var(--text-xl);
+}
+
+.proto-a-heading {
+  margin-top: var(--space-8);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--color-border);
+}
+
+.proto-a-count {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--color-done);
+}
+
+.proto-a-list {
+  display: grid;
+  padding: 0;
+  list-style: none;
+}
+
+.proto-a-row {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  column-gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3) var(--space-2);
+  border-radius: 6px;
+}
+
+.proto-a-row--task {
+  cursor: pointer;
+}
+
+.proto-a-row--task:hover {
+  background: var(--color-surface);
+}
+
+/* ── B: Checklist ───────────────────────────────────────────── */
+
+.proto-b-goal {
+  font-size: var(--text-lg);
+}
+
+.proto-b-about > summary {
+  cursor: pointer;
+  color: var(--color-link);
+  font-weight: 600;
+}
+
+.proto-b-about > p {
+  margin-top: var(--space-3);
+}
+
+.proto-b-progress {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-4);
+  margin-top: var(--space-6);
+  font-weight: 600;
+}
+
+.proto-b-bar {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.proto-b-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.proto-b-cards {
+  display: grid;
+  row-gap: var(--space-3);
+  margin-block: var(--space-4) var(--space-6);
+  padding: 0;
+  list-style: none;
+}
+
+.proto-b-card {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  grid-auto-columns: auto;
+  column-gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-sheet);
+  color: var(--color-text-primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.proto-b-card:hover {
+  border-color: var(--color-accent);
+}
+
+.proto-b-card[data-done="true"] {
+  background: var(--color-page-bg);
+  color: var(--color-done);
+}
+
+.proto-b-card-title {
+  font-weight: 600;
+}
+
+/* ── C: Finish line ─────────────────────────────────────────── */
+
+.proto-c-heading {
+  margin-top: var(--space-6);
+}
+
+.proto-c-list {
+  display: grid;
+  row-gap: var(--space-1);
+  padding: 0;
+  list-style: none;
+}
+
+.proto-c-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: 1.5rem auto;
+  grid-auto-columns: auto;
+  justify-content: start;
+  column-gap: var(--space-3);
+  align-items: center;
+  padding-block: var(--space-2);
+  cursor: pointer;
+}
+
+.proto-c-finish {
+  margin-top: var(--space-6);
+  padding: var(--space-5) var(--space-6);
+  border-left: 4px solid var(--color-heading);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-on-surface);
+}
+
+.proto-c-finish-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 0;
+}
+
+.proto-c-finish-text {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.proto-c-hint {
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 640px) {
+  .proto-c-finish {
+    padding: var(--space-4);
+  }
+  .proto-c-row {
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+  }
+}
+
+/* ── Floating switcher (not part of any design) ─────────────── */
+
+.proto-switcher {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  font:
+    600 14px/1.2 system-ui,
+    sans-serif;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
+  white-space: nowrap;
+}
+
+.proto-switcher button {
+  display: grid;
+  place-items: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: 999px;
+  background: #333;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.proto-switcher .proto-switcher-toggle {
+  padding: 0 0.75rem;
+}
+
+.proto-switcher-sep {
+  width: 1px;
+  height: 1.25rem;
+  background: #555;
+}
+
+@media (max-width: 640px) {
+  .proto-switcher {
+    width: max-content;
+    max-width: calc(100vw - 1rem);
+    flex-wrap: wrap;
+    justify-content: center;
+    border-radius: 1rem;
+  }
+}
