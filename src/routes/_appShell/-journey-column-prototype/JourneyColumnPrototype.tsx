@@ -25,6 +25,12 @@
  * C  Finish line  — the Milestone, a compact to-do list, then one tinted
  *                   finish-line block holding "Done when" and the
  *                   Return/Advance buttons — crossing it is one unit.
+ *                   (Ian, round 1: ugly — the block and the "To do"
+ *                   subheading both.)
+ *
+ * D  Sections + cards — Ian's pick from round 1: A's top half (headings,
+ *                   text, readable) with B's cards and progress bar under
+ *                   "What to do", then A's "Done when" section.
  *
  * Every variant: an `EVENT: ` title loses its prefix and gets an Event
  * pill with a calendar icon instead (display only — the data is
@@ -482,12 +488,77 @@ function VariantC(props: ColumnProps) {
   );
 }
 
+// ── D: Sections + cards (Ian's pick from round 1) ───────────────────────
+
+/**
+ * A's top half (name, outcome lede, description, headed sections) with B's
+ * progress bar and cards under "What to do", then A's "Done when" section
+ * and the buttons.
+ */
+function VariantD(props: ColumnProps) {
+  const { milestone, toDos, productId, onToggle } = props;
+  const doneCount = countDone(toDos);
+  return (
+    <section className="proto-a">
+      <h3>{milestone.name}</h3>
+      <p className="proto-a-lede">{milestone.outcome}</p>
+      <p>{milestone.description}</p>
+
+      <h4 className="proto-a-heading">What to do</h4>
+      <div className="proto-b-progress proto-d-progress">
+        <span>
+          {doneCount} of {toDos.length} done
+        </span>
+        <span className="proto-b-bar" aria-hidden="true">
+          <span style={{ width: `${(doneCount / toDos.length) * 100}%` }} />
+        </span>
+      </div>
+      <ul className="proto-b-cards">
+        {toDos.map((toDo) =>
+          toDo.kind === "worksheet" ? (
+            <li key={toDo.id}>
+              <a
+                className="proto-b-card"
+                href={`/app/products/${productId}/worksheets/${toDo.id}`}
+              >
+                <SheetIcon />
+                <span className="proto-b-card-title">{toDo.name}</span>
+                <span className="proto-muted">
+                  {toDo.filled} of {toDo.total} filled
+                </span>
+                <CaretRightIcon weight="bold" aria-hidden="true" />
+              </a>
+            </li>
+          ) : (
+            <li key={toDo.id}>
+              <label className="proto-b-card" data-done={toDo.done}>
+                <CheckBox
+                  checked={toDo.done}
+                  onChange={() => onToggle(toDo.id)}
+                />
+                <span className="proto-b-card-title">{toDo.title}</span>
+                {toDo.isEvent && <EventPill />}
+              </label>
+            </li>
+          ),
+        )}
+      </ul>
+
+      <h4 className="proto-a-heading">Done when</h4>
+      <p>{milestone.doneWhen}</p>
+
+      <MoveButtons {...props} />
+    </section>
+  );
+}
+
 // ── Switcher ─────────────────────────────────────────────────────────────
 
 const VARIANTS = [
   { key: "A", name: "Sections", Component: VariantA },
   { key: "B", name: "Checklist", Component: VariantB },
   { key: "C", name: "Finish line", Component: VariantC },
+  { key: "D", name: "Sections + cards", Component: VariantD },
 ];
 
 function PrototypeSwitcher({

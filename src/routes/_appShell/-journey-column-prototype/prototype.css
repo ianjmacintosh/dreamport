@@ -31,6 +31,9 @@
     13. .proto-c-finish       — tinted block: flag + "Done when", the line,
                                 a hint, then Return/Advance
 
+   D — Sections + cards: A's 5–6 + B's 10–11, nothing new of its own
+    14. .proto-d-progress     — the progress line's spacing under a heading
+
    Not on the list: .proto-switcher* (the prototype's own controls). */
 
 /* ── Shared ─────────────────────────────────────────────────── */
@@ -288,6 +291,39 @@
   }
   .proto-c-row {
     grid-template-columns: 1.5rem minmax(0, 1fr);
+  }
+}
+
+/* ── D: Sections + cards ─────────────────────────────────────── */
+/* Reuses A's .proto-a-* and B's .proto-b-* classes; only the progress
+   line's top margin changes, since it sits right under a heading. */
+
+.proto-d-progress {
+  margin-top: var(--space-3);
+}
+
+/* Below 640px a card's extras (the Event pill, the "n of m filled" count)
+   drop under the title, so the title keeps the row's width. */
+@media (max-width: 640px) {
+  .proto-b-card {
+    grid-auto-flow: row;
+    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+    row-gap: var(--space-1);
+  }
+  .proto-b-card > .proto-event-pill,
+  .proto-b-card > .proto-muted {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+  }
+  .proto-b-card > svg {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+  .proto-b-card > .proto-check,
+  .proto-b-card > .proto-sheet-icon {
+    grid-row: 1 / span 2;
+    align-self: center;
   }
 }
 
