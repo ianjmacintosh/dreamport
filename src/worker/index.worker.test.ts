@@ -2773,7 +2773,7 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
 });
 
 /** Shared by the Task describe block below (#140). */
-function setTaskDone(
+function putTask(
   productId: string,
   taskId: string,
   done: unknown,
@@ -2839,7 +2839,7 @@ describe("/api/products/:productId/tasks/:taskId (#140)", () => {
       TEST_EMAILS.tasksToggle,
     );
 
-    const checked = await setTaskDone(product.id, TALK_TASK, true, cookie);
+    const checked = await putTask(product.id, TALK_TASK, true, cookie);
     expect(checked.status).toBe(200);
     const body = (await checked.json()) as JourneyResponse;
     expect(body.tasks.find((t) => t.id === TALK_TASK)?.done).toBe(true);
@@ -2847,12 +2847,12 @@ describe("/api/products/:productId/tasks/:taskId (#140)", () => {
     expect(body.tasks.find((t) => t.id === EVENT_TASK)?.done).toBe(false);
 
     // A repeat check is harmless, and a later read sees it.
-    await setTaskDone(product.id, TALK_TASK, true, cookie);
+    await putTask(product.id, TALK_TASK, true, cookie);
     expect(
       (await tasksOf(product.id, cookie)).find((t) => t.id === TALK_TASK)?.done,
     ).toBe(true);
 
-    const unchecked = await setTaskDone(product.id, TALK_TASK, false, cookie);
+    const unchecked = await putTask(product.id, TALK_TASK, false, cookie);
     expect(unchecked.status).toBe(200);
     expect(
       (await tasksOf(product.id, cookie)).find((t) => t.id === TALK_TASK)?.done,
@@ -2873,7 +2873,7 @@ describe("/api/products/:productId/tasks/:taskId (#140)", () => {
     // A Task can be checked on a Milestone that isn't current, and a check
     // doesn't move the Journey either.
     const checked = (await (
-      await setTaskDone(product.id, EVENT_TASK, true, cookie)
+      await putTask(product.id, EVENT_TASK, true, cookie)
     ).json()) as JourneyResponse;
     expect(checked.journey).toEqual(advanced.journey);
 
@@ -2883,12 +2883,13 @@ describe("/api/products/:productId/tasks/:taskId (#140)", () => {
     expect(returned.journey?.currentMilestoneId).toBe(path.milestones[0].id);
     expect(returned.tasks.find((t) => t.id === EVENT_TASK)?.done).toBe(true);
 
-    // Checked or not, Advance behaves the same.
-    await setTaskDone(product.id, EVENT_TASK, false, cookie);
-    const again = (await (
+    // Milestone 1's Task checked: Advance moves on exactly the same.
+    const advancedChecked = (await (
       await advanceJourney(product.id, cookie)
     ).json()) as JourneyResponse;
-    expect(again.journey?.currentMilestoneId).toBe(path.milestones[1].id);
+    expect(advancedChecked.journey?.currentMilestoneId).toBe(
+      path.milestones[1].id,
+    );
   });
 
   it("404s before a Journey starts or for an unknown Task, and 400s a non-boolean done", async () => {
@@ -2896,19 +2897,19 @@ describe("/api/products/:productId/tasks/:taskId (#140)", () => {
     const created = await addProduct(cookie, "Unstarted Product");
     const { product } = (await created.json()) as { product: { id: string } };
 
-    expect(
-      (await setTaskDone(product.id, TALK_TASK, true, cookie)).status,
-    ).toBe(404);
+    expect((await putTask(product.id, TALK_TASK, true, cookie)).status).toBe(
+      404,
+    );
 
     await startJourney(product.id, cookie);
-    expect(
-      (await setTaskDone(product.id, "not-a-task", true, cookie)).status,
-    ).toBe(404);
+    expect((await putTask(product.id, "not-a-task", true, cookie)).status).toBe(
+      404,
+    );
 
     for (const done of ["true", 1, null, undefined]) {
-      expect(
-        (await setTaskDone(product.id, TALK_TASK, done, cookie)).status,
-      ).toBe(400);
+      expect((await putTask(product.id, TALK_TASK, done, cookie)).status).toBe(
+        400,
+      );
     }
     expect((await tasksOf(product.id, cookie)).every((t) => !t.done)).toBe(
       true,
@@ -2916,7 +2917,7 @@ describe("/api/products/:productId/tasks/:taskId (#140)", () => {
   });
 
   it("rejects a request with no session", async () => {
-    expect((await setTaskDone("some-id", TALK_TASK, true)).status).toBe(401);
+    expect((await putTask("some-id", TALK_TASK, true)).status).toBe(401);
   });
 
   it("rejects a toggle from an untrusted origin, changing nothing", async () => {
@@ -2944,13 +2945,13 @@ describe("/api/products/:productId/tasks/:taskId (#140)", () => {
       TEST_EMAILS.tasksOwnerA,
     );
     const cookieB = await signIn(TEST_EMAILS.tasksOwnerB);
-    await setTaskDone(product.id, TALK_TASK, true, cookieA);
+    await putTask(product.id, TALK_TASK, true, cookieA);
 
-    const uncheck = await setTaskDone(product.id, TALK_TASK, false, cookieB);
+    const uncheck = await putTask(product.id, TALK_TASK, false, cookieB);
     expect(uncheck.status).toBe(404);
     expect(await uncheck.json()).toEqual({ error: "Not found" });
 
-    const check = await setTaskDone(product.id, EVENT_TASK, true, cookieB);
+    const check = await putTask(product.id, EVENT_TASK, true, cookieB);
     expect(check.status).toBe(404);
 
     expect(

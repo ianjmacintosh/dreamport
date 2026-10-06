@@ -112,9 +112,9 @@ _Avoid_: form, template, canvas, questionnaire
 **Task**:
 Something a Path's Milestone asks the User to do (e.g. "Talk to 5
 potential customers"), fixed content that ships with its Path like a
-Worksheet, and checked off per Product per Path. A **standalone** Task is
-a plain to-do with no Worksheet behind it: the User checks it off, and
-can uncheck it, by hand. Checking one off is informational only — it
+Worksheet, and checked off per Product per Path. A **standalone** Task has
+no Worksheet behind it, just a title: the User checks it off, and can
+uncheck it, by hand. Checking one off is informational only — it
 never gates Advance. A Task titled `EVENT: …` (e.g. "EVENT: Set aside 1
 hour to write the Product Summary") is a stand-in for something to
 schedule once Dreamport schedules things; the prefix is title text, not

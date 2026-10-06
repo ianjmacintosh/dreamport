@@ -265,19 +265,25 @@ function ProductJourney() {
     setError("");
     setSavingTaskId(taskId);
     try {
-      const res = await fetchWithTimeout(
-        `/api/products/${product.id}/tasks/${taskId}`,
-        {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ done }),
-        },
-      );
-      if (!res.ok) {
+      const saved = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(
+          `/api/products/${product.id}/tasks/${taskId}`,
+          {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ done }),
+          },
+        );
+        if (!res.ok) {
+          return null;
+        }
+        return (await res.json()) as JourneyState;
+      });
+      if (!saved) {
         setError(SET_TASK_FAILED);
         return;
       }
-      setJourneyState((await res.json()) as JourneyState);
+      setJourneyState(saved);
     } catch {
       setError(CONNECTION_FAILED);
     } finally {
