@@ -29,8 +29,11 @@
  *                   subheading both.)
  *
  * D  Sections + cards — Ian's pick from round 1: A's top half (headings,
- *                   text, readable) with B's cards and progress bar under
- *                   "What to do", then A's "Done when" section.
+ *                   text, readable) with B's cards and progress bar.
+ *                   Round 2: no rule under the headings (too busy); the
+ *                   Worksheets and Tasks get a section each, a Worksheet
+ *                   card carrying its own fill bar instead of reading as
+ *                   a Task; headings in Title Case ("Done When").
  *
  * Every variant: an `EVENT: ` title loses its prefix and gets an Event
  * pill with a calendar icon instead (display only — the data is
@@ -497,54 +500,76 @@ function VariantC(props: ColumnProps) {
  */
 function VariantD(props: ColumnProps) {
   const { milestone, toDos, productId, onToggle } = props;
-  const doneCount = countDone(toDos);
+  const sheets = toDos.filter((t) => t.kind === "worksheet");
+  const tasks = toDos.filter((t) => t.kind === "task");
+  const doneCount = tasks.filter((t) => t.done).length;
   return (
     <section className="proto-a">
       <h3>{milestone.name}</h3>
       <p className="proto-a-lede">{milestone.outcome}</p>
       <p>{milestone.description}</p>
 
-      <h4 className="proto-a-heading">What to do</h4>
-      <div className="proto-b-progress proto-d-progress">
-        <span>
-          {doneCount} of {toDos.length} done
-        </span>
-        <span className="proto-b-bar" aria-hidden="true">
-          <span style={{ width: `${(doneCount / toDos.length) * 100}%` }} />
-        </span>
-      </div>
-      <ul className="proto-b-cards">
-        {toDos.map((toDo) =>
-          toDo.kind === "worksheet" ? (
-            <li key={toDo.id}>
-              <a
-                className="proto-b-card"
-                href={`/app/products/${productId}/worksheets/${toDo.id}`}
-              >
-                <SheetIcon />
-                <span className="proto-b-card-title">{toDo.name}</span>
-                <span className="proto-muted">
-                  {toDo.filled} of {toDo.total} filled
-                </span>
-                <CaretRightIcon weight="bold" aria-hidden="true" />
-              </a>
-            </li>
-          ) : (
-            <li key={toDo.id}>
-              <label className="proto-b-card" data-done={toDo.done}>
-                <CheckBox
-                  checked={toDo.done}
-                  onChange={() => onToggle(toDo.id)}
-                />
-                <span className="proto-b-card-title">{toDo.title}</span>
-                {toDo.isEvent && <EventPill />}
-              </label>
-            </li>
-          ),
-        )}
-      </ul>
+      {sheets.length > 0 && (
+        <>
+          <h4 className="proto-d-heading">Worksheets</h4>
+          <ul className="proto-b-cards">
+            {sheets.map((sheet) => (
+              <li key={sheet.id}>
+                <a
+                  className="proto-b-card proto-d-sheet"
+                  href={`/app/products/${productId}/worksheets/${sheet.id}`}
+                >
+                  <SheetIcon />
+                  <span className="proto-b-card-title">{sheet.name}</span>
+                  <CaretRightIcon weight="bold" aria-hidden="true" />
+                  <span className="proto-d-sheet-fill">
+                    <span className="proto-b-bar" aria-hidden="true">
+                      <span
+                        style={{
+                          width: `${(sheet.filled / sheet.total) * 100}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="proto-muted">
+                      {sheet.filled} of {sheet.total} filled
+                    </span>
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
-      <h4 className="proto-a-heading">Done when</h4>
+      {tasks.length > 0 && (
+        <>
+          <h4 className="proto-d-heading">Tasks</h4>
+          <div className="proto-b-progress proto-d-progress">
+            <span>
+              {doneCount} of {tasks.length} done
+            </span>
+            <span className="proto-b-bar" aria-hidden="true">
+              <span style={{ width: `${(doneCount / tasks.length) * 100}%` }} />
+            </span>
+          </div>
+          <ul className="proto-b-cards">
+            {tasks.map((task) => (
+              <li key={task.id}>
+                <label className="proto-b-card" data-done={task.done}>
+                  <CheckBox
+                    checked={task.done}
+                    onChange={() => onToggle(task.id)}
+                  />
+                  <span className="proto-b-card-title">{task.title}</span>
+                  {task.isEvent && <EventPill />}
+                </label>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <h4 className="proto-d-heading">Done When</h4>
       <p>{milestone.doneWhen}</p>
 
       <MoveButtons {...props} />

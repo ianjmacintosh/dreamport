@@ -32,7 +32,9 @@
                                 a hint, then Return/Advance
 
    D — Sections + cards: A's 5–6 + B's 10–11, nothing new of its own
-    14. .proto-d-progress     — the progress line's spacing under a heading
+    14. .proto-d-heading      — section headings, no rule under them
+    15. .proto-d-progress     — the progress line's spacing under a heading
+    16. .proto-d-sheet(-fill) — a Worksheet card with its own fill bar
 
    Not on the list: .proto-switcher* (the prototype's own controls). */
 
@@ -298,8 +300,33 @@
 /* Reuses A's .proto-a-* and B's .proto-b-* classes; only the progress
    line's top margin changes, since it sits right under a heading. */
 
+.proto-d-heading {
+  margin-top: var(--space-8);
+}
+
 .proto-d-progress {
   margin-top: var(--space-3);
+}
+
+/* A Worksheet card: icon, name and caret on one line, its own fill bar and
+   count under the name — a Worksheet fills up, it doesn't tick. */
+.proto-d-sheet {
+  grid-auto-flow: row;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  row-gap: var(--space-2);
+}
+
+.proto-d-sheet > svg {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.proto-d-sheet-fill {
+  grid-column: 2 / span 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
 }
 
 /* Below 640px a card's extras (the Event pill, the "n of m filled" count)
