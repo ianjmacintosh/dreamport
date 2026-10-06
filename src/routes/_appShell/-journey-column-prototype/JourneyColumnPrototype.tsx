@@ -38,6 +38,8 @@
  *                   it), no progress bars, cards on the Worksheet page's
  *                   own white with no border, the Event pill is the plain
  *                   Tag pill; the Rough One-Pager's Tasks reworded.
+ *                   Round 4: a Worksheet says "Complete" / "Incomplete",
+ *                   right-aligned in italics, not "n of m filled".
  *
  * Every variant: an `EVENT: ` title loses its prefix and gets an Event
  * pill with a calendar icon instead (display only — the data is
@@ -538,8 +540,8 @@ function VariantD(props: ColumnProps) {
                 >
                   <SheetIcon />
                   <span className="proto-b-card-title">{sheet.name}</span>
-                  <span className="proto-muted">
-                    {sheet.filled} of {sheet.total} filled
+                  <span className="proto-d-status">
+                    {sheet.filled === sheet.total ? "Complete" : "Incomplete"}
                   </span>
                   <CaretRightIcon weight="bold" aria-hidden="true" />
                 </a>
