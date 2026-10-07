@@ -356,6 +356,9 @@ export const TEST_EMAILS = {
   /** #112: set a Product's description, see it persist across a reload, then clear it. */
   e2eProductDescription:
     "delivered+e2e-product-description+e2e-test@resend.dev",
+  /** #133: a failed Journey fetch still opens the Product home, without the Journey line. */
+  e2eProductHomeJourneyDown:
+    "delivered+e2e-product-home-journey-down+e2e-test@resend.dev",
   /** #102: editing/confirming one Idea row leaves the other rows' layout unchanged. */
   e2eIdeaRowsIndependent:
     "delivered+e2e-idea-rows-independent+e2e-test@resend.dev",

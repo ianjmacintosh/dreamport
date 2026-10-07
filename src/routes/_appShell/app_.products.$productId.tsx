@@ -108,21 +108,15 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
     // (not signed in, not this User's Product, offline, a transient error)
     // redirects to `/app` rather than a dedicated not-found page.
     // The Tag catalog (#113) is fetched alongside — it's needed for the
-    // add-Idea form's `TagPicker` — and so is the Product's Journey (#137);
-    // both go through the same redirect.
+    // add-Idea form's `TagPicker` — and goes through the same redirect. So is
+    // the Product's Journey (#137), but a failed Journey fetch only drops the
+    // Journey line: Ideas and the description don't depend on Journeys.
     const [res, tagsRes, journeyRes] = await Promise.all([
       fetch(`/api/products/${params.productId}/ideas`).catch(() => null),
       fetch("/api/tags").catch(() => null),
       fetch(`/api/products/${params.productId}/journey`).catch(() => null),
     ]);
-    if (
-      !res ||
-      !res.ok ||
-      !tagsRes ||
-      !tagsRes.ok ||
-      !journeyRes ||
-      !journeyRes.ok
-    ) {
+    if (!res || !res.ok || !tagsRes || !tagsRes.ok) {
       throw redirect({ to: "/app" });
     }
     const { product, ideas } = (await res.json()) as {
@@ -130,7 +124,9 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
       ideas: Idea[];
     };
     const { tags } = (await tagsRes.json()) as { tags: string[] };
-    const journey = (await journeyRes.json()) as JourneySummary;
+    const journey = journeyRes?.ok
+      ? ((await journeyRes.json()) as JourneySummary)
+      : null;
     return { product, ideas, tagCatalog: tags, journey };
   },
   component: ProductHome,
@@ -198,12 +194,14 @@ function ProductHome() {
     tagCatalog,
     journey: initialJourney,
   } = Route.useRouteContext();
-  const { path, journey } = initialJourney;
-  const currentIndex = journey
-    ? path.milestones.findIndex(
-        (milestone) => milestone.id === journey.currentMilestoneId,
-      )
-    : -1;
+  const path = initialJourney?.path;
+  const journey = initialJourney?.journey;
+  const currentIndex =
+    path && journey
+      ? path.milestones.findIndex(
+          (milestone) => milestone.id === journey.currentMilestoneId,
+        )
+      : -1;
   const [product, setProduct] = useState<Product>(initialProduct);
   const [error, setError] = useState("");
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -297,7 +295,7 @@ function ProductHome() {
         </>
       )}
       <h2>Journey</h2>
-      {journey ? (
+      {path && journey ? (
         <p>
           {journey.finishedAt
             ? `${path.name} complete`
