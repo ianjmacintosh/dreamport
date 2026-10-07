@@ -2,12 +2,14 @@ import { test, expect, type Page } from "@playwright/test";
 
 import { TEST_EMAILS } from "../test/emails";
 import { exemptFromRateLimits } from "./rate-limit-exemption";
+import { signIn } from "./sign-in";
 
 // Every address in TEST_EMAILS used to sign in below carries the
 // `+e2e-test@` marker (issue #39, docs/adr/0009): `generateOTP` in
 // `auth.ts` returns the fixed code "000000" for it, gated off in
-// production. `signIn` below types that fixed code straight in — no
-// `/api/test/last-otp` hook needed (that hook is gone; see `index.ts`).
+// production. `signInThroughUi` below and the API `signIn` both use that
+// fixed code — no `/api/test/last-otp` hook needed (that hook is gone; see
+// `index.ts`).
 
 /** See `exemptFromRateLimits` for why rate-limited auth calls go out as one exempt IP. */
 test.beforeEach(({ page }) => exemptFromRateLimits(page));
@@ -38,8 +40,12 @@ async function gotoLoginFromHomepage(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/login$/);
 }
 
-/** Drive `/login` from the email step through to landing on `/app`. */
-async function signIn(page: Page, email: string): Promise<void> {
+/**
+ * Drive `/login` from the email step through to landing on `/app`. Only the
+ * happy path uses this; tests that just need a signed-in User use the faster
+ * API `signIn` from `./sign-in.ts` (#150).
+ */
+async function signInThroughUi(page: Page, email: string): Promise<void> {
   await gotoLoginFromHomepage(page);
   await page.getByLabel("Email address").fill(email);
 
@@ -72,7 +78,7 @@ test("happy path: email, then code, then /app shows the signed-in email", async 
 }) => {
   const email = TEST_EMAILS.e2eHappyPath;
 
-  await signIn(page, email);
+  await signInThroughUi(page, email);
 
   // The signed-in email lives in AppNav (#90), not on the page itself.
   await expect(page.getByText(email)).toBeVisible();

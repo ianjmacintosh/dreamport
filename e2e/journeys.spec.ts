@@ -1,7 +1,7 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 import { TEST_EMAILS } from "../test/emails";
-import { exemptFromRateLimits } from "./rate-limit-exemption";
+import { signIn } from "./sign-in";
 
 // Journeys (issue #137): sign in, open a Product, follow "Learn More" to its
 // Journey page, read the Path's Milestones, start the Journey, see
@@ -10,32 +10,7 @@ import { exemptFromRateLimits } from "./rate-limit-exemption";
 // returning to Milestone 1 and advancing again, and filling out the
 // Product Summary Worksheet on Milestone 1 and finding it kept on
 // Milestone 2 (issue #139), with a Task ticked along the way (#140).
-// Signs in the same way `ideas.spec.ts` does (fixed `+e2e-test@` code, see
-// docs/adr/0009).
-
-/** See `exemptFromRateLimits` for why rate-limited auth calls go out as one exempt IP. */
-test.beforeEach(({ page }) => exemptFromRateLimits(page));
-
-/** Drive `/login` from the email step through to landing on `/app`. */
-async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Email address").fill(email);
-
-  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
-    /.+/,
-    { timeout: 15_000 },
-  );
-
-  await page.getByRole("button", { name: "Send Code" }).click();
-
-  await expect(
-    page.getByRole("textbox", { name: "Six-digit code" }),
-  ).toBeVisible();
-  // The sixth digit submits the form on its own (`autoSubmit`, #128).
-  await page.getByRole("textbox", { name: "Six-digit code" }).fill("000000");
-
-  await expect(page).toHaveURL(/\/app$/);
-}
+// Signs in through the API with `signIn` (see `./sign-in.ts`).
 
 test("sign in, open a Product, learn about its Journey, start it, and see Milestone 1 current", async ({
   page,
