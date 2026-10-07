@@ -76,8 +76,8 @@ grammar and punctuation in the descriptions.
 `0017_tasks.sql` adds Tasks (issue #140): the `tasks` and
 `milestone_tasks` catalog, plus `task_completions` (one row per Task a
 Product has checked off on a Path), cascading off `products` on delete.
-`0018_standalone_tasks_seed.sql` seeds the first two standalone Tasks, one
-`EVENT:`-prefixed — split so the seed half is re-runnable.
+`0018_standalone_tasks_seed.sql` seeds the first three standalone Tasks,
+one `EVENT:`-prefixed — split so the seed half is re-runnable.
 
 ## Conventions
 

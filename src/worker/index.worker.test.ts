@@ -2791,7 +2791,8 @@ function putTask(
 }
 
 /** The seeded standalone Tasks (#140), each on one Milestone. */
-const EVENT_TASK = "event-write-product-summary";
+const COMPLETE_SUMMARY_TASK = "complete-product-summary";
+const EVENT_TASK = "event-schedule-product-summary";
 const TALK_TASK = "talk-to-five-customers";
 
 describe("/api/products/:productId/tasks/:taskId (#140)", () => {
@@ -2818,10 +2819,18 @@ describe("/api/products/:productId/tasks/:taskId (#140)", () => {
   it("lists each Milestone's standalone Tasks, unchecked, including an EVENT: one", async () => {
     const { path, tasks } = await withStartedJourney(TEST_EMAILS.tasksToggle);
 
+    // In each Milestone's own order: the Rough One-Pager's two, then Real
+    // Talk's.
     expect(tasks).toEqual([
       {
+        id: COMPLETE_SUMMARY_TASK,
+        title: "Complete the Product Summary",
+        milestoneIds: [path.milestones[0].id],
+        done: false,
+      },
+      {
         id: EVENT_TASK,
-        title: "EVENT: Set aside 1 hour to write the Product Summary",
+        title: "EVENT: Schedule time to write the Product Summary (optional)",
         milestoneIds: [path.milestones[0].id],
         done: false,
       },
@@ -2958,6 +2967,10 @@ describe("/api/products/:productId/tasks/:taskId (#140)", () => {
       Object.fromEntries(
         (await tasksOf(product.id, cookieA)).map((t) => [t.id, t.done]),
       ),
-    ).toEqual({ [EVENT_TASK]: false, [TALK_TASK]: true });
+    ).toEqual({
+      [COMPLETE_SUMMARY_TASK]: false,
+      [EVENT_TASK]: false,
+      [TALK_TASK]: true,
+    });
   });
 });
