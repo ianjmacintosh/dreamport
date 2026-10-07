@@ -4,9 +4,9 @@
 -- `tasks` and `milestone_tasks` are a fixed, Dreamport-curated catalog like
 -- `worksheets`/`milestone_worksheets` in `0013` — seeded in `0018`, never
 -- added by a route. Every Task here is standalone: a plain title the User
--- checks off by hand, with no Worksheet behind it (#141 adds the
--- Worksheet-bound kind). `milestone_tasks` is many-to-many, the same
--- attachment as Worksheets; `position` orders a Milestone's Tasks.
+-- checks off by hand, with no Worksheet behind it (#141, a Worksheet-bound
+-- kind, was cancelled — see `0018`). `milestone_tasks` is many-to-many, the
+-- same attachment as Worksheets; `position` orders a Milestone's Tasks.
 --
 -- `task_completions` is one checked-off Task, scoped per (Product, Path) the
 -- same way `journeys` and `worksheet_instances` are. An unchecked Task has

@@ -254,3 +254,29 @@ test("set a Product's description, see it persist across a reload, then clear it
   await expect(page.getByText("No description yet.")).toBeVisible();
   await expect(page.getByText(description)).not.toBeVisible();
 });
+
+test("the Product home still opens when its Journey can't be fetched", async ({
+  page,
+}) => {
+  const email = TEST_EMAILS.e2eProductHomeJourneyDown;
+  const productName = `A Product without its Journey ${Date.now()}`;
+
+  await signIn(page, email);
+
+  await page.getByLabel("Product name").fill(productName);
+  await page.getByRole("button", { name: "Add Product" }).click();
+
+  // A missing Path or unmigrated Journey tables make this endpoint 500; the
+  // Product's Ideas and description don't depend on it (#133 review).
+  await page.route("**/api/products/*/journey", (route) =>
+    route.fulfill({ status: 500, json: { error: "Internal error" } }),
+  );
+  await page.getByRole("link", { name: productName }).click();
+
+  await expect(page).toHaveURL(/\/app\/products\/.+/);
+  await expect(
+    page.getByRole("heading", { name: productName, level: 1 }),
+  ).toBeVisible();
+  await expect(page.getByText("No description yet.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Learn More" })).toBeVisible();
+});
