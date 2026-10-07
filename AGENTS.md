@@ -44,6 +44,12 @@ Tests must only send email to an address defined in `TEST_EMAILS`
 add a named entry to that object and reference it. Every address there sits
 on a domain that cannot reach a real inbox.
 
+Run tests through `npm run test:unit -- run` and `npm run test:e2e`, never
+bare `npx vitest` / `npx playwright test`. Both scripts queue behind one
+shared lock, because two or three of these runs at once exhaust the
+devcontainer's memory and freeze it (#150). Extra arguments pass through,
+e.g. `npm run test:e2e -- e2e/login.spec.ts --repeat-each 5`.
+
 ## Design System Discipline
 
 The design system has four tiers:
