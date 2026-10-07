@@ -58,6 +58,12 @@ export default defineConfig({
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
     react(),
-    cloudflare(),
+    cloudflare({
+      // `scripts/e2e-server.sh` points the e2e server at its own state
+      // directory, so it never shares local D1 files with a dev server (#150).
+      persistState: process.env.CLOUDFLARE_PERSIST_DIR
+        ? { path: process.env.CLOUDFLARE_PERSIST_DIR }
+        : true,
+    }),
   ],
 });

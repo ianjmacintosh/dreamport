@@ -34,13 +34,17 @@ export async function signIn(page: Page, email: string): Promise<void> {
     "cf-connecting-ip": E2E_RATE_LIMIT_EXEMPT_IP,
   };
 
-  const send = await page.request.post(
-    "/api/auth/email-otp/send-verification-otp",
-    {
+  const sendCode = () =>
+    page.request.post("/api/auth/email-otp/send-verification-otp", {
       headers: { ...headers, "x-turnstile-token": DUMMY_TURNSTILE_TOKEN },
       data: { email, type: "sign-in" },
-    },
-  );
+    });
+  let send = await sendCode();
+  // A 403 here means the Worker's `siteverify` call to Cloudflare failed. With
+  // the always-pass test secret that's a network blip, not a verdict (seen
+  // once across a laptop sleep/wake, #150) — retry once. A real gate
+  // regression fails the retry too.
+  if (send.status() === 403) send = await sendCode();
   expect(send.status(), "send-verification-otp status").toBe(200);
 
   const verify = await page.request.post("/api/auth/sign-in/email-otp", {

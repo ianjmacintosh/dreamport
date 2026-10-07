@@ -14,7 +14,7 @@
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "scripts/with-test-lock.sh vitest",
     "test:e2e": "scripts/e2e.sh",
-    "e2e:server": "wrangler d1 migrations apply dreamport-local --env local --local && npm run dev -- --port 5173 --strictPort",
+    "e2e:server": "scripts/e2e-server.sh",
     "migrate:local": "wrangler d1 migrations apply dreamport-local --env local --local",
     "migrate:dev": "wrangler d1 migrations apply dreamport-dev --env dev --remote",
     "migrate:staging": "wrangler d1 migrations apply dreamport-stage --env staging --remote",

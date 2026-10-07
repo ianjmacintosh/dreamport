@@ -12,6 +12,9 @@ import { defineConfig, devices } from "@playwright/test";
  */
 const DEPLOYED_TARGET = process.env.E2E_BASE_URL;
 
+/** The per-run local Worker `scripts/e2e-server.sh` boots (not the 5173 dev server). */
+const LOCAL_E2E_URL = "http://localhost:5174";
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -20,10 +23,6 @@ export default defineConfig({
   testIgnore: DEPLOYED_TARGET
     ? "**/login.spec.ts"
     : "**/deployment-smoke.spec.ts",
-  /* Apply the local D1 migrations before anything runs (also covers the
-   * reuse-existing-server case, which skips `e2e:server`). Not needed when
-   * testing a deployed environment. */
-  globalSetup: DEPLOYED_TARGET ? undefined : "./e2e/global-setup.ts",
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -39,7 +38,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/login')`. */
-    baseURL: DEPLOYED_TARGET ?? "http://localhost:5173",
+    baseURL: DEPLOYED_TARGET ?? LOCAL_E2E_URL,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
@@ -59,18 +58,19 @@ export default defineConfig({
   ],
 
   /*
-   * Boot the local Worker (Vite + the Cloudflare plugin's Miniflare) before
-   * the run. `e2e:server` first applies the D1 migrations to the local
-   * database, then starts the dev server on a fixed port. No `RESEND_API_KEY`
-   * is set for the `local` env (wrangler.jsonc), so no real email is sent and
-   * the `/api/test/last-delete-link` hook is mounted.
+   * Boot a fresh local Worker (Vite + the Cloudflare plugin's Miniflare) for
+   * every run, on its own port with its own empty state directory and
+   * freshly applied D1 migrations — never the dev server on 5173. See
+   * `scripts/e2e-server.sh` for why (#150). No `RESEND_API_KEY` is set for
+   * the `local` env (wrangler.jsonc), so no real email is sent and the
+   * `/api/test/last-delete-link` hook is mounted.
    */
   webServer: DEPLOYED_TARGET
     ? undefined
     : {
-        command: "npm run e2e:server",
-        url: "http://localhost:5173",
-        reuseExistingServer: !process.env.CI,
+        command: "scripts/e2e-server.sh",
+        url: LOCAL_E2E_URL,
+        reuseExistingServer: false,
         timeout: 120_000,
       },
 });
