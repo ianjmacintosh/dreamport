@@ -230,3 +230,11 @@ Add an entry only once a sign-off conversation resolves something repeatable
 - Helper text (`.input-helper`) is `--color-text-primary`, the label's own
   color, at `--text-sm` — never `--color-text-muted`, which fails AA on
   both cream and white (decided in #139).
+
+- Things a User does on a page — Worksheets to fill in, Tasks to tick —
+  are `ActionCard`s in an `.action-card-list`, one `h4` section per kind
+  ("Worksheets", "Tasks"), never mixed into one list. A Worksheet's card
+  says "Complete" or "Incomplete" (`ActionCard.Status`), never a count; a
+  Task's leads with a `Checkbox`. No progress bars or "n of m done"
+  counts. A section with nothing in it is left out. See the style guide's
+  "Action card" section (decided in #140).

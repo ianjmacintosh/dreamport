@@ -2255,11 +2255,8 @@ describe("/api/products/:productId/journey/advance (#138)", () => {
 
     const again = await advanceJourney(product.id, cookie);
     expect(again.status).toBe(200);
-    expect(await again.json()).toEqual({
-      path: finished.path,
-      journey: finished.journey,
-      worksheets: finished.worksheets,
-    });
+    // Everything the GET said, less the Product it bundles.
+    expect(await again.json()).toEqual({ ...finished, product: undefined });
   });
 
   it("404s advancing a Journey that hasn't started", async () => {
@@ -2772,5 +2769,208 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
         )
       ).status,
     ).toBe(404);
+  });
+});
+
+/** Shared by the Task describe block below (#140). */
+function putTask(
+  productId: string,
+  taskId: string,
+  done: unknown,
+  cookie?: string,
+) {
+  return fetchWorker(`/api/products/${productId}/tasks/${taskId}`, {
+    method: "PUT",
+    headers: {
+      ...json,
+      origin: TRUSTED_ORIGIN,
+      ...(cookie ? { cookie } : {}),
+    },
+    body: JSON.stringify({ done }),
+  });
+}
+
+/** The seeded standalone Tasks (#140), each on one Milestone. */
+const COMPLETE_SUMMARY_TASK = "complete-product-summary";
+const EVENT_TASK = "event-schedule-product-summary";
+const TALK_TASK = "talk-to-five-customers";
+
+describe("/api/products/:productId/tasks/:taskId (#140)", () => {
+  /** Sign in, add a Product and start its Journey. */
+  async function withStartedJourney(email: string) {
+    const cookie = await signIn(email);
+    const created = await addProduct(cookie, "A phone-scale app");
+    const { product } = (await created.json()) as {
+      product: { id: string; name: string };
+    };
+    const started = (await (
+      await startJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    return { cookie, product, ...started };
+  }
+
+  /** The Product's Tasks as the Journey GET reports them. */
+  async function tasksOf(productId: string, cookie: string) {
+    return (
+      (await (await getJourney(productId, cookie)).json()) as JourneyResponse
+    ).tasks;
+  }
+
+  it("lists each Milestone's standalone Tasks, unchecked, including an EVENT: one", async () => {
+    const { path, tasks } = await withStartedJourney(TEST_EMAILS.tasksToggle);
+
+    // In each Milestone's own order: the Rough One-Pager's two, then Real
+    // Talk's.
+    expect(tasks).toEqual([
+      {
+        id: COMPLETE_SUMMARY_TASK,
+        title: "Complete the Product Summary",
+        milestoneIds: [path.milestones[0].id],
+        done: false,
+      },
+      {
+        id: EVENT_TASK,
+        title: "EVENT: Schedule time to write the Product Summary (optional)",
+        milestoneIds: [path.milestones[0].id],
+        done: false,
+      },
+      {
+        id: TALK_TASK,
+        title: "Talk to 5 potential customers",
+        milestoneIds: [path.milestones[1].id],
+        done: false,
+      },
+    ]);
+  });
+
+  it("checks and unchecks a standalone Task, and the state persists", async () => {
+    const { cookie, product } = await withStartedJourney(
+      TEST_EMAILS.tasksToggle,
+    );
+
+    const checked = await putTask(product.id, TALK_TASK, true, cookie);
+    expect(checked.status).toBe(200);
+    const body = (await checked.json()) as JourneyResponse;
+    expect(body.tasks.find((t) => t.id === TALK_TASK)?.done).toBe(true);
+    // Only the Task asked for.
+    expect(body.tasks.find((t) => t.id === EVENT_TASK)?.done).toBe(false);
+
+    // A repeat check is harmless, and a later read sees it.
+    await putTask(product.id, TALK_TASK, true, cookie);
+    expect(
+      (await tasksOf(product.id, cookie)).find((t) => t.id === TALK_TASK)?.done,
+    ).toBe(true);
+
+    const unchecked = await putTask(product.id, TALK_TASK, false, cookie);
+    expect(unchecked.status).toBe(200);
+    expect(
+      (await tasksOf(product.id, cookie)).find((t) => t.id === TALK_TASK)?.done,
+    ).toBe(false);
+  });
+
+  it("never gates advancing, and moving the Journey never clears a check", async () => {
+    const { cookie, product, path } = await withStartedJourney(
+      TEST_EMAILS.tasksNotGating,
+    );
+
+    // Milestone 1's Task unchecked: Advance still moves on.
+    const advanced = (await (
+      await advanceJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    expect(advanced.journey?.currentMilestoneId).toBe(path.milestones[1].id);
+
+    // A Task can be checked on a Milestone that isn't current, and a check
+    // doesn't move the Journey either.
+    const checked = (await (
+      await putTask(product.id, EVENT_TASK, true, cookie)
+    ).json()) as JourneyResponse;
+    expect(checked.journey).toEqual(advanced.journey);
+
+    const returned = (await (
+      await returnJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    expect(returned.journey?.currentMilestoneId).toBe(path.milestones[0].id);
+    expect(returned.tasks.find((t) => t.id === EVENT_TASK)?.done).toBe(true);
+
+    // Milestone 1's Task checked: Advance moves on exactly the same.
+    const advancedChecked = (await (
+      await advanceJourney(product.id, cookie)
+    ).json()) as JourneyResponse;
+    expect(advancedChecked.journey?.currentMilestoneId).toBe(
+      path.milestones[1].id,
+    );
+  });
+
+  it("404s before a Journey starts or for an unknown Task, and 400s a non-boolean done", async () => {
+    const cookie = await signIn(TEST_EMAILS.tasksInvalid);
+    const created = await addProduct(cookie, "Unstarted Product");
+    const { product } = (await created.json()) as { product: { id: string } };
+
+    expect((await putTask(product.id, TALK_TASK, true, cookie)).status).toBe(
+      404,
+    );
+
+    await startJourney(product.id, cookie);
+    expect((await putTask(product.id, "not-a-task", true, cookie)).status).toBe(
+      404,
+    );
+
+    for (const done of ["true", 1, null, undefined]) {
+      expect((await putTask(product.id, TALK_TASK, done, cookie)).status).toBe(
+        400,
+      );
+    }
+    expect((await tasksOf(product.id, cookie)).every((t) => !t.done)).toBe(
+      true,
+    );
+  });
+
+  it("rejects a request with no session", async () => {
+    expect((await putTask("some-id", TALK_TASK, true)).status).toBe(401);
+  });
+
+  it("rejects a toggle from an untrusted origin, changing nothing", async () => {
+    const { cookie, product } = await withStartedJourney(
+      TEST_EMAILS.tasksUntrusted,
+    );
+
+    const res = await fetchWorker(
+      `/api/products/${product.id}/tasks/${TALK_TASK}`,
+      {
+        method: "PUT",
+        headers: { ...json, origin: "https://evil.example.com", cookie },
+        body: JSON.stringify({ done: true }),
+      },
+    );
+
+    expect(res.status).toBe(403);
+    expect((await tasksOf(product.id, cookie)).every((t) => !t.done)).toBe(
+      true,
+    );
+  });
+
+  it("404s a stranger's toggle of another User's Task, never touching it", async () => {
+    const { cookie: cookieA, product } = await withStartedJourney(
+      TEST_EMAILS.tasksOwnerA,
+    );
+    const cookieB = await signIn(TEST_EMAILS.tasksOwnerB);
+    await putTask(product.id, TALK_TASK, true, cookieA);
+
+    const uncheck = await putTask(product.id, TALK_TASK, false, cookieB);
+    expect(uncheck.status).toBe(404);
+    expect(await uncheck.json()).toEqual({ error: "Not found" });
+
+    const check = await putTask(product.id, EVENT_TASK, true, cookieB);
+    expect(check.status).toBe(404);
+
+    expect(
+      Object.fromEntries(
+        (await tasksOf(product.id, cookieA)).map((t) => [t.id, t.done]),
+      ),
+    ).toEqual({
+      [COMPLETE_SUMMARY_TASK]: false,
+      [EVENT_TASK]: false,
+      [TALK_TASK]: true,
+    });
   });
 });

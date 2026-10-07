@@ -109,6 +109,18 @@ Question: a Question is one prompt answered against an Idea; a Worksheet
 is a whole set of fields filled in along a Journey.
 _Avoid_: form, template, canvas, questionnaire
 
+**Task**:
+Something a Path's Milestone asks the User to do (e.g. "Talk to 5
+potential customers"), fixed content that ships with its Path like a
+Worksheet, and checked off per Product per Path. A **standalone** Task has
+no Worksheet behind it, just a title: the User checks it off, and can
+uncheck it, by hand. Checking one off is informational only — it
+never gates Advance. A Task titled `EVENT: …` (e.g. "EVENT: Set aside 1
+hour to write the Product Summary") is a stand-in for something to
+schedule once Dreamport schedules things; the prefix is title text, not
+a different kind of Task.
+_Avoid_: to-do, checklist item, step, action item
+
 **User**:
 A person with an account and a Private space of their own Products.
 Identified by an email address.

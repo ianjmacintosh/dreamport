@@ -183,6 +183,19 @@
   margin-bottom: var(--space-3);
 }
 
+.sg-checkbox-demo {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.sg-action-card-demo {
+  max-width: 40rem;
+  margin-bottom: var(--space-3);
+}
+
 .sg-dropdown-demo {
   margin-bottom: var(--space-3);
 }

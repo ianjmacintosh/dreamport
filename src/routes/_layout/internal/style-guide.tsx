@@ -1,8 +1,15 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ListIcon, PackageIcon } from "@phosphor-icons/react";
+import {
+  CalendarBlankIcon,
+  FileTextIcon,
+  ListIcon,
+  PackageIcon,
+} from "@phosphor-icons/react";
 
+import ActionCard from "../../../components/ActionCard";
 import Button from "../../../components/Button";
+import Checkbox from "../../../components/Checkbox";
 import AppNav from "../../../components/AppNav";
 import Dropdown from "../../../components/Dropdown";
 import Footer from "../../../components/Footer";
@@ -31,6 +38,56 @@ function Snippet({ code }: { code: string }) {
     <pre className="sg-snippet">
       <code>{code}</code>
     </pre>
+  );
+}
+
+function ActionCardDemo() {
+  const [done, setDone] = useState<Record<string, boolean>>({ talk: true });
+  const toggle = (id: string) => setDone((d) => ({ ...d, [id]: !d[id] }));
+  return (
+    <ul className="action-card-list sg-action-card-demo">
+      <li>
+        <ActionCard
+          href="#action-card"
+          leading={<FileTextIcon weight="bold" aria-hidden="true" />}
+          trailing={<ActionCard.Status>Incomplete</ActionCard.Status>}
+        >
+          Product Summary
+        </ActionCard>
+      </li>
+      <li>
+        <ActionCard
+          leading={
+            <Checkbox
+              checked={done.schedule ?? false}
+              onChange={() => toggle("schedule")}
+            />
+          }
+          trailing={
+            <span className="tag">
+              <CalendarBlankIcon weight="bold" aria-hidden="true" />
+              Event
+            </span>
+          }
+          done={done.schedule}
+        >
+          Schedule time to write the Product Summary (optional)
+        </ActionCard>
+      </li>
+      <li>
+        <ActionCard
+          leading={
+            <Checkbox
+              checked={done.talk ?? false}
+              onChange={() => toggle("talk")}
+            />
+          }
+          done={done.talk}
+        >
+          Talk to 5 potential customers
+        </ActionCard>
+      </li>
+    </ul>
   );
 }
 
@@ -108,6 +165,7 @@ const TYPE_SCALE = [
   { token: "--text-h1", sample: "Heading 1", tag: "h1" },
   { token: "--text-h2", sample: "Heading 2", tag: "h2" },
   { token: "--text-h3", sample: "Heading 3", tag: "h3" },
+  { token: "--text-h4", sample: "Heading 4", tag: "h4" },
   { token: "--text-2xl", sample: "2XL text", tag: "p" },
   { token: "--text-xl", sample: "XL text", tag: "p" },
   { token: "--text-lg", sample: "Large text", tag: "p" },
@@ -154,9 +212,10 @@ function StyleGuide() {
       <header className="sg-header">
         <h1>Style Guide</h1>
         <p className="sg-header-sub">
-          Headings: Funnel Display. Body: Nunito. Colors: Solarized Light. See
-          the README&apos;s Quick Start steps for what&apos;s still open. See
-          the <Link href="/internal/pattern-library">pattern library</Link> for
+          Headings: Funnel Display (h4: Nunito). Body: Nunito. Colors: Solarized
+          Light. See the README&apos;s Quick Start steps for what&apos;s still
+          open. See the{" "}
+          <Link href="/internal/pattern-library">pattern library</Link> for
           full-page mockups built from these primitives.
         </p>
       </header>
@@ -171,6 +230,8 @@ function StyleGuide() {
         <a href="#buttons">Buttons</a>
         <a href="#button-label-stack">Button label stack</a>
         <a href="#button-group">Button group</a>
+        <a href="#checkbox">Check box</a>
+        <a href="#action-card">Action card</a>
         <a href="#dropdown">Dropdown</a>
         <a href="#header-bars">Header bars</a>
         <a href="#footers">Footers</a>
@@ -268,17 +329,21 @@ function StyleGuide() {
           <h1>Heading level 1</h1>
           <h2>Heading level 2</h2>
           <h3>Heading level 3</h3>
+          <h4>Heading level 4</h4>
         </div>
         <Snippet
-          code={`<h1>Heading level 1</h1>\n<h2>Heading level 2</h2>\n<h3>Heading level 3</h3>`}
+          code={`<h1>Heading level 1</h1>\n<h2>Heading level 2</h2>\n<h3>Heading level 3</h3>\n<h4>Heading level 4</h4>`}
         />
         <p className="sg-note">
-          Use a real <code>&lt;h1&gt;</code>–<code>&lt;h3&gt;</code> — size
-          follows the tag automatically. When the visual size needs to diverge
-          from the semantic level (say, an <code>&lt;h2&gt;</code> that should
-          look like an <code>&lt;h3&gt;</code>), override just the size with a{" "}
-          <code>.text-h1</code>/<code>.text-h2</code>/<code>.text-h3</code>{" "}
-          class — never change the tag just to change how it looks.
+          Use a real <code>&lt;h1&gt;</code>–<code>&lt;h4&gt;</code> — size
+          follows the tag automatically. <code>&lt;h4&gt;</code> is set in the
+          body face (Nunito), bold and tracked in, since Funnel Display
+          doesn&apos;t read well that small. When the visual size needs to
+          diverge from the semantic level (say, an <code>&lt;h2&gt;</code> that
+          should look like an <code>&lt;h3&gt;</code>), override just the size
+          with a <code>.text-h1</code>/<code>.text-h2</code>/
+          <code>.text-h3</code> class — never change the tag just to change how
+          it looks.
         </p>
         <div className="sg-heading-stack">
           <h2 className="text-h3">
@@ -448,6 +513,64 @@ function StyleGuide() {
           Delete) — the gap between them comes from the spacing scale via Grid,
           not inline-flex's incidental whitespace. For a single button attached
           to a single field, use <code>.field-row</code> below instead.
+        </p>
+        <div className="sg-button-group-demo">
+          <div className="button-group button-group--end">
+            <Button variant="secondary">Return to Previous Milestone</Button>
+            <Button>Advance to Next Milestone</Button>
+          </div>
+        </div>
+        <Snippet
+          code={`<div className="button-group button-group--end">\n  <Button variant="secondary">Return to Previous Milestone</Button>\n  <Button>Advance to Next Milestone</Button>\n</div>`}
+        />
+        <p className="sg-note">
+          <code>.button-group--end</code> puts the group at the end of its
+          column instead, the main action last, with a little extra room above —
+          for the actions that close a block of content, like the Journey
+          page&apos;s Return / Advance (#140).
+        </p>
+      </Section>
+
+      <Section id="checkbox" label="Check box">
+        <div className="sg-checkbox-demo">
+          <Checkbox aria-label="Unticked" />
+          <Checkbox aria-label="Ticked" defaultChecked />
+        </div>
+        <Snippet
+          code={`<label>\n  <Checkbox checked={done} onChange={toggle} />\n  Talk to 5 potential customers\n</label>`}
+        />
+        <p className="sg-note">
+          <code>&lt;Checkbox&gt;</code> is a real{" "}
+          <code>&lt;input type=&quot;checkbox&quot;&gt;</code>, restyled:
+          1.5rem, rounded, filled with the accent and a bold check when ticked.
+          Hovering it outlines it the way a button&apos;s hover does. It has no
+          label of its own — put it inside one, usually an{" "}
+          <code>ActionCard</code> (below), so the whole row is the click target
+          (#140). Disabled, it keeps its look and only refuses the click (a
+          not-allowed cursor): it&apos;s meant for the moment a tick is saving,
+          when greying it out would just flash.
+        </p>
+      </Section>
+
+      <Section id="action-card" label="Action card">
+        <ActionCardDemo />
+        <Snippet
+          code={`<ul className="action-card-list">\n  <li>\n    <ActionCard\n      href={worksheetUrl}\n      leading={<FileTextIcon weight="bold" aria-hidden="true" />}\n      trailing={<ActionCard.Status>Incomplete</ActionCard.Status>}\n    >\n      Product Summary\n    </ActionCard>\n  </li>\n  <li>\n    <ActionCard\n      leading={<Checkbox checked={done} onChange={toggle} />}\n      trailing={<span className="tag"><CalendarBlankIcon … /> Event</span>}\n      done={done}\n    >\n      Schedule time to write the Product Summary (optional)\n    </ActionCard>\n  </li>\n</ul>`}
+        />
+        <p className="sg-note">
+          <code>&lt;ActionCard&gt;</code> is one thing to do, as a full-width
+          row on the sheet&apos;s own white — no border or radius of its own —
+          and the whole card is the click target. A 1.5rem <code>leading</code>{" "}
+          slot (an icon, or a <code>Checkbox</code>), the title, then an
+          optional <code>trailing</code> item at the end: a Tag, or{" "}
+          <code>&lt;ActionCard.Status&gt;</code> for italic status text like
+          &ldquo;Incomplete&rdquo;. With <code>href</code> it&apos;s a link
+          (e.g. a Worksheet to fill in) and ends with a caret; without,
+          it&apos;s a <code>&lt;label&gt;</code> around its{" "}
+          <code>Checkbox</code> (e.g. a Task to tick), and hovering anywhere on
+          it outlines the box. <code>done</code> mutes the title. Below 640px
+          the trailing item drops under the title. List them in{" "}
+          <code>&lt;ul className=&quot;action-card-list&quot;&gt;</code> (#140).
         </p>
       </Section>
 
@@ -711,6 +834,11 @@ function StyleGuide() {
           opens the <code>Dropdown</code> of checkbox items). It isn&apos;t a
           native form control — the form holds <code>selected</code> and sends
           it on submit.
+        </p>
+        <p className="sg-note">
+          A Tag can lead with an icon (e.g. the Journey page&apos;s Event Tag,
+          with a calendar): put the icon inside the <code>.tag</code>, before
+          the text, and it lines up on its own (#140).
         </p>
         <p className="sg-note">
           <code>.field-pair</code> puts a main field and a narrow companion side

@@ -9,7 +9,7 @@ import { exemptFromRateLimits } from "./rate-limit-exemption";
 // Also covers advancing from Milestone 1 to Milestone 2 (issue #138), and
 // returning to Milestone 1 and advancing again, and filling out the
 // Product Summary Worksheet on Milestone 1 and finding it kept on
-// Milestone 2 (issue #139).
+// Milestone 2 (issue #139), with a Task ticked along the way (#140).
 // Signs in the same way `ideas.spec.ts` does (fixed `+e2e-test@` code, see
 // docs/adr/0009).
 
@@ -151,7 +151,7 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
   }
   // The Product Summary stays a click away past the Milestones it's on (#139).
   await expect(
-    page.getByRole("link", { name: "Product Summary", exact: true }),
+    page.getByRole("link", { name: "Product Summary Incomplete" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Finish Journey" }).click();
   await expect(
@@ -159,7 +159,7 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
   ).toBeVisible();
   // …and once finished.
   await expect(
-    page.getByRole("link", { name: "Product Summary", exact: true }),
+    page.getByRole("link", { name: "Product Summary Incomplete" }),
   ).toBeVisible();
 
   // Returning from finished mirrors finishing: it only un-finishes, so
@@ -178,7 +178,7 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
   ).toBeVisible();
 });
 
-test("fill out the Product Summary from Milestone 1, land back on the Journey, then see it kept on Milestone 2", async ({
+test("tick a Task and fill out the Product Summary from Milestone 1, land back on the Journey with the Task still ticked, then see the Summary kept on Milestone 2", async ({
   page,
 }) => {
   const productName = `A summarized app ${Date.now()}`;
@@ -191,12 +191,21 @@ test("fill out the Product Summary from Milestone 1, land back on the Journey, t
   await page.getByRole("link", { name: "Learn More" }).click();
   await page.getByRole("button", { name: "Start Journey" }).click();
 
-  // Milestone 1 holds the Product Summary (#139), linked above its "Done
-  // when" line.
-  await expect(page.getByText("Complete your Product Summary")).toBeVisible();
-  await page
-    .getByRole("link", { name: "Product Summary", exact: true })
-    .click();
+  // Milestone 1's Tasks (#140): the Event one shows an Event Tag instead of
+  // its "EVENT:" prefix. Ticking one is saved.
+  await expect(
+    page.getByText("Schedule time to write the Product Summary (optional)"),
+  ).toBeVisible();
+  await expect(page.getByText("EVENT:")).toHaveCount(0);
+  const completeTask = page.getByRole("checkbox", {
+    name: "Complete the Product Summary",
+  });
+  await completeTask.check();
+  await expect(completeTask).toBeChecked();
+  await expect(completeTask).toBeEnabled();
+
+  // Milestone 1 holds the Product Summary (#139), not yet filled in.
+  await page.getByRole("link", { name: "Product Summary Incomplete" }).click();
   await expect(page).toHaveURL(/\/worksheets\/product-summary$/);
   await expect(
     page.getByRole("heading", { name: "Product Summary" }),
@@ -212,6 +221,10 @@ test("fill out the Product Summary from Milestone 1, land back on the Journey, t
   // Saving drops you back on the Journey page.
   await page.getByRole("button", { name: "Save Product Summary" }).click();
   await expect(page).toHaveURL(/\/journey$/);
+  // A fresh load of the Journey: the Task is still ticked.
+  await expect(
+    page.getByRole("checkbox", { name: "Complete the Product Summary" }),
+  ).toBeChecked();
 
   // Kept, and still there to edit on Milestone 2.
   await page.getByRole("button", { name: "Advance to Next Milestone" }).click();
@@ -220,9 +233,7 @@ test("fill out the Product Summary from Milestone 1, land back on the Journey, t
       .getByRole("list", { name: "Milestones" })
       .locator('[aria-current="step"]'),
   ).toContainText("Real Talk");
-  await page
-    .getByRole("link", { name: "Product Summary", exact: true })
-    .click();
+  await page.getByRole("link", { name: "Product Summary Incomplete" }).click();
   await expect(page.getByLabel("1. Problem")).toHaveValue(
     "Kitchen scales are clunky",
   );

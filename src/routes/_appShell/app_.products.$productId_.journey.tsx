@@ -1,8 +1,14 @@
 import { useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { CheckIcon } from "@phosphor-icons/react";
+import {
+  CalendarBlankIcon,
+  CheckIcon,
+  FileTextIcon,
+} from "@phosphor-icons/react";
 
+import ActionCard from "../../components/ActionCard";
 import Button from "../../components/Button";
+import Checkbox from "../../components/Checkbox";
 import Link from "../../components/Link";
 
 /**
@@ -79,6 +85,13 @@ interface JourneyState {
     filled: number;
     total: number;
   }[];
+  /** The Tasks on the Path's Milestones, each checked off or not (#140). */
+  tasks: {
+    id: string;
+    title: string;
+    milestoneIds: string[];
+    done: boolean;
+  }[];
 }
 
 /**
@@ -94,6 +107,19 @@ function milestoneStatus(
   return "done";
 }
 
+/**
+ * A Task titled `EVENT: …` stands in for a scheduled Event (#136). The
+ * page shows it without the prefix, with an Event Tag instead (#140) —
+ * display only; the title itself is unchanged.
+ */
+const EVENT_PREFIX = "EVENT: ";
+
+function taskDisplay(title: string): { title: string; isEvent: boolean } {
+  return title.startsWith(EVENT_PREFIX)
+    ? { title: title.slice(EVENT_PREFIX.length), isEvent: true }
+    : { title, isEvent: false };
+}
+
 const START_JOURNEY_FAILED =
   "We couldn't start the journey. Try again in a moment.";
 /**
@@ -106,6 +132,7 @@ const MOVE_JOURNEY_FAILED: Record<JourneyMove, string> = {
   advance: "We couldn't advance the journey. Try again in a moment.",
   return: "We couldn't return the journey. Try again in a moment.",
 };
+const SET_TASK_FAILED = "We couldn't save that task. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -145,10 +172,14 @@ export const Route = createFileRoute(
  * Milestones as a route on the left, the content for where you are on the
  * right — before starting, the Path's name, the pitch for it, an
  * invitation and "Start Journey"; after,
- * the current Milestone's name and description, a "Complete your
- * {Worksheet}" line for each of the Path's Worksheets (#139), then its
- * "Done when" line. The finished state keeps the Worksheet lines too. Picked
- * from the prototype on branch `prototype/journey-ux` (#137).
+ * the current Milestone's name and description, then h4 sections:
+ * "Worksheets" (every Worksheet on the Path, #139, as an `ActionCard`
+ * link saying Complete or Incomplete), "Tasks" (the Milestone's own, as
+ * `ActionCard`s with a `Checkbox`, #140), and "Done When", with Return /
+ * Advance at the column's end. A section with nothing in it is left out.
+ * The finished state keeps the Worksheets, but no Tasks. The route was
+ * picked from the prototype on `prototype/journey-ux` (#137), the
+ * Milestone's sections from `prototype/journey-column` (#140).
  *
  * Before starting, every stop shows its outcome line under its name; once
  * started, only the current one does, so the route stays short beside the
@@ -172,6 +203,8 @@ function ProductJourney() {
   const [isStarting, setIsStarting] = useState(false);
   /** Which way the Journey is mid-move, if it is — one move at a time. */
   const [moving, setMoving] = useState<JourneyMove | null>(null);
+  /** The Task mid-save, if one is — shown as already toggled until it lands. */
+  const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const { path, journey } = journeyState;
   const currentIndex = journey
@@ -246,17 +279,110 @@ function ProductJourney() {
     }
   }
 
+  /**
+   * Check off or uncheck one of the current Milestone's Tasks (#140). Purely
+   * informational: it never changes what Advance does.
+   */
+  async function setTaskDone(taskId: string, done: boolean) {
+    setError("");
+    setSavingTaskId(taskId);
+    try {
+      const saved = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(
+          `/api/products/${product.id}/tasks/${taskId}`,
+          {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ done }),
+          },
+        );
+        if (!res.ok) {
+          return null;
+        }
+        return (await res.json()) as JourneyState;
+      });
+      if (!saved) {
+        setError(SET_TASK_FAILED);
+        return;
+      }
+      setJourneyState(saved);
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setSavingTaskId(null);
+    }
+  }
+
+  // Only the current Milestone's Tasks: unlike a Worksheet, a Task is about
+  // one Milestone's work, not something carried along the whole Path.
+  const tasks = currentMilestone
+    ? journeyState.tasks.filter((task) =>
+        task.milestoneIds.includes(currentMilestone.id),
+      )
+    : [];
+  const taskSection = tasks.length > 0 && (
+    <>
+      <h4>Tasks</h4>
+      <ul className="action-card-list">
+        {tasks.map((task) => {
+          const { title, isEvent } = taskDisplay(task.title);
+          const checked = savingTaskId === task.id ? !task.done : task.done;
+          return (
+            <li key={task.id}>
+              <ActionCard
+                leading={
+                  <Checkbox
+                    checked={checked}
+                    disabled={savingTaskId !== null}
+                    onChange={() => void setTaskDone(task.id, !task.done)}
+                  />
+                }
+                trailing={
+                  isEvent && (
+                    <span className="tag">
+                      <CalendarBlankIcon weight="bold" aria-hidden="true" />
+                      Event
+                    </span>
+                  )
+                }
+                done={checked}
+              >
+                {title}
+              </ActionCard>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+
   // Every Worksheet on the Path stays a click away on every Milestone, and
   // once finished: the Milestones a Worksheet is on are where it's checked,
   // not the only places it can change (#139).
-  const worksheetLinks = journeyState.worksheets.map((worksheet) => (
-    <p key={worksheet.id}>
-      Complete your{" "}
-      <Link href={`/app/products/${product.id}/worksheets/${worksheet.id}`}>
-        {worksheet.name}
-      </Link>
-    </p>
-  ));
+  const worksheetSection = journeyState.worksheets.length > 0 && (
+    <>
+      <h4>Worksheets</h4>
+      <ul className="action-card-list">
+        {journeyState.worksheets.map((worksheet) => (
+          <li key={worksheet.id}>
+            <ActionCard
+              href={`/app/products/${product.id}/worksheets/${worksheet.id}`}
+              leading={<FileTextIcon weight="bold" aria-hidden="true" />}
+              trailing={
+                <ActionCard.Status>
+                  {worksheet.filled === worksheet.total
+                    ? "Complete"
+                    : "Incomplete"}
+                </ActionCard.Status>
+              }
+            >
+              {worksheet.name}
+            </ActionCard>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
 
   const returnButton = canReturn && (
     <Button
@@ -316,18 +442,20 @@ function ProductJourney() {
                 You&apos;ve worked all the way through {path.name}&rsquo;s
                 Milestones, ending with {currentMilestone.name}. Nice work!
               </p>
-              {worksheetLinks}
-              {returnButton}
+              {worksheetSection}
+              <div className="button-group button-group--end">
+                {returnButton}
+              </div>
             </>
           ) : hasStarted ? (
             <>
               <h3>{currentMilestone.name}</h3>
               <p>{currentMilestone.description}</p>
-              {worksheetLinks}
-              <p>
-                <strong>Done when:</strong> {currentMilestone.doneWhen}
-              </p>
-              <div className="button-group">
+              {worksheetSection}
+              {taskSection}
+              <h4>Done When</h4>
+              <p>{currentMilestone.doneWhen}</p>
+              <div className="button-group button-group--end">
                 {returnButton}
                 <Button
                   disabled={moving !== null}
