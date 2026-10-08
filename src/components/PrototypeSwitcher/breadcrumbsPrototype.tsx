@@ -6,6 +6,9 @@ export const BREADCRUMB_VARIANTS = [
   { key: "B", name: "White band, edge to edge, under the nav bar" },
   { key: "C", name: "White box under the h1 (ActionCard / sheet)" },
   { key: "D", name: "Tag pills under the h1" },
+  { key: "E", name: "White band, edge to edge, under the h1" },
+  { key: "F", name: "Beige (surface) band, edge to edge, under the h1" },
+  { key: "G", name: "Border rules, edge to edge, under the h1" },
 ];
 
 export function initialVariant(): string {

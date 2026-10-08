@@ -1675,3 +1675,29 @@ a.action-card:hover {
   padding: 0;
   background: none;
 }
+
+/* E/F/G: B's edge-to-edge treatment, but in place under the h1. The
+   bleed is drawn outside the box (shadow / border-image outset), so it
+   reaches the viewport edges without widening the page. */
+.proto-crumbs--E,
+.proto-crumbs--F,
+.proto-crumbs--G {
+  padding-block: var(--space-3);
+}
+
+.proto-crumbs--E {
+  background-color: var(--color-sheet);
+  box-shadow: 0 0 0 100vmax var(--color-sheet);
+  clip-path: inset(0 -100vmax);
+}
+
+.proto-crumbs--F {
+  background-color: var(--color-surface);
+  box-shadow: 0 0 0 100vmax var(--color-surface);
+  clip-path: inset(0 -100vmax);
+}
+
+.proto-crumbs--G {
+  border-block: 1px solid transparent;
+  border-image: linear-gradient(var(--color-border) 0 0) 1 / 1px 0 / 0 100vmax;
+}
