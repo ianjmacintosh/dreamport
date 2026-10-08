@@ -7,7 +7,7 @@ import { network } from "../../test/msw-network";
 import { createAuth } from "./auth";
 import { getMockSender, type EmailSender, type OtpEmail } from "./email/sender";
 import { createApp } from "./index";
-import { journeyState } from "./journeys";
+import { journeyState, worksheetState } from "./journeys";
 import { recordDailySend } from "./otp-send-throttle";
 import { PRODUCT_DESCRIPTION_MAX_LENGTH } from "./products";
 import { E2E_RATE_LIMIT_EXEMPT_IP } from "./rate-limit-exemption";
@@ -17,7 +17,7 @@ import {
   STAGING_HOSTS,
 } from "./trusted-origins";
 import type { TurnstileVerifier } from "./turnstile";
-import { WORKSHEET_ANSWER_MAX_LENGTH, worksheetState } from "./worksheets";
+import { WORKSHEET_ANSWER_MAX_LENGTH } from "./worksheets";
 
 /**
  * Seam 1 — the Worker's HTTP boundary.
@@ -1680,14 +1680,19 @@ describe("createAuth", () => {
   });
 });
 
-/** Shared by the Journey describe block below. */
+/*
+ * The Journey routes (#137-#140), one test each: status, response shape,
+ * and the 404 when there's no Journey. What a Journey does — Advance
+ * through every Milestone, Return, saving Worksheets, checking off Tasks —
+ * is covered at the module's own interface in `journeys.worker.test.ts`.
+ */
+
 function getJourney(productId: string, cookie?: string) {
   return fetchWorker(`/api/products/${productId}/journey`, {
     headers: cookie ? { cookie } : {},
   });
 }
 
-/** Shared by the Journey describe block below. */
 function startJourney(productId: string, cookie?: string) {
   return fetchWorker(`/api/products/${productId}/journey`, {
     method: "POST",
@@ -1697,7 +1702,6 @@ function startJourney(productId: string, cookie?: string) {
   });
 }
 
-/** Shared by the Journey advance describe block below (#138). */
 function advanceJourney(productId: string, cookie?: string) {
   return fetchWorker(`/api/products/${productId}/journey/advance`, {
     method: "POST",
@@ -1707,7 +1711,6 @@ function advanceJourney(productId: string, cookie?: string) {
   });
 }
 
-/** Shared by the Journey return describe block below. */
 function returnJourney(productId: string, cookie?: string) {
   return fetchWorker(`/api/products/${productId}/journey/return`, {
     method: "POST",
@@ -1717,227 +1720,12 @@ function returnJourney(productId: string, cookie?: string) {
   });
 }
 
-/** The seeded default Path's Milestones, in order (#133's own wording). */
-const DEFAULT_PATH_MILESTONE_NAMES = [
-  "Rough One-Pager",
-  "Real Talk",
-  "Solution Matchmaking",
-  "Make It Real",
-  "Observe & Refine",
-  "Open Enrollment",
-  "Growth",
-];
-
-type JourneyResponse = Awaited<ReturnType<typeof journeyState>>;
-
-describe("/api/products/:productId/journey (#137)", () => {
-  it("lists the default Path's Milestones before any Journey, then starts one on Milestone 1", async () => {
-    const cookie = await signIn(TEST_EMAILS.journeysStart);
-    const created = await addProduct(cookie, "A phone-scale app");
-    const { product } = (await created.json()) as {
-      product: { id: string; name: string };
-    };
-
-    const before = (await (
-      await getJourney(product.id, cookie)
-    ).json()) as JourneyResponse & { product: { id: string; name: string } };
-    // Bundled for the Journey page's own heading, the same way the Ideas
-    // list bundles it.
-    expect(before.product).toEqual(product);
-    expect(before.journey).toBeNull();
-    expect(before.path.milestones.map((m) => m.name)).toEqual(
-      DEFAULT_PATH_MILESTONE_NAMES,
-    );
-    expect(before.path.milestones[0]).toMatchObject({
-      description: expect.stringMatching(/^Define your product in plain terms/),
-      doneWhen:
-        "Someone else can read it, say it in their own words, and you agree.",
-      outcome: "Make a one-page summary of your understanding",
-    });
-
-    const started = await startJourney(product.id, cookie);
-    expect(started.status).toBe(201);
-    const after = (await started.json()) as JourneyResponse;
-    expect(after.path).toEqual(before.path);
-    expect(after.journey).toEqual({
-      startedAt: expect.any(String),
-      currentMilestoneId: before.path.milestones[0].id,
-      finishedAt: null,
-    });
-
-    expect(await (await getJourney(product.id, cookie)).json()).toEqual({
-      product,
-      ...after,
-    });
-  });
-
-  it("leaves an already-started Journey as it was on a repeat start", async () => {
-    const cookie = await signIn(TEST_EMAILS.journeysStartTwice);
-    const created = await addProduct(cookie, "Started-twice Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-
-    const first = (await (
-      await startJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-
-    const again = await startJourney(product.id, cookie);
-    expect(again.status).toBe(200);
-    expect(await again.json()).toEqual(first);
-  });
-});
-
-describe("/api/products/:productId/journey/advance (#138)", () => {
-  it("advances one Milestone at a time through Milestones 1 to 7, then finishes on the next advance", async () => {
-    const cookie = await signIn(TEST_EMAILS.journeysAdvance);
-    const created = await addProduct(cookie, "Sequentially-advanced Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-
-    const { path } = (await (
-      await startJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-    const milestoneIds = path.milestones.map((m) => m.id);
-    expect(milestoneIds).toHaveLength(7);
-
-    // Milestone 1 is current from the start; each advance moves to exactly
-    // the next Milestone in the Path's order, Milestones 2 through 7.
-    for (const milestoneId of milestoneIds.slice(1)) {
-      const advanced = await advanceJourney(product.id, cookie);
-      expect(advanced.status).toBe(200);
-      const { journey } = (await advanced.json()) as JourneyResponse;
-      expect(journey).toEqual({
-        startedAt: expect.any(String),
-        currentMilestoneId: milestoneId,
-        finishedAt: null,
-      });
-    }
-
-    // Milestone 7 (Growth) is current and last — advancing from it has no
-    // next Milestone, so it finishes the Journey instead, leaving Growth
-    // current rather than moving past it (#133).
-    const finished = await advanceJourney(product.id, cookie);
-    expect(finished.status).toBe(200);
-    const { journey: finishedJourney } =
-      (await finished.json()) as JourneyResponse;
-    expect(finishedJourney).toEqual({
-      startedAt: expect.any(String),
-      currentMilestoneId: milestoneIds[6],
-      finishedAt: expect.any(String),
-    });
-
-    expect(
-      ((await (await getJourney(product.id, cookie)).json()) as JourneyResponse)
-        .journey,
-    ).toEqual(finishedJourney);
-  });
-
-  it("leaves an already-finished Journey as it was on a repeat advance", async () => {
-    const cookie = await signIn(TEST_EMAILS.journeysAdvanceAlreadyFinished);
-    const created = await addProduct(cookie, "Already-finished Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-    await startJourney(product.id, cookie);
-    for (let i = 0; i < 7; i++) {
-      await advanceJourney(product.id, cookie);
-    }
-    const finished = (await (
-      await getJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-    expect(finished.journey?.finishedAt).not.toBeNull();
-
-    const again = await advanceJourney(product.id, cookie);
-    expect(again.status).toBe(200);
-    // Everything the GET said, less the Product it bundles.
-    expect(await again.json()).toEqual({ ...finished, product: undefined });
-  });
-
-  it("404s advancing a Journey that hasn't started", async () => {
-    const cookie = await signIn(TEST_EMAILS.journeysAdvanceUnstarted);
-    const created = await addProduct(cookie, "Unstarted Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-
-    const res = await advanceJourney(product.id, cookie);
-    expect(res.status).toBe(404);
-  });
-});
-
-describe("/api/products/:productId/journey/return", () => {
-  it("un-finishes a finished Journey first, then returns one Milestone at a time back to Milestone 1", async () => {
-    const cookie = await signIn(TEST_EMAILS.journeysReturn);
-    const created = await addProduct(cookie, "Returned-through Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-    const { path } = (await (
-      await startJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-    const milestoneIds = path.milestones.map((m) => m.id);
-    for (let i = 0; i < 7; i++) {
-      await advanceJourney(product.id, cookie);
-    }
-
-    // The mirror of finishing: advancing from Growth only set `finishedAt`,
-    // so the first Return only clears it, leaving Growth current (CONTEXT.md's
-    // Return).
-    const unfinished = await returnJourney(product.id, cookie);
-    expect(unfinished.status).toBe(200);
-    expect(((await unfinished.json()) as JourneyResponse).journey).toEqual({
-      startedAt: expect.any(String),
-      currentMilestoneId: milestoneIds[6],
-      finishedAt: null,
-    });
-
-    // Each Return after that moves back exactly one Milestone, 6 down to 1.
-    for (const milestoneId of milestoneIds.slice(0, 6).reverse()) {
-      const returned = await returnJourney(product.id, cookie);
-      expect(returned.status).toBe(200);
-      const { journey } = (await returned.json()) as JourneyResponse;
-      expect(journey).toEqual({
-        startedAt: expect.any(String),
-        currentMilestoneId: milestoneId,
-        finishedAt: null,
-      });
-    }
-
-    // What the Product home reads, too: stored, not just answered.
-    expect(
-      ((await (await getJourney(product.id, cookie)).json()) as JourneyResponse)
-        .journey,
-    ).toEqual({
-      startedAt: expect.any(String),
-      currentMilestoneId: milestoneIds[0],
-      finishedAt: null,
-    });
-  });
-
-  it("leaves a Journey on Milestone 1 as it was on a return", async () => {
-    const cookie = await signIn(TEST_EMAILS.journeysReturnAtFirst);
-    const created = await addProduct(cookie, "Return-at-first Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-    const started = (await (
-      await startJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-
-    // The Journey page hides Return here; a request anyway has nothing
-    // before Milestone 1 to move to.
-    const res = await returnJourney(product.id, cookie);
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(started);
-  });
-
-  it("404s returning a Journey that hasn't started", async () => {
-    const cookie = await signIn(TEST_EMAILS.journeysReturnUnstarted);
-    const created = await addProduct(cookie, "Unstarted-return Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-
-    expect((await returnJourney(product.id, cookie)).status).toBe(404);
-  });
-});
-
-/** Shared by the Worksheet describe block below (#139). */
 function getWorksheet(productId: string, worksheetId: string, cookie?: string) {
   return fetchWorker(`/api/products/${productId}/worksheets/${worksheetId}`, {
     headers: cookie ? { cookie } : {},
   });
 }
 
-/** Shared by the Worksheet describe block below (#139). */
 function saveWorksheet(
   productId: string,
   worksheetId: string,
@@ -1955,254 +1743,6 @@ function saveWorksheet(
   });
 }
 
-/** How many filled-in copies of a Worksheet a Product has (#139). */
-async function countWorksheetInstances(productId: string, worksheetId: string) {
-  const row = await env.DB.prepare(
-    'SELECT COUNT(*) AS n FROM "worksheet_instances" WHERE "productId" = ? AND "worksheetId" = ?',
-  )
-    .bind(productId, worksheetId)
-    .first<{ n: number }>();
-  return row?.n;
-}
-
-const PRODUCT_SUMMARY = "product-summary";
-
-/** The Product Summary's fields, in order (#139). */
-const PRODUCT_SUMMARY_FIELD_IDS = [
-  "problem",
-  "customer",
-  "solution",
-  "value-proposition",
-  "unfair-advantage",
-  "channel",
-  "pricing",
-  "costs",
-];
-
-type WorksheetResponse = NonNullable<
-  Awaited<ReturnType<typeof worksheetState>>
-> & {
-  product: { id: string; name: string };
-};
-
-describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
-  /** Sign in, add a Product and start its Journey. */
-  async function withStartedJourney(email: string) {
-    const cookie = await signIn(email);
-    const created = await addProduct(cookie, "A phone-scale app");
-    const { product } = (await created.json()) as {
-      product: { id: string; name: string };
-    };
-    const { path } = (await (
-      await startJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-    return { cookie, product, path };
-  }
-
-  it("creates exactly one Product Summary when a Journey starts, reused on every Milestone it's on", async () => {
-    const { cookie, product, path } = await withStartedJourney(
-      TEST_EMAILS.worksheetsSingleton,
-    );
-    expect(await countWorksheetInstances(product.id, PRODUCT_SUMMARY)).toBe(1);
-
-    const res = await getWorksheet(product.id, PRODUCT_SUMMARY, cookie);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as WorksheetResponse;
-    expect(body.product).toEqual(product);
-    expect(body.worksheet).toMatchObject({
-      id: PRODUCT_SUMMARY,
-      name: "Product Summary",
-      cardinality: "singleton",
-    });
-    expect(body.worksheet.fields.map((f) => f.id)).toEqual(
-      PRODUCT_SUMMARY_FIELD_IDS,
-    );
-    // Attached to Milestones 1-4 (#133: the one-pager is checked again at
-    // the end of Milestones 2-4).
-    expect(body.worksheet.milestoneIds).toEqual(
-      path.milestones.slice(0, 4).map((m) => m.id),
-    );
-    expect(body.answers).toEqual({});
-
-    // A repeat start, and saving from later linked Milestones, all reuse it.
-    await startJourney(product.id, cookie);
-    await saveWorksheet(product.id, PRODUCT_SUMMARY, { problem: "M1" }, cookie);
-    await advanceJourney(product.id, cookie);
-    await saveWorksheet(product.id, PRODUCT_SUMMARY, { problem: "M2" }, cookie);
-    await advanceJourney(product.id, cookie);
-    await getWorksheet(product.id, PRODUCT_SUMMARY, cookie);
-    expect(await countWorksheetInstances(product.id, PRODUCT_SUMMARY)).toBe(1);
-  });
-
-  it("saves answers (trimmed, blanks dropped) and reads them back on a later Milestone", async () => {
-    const { cookie, product } = await withStartedJourney(
-      TEST_EMAILS.worksheetsAnswers,
-    );
-
-    const saved = await saveWorksheet(
-      product.id,
-      PRODUCT_SUMMARY,
-      { problem: "  Kitchen scales are clunky  ", customer: "Home bakers" },
-      cookie,
-    );
-    expect(saved.status).toBe(200);
-    expect(((await saved.json()) as WorksheetResponse).answers).toEqual({
-      problem: "Kitchen scales are clunky",
-      customer: "Home bakers",
-    });
-
-    await advanceJourney(product.id, cookie);
-    const onTwo = (await (
-      await getWorksheet(product.id, PRODUCT_SUMMARY, cookie)
-    ).json()) as WorksheetResponse;
-    expect(onTwo.answers).toEqual({
-      problem: "Kitchen scales are clunky",
-      customer: "Home bakers",
-    });
-
-    // A save replaces every field: one left out or blank reads as blank.
-    const resaved = (await (
-      await saveWorksheet(
-        product.id,
-        PRODUCT_SUMMARY,
-        { problem: "Scales are clunky", customer: "   ", solution: "An app" },
-        cookie,
-      )
-    ).json()) as WorksheetResponse;
-    expect(resaved.answers).toEqual({
-      problem: "Scales are clunky",
-      solution: "An app",
-    });
-
-    // The Journey page's link counts what's filled.
-    const { worksheets } = (await (
-      await getJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-    expect(worksheets).toEqual([
-      {
-        id: PRODUCT_SUMMARY,
-        name: "Product Summary",
-        milestoneIds: onTwo.worksheet.milestoneIds,
-        filled: 2,
-        total: 8,
-      },
-    ]);
-  });
-
-  it("404s before a Journey starts, then saves on any Milestone, even past the ones it's on and once finished", async () => {
-    const cookie = await signIn(TEST_EMAILS.worksheetsAnyMilestone);
-    const created = await addProduct(cookie, "Any-Milestone Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-
-    // No Journey yet: nothing to read or save.
-    expect(
-      (await getWorksheet(product.id, PRODUCT_SUMMARY, cookie)).status,
-    ).toBe(404);
-    expect(
-      (
-        await saveWorksheet(
-          product.id,
-          PRODUCT_SUMMARY,
-          { problem: "x" },
-          cookie,
-        )
-      ).status,
-    ).toBe(404);
-
-    await startJourney(product.id, cookie);
-    for (let i = 0; i < 4; i++) {
-      await advanceJourney(product.id, cookie);
-    }
-
-    // Milestone 5: past the Milestones the one-pager is on, but still the
-    // User's to change (#139).
-    const onFive = await saveWorksheet(
-      product.id,
-      PRODUCT_SUMMARY,
-      { problem: "On five" },
-      cookie,
-    );
-    expect(onFive.status).toBe(200);
-
-    for (let i = 0; i < 3; i++) {
-      await advanceJourney(product.id, cookie);
-    }
-    const finished = await saveWorksheet(
-      product.id,
-      PRODUCT_SUMMARY,
-      { problem: "Finished" },
-      cookie,
-    );
-    expect(finished.status).toBe(200);
-
-    expect(
-      (
-        (await (
-          await getWorksheet(product.id, PRODUCT_SUMMARY, cookie)
-        ).json()) as WorksheetResponse
-      ).answers,
-    ).toEqual({ problem: "Finished" });
-  });
-
-  it("rejects an unknown field, a non-string answer, an over-cap answer or a non-object body, saving nothing", async () => {
-    const { cookie, product } = await withStartedJourney(
-      TEST_EMAILS.worksheetsInvalid,
-    );
-    await saveWorksheet(
-      product.id,
-      PRODUCT_SUMMARY,
-      { problem: "Kept" },
-      cookie,
-    );
-
-    for (const answers of [
-      { problem: "x", "key-metrics": "x" },
-      { problem: 42 },
-      { problem: "x".repeat(WORKSHEET_ANSWER_MAX_LENGTH + 1) },
-      ["x"],
-      "x",
-      null,
-    ]) {
-      const res = await saveWorksheet(
-        product.id,
-        PRODUCT_SUMMARY,
-        answers,
-        cookie,
-      );
-      expect(res.status).toBe(400);
-    }
-
-    expect(
-      (
-        (await (
-          await getWorksheet(product.id, PRODUCT_SUMMARY, cookie)
-        ).json()) as WorksheetResponse
-      ).answers,
-    ).toEqual({ problem: "Kept" });
-  });
-
-  it("404s a Worksheet that doesn't exist", async () => {
-    const { cookie, product } = await withStartedJourney(
-      TEST_EMAILS.worksheetsNotFound,
-    );
-
-    expect(
-      (await getWorksheet(product.id, "not-a-worksheet", cookie)).status,
-    ).toBe(404);
-    expect(
-      (
-        await saveWorksheet(
-          product.id,
-          "not-a-worksheet",
-          { problem: "x" },
-          cookie,
-        )
-      ).status,
-    ).toBe(404);
-  });
-});
-
-/** Shared by the Task describe block below (#140). */
 function putTask(
   productId: string,
   taskId: string,
@@ -2220,139 +1760,226 @@ function putTask(
   });
 }
 
-/** The seeded standalone Tasks (#140), each on one Milestone. */
-const COMPLETE_SUMMARY_TASK = "complete-product-summary";
-const EVENT_TASK = "event-schedule-product-summary";
+type JourneyResponse = Awaited<ReturnType<typeof journeyState>>;
+type WorksheetResponse = NonNullable<
+  Awaited<ReturnType<typeof worksheetState>>
+> & {
+  product: { id: string; name: string };
+};
+
+const PRODUCT_SUMMARY = "product-summary";
 const TALK_TASK = "talk-to-five-customers";
 
-describe("/api/products/:productId/tasks/:taskId (#140)", () => {
-  /** Sign in, add a Product and start its Journey. */
-  async function withStartedJourney(email: string) {
-    const cookie = await signIn(email);
-    const created = await addProduct(cookie, "A phone-scale app");
-    const { product } = (await created.json()) as {
+/** Sign in and add a Product, with no Journey yet. */
+async function unstartedProduct(email: string) {
+  const cookie = await signIn(email);
+  const { product } = (await (
+    await addProduct(cookie, "A phone-scale app")
+  ).json()) as { product: { id: string; name: string } };
+  return { cookie, product };
+}
+
+describe("Journey routes", () => {
+  it("GET /journey answers the Path and no Journey before one starts, with the Product", async () => {
+    const { cookie, product } = await unstartedProduct(
+      TEST_EMAILS.journeysState,
+    );
+
+    const res = await getJourney(product.id, cookie);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as JourneyResponse & {
       product: { id: string; name: string };
     };
-    const started = (await (
-      await startJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-    return { cookie, product, ...started };
-  }
-
-  /** The Product's Tasks as the Journey GET reports them. */
-  async function tasksOf(productId: string, cookie: string) {
-    return (
-      (await (await getJourney(productId, cookie)).json()) as JourneyResponse
-    ).tasks;
-  }
-
-  it("lists each Milestone's standalone Tasks, unchecked, including an EVENT: one", async () => {
-    const { path, tasks } = await withStartedJourney(TEST_EMAILS.tasksToggle);
-
-    // In each Milestone's own order: the Rough One-Pager's two, then Real
-    // Talk's.
-    expect(tasks).toEqual([
-      {
-        id: COMPLETE_SUMMARY_TASK,
-        title: "Complete the Product Summary",
-        milestoneIds: [path.milestones[0].id],
-        done: false,
+    expect(body).toEqual({
+      product,
+      path: {
+        id: expect.any(String),
+        name: expect.any(String),
+        milestones: expect.any(Array),
       },
-      {
-        id: EVENT_TASK,
-        title: "EVENT: Schedule time to write the Product Summary (optional)",
-        milestoneIds: [path.milestones[0].id],
-        done: false,
-      },
-      {
-        id: TALK_TASK,
-        title: "Talk to 5 potential customers",
-        milestoneIds: [path.milestones[1].id],
-        done: false,
-      },
-    ]);
+      journey: null,
+      worksheets: expect.any(Array),
+      tasks: expect.any(Array),
+    });
+    expect(body.path.milestones[0]).toEqual({
+      id: expect.any(String),
+      name: "Rough One-Pager",
+      description: expect.stringMatching(/^Define your product in plain terms/),
+      doneWhen:
+        "Someone else can read it, say it in their own words, and you agree.",
+      outcome: "Make a one-page summary of your understanding",
+    });
   });
 
-  it("checks and unchecks a standalone Task, and the state persists", async () => {
-    const { cookie, product } = await withStartedJourney(
-      TEST_EMAILS.tasksToggle,
+  it("POST /journey starts with a 201, then answers a repeat start with a 200 and the same state", async () => {
+    const { cookie, product } = await unstartedProduct(
+      TEST_EMAILS.journeysStart,
     );
 
-    const checked = await putTask(product.id, TALK_TASK, true, cookie);
-    expect(checked.status).toBe(200);
-    const body = (await checked.json()) as JourneyResponse;
-    expect(body.tasks.find((t) => t.id === TALK_TASK)?.done).toBe(true);
-    // Only the Task asked for.
-    expect(body.tasks.find((t) => t.id === EVENT_TASK)?.done).toBe(false);
+    const started = await startJourney(product.id, cookie);
+    expect(started.status).toBe(201);
+    const body = (await started.json()) as JourneyResponse;
+    expect(body.journey).toEqual({
+      startedAt: expect.any(String),
+      currentMilestoneId: body.path.milestones[0].id,
+      finishedAt: null,
+    });
 
-    // A repeat check is harmless, and a later read sees it.
-    await putTask(product.id, TALK_TASK, true, cookie);
+    const again = await startJourney(product.id, cookie);
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(body);
+  });
+
+  it("POST /journey/advance 404s with no Journey, then answers the advanced state", async () => {
+    const { cookie, product } = await unstartedProduct(
+      TEST_EMAILS.journeysAdvance,
+    );
+    expect((await advanceJourney(product.id, cookie)).status).toBe(404);
+
+    await startJourney(product.id, cookie);
+    const res = await advanceJourney(product.id, cookie);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as JourneyResponse;
+    expect(body.journey?.currentMilestoneId).toBe(body.path.milestones[1].id);
+  });
+
+  it("POST /journey/return 404s with no Journey, then answers the returned state", async () => {
+    const { cookie, product } = await unstartedProduct(
+      TEST_EMAILS.journeysReturn,
+    );
+    expect((await returnJourney(product.id, cookie)).status).toBe(404);
+
+    await startJourney(product.id, cookie);
+    await advanceJourney(product.id, cookie);
+    const res = await returnJourney(product.id, cookie);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as JourneyResponse;
+    expect(body.journey?.currentMilestoneId).toBe(body.path.milestones[0].id);
+  });
+
+  it("GET /worksheets/:worksheetId 404s with no Journey or no such Worksheet, else answers it with the Product", async () => {
+    const { cookie, product } = await unstartedProduct(
+      TEST_EMAILS.worksheetsRead,
+    );
     expect(
-      (await tasksOf(product.id, cookie)).find((t) => t.id === TALK_TASK)?.done,
-    ).toBe(true);
+      (await getWorksheet(product.id, PRODUCT_SUMMARY, cookie)).status,
+    ).toBe(404);
 
-    const unchecked = await putTask(product.id, TALK_TASK, false, cookie);
-    expect(unchecked.status).toBe(200);
+    await startJourney(product.id, cookie);
+    const res = await getWorksheet(product.id, PRODUCT_SUMMARY, cookie);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as WorksheetResponse;
+    expect(body).toEqual({
+      product,
+      worksheet: {
+        id: PRODUCT_SUMMARY,
+        name: "Product Summary",
+        cardinality: "singleton",
+        fields: expect.any(Array),
+        milestoneIds: expect.any(Array),
+      },
+      answers: {},
+    });
+    expect(body.worksheet.fields[0]).toEqual({
+      id: "problem",
+      name: expect.any(String),
+      prompt: expect.any(String),
+    });
+
     expect(
-      (await tasksOf(product.id, cookie)).find((t) => t.id === TALK_TASK)?.done,
-    ).toBe(false);
+      (await getWorksheet(product.id, "not-a-worksheet", cookie)).status,
+    ).toBe(404);
   });
 
-  it("never gates advancing, and moving the Journey never clears a check", async () => {
-    const { cookie, product, path } = await withStartedJourney(
-      TEST_EMAILS.tasksNotGating,
+  it("PUT /worksheets/:worksheetId 404s with no Journey or no such Worksheet, 400s a bad body, else answers the trimmed answers", async () => {
+    const { cookie, product } = await unstartedProduct(
+      TEST_EMAILS.worksheetsSave,
     );
+    expect(
+      (
+        await saveWorksheet(
+          product.id,
+          PRODUCT_SUMMARY,
+          { problem: "x" },
+          cookie,
+        )
+      ).status,
+    ).toBe(404);
 
-    // Milestone 1's Task unchecked: Advance still moves on.
-    const advanced = (await (
-      await advanceJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-    expect(advanced.journey?.currentMilestoneId).toBe(path.milestones[1].id);
-
-    // A Task can be checked on a Milestone that isn't current, and a check
-    // doesn't move the Journey either.
-    const checked = (await (
-      await putTask(product.id, EVENT_TASK, true, cookie)
-    ).json()) as JourneyResponse;
-    expect(checked.journey).toEqual(advanced.journey);
-
-    const returned = (await (
-      await returnJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-    expect(returned.journey?.currentMilestoneId).toBe(path.milestones[0].id);
-    expect(returned.tasks.find((t) => t.id === EVENT_TASK)?.done).toBe(true);
-
-    // Milestone 1's Task checked: Advance moves on exactly the same.
-    const advancedChecked = (await (
-      await advanceJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-    expect(advancedChecked.journey?.currentMilestoneId).toBe(
-      path.milestones[1].id,
+    await startJourney(product.id, cookie);
+    const saved = await saveWorksheet(
+      product.id,
+      PRODUCT_SUMMARY,
+      { problem: "  Kitchen scales are clunky  ", customer: "   " },
+      cookie,
     );
+    expect(saved.status).toBe(200);
+    const body = (await saved.json()) as WorksheetResponse;
+    expect(body.product).toEqual(product);
+    expect(body.worksheet.id).toBe(PRODUCT_SUMMARY);
+    expect(body.answers).toEqual({ problem: "Kitchen scales are clunky" });
+
+    for (const answers of [
+      { problem: "x", "key-metrics": "x" },
+      { problem: 42 },
+      { problem: "x".repeat(WORKSHEET_ANSWER_MAX_LENGTH + 1) },
+      ["x"],
+      "x",
+      null,
+    ]) {
+      expect(
+        (await saveWorksheet(product.id, PRODUCT_SUMMARY, answers, cookie))
+          .status,
+      ).toBe(400);
+    }
+    expect(
+      (
+        (await (
+          await getWorksheet(product.id, PRODUCT_SUMMARY, cookie)
+        ).json()) as WorksheetResponse
+      ).answers,
+    ).toEqual({ problem: "Kitchen scales are clunky" });
+
+    expect(
+      (
+        await saveWorksheet(
+          product.id,
+          "not-a-worksheet",
+          { problem: "x" },
+          cookie,
+        )
+      ).status,
+    ).toBe(404);
   });
 
-  it("404s before a Journey starts or for an unknown Task, and 400s a non-boolean done", async () => {
-    const cookie = await signIn(TEST_EMAILS.tasksInvalid);
-    const created = await addProduct(cookie, "Unstarted Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-
+  it("PUT /tasks/:taskId 404s with no Journey or no such Task, 400s a non-boolean done, else answers the Journey's state", async () => {
+    const { cookie, product } = await unstartedProduct(
+      TEST_EMAILS.tasksCheckOff,
+    );
     expect((await putTask(product.id, TALK_TASK, true, cookie)).status).toBe(
       404,
     );
 
     await startJourney(product.id, cookie);
-    expect((await putTask(product.id, "not-a-task", true, cookie)).status).toBe(
-      404,
-    );
-
     for (const done of ["true", 1, null, undefined]) {
       expect((await putTask(product.id, TALK_TASK, done, cookie)).status).toBe(
         400,
       );
     }
-    expect((await tasksOf(product.id, cookie)).every((t) => !t.done)).toBe(
-      true,
+    expect((await putTask(product.id, "not-a-task", true, cookie)).status).toBe(
+      404,
     );
+
+    const res = await putTask(product.id, TALK_TASK, true, cookie);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as JourneyResponse;
+    expect(body.journey).not.toBeNull();
+    expect(body.tasks.find((t) => t.id === TALK_TASK)).toEqual({
+      id: TALK_TASK,
+      title: "Talk to 5 potential customers",
+      milestoneIds: [body.path.milestones[1].id],
+      done: true,
+    });
   });
 });
 

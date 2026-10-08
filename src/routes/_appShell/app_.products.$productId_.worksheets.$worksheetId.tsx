@@ -47,7 +47,7 @@ async function withMinimumDuration<T>(
 /** Mirrors `WORKSHEET_ANSWER_MAX_LENGTH` in `src/worker/worksheets.ts` — a client-side hint only; the server enforces it. */
 const WORKSHEET_ANSWER_MAX_LENGTH = 1000;
 
-/** `/api/products/:productId/worksheets/:worksheetId`'s answer (see `src/worker/worksheets.ts`). */
+/** `/api/products/:productId/worksheets/:worksheetId`'s answer (see `worksheetState` in `src/worker/journeys.ts`). */
 interface WorksheetState {
   worksheet: {
     id: string;
