@@ -1625,3 +1625,53 @@ a.action-card:hover {
     grid-row: 1;
   }
 }
+
+/* ── PROTOTYPE (#109): breadcrumb treatments, 109-prototype-breadcrumbs only ── */
+
+/* B: a white band edge to edge under the nav bar, content column lined
+   up with <main> via the header/footer breakout grid. */
+.proto-band {
+  display: grid;
+  grid-template-columns: 1fr var(--page-width) 1fr;
+  background-color: var(--color-sheet);
+}
+
+.proto-band-inner {
+  grid-column: 2;
+  padding: var(--space-3) var(--space-6);
+}
+
+/* C: the ActionCard / sheet white box, content width, under the h1. */
+.proto-crumbs--C {
+  background-color: var(--color-sheet);
+  padding: var(--space-3) var(--space-4);
+}
+
+/* D: each crumb a Tag pill; the current page outlined like "+N". */
+.proto-crumbs--D .breadcrumbs-label,
+.proto-crumbs--D .breadcrumbs-up {
+  padding: 0 var(--space-2);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text-on-surface);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.6;
+  text-decoration: none;
+}
+
+.proto-crumbs--D .breadcrumbs-label:hover,
+.proto-crumbs--D .breadcrumbs-up:hover {
+  text-decoration: underline;
+}
+
+.proto-crumbs--D .breadcrumbs-label[aria-current="page"] {
+  border: 1px solid var(--color-border);
+  background: none;
+  color: var(--color-text-primary);
+}
+
+.proto-crumbs--D .breadcrumbs-up .breadcrumbs-label {
+  padding: 0;
+  background: none;
+}

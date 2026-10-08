@@ -1,8 +1,10 @@
 import { useRef } from "react";
+import { createPortal } from "react-dom";
 import { CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react";
 
 import Link from "../Link";
 import { useBreadcrumbsFit } from "./fitBreadcrumbs";
+import { useBreadcrumbsPrototype } from "../PrototypeSwitcher/breadcrumbsPrototype";
 
 export interface Crumb {
   label: string;
@@ -39,13 +41,18 @@ function crumbClass(shrinks: boolean) {
  */
 export function Breadcrumbs({ trail, current }: BreadcrumbsProps) {
   const parent = trail[trail.length - 1];
+  const { variant, bandSlot } = useBreadcrumbsPrototype();
   const boxRef = useRef<HTMLElement>(null);
   const fit = useBreadcrumbsFit(boxRef, [
     ...trail.map(({ label }) => label),
     current,
   ]);
-  return (
-    <nav ref={boxRef} aria-label="Breadcrumb" className="breadcrumbs">
+  const nav = (
+    <nav
+      ref={boxRef}
+      aria-label="Breadcrumb"
+      className={`breadcrumbs proto-crumbs--${variant}`}
+    >
       <ol className="breadcrumbs-list">
         {trail.map(({ label, href }, i) => (
           <li
@@ -70,6 +77,15 @@ export function Breadcrumbs({ trail, current }: BreadcrumbsProps) {
       </Link>
     </nav>
   );
+  if (variant === "B" && bandSlot) {
+    return createPortal(
+      <div className="proto-band">
+        <div className="proto-band-inner">{nav}</div>
+      </div>,
+      bandSlot,
+    );
+  }
+  return nav;
 }
 
 export default Breadcrumbs;

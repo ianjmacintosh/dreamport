@@ -5,7 +5,16 @@ import {
   useLocation,
 } from "@tanstack/react-router";
 
+import { useState } from "react";
+
 import AppNav from "../components/AppNav";
+import PrototypeSwitcher from "../components/PrototypeSwitcher";
+import {
+  BREADCRUMB_VARIANTS,
+  BreadcrumbsPrototype,
+  initialVariant,
+  rememberVariant,
+} from "../components/PrototypeSwitcher/breadcrumbsPrototype";
 import Footer from "../components/Footer";
 import { useSignOut } from "../utils/use-sign-out";
 
@@ -62,19 +71,32 @@ function AppShellLayout() {
   // Sign-out used to be its own button on `/app/settings` (#26); it moved
   // to `AppNav` so every signed-in page carries the same way out.
   const { signOut, error } = useSignOut();
+  const [variant, setVariant] = useState(initialVariant);
+  const [bandSlot, setBandSlot] = useState<HTMLElement | null>(null);
 
   return (
-    <>
-      <AppNav
-        email={email}
-        onLogout={() => void signOut()}
-        pathname={pathname}
-      />
+    <BreadcrumbsPrototype.Provider value={{ variant, bandSlot }}>
+      <div>
+        <AppNav
+          email={email}
+          onLogout={() => void signOut()}
+          pathname={pathname}
+        />
+        <div ref={setBandSlot} />
+      </div>
       {error && <p role="alert">{error}</p>}
       <main>
         <Outlet />
       </main>
       <Footer />
-    </>
+      <PrototypeSwitcher
+        variants={BREADCRUMB_VARIANTS}
+        current={variant}
+        onChange={(key) => {
+          setVariant(key);
+          rememberVariant(key);
+        }}
+      />
+    </BreadcrumbsPrototype.Provider>
   );
 }
