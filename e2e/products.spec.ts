@@ -1,38 +1,13 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 import { TEST_EMAILS } from "../test/emails";
 import { expectOtherRowsUnaffected, LAYOUT_WIDTHS } from "./list-rows";
-import { exemptFromRateLimits } from "./rate-limit-exemption";
+import { signIn } from "./sign-in";
 
 // Products v1: sign in, add a Product, see it in the list without a full
 // page reload (slice 1, issue #88), delete one (slice 2, issue #89), behind
-// a per-row Confirm/Cancel reveal (slice 3, issue #90). Signs in the same
-// way `login.spec.ts` does (fixed `+e2e-test@` code, see docs/adr/0009) —
-// see that file's header comment for why.
-
-/** See `exemptFromRateLimits` for why rate-limited auth calls go out as one exempt IP. */
-test.beforeEach(({ page }) => exemptFromRateLimits(page));
-
-/** Drive `/login` from the email step through to landing on `/app`. */
-async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Email address").fill(email);
-
-  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(
-    /.+/,
-    { timeout: 15_000 },
-  );
-
-  await page.getByRole("button", { name: "Send Code" }).click();
-
-  await expect(
-    page.getByRole("textbox", { name: "Six-digit code" }),
-  ).toBeVisible();
-  // The sixth digit submits the form on its own (`autoSubmit`, #128).
-  await page.getByRole("textbox", { name: "Six-digit code" }).fill("000000");
-
-  await expect(page).toHaveURL(/\/app$/);
-}
+// a per-row Confirm/Cancel reveal (slice 3, issue #90). Signs in through
+// the API with `signIn` (see `./sign-in.ts`).
 
 test("sign in, add a Product, and see it in the list", async ({ page }) => {
   const email = TEST_EMAILS.e2eAddProduct;

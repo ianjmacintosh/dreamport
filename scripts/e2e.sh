@@ -17,10 +17,10 @@
 # `scripts/e2e.sh --grep foo` (no environment) behaves exactly like
 # `npx playwright test --reporter=list --grep foo` always did.
 #
-# With no environment selected, this is exactly `npx playwright test
-# --reporter=list` — no E2E_BASE_URL, so playwright.config.ts takes the local
-# path (Miniflare Worker, full suite) unchanged from before this script
-# existed.
+# With no environment selected, this is `npx playwright test
+# --reporter=list` behind the heavy-test lock (scripts/with-test-lock.sh) —
+# no E2E_BASE_URL, so playwright.config.ts takes the local path (Miniflare
+# Worker, full suite).
 #
 # Against a deployed environment, E2E_BASE_URL is set instead, which makes
 # playwright.config.ts skip the local webServer/migrations and run only
@@ -51,4 +51,8 @@ if [[ "${1:-}" == "staging" || "${1:-}" == "production" ]]; then
   E2E_BASE_URL="$BASE_URL" exec npx playwright test --reporter=list "$@"
 fi
 
-exec npx playwright test --reporter=list "$@"
+# Only the local run takes the heavy-test lock: it boots Chromium against the
+# local Worker, which is what overloads the devcontainer when stacked on a
+# Vitest run (#150). A deployed-environment run doesn't share that load.
+exec "$(dirname "${BASH_SOURCE[0]}")/with-test-lock.sh" \
+  npx playwright test --reporter=list "$@"
