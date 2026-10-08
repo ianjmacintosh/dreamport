@@ -3,13 +3,13 @@
  * ordered Milestones.
  *
  * Plain data-access functions over `paths`/`milestones`/`journeys`
- * (`migrations/0007_*.sql`) — the HTTP boundary (session check, ownership
- * check, request/response shaping) lives in `index.ts`'s
- * `/api/products/:productId/journey` routes, the same split `ideas.ts` has.
- * Nothing here re-checks that `productId` belongs to the caller — the route
- * already will have, via `getProduct`.
+ * (`migrations/0007_*.sql`) — the HTTP boundary (request/response shaping)
+ * lives in `product-routes.ts`'s `/journey` routes, the same split
+ * `ideas.ts` has. Each takes an `OwnedProduct`, so ownership is already
+ * settled by the time one runs.
  */
 
+import type { OwnedProduct } from "./products";
 import {
   createSingletonInstances,
   worksheetSummaries,
@@ -77,14 +77,14 @@ export async function getPath(db: D1Database, pathId: string): Promise<Path> {
 /** A Product's Journey on `pathId`, or `null` if it hasn't started one. */
 export async function getJourney(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
   pathId: string,
 ): Promise<Journey | null> {
   return db
     .prepare(
       'SELECT "startedAt", "currentMilestoneId", "finishedAt" FROM "journeys" WHERE "productId" = ? AND "pathId" = ?',
     )
-    .bind(productId, pathId)
+    .bind(product.id, pathId)
     .first<Journey>();
 }
 
@@ -98,16 +98,16 @@ export async function getJourney(
  */
 export async function startJourney(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
   pathId: string,
 ): Promise<boolean> {
   const { meta } = await db
     .prepare(
       'INSERT INTO "journeys" ("id", "productId", "pathId", "currentMilestoneId", "startedAt") SELECT ?, ?, "pathId", "id", ? FROM "milestones" WHERE "pathId" = ? AND "position" = 1 ON CONFLICT ("productId", "pathId") DO NOTHING',
     )
-    .bind(crypto.randomUUID(), productId, new Date().toISOString(), pathId)
+    .bind(crypto.randomUUID(), product.id, new Date().toISOString(), pathId)
     .run();
-  await createSingletonInstances(db, productId, pathId);
+  await createSingletonInstances(db, product, pathId);
   return meta.changes > 0;
 }
 
@@ -133,7 +133,7 @@ export async function startJourney(
  */
 export async function advanceJourney(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
   pathId: string,
 ): Promise<Journey | null> {
   await db
@@ -163,10 +163,10 @@ export async function advanceJourney(
          END
        WHERE "productId" = ? AND "pathId" = ? AND "finishedAt" IS NULL`,
     )
-    .bind(new Date().toISOString(), productId, pathId)
+    .bind(new Date().toISOString(), product.id, pathId)
     .run();
 
-  return getJourney(db, productId, pathId);
+  return getJourney(db, product, pathId);
 }
 
 /**
@@ -190,7 +190,7 @@ export async function advanceJourney(
  */
 export async function returnJourney(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
   pathId: string,
 ): Promise<Journey | null> {
   await db
@@ -213,10 +213,10 @@ export async function returnJourney(
          "finishedAt" = NULL
        WHERE "productId" = ? AND "pathId" = ?`,
     )
-    .bind(productId, pathId)
+    .bind(product.id, pathId)
     .run();
 
-  return getJourney(db, productId, pathId);
+  return getJourney(db, product, pathId);
 }
 
 /**
@@ -227,7 +227,7 @@ export async function returnJourney(
  */
 export async function journeyState(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
 ): Promise<{
   path: Path;
   journey: Journey | null;
@@ -236,9 +236,9 @@ export async function journeyState(
 }> {
   const [path, journey, worksheets, tasks] = await Promise.all([
     getPath(db, DEFAULT_PATH_ID),
-    getJourney(db, productId, DEFAULT_PATH_ID),
-    worksheetSummaries(db, productId, DEFAULT_PATH_ID),
-    taskSummaries(db, productId, DEFAULT_PATH_ID),
+    getJourney(db, product, DEFAULT_PATH_ID),
+    worksheetSummaries(db, product, DEFAULT_PATH_ID),
+    taskSummaries(db, product, DEFAULT_PATH_ID),
   ]);
   return { path, journey, worksheets, tasks };
 }

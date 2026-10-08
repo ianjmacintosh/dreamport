@@ -2,15 +2,16 @@
  * Issue #113: Idea Tags from a fixed catalog.
  *
  * Plain data-access functions over the `tags` catalog and the `idea_tags`
- * join table (`migrations/0006_*.sql`) — the HTTP boundary (session check,
- * ownership check, validating submitted names against the catalog) lives in
- * `index.ts`, the same split `ideas.ts` has with its own routes. Nothing
- * here checks that `productId` belongs to the caller; the route already
- * will have, via `getProduct`.
+ * join table (`migrations/0006_*.sql`) — the HTTP boundary (validating
+ * submitted names against the catalog) lives in `product-routes.ts`, the
+ * same split `ideas.ts` has. Each takes an `OwnedProduct`, so ownership is
+ * already settled by the time one runs.
  *
  * Tags come back alphabetical everywhere — the catalog has no ordering of
  * its own beyond the name that keys it.
  */
+
+import type { OwnedProduct } from "./products";
 
 /** Every Tag name in the catalog, alphabetical. */
 export async function listTags(db: D1Database): Promise<string[]> {
@@ -21,19 +22,19 @@ export async function listTags(db: D1Database): Promise<string[]> {
 }
 
 /**
- * Every Idea under `productId` that has at least one Tag, mapped to its own
+ * Every Idea under `product` that has at least one Tag, mapped to its own
  * Tag names (alphabetical) — one query for the whole Product, not one per
  * Idea. An Idea with no Tags has no entry; callers default it to `[]`.
  */
 export async function listTagsByIdea(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
 ): Promise<Map<string, string[]>> {
   const { results } = await db
     .prepare(
       'SELECT "idea_tags"."ideaId", "idea_tags"."tagName" FROM "idea_tags" JOIN "ideas" ON "ideas"."id" = "idea_tags"."ideaId" WHERE "ideas"."productId" = ? ORDER BY "idea_tags"."tagName" ASC',
     )
-    .bind(productId)
+    .bind(product.id)
     .all<{ ideaId: string; tagName: string }>();
   const byIdea = new Map<string, string[]>();
   for (const { ideaId, tagName } of results) {
@@ -45,7 +46,7 @@ export async function listTagsByIdea(
 /**
  * Replace an Idea's whole Tag set with `tagNames`, returning the stored set
  * (deduplicated, alphabetical), or `null` if no Idea `id` exists under
- * `productId` — same "a different Product's Idea is indistinguishable from
+ * `product` — same "a different Product's Idea is indistinguishable from
  * a nonexistent one" scoping `renameIdea` uses. Caller has already
  * validated every name against the catalog.
  *
@@ -58,13 +59,13 @@ export async function listTagsByIdea(
  */
 export async function setIdeaTags(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
   id: string,
   tagNames: readonly string[],
 ): Promise<string[] | null> {
   const idea = await db
     .prepare('SELECT "id" FROM "ideas" WHERE "id" = ? AND "productId" = ?')
-    .bind(id, productId)
+    .bind(id, product.id)
     .first();
   if (!idea) {
     return null;

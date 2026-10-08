@@ -75,9 +75,9 @@ export function hostnameInList(
  * state-changing, session-cookie-bearing request to this Host — the same
  * origin-check shape Better Auth grants its own routes for free
  * (`auth.handler`'s `trustedOrigins` + dynamic-`baseURL` self-trust, see
- * `auth.ts`), for the handful of dreamport-owned routes that sit outside
- * `auth.handler` and so don't get that check automatically (issue #88's
- * `/api/products`; see `index.ts`).
+ * `auth.ts`), for dreamport's own routes that sit outside `auth.handler`
+ * and so don't get that check automatically — every `/api/*` request that
+ * changes data, via the middleware at the top of `index.ts` (#154).
  *
  * Trusted iff the origin's host either matches `requestHost` (self-trust —
  * the same origin `ALLOWED_HOSTS` already resolves this request's own

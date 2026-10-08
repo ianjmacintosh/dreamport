@@ -129,83 +129,41 @@ export const TEST_EMAILS = {
   /** Posts an empty/whitespace-only name; expects a 400 and nothing created. */
   productsInvalidName: "delivered+products-invalid-name@resend.dev",
 
-  // --- Seam 1: DELETE /api/products/:id (#89) ---
+  // --- Seam 1: DELETE /api/products/:productId (#89) ---
   /** Adds a Product, deletes it, then finds the list empty again. */
   productsDeleteOwn: "delivered+products-delete-own@resend.dev",
-  /** Rejects a delete from an untrusted origin, leaving the Product intact. */
-  productsDeleteUntrustedOrigin:
-    "delivered+products-delete-untrusted-origin@resend.dev",
-  /** Owner side of the delete ownership boundary check. */
-  productsDeleteOwnerA: "delivered+products-delete-owner-a@resend.dev",
-  /** Other User whose delete on A's Product must 404, not succeed. */
-  productsDeleteOwnerB: "delivered+products-delete-owner-b@resend.dev",
-  /** Deletes an id that was never created; expects a 404. */
-  productsDeleteNotFound: "delivered+products-delete-not-found@resend.dev",
 
-  // --- Seam 1: PATCH /api/products/:id (#112) ---
-  /** Rejects a description change from an untrusted origin, leaving it unset. */
-  productsDescribeUntrusted: "delivered+products-describe-untrusted@resend.dev",
+  // --- Seam 1: PATCH /api/products/:productId (#112) ---
   /** Sets a description, reads it back, then clears it with an empty string. */
   productsDescribeOwner: "delivered+products-describe-owner@resend.dev",
-  /** Owner side of the description ownership boundary check. */
-  productsDescribeOwnerA: "delivered+products-describe-owner-a@resend.dev",
-  /** Other User whose description change on A's Product must 404, not succeed. */
-  productsDescribeOwnerB: "delivered+products-describe-owner-b@resend.dev",
   /** Sends an over-cap or non-string description; expects 400s and no change. */
   productsDescribeInvalid: "delivered+products-describe-invalid@resend.dev",
-  /** Describes an id that was never created; expects a 404. */
-  productsDescribeNotFound: "delivered+products-describe-not-found@resend.dev",
 
   // --- Seam 1: /api/products/:productId/ideas (#99) ---
   /** Adds a Product, opens it, adds an Idea, reads it back in its own list. */
   ideasAddOne: "delivered+ideas-add-one@resend.dev",
-  /** Owner side of the Ideas ownership boundary check. */
-  ideasOwnerA: "delivered+ideas-owner-a@resend.dev",
-  /** Other User whose request against A's Product must 404, not list A's Ideas. */
-  ideasOwnerB: "delivered+ideas-owner-b@resend.dev",
   /** Posts an empty/whitespace-only name; expects a 400 and nothing created. */
   ideasInvalidName: "delivered+ideas-invalid-name@resend.dev",
 
   // --- Seam 1: DELETE /api/products/:productId/ideas/:id (#100) ---
-  /** Rejects a delete from an untrusted origin, leaving the Idea intact. */
-  ideasDeleteUntrusted: "delivered+ideas-delete-untrusted@resend.dev",
   /** Adds an Idea, deletes it, then finds the list empty again. */
   ideasDeleteOwner: "delivered+ideas-delete-owner@resend.dev",
-  /** Owner side of the Ideas delete ownership boundary check. */
-  ideasDeleteOwnerA: "delivered+ideas-delete-owner-a@resend.dev",
-  /** Other User whose delete on A's Idea must 404, not succeed. */
-  ideasDeleteOwnerB: "delivered+ideas-delete-owner-b@resend.dev",
   /** Deletes an Idea id that was never created; expects a 404. */
   ideasDeleteNonexistent: "delivered+ideas-delete-nonexistent@resend.dev",
-  /** Deletes an Idea under a Product id that was never created; expects a 404. */
-  ideasDeleteNonexistentProduct:
-    "delivered+ideas-delete-nonexistent-product@resend.dev",
 
   // --- Seam 1: PATCH /api/products/:productId/ideas/:id (#102) ---
-  /** Rejects a rename from an untrusted origin, leaving the name intact. */
-  ideasRenameUntrusted: "delivered+ideas-rename-untrusted@resend.dev",
   /** Adds an Idea, renames it, then reads the new name back in the list. */
   ideasRenameOwner: "delivered+ideas-rename-owner@resend.dev",
-  /** Owner side of the Ideas rename ownership boundary check. */
-  ideasRenameOwnerA: "delivered+ideas-rename-owner-a@resend.dev",
-  /** Other User whose rename of A's Idea must 404, not succeed. */
-  ideasRenameOwnerB: "delivered+ideas-rename-owner-b@resend.dev",
   /** Renames to an empty/whitespace/over-cap name; expects 400s and no change. */
   ideasRenameInvalidName: "delivered+ideas-rename-invalid-name@resend.dev",
   /** Renames an Idea id that was never created; expects a 404. */
   ideasRenameNonexistent: "delivered+ideas-rename-nonexistent@resend.dev",
 
   // --- Seam 1: PUT /api/products/:productId/ideas/:id/tags (#113) ---
-  /** Rejects a tag change from an untrusted origin, leaving the tags intact. */
-  ideasTagsUntrusted: "delivered+ideas-tags-untrusted@resend.dev",
   /** Sets an Idea's tags, replaces them, then reads them back in the list. */
   ideasTagsOwner: "delivered+ideas-tags-owner@resend.dev",
   /** Sends an unknown tag name or a malformed body; expects 400s and no change. */
   ideasTagsInvalid: "delivered+ideas-tags-invalid@resend.dev",
-  /** Owner side of the Idea tags ownership boundary check. */
-  ideasTagsOwnerA: "delivered+ideas-tags-owner-a@resend.dev",
-  /** Other User whose tag change on A's Idea must 404, not succeed. */
-  ideasTagsOwnerB: "delivered+ideas-tags-owner-b@resend.dev",
   /** Tags an Idea id that was never created; expects a 404. */
   ideasTagsNonexistent: "delivered+ideas-tags-nonexistent@resend.dev",
 
@@ -214,12 +172,6 @@ export const TEST_EMAILS = {
   journeysStart: "delivered+journeys-start@resend.dev",
   /** Starts a Journey twice; the second start leaves Milestone 1 current. */
   journeysStartTwice: "delivered+journeys-start-twice@resend.dev",
-  /** Rejects a start from an untrusted origin, starting nothing. */
-  journeysUntrusted: "delivered+journeys-untrusted@resend.dev",
-  /** Owner side of the Journey ownership boundary check. */
-  journeysOwnerA: "delivered+journeys-owner-a@resend.dev",
-  /** Other User whose read or start of A's Journey must 404. */
-  journeysOwnerB: "delivered+journeys-owner-b@resend.dev",
 
   // --- Seam 1b: /api/products/:productId/journey/advance (#138) ---
   /** Advances a fresh Journey through every Milestone, then finishes it. */
@@ -229,12 +181,6 @@ export const TEST_EMAILS = {
   /** Advancing an already-finished Journey is a harmless no-op. */
   journeysAdvanceAlreadyFinished:
     "delivered+journeys-advance-already-finished@resend.dev",
-  /** Rejects an advance from an untrusted origin, advancing nothing. */
-  journeysAdvanceUntrusted: "delivered+journeys-advance-untrusted@resend.dev",
-  /** Owner side of the advance ownership boundary check. */
-  journeysAdvanceOwnerA: "delivered+journeys-advance-owner-a@resend.dev",
-  /** Other User whose advance of A's Journey must 404, not succeed. */
-  journeysAdvanceOwnerB: "delivered+journeys-advance-owner-b@resend.dev",
 
   // --- Seam 1c: /api/products/:productId/journey/return ---
   /** Returns a finished Journey all the way back to Milestone 1. */
@@ -243,12 +189,6 @@ export const TEST_EMAILS = {
   journeysReturnAtFirst: "delivered+journeys-return-at-first@resend.dev",
   /** Returning a Journey that hasn't started yet 404s. */
   journeysReturnUnstarted: "delivered+journeys-return-unstarted@resend.dev",
-  /** Rejects a return from an untrusted origin, returning nothing. */
-  journeysReturnUntrusted: "delivered+journeys-return-untrusted@resend.dev",
-  /** Owner side of the return ownership boundary check. */
-  journeysReturnOwnerA: "delivered+journeys-return-owner-a@resend.dev",
-  /** Other User whose return of A's Journey must 404, not succeed. */
-  journeysReturnOwnerB: "delivered+journeys-return-owner-b@resend.dev",
 
   // --- Seam 1d: /api/products/:productId/worksheets/:worksheetId (#139) ---
   /** Starting a Journey creates one Product Summary instance, never two. */
@@ -259,12 +199,8 @@ export const TEST_EMAILS = {
   worksheetsAnyMilestone: "delivered+worksheets-any-milestone@resend.dev",
   /** Rejects bad answer bodies: unknown field, non-string, over the cap. */
   worksheetsInvalid: "delivered+worksheets-invalid@resend.dev",
-  /** Saving from an untrusted origin changes nothing. */
-  worksheetsUntrusted: "delivered+worksheets-untrusted@resend.dev",
-  /** Owner side of the Worksheet ownership boundary check. */
-  worksheetsOwnerA: "delivered+worksheets-owner-a@resend.dev",
-  /** Other User whose read or save of A's one-pager must 404. */
-  worksheetsOwnerB: "delivered+worksheets-owner-b@resend.dev",
+  /** Asks for a Worksheet that doesn't exist; expects a 404. */
+  worksheetsNotFound: "delivered+worksheets-not-found@resend.dev",
 
   // --- Seam 1e: /api/products/:productId/tasks/:taskId (#140) ---
   /** Checks and unchecks a standalone Task; the state persists. */
@@ -273,12 +209,12 @@ export const TEST_EMAILS = {
   tasksNotGating: "delivered+tasks-not-gating@resend.dev",
   /** 404s before a Journey starts or for an unknown Task; 400s a bad body. */
   tasksInvalid: "delivered+tasks-invalid@resend.dev",
-  /** Toggling from an untrusted origin changes nothing. */
-  tasksUntrusted: "delivered+tasks-untrusted@resend.dev",
-  /** Owner side of the Task ownership boundary check. */
-  tasksOwnerA: "delivered+tasks-owner-a@resend.dev",
-  /** Other User whose toggle of A's Task must 404. */
-  tasksOwnerB: "delivered+tasks-owner-b@resend.dev",
+
+  // --- Seam 1f: the gates every product route crosses (#154) ---
+  /** Owns the Product every product-scoped route is driven against. */
+  gatesOwner: "delivered+gates-owner@resend.dev",
+  /** Other User whose request against the owner's Product must 404. */
+  gatesStranger: "delivered+gates-stranger@resend.dev",
 
   // --- e2e: the /login + /app Playwright flow (all via the mock sender) ---
   // Every address below carries the `+e2e-test@` marker (issue #39): the
