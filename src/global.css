@@ -1268,6 +1268,65 @@ button.tag-more[data-popup-open] {
   color: var(--color-text-primary);
 }
 
+/* ── Components: breadcrumbs ───────────────────────────────── */
+/* `Breadcrumbs` (#109): one line that never wraps. CSS alone can't say
+   "shorten the ancestors before the current page" or "never below 44px,
+   but never padded out to it either", so `useBreadcrumbsFit` measures and
+   marks which crumbs may shrink (`--shrinks`), and flexbox does the
+   shrinking. Flex, not grid: this is the component's own row, not page
+   structure. */
+.breadcrumbs {
+  /* Read by `useBreadcrumbsFit` too, so its measure matches this CSS. */
+  --breadcrumbs-min-label: 44px;
+}
+
+.breadcrumbs-list {
+  display: flex;
+  flex-wrap: nowrap;
+  column-gap: var(--space-2);
+  list-style: none;
+  padding: 0;
+}
+
+.breadcrumbs-crumb {
+  display: flex;
+  align-items: center;
+  column-gap: var(--space-2);
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.breadcrumbs-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breadcrumbs-label[aria-current="page"] {
+  color: var(--color-text-primary);
+}
+
+.breadcrumbs-separator {
+  flex: none;
+  color: var(--color-text-primary);
+}
+
+/* An ancestor's floor is set on the crumb, not just its label: a flex
+   item's automatic minimum is its full content width. The 1em is the
+   separator icon. The large flex-shrink makes the ancestors take nearly
+   all of the shortening, so the current page (only marked `--shrinks`
+   once ancestors at their floor still don't fit) gives up only what's
+   left once they've hit it. */
+.breadcrumbs-crumb--shrinks {
+  flex-shrink: 1;
+}
+
+.breadcrumbs-crumb--shrinks:not(:last-child) {
+  flex-shrink: 1000;
+  min-width: calc(var(--breadcrumbs-min-label) + var(--space-2) + 1em);
+}
+
 /* ── Components: check box ─────────────────────────────────── */
 /* `Checkbox` (#140): a real checkbox, restyled — 1.5rem, rounded, filled
    with the accent and a bold check (`.checkbox-mark`, drawn over it) when

@@ -8,6 +8,7 @@ import {
 } from "@phosphor-icons/react";
 
 import ActionCard from "../../../components/ActionCard";
+import Breadcrumbs from "../../../components/Breadcrumbs";
 import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
 import AppNav from "../../../components/AppNav";
@@ -233,6 +234,7 @@ function StyleGuide() {
         <a href="#checkbox">Check box</a>
         <a href="#action-card">Action card</a>
         <a href="#dropdown">Dropdown</a>
+        <a href="#breadcrumbs">Breadcrumbs</a>
         <a href="#header-bars">Header bars</a>
         <a href="#footers">Footers</a>
         <a href="#text-inputs">Text inputs</a>
@@ -636,6 +638,39 @@ function StyleGuide() {
           <code>TagPicker</code> below). Open it with the keyboard (Enter, then
           the arrow keys) to see the item highlight, which is the same for
           pointer and keyboard.
+        </p>
+      </Section>
+
+      <Section id="breadcrumbs" label="Breadcrumbs">
+        <Breadcrumbs
+          trail={[
+            { label: "Products", href: "#breadcrumbs" },
+            { label: "Tarot", href: "#breadcrumbs" },
+            { label: "Journey", href: "#breadcrumbs" },
+          ]}
+          current="Product Summary"
+        />
+        <Snippet
+          code={`<h1>{product.name}</h1>\n<Breadcrumbs\n  trail={[\n    { label: "Products", href: "/app" },\n    { label: product.name, href: \`/app/products/\${product.id}\` },\n    { label: "Journey", href: \`/app/products/\${product.id}/journey\` },\n  ]}\n  current={worksheet.name}\n/>`}
+        />
+        <p className="sg-note">
+          <code>&lt;Breadcrumbs&gt;</code> goes straight under the h1 on every
+          page under <code>/app</code>, and replaces a &ldquo;Back to
+          &hellip;&rdquo; link. <code>trail</code> is the pages above this one,
+          root first, each a link; <code>current</code> is the page you&apos;re
+          on, plain text marked <code>aria-current=&quot;page&quot;</code>. A
+          top-level page passes <code>trail={"{[]}"}</code>. The root is the
+          page&apos;s own section (&ldquo;Products&rdquo;,
+          &ldquo;Settings&rdquo;), never a &ldquo;Home&rdquo; crumb, and a
+          Milestone is never a crumb (#109).
+        </p>
+        <p className="sg-note">
+          It stays on one line. Narrow the window to see the ancestors shorten
+          with &ldquo;…&rdquo; first, down to 44px each (a name already narrower
+          stays as it is); the current page shortens only once they all have.
+          The separators never shorten and are hidden from screen readers. There
+          are no tooltips: the full name is in the accessible text and on the
+          page itself.
         </p>
       </Section>
 
