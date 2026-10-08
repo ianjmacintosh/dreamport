@@ -7,9 +7,9 @@ import {
 } from "@phosphor-icons/react";
 
 import ActionCard from "../../components/ActionCard";
+import Breadcrumbs from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
-import Link from "../../components/Link";
 
 /**
  * Plain `fetch` never times out on its own — if the server accepts the TCP
@@ -168,7 +168,7 @@ export const Route = createFileRoute(
  * own page so the Product home only needs a line about it.
  *
  * The Product's name is the h1 and "Journey" the h2, so the page reads as
- * part of the Product. Below them, `.journey-split` (see global.css): the
+ * part of the Product; `Breadcrumbs` between them lead back up (#109). Below them, `.journey-split` (see global.css): the
  * Milestones as a route on the left, the content for where you are on the
  * right — before starting, the Path's name, the pitch for it, an
  * invitation and "Start Journey"; after,
@@ -188,12 +188,6 @@ export const Route = createFileRoute(
  * The route is an `<ol>`, so screen readers already number each stop; the
  * dot's visible number is hidden from them. A done stop's dot shows a check
  * instead, labelled "Done", and the current one is `aria-current="step"`.
- *
- * Ends with a plain "Back to {Product}" link, the same shape as the
- * Product home's own "Back to Products" (see #109 for whether that grows
- * into a breadcrumb). `current={false}`: this page sits under the Product
- * home's URL, so the router would otherwise mark the link as the current
- * page.
  */
 function ProductJourney() {
   const { product, journeyState: initialJourneyState } =
@@ -399,6 +393,13 @@ function ProductJourney() {
   return (
     <>
       <h1>{product.name}</h1>
+      <Breadcrumbs
+        trail={[
+          { label: "Products", href: "/app" },
+          { label: product.name, href: `/app/products/${product.id}` },
+        ]}
+        current="Journey"
+      />
       <h2>Journey</h2>
       <div className="journey-split">
         <ol aria-label="Milestones" className="journey-route">
@@ -506,12 +507,6 @@ function ProductJourney() {
           {error && <p role="alert">{error}</p>}
         </section>
       </div>
-
-      <p>
-        <Link href={`/app/products/${product.id}`} current={false}>
-          Back to {product.name}
-        </Link>
-      </p>
     </>
   );
 }

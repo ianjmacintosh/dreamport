@@ -212,8 +212,8 @@ Add an entry only once a sign-off conversation resolves something repeatable
   7 · Next · Ends at" line: the route already says it. Picked from a
   prototype on branch `prototype/journey-ux` (decided in #137).
 
-- A Worksheet's page puts the Product's name in the h1, then "Back to
-  Journey", then the Worksheet drawn as a sheet of paper (`.sheet`): white
+- A Worksheet's page puts the Product's name in the h1, then its
+  `Breadcrumbs` (#109), then the Worksheet drawn as a sheet of paper (`.sheet`): white
   (`--color-sheet`, an acknowledged addition to Solarized Light) on the
   cream page, full content width, square corners, no border, no shadow.
   On the sheet: the Worksheet's name as its h2, numbered questions ("1.

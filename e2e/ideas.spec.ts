@@ -42,9 +42,14 @@ test("sign in, add a Product, open it, add an Idea, and see it in the list", asy
   // without the page itself having navigated.
   await expect(page.getByLabel("Idea name")).toHaveValue("");
 
-  await page.getByRole("link", { name: "Back to Products" }).click();
+  await page
+    .getByRole("navigation", { name: "Breadcrumb" })
+    .getByRole("link", { name: "Products" })
+    .click();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByText(productName)).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: "Products" }).getByText(productName),
+  ).toBeVisible();
 });
 
 // Ideas v1 slice 2 (issue #100): add a Product, add an Idea, delete it,

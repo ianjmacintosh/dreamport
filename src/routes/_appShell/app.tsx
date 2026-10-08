@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
+import Breadcrumbs from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Link from "../../components/Link";
 import TextInput from "../../components/TextInput";
@@ -210,6 +211,7 @@ function App() {
   return (
     <>
       <h1 id="products-heading">Products</h1>
+      <Breadcrumbs trail={[]} current="Products" />
       <form
         onSubmit={(e) => {
           e.preventDefault();
