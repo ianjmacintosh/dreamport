@@ -234,3 +234,13 @@ export function createAuth(env: WorkerEnv, deps: AuthDeps = {}) {
 }
 
 export type Auth = ReturnType<typeof createAuth>;
+
+/**
+ * The caller's session for this request, or `null` with no valid session
+ * cookie — verified against the database, never trusted from the client.
+ * Shared by every route that gates on being signed in, so a change to how
+ * that check works needs editing in one place.
+ */
+export function currentSession(env: WorkerEnv, request: Request) {
+  return createAuth(env).api.getSession({ headers: request.headers });
+}

@@ -1,6 +1,6 @@
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
 
-import { createAuth } from "./auth";
+import { createAuth, currentSession } from "./auth";
 import { getMockSender } from "./email/sender";
 import type { WorkerEnv } from "./env";
 import {
@@ -19,31 +19,11 @@ import {
 } from "./trusted-origins";
 import {
   createProduct,
-  deleteProduct,
-  getProduct,
   listProducts,
-  PRODUCT_DESCRIPTION_MAX_LENGTH,
   PRODUCT_NAME_MAX_LENGTH,
-  updateProductDescription,
 } from "./products";
-import {
-  createIdea,
-  deleteIdea,
-  IDEA_NAME_MAX_LENGTH,
-  listIdeas,
-  renameIdea,
-} from "./ideas";
-import {
-  DEFAULT_PATH_ID,
-  startJourney,
-  advanceJourney,
-  returnJourney,
-  journeyState,
-  getJourney,
-} from "./journeys";
-import { parseAnswers, saveAnswers, worksheetState } from "./worksheets";
-import { listTags, listTagsByIdea, setIdeaTags } from "./tags";
-import { setTaskDone } from "./tasks";
+import { productRoutes } from "./product-routes";
+import { listTags } from "./tags";
 import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
 
@@ -55,41 +35,6 @@ import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
  * keys don't echo a stable action.
  */
 const TURNSTILE_ACTION = "send-otp";
-
-/**
- * The caller's session for this request, or `null` with no valid session
- * cookie — verified against the database, never trusted from the client.
- * Shared by every route below that gates on being signed in (`/api/me`,
- * `/api/products`), so a change to how that check works needs editing in
- * one place.
- */
-function currentSession(c: Context<{ Bindings: WorkerEnv }>) {
-  return createAuth(c.env).api.getSession({ headers: c.req.raw.headers });
-}
-
-/**
- * Parse and validate an Idea `name` from the request body — shared by
- * create (POST) and rename (PATCH) so both enforce the same rule: a
- * string, non-empty after trimming, at most `IDEA_NAME_MAX_LENGTH`.
- * Returns the trimmed name, or the 400 response to send instead.
- */
-async function readIdeaName(c: Context<{ Bindings: WorkerEnv }>) {
-  const body = await c.req.json().catch(() => null);
-  const name =
-    body && typeof body === "object" && typeof body.name === "string"
-      ? body.name.trim()
-      : "";
-  if (!name) {
-    return c.json({ error: "name is required" }, 400);
-  }
-  if (name.length > IDEA_NAME_MAX_LENGTH) {
-    return c.json(
-      { error: `name must be ${IDEA_NAME_MAX_LENGTH} characters or fewer` },
-      400,
-    );
-  }
-  return name;
-}
 
 /**
  * Overrides for {@link createApp}. `verifyTurnstile` lets the Seam 1 tests
@@ -126,6 +71,29 @@ export function createApp(deps: AppDeps = {}) {
   const turnstileStrict =
     deps.isProductionEnvironment ?? IS_PRODUCTION_ENVIRONMENT;
   const app = new Hono<{ Bindings: WorkerEnv }>();
+
+  /**
+   * Origin check on every request that changes data (#154). Routes under
+   * `/api/auth/*` are Better Auth's, which checks origin itself; everything
+   * else under `/api/*` is Dreamport's own and gets none of that for free,
+   * so it gets the same self-trust-or-TRUSTED_ORIGINS check here — see
+   * `isTrustedRequestOrigin`. GET and HEAD pass: browsers leave `Origin`
+   * off same-origin reads, and they change nothing.
+   */
+  app.use("/api/*", async (c, next) => {
+    if (
+      c.req.method !== "GET" &&
+      c.req.method !== "HEAD" &&
+      !c.req.path.startsWith("/api/auth/") &&
+      !isTrustedRequestOrigin(
+        c.req.header("origin") ?? null,
+        c.req.header("host") ?? "",
+      )
+    ) {
+      return c.json({ error: "Invalid origin" }, 403);
+    }
+    await next();
+  });
 
   /**
    * Bot deterrence on the code-send path (issue #23). Registered before the
@@ -303,7 +271,7 @@ export function createApp(deps: AppDeps = {}) {
    * email. 401 with no valid session.
    */
   app.get("/api/me", async (c) => {
-    const session = await currentSession(c);
+    const session = await currentSession(c.env, c.req.raw);
 
     if (!session) {
       return c.json({ error: "Not signed in" }, 401);
@@ -319,7 +287,7 @@ export function createApp(deps: AppDeps = {}) {
    * `session.user.id`, so a User can only ever see or create their own rows.
    */
   app.get("/api/products", async (c) => {
-    const session = await currentSession(c);
+    const session = await currentSession(c.env, c.req.raw);
     if (!session) {
       return c.json({ error: "Not signed in" }, 401);
     }
@@ -329,22 +297,7 @@ export function createApp(deps: AppDeps = {}) {
   });
 
   app.post("/api/products", async (c) => {
-    // This route creates rows, but sits outside `auth.handler`, so it gets
-    // none of Better Auth's own origin/CSRF check for free the way
-    // send-OTP, sign-out, and delete-user do (each of those either calls the
-    // handler directly or, on the two routes registered ahead of it above,
-    // still ends by calling into it). Same self-trust-or-TRUSTED_ORIGINS
-    // shape as that check — see `isTrustedRequestOrigin`.
-    if (
-      !isTrustedRequestOrigin(
-        c.req.header("origin") ?? null,
-        c.req.header("host") ?? "",
-      )
-    ) {
-      return c.json({ error: "Invalid origin" }, 403);
-    }
-
-    const session = await currentSession(c);
+    const session = await currentSession(c.env, c.req.raw);
     if (!session) {
       return c.json({ error: "Not signed in" }, 401);
     }
@@ -370,267 +323,9 @@ export function createApp(deps: AppDeps = {}) {
     return c.json({ product }, 201);
   });
 
-  /**
-   * Products v1 slice 2 (issue #89): delete one of the signed-in User's own
-   * Products. Same origin check as POST above (this route sits outside
-   * `auth.handler` the same way) and the same session gate as the other
-   * three routes. `deleteProduct` scopes by both id and userId, so zero rows
-   * changed means either the id doesn't exist or isn't this User's — the
-   * response never distinguishes the two, so it's always 404, never 403.
-   */
-  app.delete("/api/products/:id", async (c) => {
-    if (
-      !isTrustedRequestOrigin(
-        c.req.header("origin") ?? null,
-        c.req.header("host") ?? "",
-      )
-    ) {
-      return c.json({ error: "Invalid origin" }, 403);
-    }
-
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const deleted = await deleteProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("id"),
-    );
-    if (!deleted) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    return c.json({}, 200);
-  });
-
-  /**
-   * Issue #112: set or clear the description of one of the signed-in User's
-   * own Products. Same origin check and session gate as DELETE above.
-   * `description` must be a string; it's trimmed, and an empty result is
-   * stored as `null` ("no description") — unlike `name`, empty is valid.
-   * `updateProductDescription` scopes by both id and userId, so zero rows
-   * matched is always 404, never 403, for the same reason DELETE gives.
-   * Responds with the stored Product so the client shows what was saved.
-   */
-  app.patch("/api/products/:id", async (c) => {
-    if (
-      !isTrustedRequestOrigin(
-        c.req.header("origin") ?? null,
-        c.req.header("host") ?? "",
-      )
-    ) {
-      return c.json({ error: "Invalid origin" }, 403);
-    }
-
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const body = await c.req.json().catch(() => null);
-    if (
-      !body ||
-      typeof body !== "object" ||
-      typeof body.description !== "string"
-    ) {
-      return c.json({ error: "description must be a string" }, 400);
-    }
-    const description = body.description.trim();
-    if (description.length > PRODUCT_DESCRIPTION_MAX_LENGTH) {
-      return c.json(
-        {
-          error: `description must be ${PRODUCT_DESCRIPTION_MAX_LENGTH} characters or fewer`,
-        },
-        400,
-      );
-    }
-
-    const product = await updateProductDescription(
-      c.env.DB,
-      session.user.id,
-      c.req.param("id"),
-      description || null,
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    return c.json({ product }, 200);
-  });
-
-  /**
-   * Ideas v1 slice 1 (issue #99): a Product's own flat list of Ideas.
-   * Session-gated the same way `/api/products` is, plus an ownership check:
-   * `getProduct` scopes by both `productId` and `session.user.id`, so a
-   * `:productId` that exists but isn't the caller's own reads identically to
-   * one that doesn't exist at all — always 404, never 403. Bundles the
-   * Product's own `{ id, name, description, createdAt }` into the response rather than a
-   * separate endpoint, since the page needs the Product's name for its
-   * heading and the ownership check already has the row in hand.
-   */
-  app.get("/api/products/:productId/ideas", async (c) => {
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const product = await getProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("productId"),
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const [ideas, tagsByIdea] = await Promise.all([
-      listIdeas(c.env.DB, product.id),
-      listTagsByIdea(c.env.DB, product.id),
-    ]);
-    return c.json({
-      product,
-      ideas: ideas.map((idea) => ({
-        ...idea,
-        tags: tagsByIdea.get(idea.id) ?? [],
-      })),
-    });
-  });
-
-  app.post("/api/products/:productId/ideas", async (c) => {
-    // Same origin check `POST /api/products` already does — this route
-    // creates rows and sits outside `auth.handler` too.
-    if (
-      !isTrustedRequestOrigin(
-        c.req.header("origin") ?? null,
-        c.req.header("host") ?? "",
-      )
-    ) {
-      return c.json({ error: "Invalid origin" }, 403);
-    }
-
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const product = await getProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("productId"),
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const name = await readIdeaName(c);
-    if (typeof name !== "string") {
-      return name;
-    }
-
-    const idea = await createIdea(c.env.DB, product.id, name);
-    // A new Idea has no Tags yet (#113) — the client sets them with a
-    // follow-up PUT — but carries the same shape the list response does.
-    return c.json({ idea: { ...idea, tags: [] } }, 201);
-  });
-
-  /**
-   * Ideas v1 slice 2 (issue #100): delete an Idea under a Product that
-   * belongs to the signed-in User. Same origin check as POST /api/products
-   * (this route sits outside `auth.handler` the same way) and same session
-   * gate. First confirms the Product belongs to the caller via `getProduct`,
-   * then deletes the Idea scoped by both `id` and `productId`. Zero rows
-   * changed means either the Idea doesn't exist or isn't under this Product
-   * — the response never distinguishes the two, so it's always 404, never 403.
-   */
-  app.delete("/api/products/:productId/ideas/:id", async (c) => {
-    if (
-      !isTrustedRequestOrigin(
-        c.req.header("origin") ?? null,
-        c.req.header("host") ?? "",
-      )
-    ) {
-      return c.json({ error: "Invalid origin" }, 403);
-    }
-
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const product = await getProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("productId"),
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const deleted = await deleteIdea(c.env.DB, product.id, c.req.param("id"));
-    if (!deleted) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    return c.json({}, 200);
-  });
-
-  /**
-   * Issue #102: rename an Idea under a Product that belongs to the
-   * signed-in User. Same origin check, session gate, and `getProduct`
-   * ownership check as the DELETE route above, and the same `name`
-   * validation as create (`readIdeaName`). Zero rows matched reads as 404,
-   * never 403, for the same reason DELETE gives. Responds with the renamed
-   * Idea so the client shows the stored (trimmed) name, not its own copy.
-   */
-  app.patch("/api/products/:productId/ideas/:id", async (c) => {
-    if (
-      !isTrustedRequestOrigin(
-        c.req.header("origin") ?? null,
-        c.req.header("host") ?? "",
-      )
-    ) {
-      return c.json({ error: "Invalid origin" }, 403);
-    }
-
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const product = await getProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("productId"),
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const name = await readIdeaName(c);
-    if (typeof name !== "string") {
-      return name;
-    }
-
-    const idea = await renameIdea(
-      c.env.DB,
-      product.id,
-      c.req.param("id"),
-      name,
-    );
-    if (!idea) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    // Same shape the list response gives an Idea (#113), so the client can
-    // swap the renamed Idea in without dropping its Tags.
-    const tagsByIdea = await listTagsByIdea(c.env.DB, product.id);
-    return c.json(
-      { idea: { ...idea, tags: tagsByIdea.get(idea.id) ?? [] } },
-      200,
-    );
-  });
+  // Every route about one Product: session and ownership checked once,
+  // in front of them all — see `product-routes.ts`.
+  app.route("/api/products/:productId", productRoutes);
 
   /**
    * Issue #113: the fixed Tag catalog. No session needed — it's the same
@@ -638,375 +333,6 @@ export function createApp(deps: AppDeps = {}) {
    */
   app.get("/api/tags", async (c) => {
     return c.json({ tags: await listTags(c.env.DB) });
-  });
-
-  /**
-   * Issue #113: replace one Idea's whole Tag set. Same origin check,
-   * session gate, and `getProduct` ownership check as the rename route
-   * above; zero Ideas matched reads as 404, never 403, for the same reason.
-   * `tags` must be an array of names that all exist in the catalog —
-   * anything else is a 400 and changes nothing. Responds with the stored
-   * set (deduplicated, alphabetical).
-   */
-  app.put("/api/products/:productId/ideas/:id/tags", async (c) => {
-    if (
-      !isTrustedRequestOrigin(
-        c.req.header("origin") ?? null,
-        c.req.header("host") ?? "",
-      )
-    ) {
-      return c.json({ error: "Invalid origin" }, 403);
-    }
-
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const product = await getProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("productId"),
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const body = await c.req.json().catch(() => null);
-    const submitted: unknown =
-      body && typeof body === "object" ? body.tags : undefined;
-    if (
-      !Array.isArray(submitted) ||
-      !submitted.every((tag) => typeof tag === "string")
-    ) {
-      return c.json({ error: "tags must be an array of tag names" }, 400);
-    }
-    const catalog = new Set(await listTags(c.env.DB));
-    const unknown = submitted.filter((tag) => !catalog.has(tag));
-    if (unknown.length > 0) {
-      return c.json({ error: `Unknown tags: ${unknown.join(", ")}` }, 400);
-    }
-
-    const tags = await setIdeaTags(
-      c.env.DB,
-      product.id,
-      c.req.param("id"),
-      submitted,
-    );
-    if (!tags) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    return c.json({ tags }, 200);
-  });
-
-  /**
-   * Journeys (issue #137): a Product's Journey on the default Path — the
-   * only Path Phase 1 ships, so there's no Path in the URL. Same session gate
-   * and `getProduct` ownership check as the Ideas routes: a stranger's
-   * Product reads identically to a nonexistent one, always 404, never 403.
-   * `journey` is `null` until the User starts one; `path` is always there so
-   * the page can name what starting would mean. Bundles the Product itself,
-   * as the Ideas list does, for the Journey page's heading.
-   */
-  app.get("/api/products/:productId/journey", async (c) => {
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const product = await getProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("productId"),
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    return c.json({
-      product,
-      ...(await journeyState(c.env.DB, product.id)),
-    });
-  });
-
-  /**
-   * Start a Product's Journey on the default Path, at Milestone 1. Same
-   * origin check as the other row-creating routes (this one sits outside
-   * `auth.handler` too). A repeat start is harmless: it leaves the existing
-   * Journey's progress as it was and answers 200 rather than 201.
-   */
-  app.post("/api/products/:productId/journey", async (c) => {
-    if (
-      !isTrustedRequestOrigin(
-        c.req.header("origin") ?? null,
-        c.req.header("host") ?? "",
-      )
-    ) {
-      return c.json({ error: "Invalid origin" }, 403);
-    }
-
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const product = await getProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("productId"),
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const started = await startJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
-    return c.json(
-      await journeyState(c.env.DB, product.id),
-      started ? 201 : 200,
-    );
-  });
-
-  /**
-   * Advance a Product's Journey one Milestone (issue #138). Same origin,
-   * session and ownership checks as starting a Journey. 404s when there's
-   * no Journey to advance — the Journey page only ever shows this action
-   * once one's started, so reaching this with none is a stranger/stale
-   * request, not a real "nothing to do" case worth a 200 for.
-   */
-  app.post("/api/products/:productId/journey/advance", async (c) => {
-    if (
-      !isTrustedRequestOrigin(
-        c.req.header("origin") ?? null,
-        c.req.header("host") ?? "",
-      )
-    ) {
-      return c.json({ error: "Invalid origin" }, 403);
-    }
-
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const product = await getProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("productId"),
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const advanced = await advanceJourney(
-      c.env.DB,
-      product.id,
-      DEFAULT_PATH_ID,
-    );
-    if (!advanced) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    return c.json(await journeyState(c.env.DB, product.id), 200);
-  });
-
-  /**
-   * Return the caller's own Product's Journey by one Milestone, or
-   * un-finish it if it's finished — see `returnJourney`. Same origin,
-   * session and ownership checks as advancing, and the same 404 when
-   * there's no Journey to return.
-   */
-  app.post("/api/products/:productId/journey/return", async (c) => {
-    if (
-      !isTrustedRequestOrigin(
-        c.req.header("origin") ?? null,
-        c.req.header("host") ?? "",
-      )
-    ) {
-      return c.json({ error: "Invalid origin" }, 403);
-    }
-
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const product = await getProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("productId"),
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const returned = await returnJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
-    if (!returned) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    return c.json(await journeyState(c.env.DB, product.id), 200);
-  });
-
-  /**
-   * Worksheets (issue #139): a Product's instance of one Worksheet on the
-   * default Path — the Worksheet and its answers. Same
-   * session gate and `getProduct` ownership check as the Journey routes.
-   * 404s when there's no such Worksheet or the Product hasn't started its
-   * Journey. Bundles the Product for the Worksheet page's heading.
-   */
-  app.get("/api/products/:productId/worksheets/:worksheetId", async (c) => {
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const product = await getProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("productId"),
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const journey = await getJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
-    const state =
-      journey &&
-      (await worksheetState(
-        c.env.DB,
-        product.id,
-        DEFAULT_PATH_ID,
-        c.req.param("worksheetId"),
-      ));
-    if (!state) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    return c.json({ product, ...state });
-  });
-
-  /**
-   * Save a Product's answers on one Worksheet, replacing every field (one
-   * left out reads as blank). Same origin, session and ownership checks as
-   * the Journey moves, and the same 404s as reading it. Saving works at
-   * any point in the Journey, finished or not.
-   */
-  app.put("/api/products/:productId/worksheets/:worksheetId", async (c) => {
-    if (
-      !isTrustedRequestOrigin(
-        c.req.header("origin") ?? null,
-        c.req.header("host") ?? "",
-      )
-    ) {
-      return c.json({ error: "Invalid origin" }, 403);
-    }
-
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const product = await getProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("productId"),
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const worksheetId = c.req.param("worksheetId");
-    const journey = await getJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
-    const state =
-      journey &&
-      (await worksheetState(
-        c.env.DB,
-        product.id,
-        DEFAULT_PATH_ID,
-        worksheetId,
-      ));
-    if (!state) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const body = await c.req.json().catch(() => null);
-    const answers = parseAnswers(
-      state.worksheet,
-      body && typeof body === "object" ? body.answers : null,
-    );
-    if (!answers) {
-      return c.json(
-        { error: "answers must map this Worksheet's fields to text" },
-        400,
-      );
-    }
-
-    await saveAnswers(
-      c.env.DB,
-      product.id,
-      DEFAULT_PATH_ID,
-      worksheetId,
-      answers,
-    );
-    return c.json({ product, ...state, answers }, 200);
-  });
-
-  /**
-   * Tasks (issue #140): check off or uncheck one of the Product's Tasks on
-   * the default Path, with `{ "done": true | false }`. Same origin, session
-   * and ownership checks as saving a Worksheet, and the same 404s when the
-   * Product hasn't started its Journey or there's no such Task on the Path.
-   * Works on any Task, not just the current Milestone's, and never moves
-   * the Journey. Answers with the Journey's state, like Advance and Return.
-   */
-  app.put("/api/products/:productId/tasks/:taskId", async (c) => {
-    if (
-      !isTrustedRequestOrigin(
-        c.req.header("origin") ?? null,
-        c.req.header("host") ?? "",
-      )
-    ) {
-      return c.json({ error: "Invalid origin" }, 403);
-    }
-
-    const session = await currentSession(c);
-    if (!session) {
-      return c.json({ error: "Not signed in" }, 401);
-    }
-
-    const product = await getProduct(
-      c.env.DB,
-      session.user.id,
-      c.req.param("productId"),
-    );
-    if (!product) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const journey = await getJourney(c.env.DB, product.id, DEFAULT_PATH_ID);
-    if (!journey) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    const body = await c.req.json().catch(() => null);
-    const done = body && typeof body === "object" ? body.done : null;
-    if (typeof done !== "boolean") {
-      return c.json({ error: "done must be true or false" }, 400);
-    }
-
-    const found = await setTaskDone(
-      c.env.DB,
-      product.id,
-      DEFAULT_PATH_ID,
-      c.req.param("taskId"),
-      done,
-    );
-    if (!found) {
-      return c.json({ error: "Not found" }, 404);
-    }
-
-    return c.json(await journeyState(c.env.DB, product.id), 200);
   });
 
   /**

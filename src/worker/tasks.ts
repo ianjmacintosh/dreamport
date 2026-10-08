@@ -4,14 +4,16 @@
  *
  * Plain data-access functions over `tasks`/`milestone_tasks`/
  * `task_completions` (`migrations/0017_*.sql`) — the HTTP boundary lives in
- * `index.ts`'s `/api/products/:productId/tasks/:taskId` route, the same
- * split `worksheets.ts` has. Nothing here re-checks that `productId`
- * belongs to the caller — the route already will have, via `getProduct`.
+ * `product-routes.ts`'s `/tasks/:taskId` route, the same split
+ * `worksheets.ts` has. Each takes an `OwnedProduct`, so ownership is
+ * already settled by the time one runs.
  *
  * Every Task is standalone for now: the User checks it off by hand.
  * Checking one off is purely informational — nothing in `journeys.ts`
  * reads it, so it never gates Advance (#133).
  */
+
+import type { OwnedProduct } from "./products";
 
 /** What the Journey page needs to show a Task: where it's on and whether it's checked off. */
 export interface TaskSummary {
@@ -29,7 +31,7 @@ export interface TaskSummary {
  */
 export async function taskSummaries(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
   pathId: string,
 ): Promise<TaskSummary[]> {
   const { results } = await db
@@ -45,7 +47,7 @@ export async function taskSummaries(
        WHERE "milestones"."pathId" = ?
        ORDER BY "milestones"."position" ASC, "milestone_tasks"."position" ASC`,
     )
-    .bind(productId, pathId, pathId)
+    .bind(product.id, pathId, pathId)
     .all<{ id: string; title: string; milestoneId: string; done: number }>();
 
   const summaries = new Map<string, TaskSummary>();
@@ -70,7 +72,7 @@ export async function taskSummaries(
  */
 export async function setTaskDone(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
   pathId: string,
   taskId: string,
   done: boolean,
@@ -91,12 +93,12 @@ export async function setTaskDone(
           .prepare(
             'INSERT INTO "task_completions" ("productId", "pathId", "taskId", "completedAt") VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
           )
-          .bind(productId, pathId, taskId, new Date().toISOString())
+          .bind(product.id, pathId, taskId, new Date().toISOString())
       : db
           .prepare(
             'DELETE FROM "task_completions" WHERE "productId" = ? AND "pathId" = ? AND "taskId" = ?',
           )
-          .bind(productId, pathId, taskId)
+          .bind(product.id, pathId, taskId)
   ).run();
   return true;
 }

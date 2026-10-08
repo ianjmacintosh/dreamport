@@ -1138,21 +1138,6 @@ describe("/api/products (#88)", () => {
     expect(await res.json()).toEqual({ error: "Not signed in" });
   });
 
-  it("rejects an add from an untrusted origin, creating nothing (#88 origin check)", async () => {
-    const cookie = await signIn(TEST_EMAILS.productsInvalidName);
-
-    const res = await fetchWorker("/api/products", {
-      method: "POST",
-      headers: { ...json, origin: "https://evil.example.com", cookie },
-      body: JSON.stringify({ name: "Should not be created" }),
-    });
-
-    expect(res.status).toBe(403);
-    expect(await (await getProducts(cookie)).json()).toEqual({
-      products: [],
-    });
-  });
-
   it("starts empty, then lists a Product just added", async () => {
     const cookie = await signIn(TEST_EMAILS.productsAddOne);
 
@@ -1212,37 +1197,13 @@ describe("/api/products (#88)", () => {
   });
 });
 
-describe("DELETE /api/products/:id (#89)", () => {
+describe("DELETE /api/products/:productId (#89)", () => {
   function deleteProduct(id: string, cookie?: string) {
     return fetchWorker(`/api/products/${id}`, {
       method: "DELETE",
       headers: { origin: TRUSTED_ORIGIN, ...(cookie ? { cookie } : {}) },
     });
   }
-
-  it("rejects a request with no session", async () => {
-    const res = await deleteProduct("some-id");
-
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Not signed in" });
-  });
-
-  it("rejects a delete from an untrusted origin", async () => {
-    const cookie = await signIn(TEST_EMAILS.productsDeleteUntrustedOrigin);
-    const created = await addProduct(cookie, "To survive an untrusted delete");
-    const { product } = (await created.json()) as { product: { id: string } };
-
-    const res = await fetchWorker(`/api/products/${product.id}`, {
-      method: "DELETE",
-      headers: { origin: "https://evil.example.com", cookie },
-    });
-
-    expect(res.status).toBe(403);
-    const listed = (await (await getProducts(cookie)).json()) as {
-      products: { id: string }[];
-    };
-    expect(listed.products.map((p) => p.id)).toContain(product.id);
-  });
 
   it("deletes a Product it owns, leaving the list empty again", async () => {
     const cookie = await signIn(TEST_EMAILS.productsDeleteOwn);
@@ -1256,34 +1217,9 @@ describe("DELETE /api/products/:id (#89)", () => {
       products: [],
     });
   });
-
-  it("404s on a nonexistent id, never a 403", async () => {
-    const cookie = await signIn(TEST_EMAILS.productsDeleteNotFound);
-
-    const res = await deleteProduct("not-a-real-id", cookie);
-
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "Not found" });
-  });
-
-  it("404s a stranger's delete of another User's Product, leaving it intact", async () => {
-    const cookieA = await signIn(TEST_EMAILS.productsDeleteOwnerA);
-    const cookieB = await signIn(TEST_EMAILS.productsDeleteOwnerB);
-    const created = await addProduct(cookieA, "Owner A's Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-
-    const res = await deleteProduct(product.id, cookieB);
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "Not found" });
-
-    const asA = (await (await getProducts(cookieA)).json()) as {
-      products: { id: string }[];
-    };
-    expect(asA.products.map((p) => p.id)).toEqual([product.id]);
-  });
 });
 
-describe("PATCH /api/products/:id (#112)", () => {
+describe("PATCH /api/products/:productId (#112)", () => {
   function setDescription(id: string, description: unknown, cookie?: string) {
     return fetchWorker(`/api/products/${id}`, {
       method: "PATCH",
@@ -1310,30 +1246,6 @@ describe("PATCH /api/products/:id (#112)", () => {
     };
     return { cookie, product };
   }
-
-  it("rejects a request with no session", async () => {
-    const res = await setDescription("some-id", "Anything");
-
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Not signed in" });
-  });
-
-  it("rejects a request from an untrusted origin, changing nothing", async () => {
-    const { cookie, product } = await withOneProduct(
-      TEST_EMAILS.productsDescribeUntrusted,
-    );
-
-    const res = await fetchWorker(`/api/products/${product.id}`, {
-      method: "PATCH",
-      headers: { ...json, origin: "https://evil.example.com", cookie },
-      body: JSON.stringify({ description: "Should not apply" }),
-    });
-
-    expect(res.status).toBe(403);
-    expect(await (await getProducts(cookie)).json()).toEqual({
-      products: [product],
-    });
-  });
 
   it("starts a new Product with no description, sets one (trimmed), then clears it back to null", async () => {
     const { cookie, product } = await withOneProduct(
@@ -1396,30 +1308,6 @@ describe("PATCH /api/products/:id (#112)", () => {
       products: [atCapProduct],
     });
   });
-
-  it("404s a stranger's change to another User's Product, leaving it intact", async () => {
-    const { cookie: cookieA, product } = await withOneProduct(
-      TEST_EMAILS.productsDescribeOwnerA,
-    );
-    const cookieB = await signIn(TEST_EMAILS.productsDescribeOwnerB);
-
-    const res = await setDescription(product.id, "Hijacked", cookieB);
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "Not found" });
-
-    expect(await (await getProducts(cookieA)).json()).toEqual({
-      products: [product],
-    });
-  });
-
-  it("404s on a nonexistent id, never a 403", async () => {
-    const cookie = await signIn(TEST_EMAILS.productsDescribeNotFound);
-
-    const res = await setDescription("not-a-real-id", "Anything", cookie);
-
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "Not found" });
-  });
 });
 
 /** Shared by the Ideas describe block below. */
@@ -1463,13 +1351,6 @@ function renameIdea(
 }
 
 describe("/api/products/:productId/ideas (#99)", () => {
-  it("rejects a request with no session", async () => {
-    const res = await getIdeas("some-id");
-
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Not signed in" });
-  });
-
   it("starts empty, then lists an Idea just added, alongside its Product", async () => {
     const cookie = await signIn(TEST_EMAILS.ideasAddOne);
     const created = await addProduct(cookie, "A phone-scale app");
@@ -1493,24 +1374,6 @@ describe("/api/products/:productId/ideas (#99)", () => {
     expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
       product,
       ideas: [idea],
-    });
-  });
-
-  it("rejects an add from an untrusted origin, creating nothing", async () => {
-    const cookie = await signIn(TEST_EMAILS.ideasInvalidName);
-    const created = await addProduct(cookie, "Untrusted-origin Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-
-    const res = await fetchWorker(`/api/products/${product.id}/ideas`, {
-      method: "POST",
-      headers: { ...json, origin: "https://evil.example.com", cookie },
-      body: JSON.stringify({ name: "Should not be created" }),
-    });
-
-    expect(res.status).toBe(403);
-    expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
-      product,
-      ideas: [],
     });
   });
 
@@ -1544,68 +1407,7 @@ describe("/api/products/:productId/ideas (#99)", () => {
     });
   });
 
-  it("404s a stranger's request against another User's Product, never listing its Ideas", async () => {
-    const cookieA = await signIn(TEST_EMAILS.ideasOwnerA);
-    const cookieB = await signIn(TEST_EMAILS.ideasOwnerB);
-    const created = await addProduct(cookieA, "Owner A's Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-    await addIdea(product.id, cookieA, "Owner A's Idea");
-
-    const listRes = await getIdeas(product.id, cookieB);
-    expect(listRes.status).toBe(404);
-    expect(await listRes.json()).toEqual({ error: "Not found" });
-
-    const postRes = await addIdea(product.id, cookieB, "Should not be created");
-    expect(postRes.status).toBe(404);
-    expect(await postRes.json()).toEqual({ error: "Not found" });
-
-    const asA = (await (await getIdeas(product.id, cookieA)).json()) as {
-      ideas: { name: string }[];
-    };
-    expect(asA.ideas.map((i) => i.name)).toEqual(["Owner A's Idea"]);
-  });
-
-  it("404s a nonexistent productId, never a 403", async () => {
-    const cookie = await signIn(TEST_EMAILS.ideasOwnerA);
-
-    const res = await getIdeas("not-a-real-id", cookie);
-
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "Not found" });
-  });
-
   describe("delete (#100)", () => {
-    it("rejects a request with no session", async () => {
-      const res = await deleteIdea("some-product-id", "some-idea-id");
-
-      expect(res.status).toBe(401);
-      expect(await res.json()).toEqual({ error: "Not signed in" });
-    });
-
-    it("rejects a request from an untrusted origin", async () => {
-      const cookie = await signIn(TEST_EMAILS.ideasDeleteUntrusted);
-      const created = await addProduct(cookie, "Untrusted-origin Product");
-      const { product } = (await created.json()) as { product: { id: string } };
-      const idea = await addIdea(product.id, cookie, "Test Idea");
-      const { idea: ideaData } = (await idea.json()) as {
-        idea: { id: string };
-      };
-
-      const res = await fetchWorker(
-        `/api/products/${product.id}/ideas/${ideaData.id}`,
-        {
-          method: "DELETE",
-          headers: { origin: "https://evil.example.com", cookie },
-        },
-      );
-
-      expect(res.status).toBe(403);
-
-      const list = await getIdeas(product.id, cookie);
-      const { ideas } = (await list.json()) as { ideas: { name: string }[] };
-      expect(ideas.map((i) => i.name)).toEqual(["Test Idea"]);
-    });
-
     it("deletes an Idea and removes it from the list", async () => {
       const cookie = await signIn(TEST_EMAILS.ideasDeleteOwner);
       const created = await addProduct(cookie, "Delete Product");
@@ -1630,43 +1432,12 @@ describe("/api/products/:productId/ideas (#99)", () => {
       });
     });
 
-    it("404s when a stranger tries to delete an Idea under another User's Product", async () => {
-      const cookieA = await signIn(TEST_EMAILS.ideasDeleteOwnerA);
-      const cookieB = await signIn(TEST_EMAILS.ideasDeleteOwnerB);
-      const created = await addProduct(cookieA, "Owner A's Delete Product");
-      const { product } = (await created.json()) as { product: { id: string } };
-      const idea = await addIdea(product.id, cookieA, "Owner A's Idea");
-      const { idea: ideaData } = (await idea.json()) as {
-        idea: { id: string };
-      };
-
-      const res = await deleteIdea(product.id, ideaData.id, cookieB);
-      expect(res.status).toBe(404);
-      expect(await res.json()).toEqual({ error: "Not found" });
-
-      const list = await getIdeas(product.id, cookieA);
-      const { ideas } = (await list.json()) as { ideas: { name: string }[] };
-      expect(ideas.map((i) => i.name)).toEqual(["Owner A's Idea"]);
-    });
-
     it("404s when trying to delete a nonexistent Idea", async () => {
       const cookie = await signIn(TEST_EMAILS.ideasDeleteNonexistent);
       const created = await addProduct(cookie, "Delete Nonexistent Product");
       const { product } = (await created.json()) as { product: { id: string } };
 
       const res = await deleteIdea(product.id, "not-a-real-id", cookie);
-      expect(res.status).toBe(404);
-      expect(await res.json()).toEqual({ error: "Not found" });
-    });
-
-    it("404s when trying to delete an Idea under a nonexistent Product", async () => {
-      const cookie = await signIn(TEST_EMAILS.ideasDeleteNonexistentProduct);
-
-      const res = await deleteIdea(
-        "not-a-real-product",
-        "not-a-real-idea",
-        cookie,
-      );
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({ error: "Not found" });
     });
@@ -1686,34 +1457,6 @@ describe("/api/products/:productId/ideas (#99)", () => {
       };
       return { cookie, product, idea };
     }
-
-    it("rejects a request with no session", async () => {
-      const res = await renameIdea("some-product-id", "some-idea-id", "New");
-
-      expect(res.status).toBe(401);
-      expect(await res.json()).toEqual({ error: "Not signed in" });
-    });
-
-    it("rejects a request from an untrusted origin, changing nothing", async () => {
-      const { cookie, product, idea } = await withOneIdea(
-        TEST_EMAILS.ideasRenameUntrusted,
-      );
-
-      const res = await fetchWorker(
-        `/api/products/${product.id}/ideas/${idea.id}`,
-        {
-          method: "PATCH",
-          headers: { ...json, origin: "https://evil.example.com", cookie },
-          body: JSON.stringify({ name: "Should not apply" }),
-        },
-      );
-
-      expect(res.status).toBe(403);
-      expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
-        product,
-        ideas: [idea],
-      });
-    });
 
     it("renames an Idea, trimming the name, and lists it under the new name", async () => {
       const { cookie, product, idea } = await withOneIdea(
@@ -1753,24 +1496,7 @@ describe("/api/products/:productId/ideas (#99)", () => {
       });
     });
 
-    it("404s when a stranger tries to rename an Idea under another User's Product", async () => {
-      const {
-        cookie: cookieA,
-        product,
-        idea,
-      } = await withOneIdea(TEST_EMAILS.ideasRenameOwnerA, "Owner A's Idea");
-      const cookieB = await signIn(TEST_EMAILS.ideasRenameOwnerB);
-
-      const res = await renameIdea(product.id, idea.id, "Hijacked", cookieB);
-      expect(res.status).toBe(404);
-      expect(await res.json()).toEqual({ error: "Not found" });
-
-      const list = await getIdeas(product.id, cookieA);
-      const { ideas } = (await list.json()) as { ideas: { name: string }[] };
-      expect(ideas.map((i) => i.name)).toEqual(["Owner A's Idea"]);
-    });
-
-    it("404s when renaming a nonexistent Idea or one under a nonexistent Product", async () => {
+    it("404s when renaming a nonexistent Idea", async () => {
       const { cookie, product } = await withOneIdea(
         TEST_EMAILS.ideasRenameNonexistent,
       );
@@ -1778,15 +1504,6 @@ describe("/api/products/:productId/ideas (#99)", () => {
       const noIdea = await renameIdea(product.id, "not-a-real-id", "X", cookie);
       expect(noIdea.status).toBe(404);
       expect(await noIdea.json()).toEqual({ error: "Not found" });
-
-      const noProduct = await renameIdea(
-        "not-a-real-product",
-        "not-a-real-idea",
-        "X",
-        cookie,
-      );
-      expect(noProduct.status).toBe(404);
-      expect(await noProduct.json()).toEqual({ error: "Not found" });
     });
   });
 });
@@ -1838,34 +1555,6 @@ describe("PUT /api/products/:productId/ideas/:id/tags (#113)", () => {
     };
     return { cookie, product, idea };
   }
-
-  it("rejects a request with no session", async () => {
-    const res = await setIdeaTags("some-product-id", "some-idea-id", []);
-
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Not signed in" });
-  });
-
-  it("rejects a request from an untrusted origin, changing nothing", async () => {
-    const { cookie, product, idea } = await withOneIdea(
-      TEST_EMAILS.ideasTagsUntrusted,
-    );
-
-    const res = await fetchWorker(
-      `/api/products/${product.id}/ideas/${idea.id}/tags`,
-      {
-        method: "PUT",
-        headers: { ...json, origin: "https://evil.example.com", cookie },
-        body: JSON.stringify({ tags: ["Design"] }),
-      },
-    );
-
-    expect(res.status).toBe(403);
-    expect(await (await getIdeas(product.id, cookie)).json()).toEqual({
-      product,
-      ideas: [idea],
-    });
-  });
 
   it("starts an Idea with no tags, sets them, replaces them, and lists them with the Idea", async () => {
     const { cookie, product, idea } = await withOneIdea(
@@ -1948,38 +1637,7 @@ describe("PUT /api/products/:productId/ideas/:id/tags (#113)", () => {
     });
   });
 
-  it("404s when a stranger tries to tag an Idea under another User's Product", async () => {
-    const {
-      cookie: cookieA,
-      product,
-      idea,
-    } = await withOneIdea(TEST_EMAILS.ideasTagsOwnerA, "Owner A's Idea");
-    const cookieB = await signIn(TEST_EMAILS.ideasTagsOwnerB);
-
-    const res = await setIdeaTags(product.id, idea.id, ["Design"], cookieB);
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "Not found" });
-
-    // B's own Product id doesn't unlock A's Idea either.
-    const created = await addProduct(cookieB, "B's own Product");
-    const { product: productB } = (await created.json()) as {
-      product: { id: string };
-    };
-    const viaOwnProduct = await setIdeaTags(
-      productB.id,
-      idea.id,
-      ["Design"],
-      cookieB,
-    );
-    expect(viaOwnProduct.status).toBe(404);
-
-    expect(await (await getIdeas(product.id, cookieA)).json()).toEqual({
-      product,
-      ideas: [idea],
-    });
-  });
-
-  it("404s when tagging a nonexistent Idea or one under a nonexistent Product", async () => {
+  it("404s when tagging a nonexistent Idea", async () => {
     const { cookie, product } = await withOneIdea(
       TEST_EMAILS.ideasTagsNonexistent,
     );
@@ -1992,15 +1650,6 @@ describe("PUT /api/products/:productId/ideas/:id/tags (#113)", () => {
     );
     expect(noIdea.status).toBe(404);
     expect(await noIdea.json()).toEqual({ error: "Not found" });
-
-    const noProduct = await setIdeaTags(
-      "not-a-real-product",
-      "not-a-real-idea",
-      ["Design"],
-      cookie,
-    );
-    expect(noProduct.status).toBe(404);
-    expect(await noProduct.json()).toEqual({ error: "Not found" });
   });
 
   it("keeps an Idea's tags across a rename, and returns them with it", async () => {
@@ -2135,65 +1784,6 @@ describe("/api/products/:productId/journey (#137)", () => {
     expect(again.status).toBe(200);
     expect(await again.json()).toEqual(first);
   });
-
-  it("rejects a request with no session", async () => {
-    const res = await getJourney("some-id");
-    expect(res.status).toBe(401);
-
-    const start = await startJourney("some-id");
-    expect(start.status).toBe(401);
-  });
-
-  it("rejects a start from an untrusted origin, starting nothing", async () => {
-    const cookie = await signIn(TEST_EMAILS.journeysUntrusted);
-    const created = await addProduct(cookie, "Untrusted-origin Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-
-    const res = await fetchWorker(`/api/products/${product.id}/journey`, {
-      method: "POST",
-      headers: { origin: "https://evil.example.com", cookie },
-    });
-
-    expect(res.status).toBe(403);
-    const after = (await (
-      await getJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-    expect(after.journey).toBeNull();
-  });
-
-  it("404s a stranger's read or start of another User's Journey, never touching it", async () => {
-    const cookieA = await signIn(TEST_EMAILS.journeysOwnerA);
-    const cookieB = await signIn(TEST_EMAILS.journeysOwnerB);
-    const createdA = await addProduct(cookieA, "Owner A's started Product");
-    const { product: started } = (await createdA.json()) as {
-      product: { id: string };
-    };
-    await startJourney(started.id, cookieA);
-    const createdUnstarted = await addProduct(cookieA, "Owner A's unstarted");
-    const { product: unstarted } = (await createdUnstarted.json()) as {
-      product: { id: string };
-    };
-
-    const read = await getJourney(started.id, cookieB);
-    expect(read.status).toBe(404);
-    expect(await read.json()).toEqual({ error: "Not found" });
-
-    const start = await startJourney(unstarted.id, cookieB);
-    expect(start.status).toBe(404);
-    expect(await start.json()).toEqual({ error: "Not found" });
-
-    const asA = (await (
-      await getJourney(unstarted.id, cookieA)
-    ).json()) as JourneyResponse;
-    expect(asA.journey).toBeNull();
-  });
-
-  it("404s a nonexistent productId, never a 403", async () => {
-    const cookie = await signIn(TEST_EMAILS.journeysOwnerA);
-
-    expect((await getJourney("not-a-real-id", cookie)).status).toBe(404);
-    expect((await startJourney("not-a-real-id", cookie)).status).toBe(404);
-  });
 });
 
 describe("/api/products/:productId/journey/advance (#138)", () => {
@@ -2267,52 +1857,6 @@ describe("/api/products/:productId/journey/advance (#138)", () => {
     const res = await advanceJourney(product.id, cookie);
     expect(res.status).toBe(404);
   });
-
-  it("rejects an advance with no session", async () => {
-    expect((await advanceJourney("some-id")).status).toBe(401);
-  });
-
-  it("rejects an advance from an untrusted origin, advancing nothing", async () => {
-    const cookie = await signIn(TEST_EMAILS.journeysAdvanceUntrusted);
-    const created = await addProduct(cookie, "Untrusted-advance Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-    const { journey: before } = (await (
-      await startJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-
-    const res = await fetchWorker(
-      `/api/products/${product.id}/journey/advance`,
-      {
-        method: "POST",
-        headers: { origin: "https://evil.example.com", cookie },
-      },
-    );
-
-    expect(res.status).toBe(403);
-    const after = (await (
-      await getJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-    expect(after.journey).toEqual(before);
-  });
-
-  it("404s a stranger's advance of another User's Journey, never touching it", async () => {
-    const cookieA = await signIn(TEST_EMAILS.journeysAdvanceOwnerA);
-    const cookieB = await signIn(TEST_EMAILS.journeysAdvanceOwnerB);
-    const created = await addProduct(cookieA, "Owner A's advanced Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-    const { journey: before } = (await (
-      await startJourney(product.id, cookieA)
-    ).json()) as JourneyResponse;
-
-    const advance = await advanceJourney(product.id, cookieB);
-    expect(advance.status).toBe(404);
-    expect(await advance.json()).toEqual({ error: "Not found" });
-
-    const after = (await (
-      await getJourney(product.id, cookieA)
-    ).json()) as JourneyResponse;
-    expect(after.journey).toEqual(before);
-  });
 });
 
 describe("/api/products/:productId/journey/return", () => {
@@ -2383,54 +1927,6 @@ describe("/api/products/:productId/journey/return", () => {
     const { product } = (await created.json()) as { product: { id: string } };
 
     expect((await returnJourney(product.id, cookie)).status).toBe(404);
-  });
-
-  it("rejects a return with no session", async () => {
-    expect((await returnJourney("some-id")).status).toBe(401);
-  });
-
-  it("rejects a return from an untrusted origin, returning nothing", async () => {
-    const cookie = await signIn(TEST_EMAILS.journeysReturnUntrusted);
-    const created = await addProduct(cookie, "Untrusted-return Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-    await startJourney(product.id, cookie);
-    const { journey: before } = (await (
-      await advanceJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-
-    const res = await fetchWorker(
-      `/api/products/${product.id}/journey/return`,
-      {
-        method: "POST",
-        headers: { origin: "https://evil.example.com", cookie },
-      },
-    );
-
-    expect(res.status).toBe(403);
-    const after = (await (
-      await getJourney(product.id, cookie)
-    ).json()) as JourneyResponse;
-    expect(after.journey).toEqual(before);
-  });
-
-  it("404s a stranger's return of another User's Journey, never touching it", async () => {
-    const cookieA = await signIn(TEST_EMAILS.journeysReturnOwnerA);
-    const cookieB = await signIn(TEST_EMAILS.journeysReturnOwnerB);
-    const created = await addProduct(cookieA, "Owner A's returned Product");
-    const { product } = (await created.json()) as { product: { id: string } };
-    await startJourney(product.id, cookieA);
-    const { journey: before } = (await (
-      await advanceJourney(product.id, cookieA)
-    ).json()) as JourneyResponse;
-
-    const res = await returnJourney(product.id, cookieB);
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "Not found" });
-
-    const after = (await (
-      await getJourney(product.id, cookieA)
-    ).json()) as JourneyResponse;
-    expect(after.journey).toEqual(before);
   });
 });
 
@@ -2685,75 +2181,9 @@ describe("/api/products/:productId/worksheets/:worksheetId (#139)", () => {
     ).toEqual({ problem: "Kept" });
   });
 
-  it("rejects a request with no session", async () => {
-    expect((await getWorksheet("some-id", PRODUCT_SUMMARY)).status).toBe(401);
-    expect(
-      (await saveWorksheet("some-id", PRODUCT_SUMMARY, { problem: "x" }))
-        .status,
-    ).toBe(401);
-  });
-
-  it("rejects a save from an untrusted origin, saving nothing", async () => {
-    const { cookie, product } = await withStartedJourney(
-      TEST_EMAILS.worksheetsUntrusted,
-    );
-
-    const res = await fetchWorker(
-      `/api/products/${product.id}/worksheets/${PRODUCT_SUMMARY}`,
-      {
-        method: "PUT",
-        headers: { ...json, origin: "https://evil.example.com", cookie },
-        body: JSON.stringify({ answers: { problem: "x" } }),
-      },
-    );
-
-    expect(res.status).toBe(403);
-    expect(
-      (
-        (await (
-          await getWorksheet(product.id, PRODUCT_SUMMARY, cookie)
-        ).json()) as WorksheetResponse
-      ).answers,
-    ).toEqual({});
-  });
-
-  it("404s a stranger's read or save of another User's Worksheet, never touching it", async () => {
-    const { cookie: cookieA, product } = await withStartedJourney(
-      TEST_EMAILS.worksheetsOwnerA,
-    );
-    const cookieB = await signIn(TEST_EMAILS.worksheetsOwnerB);
-    await saveWorksheet(
-      product.id,
-      PRODUCT_SUMMARY,
-      { problem: "A's own" },
-      cookieA,
-    );
-
-    const read = await getWorksheet(product.id, PRODUCT_SUMMARY, cookieB);
-    expect(read.status).toBe(404);
-    expect(await read.json()).toEqual({ error: "Not found" });
-
-    const save = await saveWorksheet(
-      product.id,
-      PRODUCT_SUMMARY,
-      { problem: "B was here" },
-      cookieB,
-    );
-    expect(save.status).toBe(404);
-    expect(await save.json()).toEqual({ error: "Not found" });
-
-    expect(
-      (
-        (await (
-          await getWorksheet(product.id, PRODUCT_SUMMARY, cookieA)
-        ).json()) as WorksheetResponse
-      ).answers,
-    ).toEqual({ problem: "A's own" });
-  });
-
   it("404s a Worksheet that doesn't exist", async () => {
     const { cookie, product } = await withStartedJourney(
-      TEST_EMAILS.worksheetsOwnerA,
+      TEST_EMAILS.worksheetsNotFound,
     );
 
     expect(
@@ -2924,53 +2354,131 @@ describe("/api/products/:productId/tasks/:taskId (#140)", () => {
       true,
     );
   });
+});
 
-  it("rejects a request with no session", async () => {
-    expect((await putTask("some-id", TALK_TASK, true)).status).toBe(401);
-  });
+/**
+ * The two gates in front of Dreamport's own routes (#154), checked across
+ * every route the app registers rather than one endpoint at a time, so a
+ * route added later is covered without anyone remembering to add a test.
+ */
+describe("request gates, across every route (#154)", () => {
+  const UNTRUSTED_ORIGIN = "https://evil.example";
+  const routes = app.routes.filter((route) => route.method !== "ALL");
 
-  it("rejects a toggle from an untrusted origin, changing nothing", async () => {
-    const { cookie, product } = await withStartedJourney(
-      TEST_EMAILS.tasksUntrusted,
+  /** `path` with each `:param` replaced from `params`; throws on one it lacks. */
+  function fill(path: string, params: Record<string, string>) {
+    return path.replace(/:(\w+)/g, (_, name: string) => {
+      const value = params[name];
+      if (value === undefined) {
+        throw new Error(`no value for :${name} in ${path}`);
+      }
+      return value;
+    });
+  }
+
+  describe("origin", () => {
+    const changing = routes.filter(
+      (route) =>
+        route.method !== "GET" &&
+        route.path.startsWith("/api/") &&
+        !route.path.startsWith("/api/auth/"),
     );
 
-    const res = await fetchWorker(
-      `/api/products/${product.id}/tasks/${TALK_TASK}`,
-      {
-        method: "PUT",
-        headers: { ...json, origin: "https://evil.example.com", cookie },
-        body: JSON.stringify({ done: true }),
+    it("finds the routes that change data", () => {
+      expect(changing.length).toBeGreaterThan(0);
+    });
+
+    it.each(changing.map((route) => [route.method, route.path]))(
+      "%s %s refuses an untrusted origin before checking the session",
+      async (method, path) => {
+        const res = await fetchWorker(path.replace(/:\w+/g, "some-id"), {
+          method,
+          headers: { origin: UNTRUSTED_ORIGIN },
+        });
+
+        expect(res.status).toBe(403);
+        expect(await res.json()).toEqual({ error: "Invalid origin" });
       },
     );
 
-    expect(res.status).toBe(403);
-    expect((await tasksOf(product.id, cookie)).every((t) => !t.done)).toBe(
-      true,
-    );
+    it("refuses an untrusted origin on an unknown /api path too", async () => {
+      const res = await fetchWorker("/api/no-such-route", {
+        method: "POST",
+        headers: { origin: UNTRUSTED_ORIGIN },
+      });
+
+      expect(res.status).toBe(403);
+    });
   });
 
-  it("404s a stranger's toggle of another User's Task, never touching it", async () => {
-    const { cookie: cookieA, product } = await withStartedJourney(
-      TEST_EMAILS.tasksOwnerA,
+  describe("Product ownership", () => {
+    const productScoped = routes.filter((route) =>
+      route.path.startsWith("/api/products/:"),
     );
-    const cookieB = await signIn(TEST_EMAILS.tasksOwnerB);
-    await putTask(product.id, TALK_TASK, true, cookieA);
 
-    const uncheck = await putTask(product.id, TALK_TASK, false, cookieB);
-    expect(uncheck.status).toBe(404);
-    expect(await uncheck.json()).toEqual({ error: "Not found" });
+    /**
+     * The owner's Product, with one of everything a product-scoped route
+     * can name — an Idea, a started Journey (so its Worksheet exists), a
+     * Task — so a route that skipped the ownership check would succeed
+     * against it rather than 404 for some other reason.
+     */
+    async function ownedProduct() {
+      const cookie = await signIn(TEST_EMAILS.gatesOwner);
+      const { product } = (await (
+        await addProduct(cookie, "A phone-scale app")
+      ).json()) as { product: { id: string } };
+      const { idea } = (await (
+        await addIdea(product.id, cookie, "Dark mode")
+      ).json()) as { idea: { id: string } };
+      expect((await startJourney(product.id, cookie)).status).toBe(201);
+      return {
+        cookie,
+        params: {
+          productId: product.id,
+          id: idea.id,
+          worksheetId: PRODUCT_SUMMARY,
+          taskId: TALK_TASK,
+        },
+      };
+    }
 
-    const check = await putTask(product.id, EVENT_TASK, true, cookieB);
-    expect(check.status).toBe(404);
-
-    expect(
-      Object.fromEntries(
-        (await tasksOf(product.id, cookieA)).map((t) => [t.id, t.done]),
-      ),
-    ).toEqual({
-      [COMPLETE_SUMMARY_TASK]: false,
-      [EVENT_TASK]: false,
-      [TALK_TASK]: true,
+    it("finds the product-scoped routes", () => {
+      expect(productScoped.length).toBeGreaterThan(0);
     });
+
+    it.each(productScoped.map((route) => [route.method, route.path]))(
+      "%s %s answers only the Product's owner",
+      async (method, path) => {
+        const owner = await ownedProduct();
+        const stranger = await signIn(TEST_EMAILS.gatesStranger);
+        const request = (params: Record<string, string>, cookie?: string) =>
+          fetchWorker(fill(path, params), {
+            method,
+            headers: {
+              origin: TRUSTED_ORIGIN,
+              ...(cookie ? { cookie } : {}),
+            },
+          });
+
+        const signedOut = await request(owner.params);
+        expect(signedOut.status).toBe(401);
+        expect(await signedOut.json()).toEqual({ error: "Not signed in" });
+
+        // Someone else's Product reads exactly like one that doesn't exist.
+        const asStranger = await request(owner.params, stranger);
+        const nonexistent = await request(
+          { ...owner.params, productId: "no-such-product" },
+          owner.cookie,
+        );
+        expect(asStranger.status).toBe(404);
+        expect(await asStranger.json()).toEqual(await nonexistent.json());
+        expect(nonexistent.status).toBe(404);
+
+        // The control: the owner gets past the gate with the same params.
+        expect((await request(owner.params, owner.cookie)).status).not.toBe(
+          404,
+        );
+      },
+    );
   });
 });

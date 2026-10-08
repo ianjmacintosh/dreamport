@@ -3,8 +3,9 @@
  *
  * Plain data-access functions over the `products` table (`migrations/0003_*.sql`)
  * — the HTTP boundary (session check, request/response shaping) lives in
- * `index.ts`'s `/api/products` routes, the same split `otp-send-throttle.ts`
- * uses for its D1 access.
+ * `index.ts`'s `/api/products` routes and, for one Product,
+ * `product-routes.ts`; the same split `otp-send-throttle.ts` uses for its D1
+ * access.
  */
 
 export interface Product {
@@ -65,6 +66,16 @@ export async function createProduct(
   return product;
 }
 
+declare const owned: unique symbol;
+
+/**
+ * A Product confirmed to belong to the User asking for it (#154). Only
+ * `getProduct` makes one, so every function that reads or writes under a
+ * Product takes this rather than a bare id: one nobody checked won't
+ * typecheck.
+ */
+export type OwnedProduct = Product & { readonly [owned]: true };
+
 /**
  * A User's own Product by id, or null if it doesn't exist or isn't theirs.
  * Scoped by both `id` and `userId` in one query — same reasoning as
@@ -75,30 +86,28 @@ export async function getProduct(
   db: D1Database,
   userId: string,
   id: string,
-): Promise<Product | null> {
+): Promise<OwnedProduct | null> {
   return db
     .prepare(
       'SELECT "id", "name", "description", "createdAt" FROM "products" WHERE "id" = ? AND "userId" = ?',
     )
     .bind(id, userId)
-    .first<Product>();
+    .first<OwnedProduct>();
 }
 
 /**
- * Delete a Product owned by `userId`. Scoped by both `id` and `userId` in
- * the one query — not a select-then-delete — so a stranger's row is
- * indistinguishable from a nonexistent one at the DB layer too. Returns
- * whether a row was actually deleted, so the caller can decide 404 vs 200
- * without a separate existence check.
+ * Delete a Product owned by `userId`. Still scoped by `userId` in the query
+ * as well, a second check behind `OwnedProduct`'s. Returns whether a row was
+ * actually deleted.
  */
 export async function deleteProduct(
   db: D1Database,
   userId: string,
-  id: string,
+  product: OwnedProduct,
 ): Promise<boolean> {
   const { meta } = await db
     .prepare('DELETE FROM "products" WHERE "id" = ? AND "userId" = ?')
-    .bind(id, userId)
+    .bind(product.id, userId)
     .run();
   return meta.changes > 0;
 }
@@ -106,19 +115,20 @@ export async function deleteProduct(
 /**
  * Set (or, with `null`, clear) the description of a Product owned by
  * `userId`. Caller has already validated and normalised `description`.
- * Scoped by both `id` and `userId` in the one query, same as
- * `deleteProduct`; returns the updated Product, or null if no row matched.
+ * Still scoped by `userId` in the query, the same second check
+ * `deleteProduct` keeps; returns the updated Product, or null if no row
+ * matched.
  */
 export async function updateProductDescription(
   db: D1Database,
   userId: string,
-  id: string,
+  product: OwnedProduct,
   description: string | null,
 ): Promise<Product | null> {
   return db
     .prepare(
       'UPDATE "products" SET "description" = ? WHERE "id" = ? AND "userId" = ? RETURNING "id", "name", "description", "createdAt"',
     )
-    .bind(description, id, userId)
+    .bind(description, product.id, userId)
     .first<Product>();
 }

@@ -3,16 +3,18 @@
  * Milestones hold, filled in per Product.
  *
  * Plain data-access functions over the `worksheets`/`worksheet_*` tables
- * (`migrations/0013_*.sql`) — the HTTP boundary lives in `index.ts`'s
- * `/api/products/:productId/worksheets/:worksheetId` routes, the same split
- * `journeys.ts` has. Nothing here re-checks that `productId` belongs to the
- * caller — the route already will have, via `getProduct`.
+ * (`migrations/0013_*.sql`) — the HTTP boundary lives in
+ * `product-routes.ts`'s `/worksheets/:worksheetId` routes, the same split
+ * `journeys.ts` has. Each takes an `OwnedProduct`, so ownership is already
+ * settled by the time one runs.
  *
  * Only singleton Worksheets have any content yet (the Product Summary), so
  * reading and saving answers addresses a Worksheet's one copy by
  * (Product, Path, Worksheet). A repeatable Worksheet's copies will need
  * their own ids in the URL once one is authored.
  */
+
+import type { OwnedProduct } from "./products";
 
 /** Longest answer a Worksheet field takes, in characters. */
 export const WORKSHEET_ANSWER_MAX_LENGTH = 1000;
@@ -89,7 +91,7 @@ export async function getWorksheet(
  */
 export async function createSingletonInstances(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
   pathId: string,
 ): Promise<void> {
   await db
@@ -105,14 +107,14 @@ export async function createSingletonInstances(
          )
        ON CONFLICT DO NOTHING`,
     )
-    .bind(productId, pathId, new Date().toISOString(), pathId)
+    .bind(product.id, pathId, new Date().toISOString(), pathId)
     .run();
 }
 
 /** The Product's answers on its copy of a singleton Worksheet. */
 export async function getAnswers(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
   pathId: string,
   worksheetId: string,
 ): Promise<WorksheetAnswers> {
@@ -124,7 +126,7 @@ export async function getAnswers(
        WHERE "worksheet_instances"."productId" = ? AND "worksheet_instances"."pathId" = ?
          AND "worksheet_instances"."worksheetId" = ? AND "worksheet_instances"."singleton" = 1`,
     )
-    .bind(productId, pathId, worksheetId)
+    .bind(product.id, pathId, worksheetId)
     .all<{ fieldId: string; value: string }>();
   return Object.fromEntries(results.map((r) => [r.fieldId, r.value]));
 }
@@ -139,7 +141,7 @@ export async function getAnswers(
  */
 export async function saveAnswers(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
   pathId: string,
   worksheetId: string,
   answers: WorksheetAnswers,
@@ -152,7 +154,7 @@ export async function saveAnswers(
       )
       .bind(
         crypto.randomUUID(),
-        productId,
+        product.id,
         pathId,
         worksheetId,
         new Date().toISOString(),
@@ -161,13 +163,13 @@ export async function saveAnswers(
       .prepare(
         `DELETE FROM "worksheet_answers" WHERE "instanceId" = ${instanceId}`,
       )
-      .bind(productId, pathId, worksheetId),
+      .bind(product.id, pathId, worksheetId),
     ...Object.entries(answers).map(([fieldId, value]) =>
       db
         .prepare(
           `INSERT INTO "worksheet_answers" ("instanceId", "fieldId", "value") VALUES (${instanceId}, ?, ?)`,
         )
-        .bind(productId, pathId, worksheetId, fieldId, value),
+        .bind(product.id, pathId, worksheetId, fieldId, value),
     ),
   ]);
 }
@@ -178,7 +180,7 @@ export async function saveAnswers(
  */
 export async function worksheetSummaries(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
   pathId: string,
 ): Promise<WorksheetSummary[]> {
   const [{ results: links }, { results: filledCounts }] = await Promise.all([
@@ -203,7 +205,7 @@ export async function worksheetSummaries(
            AND "worksheet_instances"."singleton" = 1
          GROUP BY "worksheet_instances"."worksheetId"`,
       )
-      .bind(productId, pathId)
+      .bind(product.id, pathId)
       .all<{ worksheetId: string; filled: number }>(),
   ]);
 
@@ -232,13 +234,13 @@ export async function worksheetSummaries(
  */
 export async function worksheetState(
   db: D1Database,
-  productId: string,
+  product: OwnedProduct,
   pathId: string,
   worksheetId: string,
 ): Promise<{ worksheet: Worksheet; answers: WorksheetAnswers } | null> {
   const [worksheet, answers] = await Promise.all([
     getWorksheet(db, worksheetId),
-    getAnswers(db, productId, pathId, worksheetId),
+    getAnswers(db, product, pathId, worksheetId),
   ]);
   if (!worksheet) {
     return null;
