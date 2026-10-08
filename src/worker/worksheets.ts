@@ -2,7 +2,7 @@
  * Worksheets (issue #139, parent #133): sets of fields a Path's
  * Milestones hold. This is the fixed content every Product shares — the
  * catalog over `worksheets`/`worksheet_fields` (`migrations/0013_*.sql`)
- * and the rule for what a filled-in field may hold. A Product's own copies
+ * and the rule for what a filled-in field may hold. A Product's own instances
  * and answers belong to its Journey, in `journeys.ts`.
  */
 

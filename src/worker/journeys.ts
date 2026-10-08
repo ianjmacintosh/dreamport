@@ -1,8 +1,8 @@
 /**
  * Journeys (issues #137-#140, deepened in #156): everything about one
  * Product's progress on a Path — starting it, Advance and Return, the
- * Product's copies of the Path's Worksheets, Task check-off, and the
- * combined state the Journey page shows.
+ * Product's Worksheet instances, Task check-off, and the combined state
+ * the Journey page shows.
  *
  * Plain data-access functions over `journeys` (`migrations/0007_*.sql`),
  * `worksheet_instances`/`worksheet_answers` (`0013`) and `task_completions`
@@ -79,7 +79,7 @@ export type StartedJourney = {
 
 /**
  * What the Journey page needs to link to a Worksheet: where it's on and how
- * much of the Product's copy is filled in.
+ * much of the Product's instance is filled in.
  */
 export interface WorksheetSummary {
   id: string;
@@ -111,11 +111,11 @@ export async function loadJourney(
 }
 
 /**
- * Start the Product's Journey at its first Milestone, with its one copy of
+ * Start the Product's Journey at its first Milestone, with its one instance of
  * each singleton Worksheet on the Path (#139). Returns whether a Journey
  * was actually started — `false` means one already existed, and it's left
  * exactly as it was (a repeat start never resets progress). A repeat start
- * still creates any singleton copy that's missing, which a Journey started
+ * still creates any singleton instance that's missing, which a Journey started
  * before #139 would be.
  */
 export async function startJourney(
@@ -128,7 +128,7 @@ export async function startJourney(
     )
     .bind(crypto.randomUUID(), product.id, new Date().toISOString(), PATH_ID)
     .run();
-  await createSingletonCopies(db, product, PATH_ID);
+  await createSingletonInstances(db, product, PATH_ID);
   return meta.changes > 0;
 }
 
@@ -231,7 +231,7 @@ export async function returnJourney(
 }
 
 /**
- * The Worksheet and the Product's answers on its copy, or `null` if there's
+ * The Worksheet and the Product's answers on its instance, or `null` if there's
  * no such Worksheet. The answers can be changed at any point in the
  * Journey, not just on the Milestones the Worksheet is on — those are only
  * where it's checked (#139).
@@ -264,13 +264,13 @@ export async function worksheetState(
 }
 
 /**
- * Replace every answer on the Product's copy of a singleton Worksheet with
- * `answers` — a field left out reads as blank afterwards. Creates the copy
+ * Replace every answer on the Product's instance of a singleton Worksheet with
+ * `answers` — a field left out reads as blank afterwards. Creates the instance
  * first if it's missing (a Journey started before #139 has none).
  *
  * Only singleton Worksheets have any content yet (the Product Summary), so
- * the copy is addressed by (Product, Path, Worksheet). A repeatable
- * Worksheet's copies will need their own ids once one is authored (#151).
+ * the instance is addressed by (Product, Path, Worksheet). A repeatable
+ * Worksheet's instances will need their own ids once one is authored (#151).
  *
  * One `batch`, which D1 runs as a single transaction, so a save never
  * half-applies (old answers deleted, new ones not yet written).
@@ -403,12 +403,12 @@ async function getPath(db: D1Database, pathId: string): Promise<Path> {
 }
 
 /**
- * Create the Product's one copy of every singleton Worksheet on `pathId`'s
+ * Create the Product's one instance of every singleton Worksheet on `pathId`'s
  * Milestones, skipping any it already has — so it's safe to call on every
  * Journey start, repeat or not. Ids come from SQLite's `randomblob`, since
  * one `INSERT ... SELECT` can't call `crypto.randomUUID()` per row.
  */
-async function createSingletonCopies(
+async function createSingletonInstances(
   db: D1Database,
   product: OwnedProduct,
   pathId: string,

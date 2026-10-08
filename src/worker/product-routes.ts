@@ -290,9 +290,9 @@ productRoutes.post("/journey/advance", async (c) => {
 });
 
 /**
- * Return the Product's Journey by one Milestone, or reopen it if it's
- * completed — see `returnJourney`. The same 404 as advancing when there's
- * no Journey to return.
+ * Return the Product's Journey by one Milestone, or put it back in
+ * progress if it's completed — see `returnJourney`. The same 404 as
+ * advancing when there's no Journey to return.
  */
 productRoutes.post("/journey/return", async (c) => {
   const { product } = c.var;
@@ -306,7 +306,7 @@ productRoutes.post("/journey/return", async (c) => {
 });
 
 /**
- * Worksheets (issue #139): the Product's copy of one Worksheet on its
+ * Worksheets (issue #139): the Product's instance of one Worksheet on its
  * Journey — the Worksheet and its answers. 404s when the Product hasn't
  * started its Journey or there's no such Worksheet. Bundles the Product
  * for the Worksheet page's heading.
@@ -314,9 +314,15 @@ productRoutes.post("/journey/return", async (c) => {
 productRoutes.get("/worksheets/:worksheetId", async (c) => {
   const { product } = c.var;
   const journey = await loadJourney(c.env.DB, product);
-  const state =
-    journey &&
-    (await worksheetState(c.env.DB, journey, c.req.param("worksheetId")));
+  if (!journey) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  const state = await worksheetState(
+    c.env.DB,
+    journey,
+    c.req.param("worksheetId"),
+  );
   if (!state) {
     return c.json({ error: "Not found" }, 404);
   }
@@ -333,9 +339,12 @@ productRoutes.put("/worksheets/:worksheetId", async (c) => {
   const { product } = c.var;
   const worksheetId = c.req.param("worksheetId");
   const journey = await loadJourney(c.env.DB, product);
-  const state =
-    journey && (await worksheetState(c.env.DB, journey, worksheetId));
-  if (!journey || !state) {
+  if (!journey) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  const state = await worksheetState(c.env.DB, journey, worksheetId);
+  if (!state) {
     return c.json({ error: "Not found" }, 404);
   }
 

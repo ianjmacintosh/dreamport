@@ -67,8 +67,8 @@ const COMPLETE_SUMMARY_TASK = "complete-product-summary";
 const EVENT_TASK = "event-schedule-product-summary";
 const TALK_TASK = "talk-to-five-customers";
 
-/** How many copies of a Worksheet a Product has. */
-async function countWorksheetCopies(productId: string, worksheetId: string) {
+/** How many instances of a Worksheet a Product has. */
+async function countWorksheetInstances(productId: string, worksheetId: string) {
   const row = await env.DB.prepare(
     'SELECT COUNT(*) AS n FROM "worksheet_instances" WHERE "productId" = ? AND "worksheetId" = ?',
   )
@@ -95,7 +95,7 @@ describe("starting a Journey", () => {
     ]);
   });
 
-  it("starts on Milestone 1 with one copy of each singleton Worksheet", async () => {
+  it("starts on Milestone 1 with one instance of each singleton Worksheet", async () => {
     const product = await newProduct();
 
     expect(await startJourney(env.DB, product)).toBe(true);
@@ -108,7 +108,7 @@ describe("starting a Journey", () => {
       currentMilestoneId: path.milestones[0].id,
       finishedAt: null,
     });
-    expect(await countWorksheetCopies(product.id, PRODUCT_SUMMARY)).toBe(1);
+    expect(await countWorksheetInstances(product.id, PRODUCT_SUMMARY)).toBe(1);
     expect(worksheets).toEqual([
       {
         id: PRODUCT_SUMMARY,
@@ -147,7 +147,7 @@ describe("starting a Journey", () => {
 
     expect(await startJourney(env.DB, product)).toBe(false);
     expect(await progress(product)).toEqual(before);
-    expect(await countWorksheetCopies(product.id, PRODUCT_SUMMARY)).toBe(1);
+    expect(await countWorksheetInstances(product.id, PRODUCT_SUMMARY)).toBe(1);
   });
 });
 
@@ -186,7 +186,7 @@ describe("Advance", () => {
 });
 
 describe("Return", () => {
-  it("reopens a completed Journey first, then moves back one Milestone at a time", async () => {
+  it("puts a completed Journey back in progress first, then moves back one Milestone at a time", async () => {
     const { product, journey, milestoneIds } = await started();
     await advanceTimes(journey, 7);
 
@@ -232,7 +232,7 @@ describe("Worksheets", () => {
     expect(await worksheetState(env.DB, journey, "not-a-worksheet")).toBeNull();
   });
 
-  it("saves on any Milestone, past the ones it's on, and once completed, into the one copy", async () => {
+  it("saves on any Milestone, past the ones it's on, and once completed, into the one instance", async () => {
     const { product, journey } = await started();
 
     for (let milestone = 1; milestone <= 7; milestone++) {
@@ -253,7 +253,7 @@ describe("Worksheets", () => {
     expect(
       (await worksheetState(env.DB, journey, PRODUCT_SUMMARY))?.answers,
     ).toEqual({ problem: "Completed", customer: "Home bakers" });
-    expect(await countWorksheetCopies(product.id, PRODUCT_SUMMARY)).toBe(1);
+    expect(await countWorksheetInstances(product.id, PRODUCT_SUMMARY)).toBe(1);
   });
 
   it("replaces every answer on a save, and the Journey page counts what's filled", async () => {
@@ -277,9 +277,9 @@ describe("Worksheets", () => {
     });
   });
 
-  it("creates the copy on save when a Journey started without one", async () => {
+  it("creates the instance on save when a Journey started without one", async () => {
     const { product, journey } = await started();
-    // A Journey started before #139 has no Worksheet copies.
+    // A Journey started before #139 has no Worksheet instances.
     await env.DB.prepare(
       'DELETE FROM "worksheet_instances" WHERE "productId" = ?',
     )
@@ -290,7 +290,7 @@ describe("Worksheets", () => {
     expect(
       (await worksheetState(env.DB, journey, PRODUCT_SUMMARY))?.answers,
     ).toEqual({ problem: "Late" });
-    expect(await countWorksheetCopies(product.id, PRODUCT_SUMMARY)).toBe(1);
+    expect(await countWorksheetInstances(product.id, PRODUCT_SUMMARY)).toBe(1);
   });
 });
 
