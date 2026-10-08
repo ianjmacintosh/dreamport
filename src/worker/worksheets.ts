@@ -1,20 +1,10 @@
 /**
  * Worksheets (issue #139, parent #133): sets of fields a Path's
- * Milestones hold, filled in per Product.
- *
- * Plain data-access functions over the `worksheets`/`worksheet_*` tables
- * (`migrations/0013_*.sql`) — the HTTP boundary lives in
- * `product-routes.ts`'s `/worksheets/:worksheetId` routes, the same split
- * `journeys.ts` has. Each takes an `OwnedProduct`, so ownership is already
- * settled by the time one runs.
- *
- * Only singleton Worksheets have any content yet (the Product Summary), so
- * reading and saving answers addresses a Worksheet's one copy by
- * (Product, Path, Worksheet). A repeatable Worksheet's copies will need
- * their own ids in the URL once one is authored.
+ * Milestones hold. This is the fixed content every Product shares — the
+ * catalog over `worksheets`/`worksheet_fields` (`migrations/0013_*.sql`)
+ * and the rule for what a filled-in field may hold. A Product's own instances
+ * and answers belong to its Journey, in `journeys.ts`.
  */
-
-import type { OwnedProduct } from "./products";
 
 /** Longest answer a Worksheet field takes, in characters. */
 export const WORKSHEET_ANSWER_MAX_LENGTH = 1000;
@@ -38,18 +28,6 @@ export interface Worksheet {
 
 /** A Worksheet's filled-in fields, by field id. A blank field is absent. */
 export type WorksheetAnswers = Record<string, string>;
-
-/**
- * What the Journey page needs to link to a Worksheet: where it's on and how
- * much of the Product's copy is filled in.
- */
-export interface WorksheetSummary {
-  id: string;
-  name: string;
-  milestoneIds: string[];
-  filled: number;
-  total: number;
-}
 
 /** A Worksheet from the catalog, or `null` if there's no such Worksheet. */
 export async function getWorksheet(
@@ -81,171 +59,6 @@ export async function getWorksheet(
     return null;
   }
   return { ...worksheet, fields, milestoneIds: milestones.map((m) => m.id) };
-}
-
-/**
- * Create the Product's one copy of every singleton Worksheet on `pathId`'s
- * Milestones, skipping any it already has — so it's safe to call on every
- * Journey start, repeat or not. Ids come from SQLite's `randomblob`, since
- * one `INSERT ... SELECT` can't call `crypto.randomUUID()` per row.
- */
-export async function createSingletonInstances(
-  db: D1Database,
-  product: OwnedProduct,
-  pathId: string,
-): Promise<void> {
-  await db
-    .prepare(
-      `INSERT INTO "worksheet_instances" ("id", "productId", "pathId", "worksheetId", "singleton", "createdAt")
-       SELECT lower(hex(randomblob(16))), ?, ?, "worksheets"."id", 1, ?
-       FROM "worksheets"
-       WHERE "worksheets"."cardinality" = 'singleton'
-         AND "worksheets"."id" IN (
-           SELECT "milestone_worksheets"."worksheetId" FROM "milestone_worksheets"
-           JOIN "milestones" ON "milestones"."id" = "milestone_worksheets"."milestoneId"
-           WHERE "milestones"."pathId" = ?
-         )
-       ON CONFLICT DO NOTHING`,
-    )
-    .bind(product.id, pathId, new Date().toISOString(), pathId)
-    .run();
-}
-
-/** The Product's answers on its copy of a singleton Worksheet. */
-export async function getAnswers(
-  db: D1Database,
-  product: OwnedProduct,
-  pathId: string,
-  worksheetId: string,
-): Promise<WorksheetAnswers> {
-  const { results } = await db
-    .prepare(
-      `SELECT "worksheet_answers"."fieldId", "worksheet_answers"."value"
-       FROM "worksheet_answers"
-       JOIN "worksheet_instances" ON "worksheet_instances"."id" = "worksheet_answers"."instanceId"
-       WHERE "worksheet_instances"."productId" = ? AND "worksheet_instances"."pathId" = ?
-         AND "worksheet_instances"."worksheetId" = ? AND "worksheet_instances"."singleton" = 1`,
-    )
-    .bind(product.id, pathId, worksheetId)
-    .all<{ fieldId: string; value: string }>();
-  return Object.fromEntries(results.map((r) => [r.fieldId, r.value]));
-}
-
-/**
- * Replace every answer on the Product's copy of a singleton Worksheet with
- * `answers` — a field left out reads as blank afterwards. Creates the copy
- * first if it's missing (a Journey started before #139 has none).
- *
- * One `batch`, which D1 runs as a single transaction, so a save never
- * half-applies (old answers deleted, new ones not yet written).
- */
-export async function saveAnswers(
-  db: D1Database,
-  product: OwnedProduct,
-  pathId: string,
-  worksheetId: string,
-  answers: WorksheetAnswers,
-): Promise<void> {
-  const instanceId = `(SELECT "id" FROM "worksheet_instances" WHERE "productId" = ? AND "pathId" = ? AND "worksheetId" = ? AND "singleton" = 1)`;
-  await db.batch([
-    db
-      .prepare(
-        'INSERT INTO "worksheet_instances" ("id", "productId", "pathId", "worksheetId", "singleton", "createdAt") VALUES (?, ?, ?, ?, 1, ?) ON CONFLICT DO NOTHING',
-      )
-      .bind(
-        crypto.randomUUID(),
-        product.id,
-        pathId,
-        worksheetId,
-        new Date().toISOString(),
-      ),
-    db
-      .prepare(
-        `DELETE FROM "worksheet_answers" WHERE "instanceId" = ${instanceId}`,
-      )
-      .bind(product.id, pathId, worksheetId),
-    ...Object.entries(answers).map(([fieldId, value]) =>
-      db
-        .prepare(
-          `INSERT INTO "worksheet_answers" ("instanceId", "fieldId", "value") VALUES (${instanceId}, ?, ?)`,
-        )
-        .bind(product.id, pathId, worksheetId, fieldId, value),
-    ),
-  ]);
-}
-
-/**
- * Every Worksheet on `pathId`'s Milestones, in the order its first
- * Milestone comes, with how many of the Product's answers are filled in.
- */
-export async function worksheetSummaries(
-  db: D1Database,
-  product: OwnedProduct,
-  pathId: string,
-): Promise<WorksheetSummary[]> {
-  const [{ results: links }, { results: filledCounts }] = await Promise.all([
-    db
-      .prepare(
-        `SELECT "worksheets"."id", "worksheets"."name", "milestone_worksheets"."milestoneId",
-           (SELECT COUNT(*) FROM "worksheet_fields" WHERE "worksheetId" = "worksheets"."id") AS "total"
-         FROM "milestone_worksheets"
-         JOIN "milestones" ON "milestones"."id" = "milestone_worksheets"."milestoneId"
-         JOIN "worksheets" ON "worksheets"."id" = "milestone_worksheets"."worksheetId"
-         WHERE "milestones"."pathId" = ?
-         ORDER BY "milestones"."position" ASC, "worksheets"."id" ASC`,
-      )
-      .bind(pathId)
-      .all<{ id: string; name: string; milestoneId: string; total: number }>(),
-    db
-      .prepare(
-        `SELECT "worksheet_instances"."worksheetId", COUNT(*) AS "filled"
-         FROM "worksheet_answers"
-         JOIN "worksheet_instances" ON "worksheet_instances"."id" = "worksheet_answers"."instanceId"
-         WHERE "worksheet_instances"."productId" = ? AND "worksheet_instances"."pathId" = ?
-           AND "worksheet_instances"."singleton" = 1
-         GROUP BY "worksheet_instances"."worksheetId"`,
-      )
-      .bind(product.id, pathId)
-      .all<{ worksheetId: string; filled: number }>(),
-  ]);
-
-  const filled = new Map(filledCounts.map((r) => [r.worksheetId, r.filled]));
-  const summaries = new Map<string, WorksheetSummary>();
-  for (const { id, name, milestoneId, total } of links) {
-    const summary = summaries.get(id) ?? {
-      id,
-      name,
-      milestoneIds: [],
-      filled: filled.get(id) ?? 0,
-      total,
-    };
-    summary.milestoneIds.push(milestoneId);
-    summaries.set(id, summary);
-  }
-  return [...summaries.values()];
-}
-
-/**
- * What `/api/products/:productId/worksheets/:worksheetId` answers with: the
- * Worksheet and the Product's answers on it, or `null` if there's no such
- * Worksheet. The answers can be changed at any point in the Journey, not
- * just on the Milestones the Worksheet is on — those are only where it's
- * checked (#139).
- */
-export async function worksheetState(
-  db: D1Database,
-  product: OwnedProduct,
-  pathId: string,
-  worksheetId: string,
-): Promise<{ worksheet: Worksheet; answers: WorksheetAnswers } | null> {
-  const [worksheet, answers] = await Promise.all([
-    getWorksheet(db, worksheetId),
-    getAnswers(db, product, pathId, worksheetId),
-  ]);
-  if (!worksheet) {
-    return null;
-  }
-  return { worksheet, answers };
 }
 
 /**

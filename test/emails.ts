@@ -167,48 +167,25 @@ export const TEST_EMAILS = {
   /** Tags an Idea id that was never created; expects a 404. */
   ideasTagsNonexistent: "delivered+ideas-tags-nonexistent@resend.dev",
 
-  // --- Seam 1: /api/products/:productId/journey (#137) ---
-  /** Starts a Journey on a fresh Product and reads back its Milestones. */
+  // --- The Journey module, called directly (#156) ---
+  /** The one User who owns every Product in `journeys.worker.test.ts`. Never signs in. */
+  journeysModule: "delivered+journeys-module@resend.dev",
+
+  // --- Seam 1: the Journey routes (#137-#140), one test each ---
+  /** Reads the Journey page's state before a Journey starts. */
+  journeysState: "delivered+journeys-state@resend.dev",
+  /** Starts a Journey, then starts it again. */
   journeysStart: "delivered+journeys-start@resend.dev",
-  /** Starts a Journey twice; the second start leaves Milestone 1 current. */
-  journeysStartTwice: "delivered+journeys-start-twice@resend.dev",
-
-  // --- Seam 1b: /api/products/:productId/journey/advance (#138) ---
-  /** Advances a fresh Journey through every Milestone, then finishes it. */
+  /** Advances with no Journey (404), then with one. */
   journeysAdvance: "delivered+journeys-advance@resend.dev",
-  /** Advancing a Journey that hasn't started yet 404s. */
-  journeysAdvanceUnstarted: "delivered+journeys-advance-unstarted@resend.dev",
-  /** Advancing an already-finished Journey is a harmless no-op. */
-  journeysAdvanceAlreadyFinished:
-    "delivered+journeys-advance-already-finished@resend.dev",
-
-  // --- Seam 1c: /api/products/:productId/journey/return ---
-  /** Returns a finished Journey all the way back to Milestone 1. */
+  /** Returns with no Journey (404), then with one. */
   journeysReturn: "delivered+journeys-return@resend.dev",
-  /** Returning from Milestone 1 is a harmless no-op. */
-  journeysReturnAtFirst: "delivered+journeys-return-at-first@resend.dev",
-  /** Returning a Journey that hasn't started yet 404s. */
-  journeysReturnUnstarted: "delivered+journeys-return-unstarted@resend.dev",
-
-  // --- Seam 1d: /api/products/:productId/worksheets/:worksheetId (#139) ---
-  /** Starting a Journey creates one Product Summary instance, never two. */
-  worksheetsSingleton: "delivered+worksheets-singleton@resend.dev",
-  /** Saves one-pager answers on one Milestone, reads them back on another. */
-  worksheetsAnswers: "delivered+worksheets-answers@resend.dev",
-  /** 404s before a Journey starts, then saves on Milestone 5 and once finished. */
-  worksheetsAnyMilestone: "delivered+worksheets-any-milestone@resend.dev",
-  /** Rejects bad answer bodies: unknown field, non-string, over the cap. */
-  worksheetsInvalid: "delivered+worksheets-invalid@resend.dev",
-  /** Asks for a Worksheet that doesn't exist; expects a 404. */
-  worksheetsNotFound: "delivered+worksheets-not-found@resend.dev",
-
-  // --- Seam 1e: /api/products/:productId/tasks/:taskId (#140) ---
-  /** Checks and unchecks a standalone Task; the state persists. */
-  tasksToggle: "delivered+tasks-toggle@resend.dev",
-  /** Advances and returns with Tasks checked and unchecked alike. */
-  tasksNotGating: "delivered+tasks-not-gating@resend.dev",
-  /** 404s before a Journey starts or for an unknown Task; 400s a bad body. */
-  tasksInvalid: "delivered+tasks-invalid@resend.dev",
+  /** Reads the Product Summary with no Journey (404), then with one. */
+  worksheetsRead: "delivered+worksheets-read@resend.dev",
+  /** Saves the Product Summary with no Journey (404), a bad body (400), then a good one. */
+  worksheetsSave: "delivered+worksheets-save@resend.dev",
+  /** Checks off a Task with no Journey (404), a bad body (400), then a good one. */
+  tasksCheckOff: "delivered+tasks-check-off@resend.dev",
 
   // --- Seam 1f: the gates every product route crosses (#154) ---
   /** Owns the Product every product-scoped route is driven against. */

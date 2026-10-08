@@ -68,28 +68,53 @@ _Avoid_: stage, phase, step
 One Product's progress following one Path — started by the User, at the
 Path's first Milestone. Strictly sequenced: exactly one current Milestone,
 everything before it done, everything after it future. A Product has at
-most one Journey per Path, so following a different Path later wouldn't
-overwrite progress on the first. A Journey always belongs to its Product
-— it's "Tarot's Journey," never a Journey called "Tarot." Its page is just
-"the Journey," the same way the Product's Ideas section is "Ideas."
-_Avoid_: progress, roadmap, track
+most one Journey per Path, and can be on several Paths at once (e.g. one
+for building the product, one for marketing it), each its own Journey. A
+Journey is **in progress**, **paused** (set aside by the User, everything
+kept), or **completed** (Advanced past its last Milestone). A Journey
+always belongs to its Product — it's "Tarot's Journey," never a Journey
+called "Tarot." Its page is just "the Journey," the same way the
+Product's Ideas section is "Ideas."
+_Avoid_: progress, roadmap, track; active (say in progress); finished
+(say completed); stopped, abandoned (say paused)
 
 **Advance**:
 Move a Journey's current Milestone forward by one, something the User
 does whenever they're ready — not automatic, and not gated on anything
 the User hasn't themselves judged done. Advancing past the last Milestone
-finishes the Journey instead of moving further — a finished state, not
+completes the Journey instead of moving further — a completed state, not
 staying on the last Milestone forever. The mirror of Return.
-_Avoid_: progress, complete (as a verb for this), next
+_Avoid_: progress, complete (as another name for Advance), next
 
 **Return**:
 Move a Journey's current Milestone backward by one — the mirror of
 Advance, for a User who wants to revisit a Milestone they've already
 passed (misread its "done when," did too little, or just wants another
-look). Returning from a finished Journey un-finishes it. Never
-destructive: nothing is deleted, since a Milestone is fixed content, not
-something a User's own work is attached to.
+look). Returning from a completed Journey puts it back in progress, on
+its last Milestone. Never destructive: nothing is deleted, since a
+Milestone is fixed content, not something a User's own work is attached
+to.
 _Avoid_: step back, go back, revert, undo, retreat
+
+**Pause**:
+Set an in-progress Journey aside, for a User taking time away from that
+Path. Everything is kept — the current Milestone, Worksheet answers,
+checked Tasks — and the Journey waits, paused, until the User resumes or
+restarts it. Not the same as completed: a paused Journey was set aside partway.
+_Avoid_: stop, abandon, archive
+
+**Resume**:
+Put a paused Journey back in progress, on the Milestone the User left it
+on. The mirror of Pause.
+_Avoid_: unpause, continue
+
+**Restart**:
+Put a paused or completed Journey back on its Path's first Milestone, in
+progress — the alternative to Resume when a User starts a Path their
+Product has been on before. Never destructive: Worksheet answers and
+checked Tasks stay as they were, for the User to revise, or clear by hand
+if they want a blank slate.
+_Avoid_: reset, start over, start from scratch
 
 **Worksheet**:
 A fixed, Dreamport-authored set of ordered fields, each asking one thing

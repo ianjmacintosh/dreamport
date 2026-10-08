@@ -11,11 +11,13 @@ import {
 } from "./ideas";
 import {
   advanceJourney,
-  DEFAULT_PATH_ID,
-  getJourney,
   journeyState,
+  loadJourney,
   returnJourney,
+  saveAnswers,
+  setTaskDone,
   startJourney,
+  worksheetState,
 } from "./journeys";
 import {
   deleteProduct,
@@ -25,8 +27,7 @@ import {
   updateProductDescription,
 } from "./products";
 import { listTags, listTagsByIdea, setIdeaTags } from "./tags";
-import { setTaskDone } from "./tasks";
-import { parseAnswers, saveAnswers, worksheetState } from "./worksheets";
+import { parseAnswers } from "./worksheets";
 
 type ProductEnv = {
   Bindings: WorkerEnv;
@@ -267,7 +268,7 @@ productRoutes.get("/journey", async (c) => {
  */
 productRoutes.post("/journey", async (c) => {
   const { product } = c.var;
-  const started = await startJourney(c.env.DB, product, DEFAULT_PATH_ID);
+  const started = await startJourney(c.env.DB, product);
   return c.json(await journeyState(c.env.DB, product), started ? 201 : 200);
 });
 
@@ -279,46 +280,49 @@ productRoutes.post("/journey", async (c) => {
  */
 productRoutes.post("/journey/advance", async (c) => {
   const { product } = c.var;
-  const advanced = await advanceJourney(c.env.DB, product, DEFAULT_PATH_ID);
-  if (!advanced) {
+  const journey = await loadJourney(c.env.DB, product);
+  if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
 
+  await advanceJourney(c.env.DB, journey);
   return c.json(await journeyState(c.env.DB, product), 200);
 });
 
 /**
- * Return the Product's Journey by one Milestone, or un-finish it if it's
- * finished — see `returnJourney`. The same 404 as advancing when there's no
- * Journey to return.
+ * Return the Product's Journey by one Milestone, or put it back in
+ * progress if it's completed — see `returnJourney`. The same 404 as
+ * advancing when there's no Journey to return.
  */
 productRoutes.post("/journey/return", async (c) => {
   const { product } = c.var;
-  const returned = await returnJourney(c.env.DB, product, DEFAULT_PATH_ID);
-  if (!returned) {
+  const journey = await loadJourney(c.env.DB, product);
+  if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
 
+  await returnJourney(c.env.DB, journey);
   return c.json(await journeyState(c.env.DB, product), 200);
 });
 
 /**
- * Worksheets (issue #139): the Product's instance of one Worksheet on the
- * default Path — the Worksheet and its answers. 404s when there's no such
- * Worksheet or the Product hasn't started its Journey. Bundles the Product
+ * Worksheets (issue #139): the Product's instance of one Worksheet on its
+ * Journey — the Worksheet and its answers. 404s when the Product hasn't
+ * started its Journey or there's no such Worksheet. Bundles the Product
  * for the Worksheet page's heading.
  */
 productRoutes.get("/worksheets/:worksheetId", async (c) => {
   const { product } = c.var;
-  const journey = await getJourney(c.env.DB, product, DEFAULT_PATH_ID);
-  const state =
-    journey &&
-    (await worksheetState(
-      c.env.DB,
-      product,
-      DEFAULT_PATH_ID,
-      c.req.param("worksheetId"),
-    ));
+  const journey = await loadJourney(c.env.DB, product);
+  if (!journey) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  const state = await worksheetState(
+    c.env.DB,
+    journey,
+    c.req.param("worksheetId"),
+  );
   if (!state) {
     return c.json({ error: "Not found" }, 404);
   }
@@ -329,15 +333,17 @@ productRoutes.get("/worksheets/:worksheetId", async (c) => {
 /**
  * Save the Product's answers on one Worksheet, replacing every field (one
  * left out reads as blank). The same 404s as reading it. Saving works at
- * any point in the Journey, finished or not.
+ * any point in the Journey, completed or not.
  */
 productRoutes.put("/worksheets/:worksheetId", async (c) => {
   const { product } = c.var;
   const worksheetId = c.req.param("worksheetId");
-  const journey = await getJourney(c.env.DB, product, DEFAULT_PATH_ID);
-  const state =
-    journey &&
-    (await worksheetState(c.env.DB, product, DEFAULT_PATH_ID, worksheetId));
+  const journey = await loadJourney(c.env.DB, product);
+  if (!journey) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  const state = await worksheetState(c.env.DB, journey, worksheetId);
   if (!state) {
     return c.json({ error: "Not found" }, 404);
   }
@@ -354,13 +360,13 @@ productRoutes.put("/worksheets/:worksheetId", async (c) => {
     );
   }
 
-  await saveAnswers(c.env.DB, product, DEFAULT_PATH_ID, worksheetId, answers);
+  await saveAnswers(c.env.DB, journey, worksheetId, answers);
   return c.json({ product, ...state, answers }, 200);
 });
 
 /**
  * Tasks (issue #140): check off or uncheck one of the Product's Tasks on
- * the default Path, with `{ "done": true | false }`. The same 404s as a
+ * its Journey, with `{ "done": true | false }`. The same 404s as a
  * Worksheet when the Product hasn't started its Journey or there's no such
  * Task on the Path. Works on any Task, not just the current Milestone's,
  * and never moves the Journey. Answers with the Journey's state, like
@@ -368,7 +374,7 @@ productRoutes.put("/worksheets/:worksheetId", async (c) => {
  */
 productRoutes.put("/tasks/:taskId", async (c) => {
   const { product } = c.var;
-  const journey = await getJourney(c.env.DB, product, DEFAULT_PATH_ID);
+  const journey = await loadJourney(c.env.DB, product);
   if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
@@ -381,8 +387,7 @@ productRoutes.put("/tasks/:taskId", async (c) => {
 
   const found = await setTaskDone(
     c.env.DB,
-    product,
-    DEFAULT_PATH_ID,
+    journey,
     c.req.param("taskId"),
     done,
   );
