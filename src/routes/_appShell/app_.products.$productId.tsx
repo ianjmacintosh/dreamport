@@ -1,7 +1,7 @@
 import { Fragment, useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import Breadcrumbs from "../../components/Breadcrumbs";
+import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Link from "../../components/Link";
 import TagList from "../../components/TagList";
@@ -128,7 +128,16 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
     const journey = journeyRes?.ok
       ? ((await journeyRes.json()) as JourneySummary)
       : null;
-    return { product, ideas, tagCatalog: tags, journey };
+    return {
+      product,
+      ideas,
+      tagCatalog: tags,
+      journey,
+      breadcrumbs: {
+        trail: [{ label: "Products", href: "/app" }],
+        current: product.name,
+      } satisfies BreadcrumbsProps,
+    };
   },
   component: ProductHome,
 });
@@ -169,8 +178,9 @@ const CONNECTION_FAILED =
  * (`ProductIdeas`, below). Composed from existing components plus
  * heading/paragraph primitives in plain document order.
  *
- * The h1 is the Product's name alone, like its Journey and Worksheet pages,
- * with `Breadcrumbs` (Products › the Product) under it (#109).
+ * The h1 is the Product's name alone, like its Journey and Worksheet pages;
+ * its `breadcrumbs` (Products › the Product) go in the band under `AppNav`
+ * (#109).
  *
  * The Product's own description (#112) sits under the heading — its text,
  * or "No description yet." — with an "Edit Description" button that swaps
@@ -244,10 +254,6 @@ function ProductHome() {
   return (
     <>
       <h1>{product.name}</h1>
-      <Breadcrumbs
-        trail={[{ label: "Products", href: "/app" }]}
-        current={product.name}
-      />
       {isEditingDescription ? (
         <form
           className="field-row"

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
-import Breadcrumbs from "../../components/Breadcrumbs";
+import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Link from "../../components/Link";
 import TextArea from "../../components/TextArea";
@@ -102,7 +102,18 @@ export const Route = createFileRoute(
     const { product, ...worksheetState } = (await res.json()) as {
       product: { id: string; name: string };
     } & WorksheetState;
-    return { product, worksheetState };
+    return {
+      product,
+      worksheetState,
+      breadcrumbs: {
+        trail: [
+          { label: "Products", href: "/app" },
+          { label: product.name, href: `/app/products/${product.id}` },
+          { label: "Journey", href: `/app/products/${product.id}/journey` },
+        ],
+        current: worksheetState.worksheet.name,
+      } satisfies BreadcrumbsProps,
+    };
   },
   component: ProductWorksheet,
 });
@@ -112,8 +123,8 @@ export const Route = createFileRoute(
  * Milestone's content on the Journey page, on every Milestone and once
  * finished.
  *
- * The Product's name is the h1, then `Breadcrumbs` (Products › Product ›
- * Journey › this Worksheet, #109), then the
+ * The Product's name is the h1 (its `breadcrumbs`, Products › Product ›
+ * Journey › this Worksheet, go in the band under `AppNav`, #109), then the
  * Worksheet drawn as a sheet of paper (`.sheet`, picked from a prototype on
  * branch `prototype/worksheet-design`): its name as the sheet's h2, one
  * numbered `TextArea` per field with its prompt as helper text, one Save
@@ -164,14 +175,6 @@ function ProductWorksheet() {
   return (
     <>
       <h1>{product.name}</h1>
-      <Breadcrumbs
-        trail={[
-          { label: "Products", href: "/app" },
-          { label: product.name, href: `/app/products/${product.id}` },
-          { label: "Journey", href: `/app/products/${product.id}/journey` },
-        ]}
-        current={worksheet.name}
-      />
       <article className="sheet">
         <h2>{worksheet.name}</h2>
         <form

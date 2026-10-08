@@ -61,31 +61,31 @@ const NOTHING_SHRINKS: BreadcrumbsFit = {
 };
 
 /**
- * `fitBreadcrumbs` against the real layout. `boxRef` is the `<nav>`; each
- * `.breadcrumbs-crumb` in it holds a `.breadcrumbs-label`, whose
+ * `fitBreadcrumbs` against the real layout. `listRef` is the trail's
+ * `<ol>`, as wide as the space it has; each `.breadcrumbs-crumb` in it holds a `.breadcrumbs-label`, whose
  * `scrollWidth` is its full width even while shortened. The narrowest an
- * ancestor's label may get comes from the nav's `--breadcrumbs-min-label`,
+ * ancestor's label may get comes from `--breadcrumbs-min-label`,
  * so CSS and this measure agree. Refits when the box resizes, when the
  * labels change, and once web fonts finish loading (that changes the
- * labels' widths without resizing the box).
+ * labels' widths without resizing the list).
  */
 export function useBreadcrumbsFit(
-  boxRef: RefObject<HTMLElement | null>,
+  listRef: RefObject<HTMLElement | null>,
   labels: string[],
 ): BreadcrumbsFit {
   const [fit, setFit] = useState(NOTHING_SHRINKS);
   const labelsKey = labels.join("\n");
   useLayoutEffect(() => {
-    const box = boxRef.current;
-    if (!box) {
+    const list = listRef.current;
+    if (!list) {
       return;
     }
     function refit() {
-      if (!box) {
+      if (!list) {
         return;
       }
       const crumbs = [
-        ...box.querySelectorAll<HTMLElement>(".breadcrumbs-crumb"),
+        ...list.querySelectorAll<HTMLElement>(".breadcrumbs-crumb"),
       ].map((crumb) => {
         const label = crumb.querySelector<HTMLElement>(".breadcrumbs-label");
         const labelBox = label?.getBoundingClientRect().width ?? 0;
@@ -95,12 +95,11 @@ export function useBreadcrumbsFit(
         };
       });
       const current = crumbs.pop();
-      const list = box.querySelector(".breadcrumbs-list");
-      const style = getComputedStyle(box);
+      const style = getComputedStyle(list);
       setFit(
         fitBreadcrumbs({
-          available: box.clientWidth,
-          gap: list ? parseFloat(getComputedStyle(list).columnGap) || 0 : 0,
+          available: list.clientWidth,
+          gap: parseFloat(style.columnGap) || 0,
           ancestors: crumbs,
           current: current?.label ?? 0,
           minLabel:
@@ -116,11 +115,11 @@ export function useBreadcrumbsFit(
       }
     });
     const observer = new ResizeObserver(refit);
-    observer.observe(box);
+    observer.observe(list);
     return () => {
       cancelled = true;
       observer.disconnect();
     };
-  }, [boxRef, labelsKey]);
+  }, [listRef, labelsKey]);
   return fit;
 }

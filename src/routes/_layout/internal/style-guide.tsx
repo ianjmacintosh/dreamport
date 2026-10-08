@@ -642,25 +642,31 @@ function StyleGuide() {
       </Section>
 
       <Section id="breadcrumbs" label="Breadcrumbs">
-        <Breadcrumbs
-          trail={[
-            { label: "Products", href: "#breadcrumbs" },
-            { label: "Tarot", href: "#breadcrumbs" },
-            { label: "Journey", href: "#breadcrumbs" },
-          ]}
-          current="Product Summary"
-        />
+        <div className="sg-bar-demo">
+          <Breadcrumbs
+            trail={[
+              { label: "Products", href: "#breadcrumbs" },
+              { label: "Tarot", href: "#breadcrumbs" },
+              { label: "Journey", href: "#breadcrumbs" },
+            ]}
+            current="Product Summary"
+          />
+        </div>
         <Snippet
-          code={`<h1>{product.name}</h1>\n<Breadcrumbs\n  trail={[\n    { label: "Products", href: "/app" },\n    { label: product.name, href: \`/app/products/\${product.id}\` },\n    { label: "Journey", href: \`/app/products/\${product.id}/journey\` },\n  ]}\n  current={worksheet.name}\n/>`}
+          code={`// In the page route's beforeLoad:\nreturn {\n  …,\n  breadcrumbs: {\n    trail: [\n      { label: "Products", href: "/app" },\n      { label: product.name, href: \`/app/products/\${product.id}\` },\n      { label: "Journey", href: \`/app/products/\${product.id}/journey\` },\n    ],\n    current: worksheet.name,\n  } satisfies BreadcrumbsProps,\n};`}
         />
         <p className="sg-note">
-          <code>&lt;Breadcrumbs&gt;</code> goes straight under the h1 on every
-          page nested under <code>/app</code>, and replaces a &ldquo;Back to
-          &hellip;&rdquo; link. <code>trail</code> is the pages above this one,
-          root first, each a link; <code>current</code> is the page you&apos;re
-          on, plain text marked <code>aria-current=&quot;page&quot;</code>. A
-          top-level page (Products, Settings) has no breadcrumbs: one crumb
-          would only repeat its h1. The root is the page&apos;s own section
+          <code>&lt;Breadcrumbs&gt;</code> is a white band edge to edge directly
+          under <code>AppNav</code>, on every page nested under{" "}
+          <code>/app</code>, in place of a &ldquo;Back to &hellip;&rdquo; link.
+          A page doesn&apos;t render it: it returns <code>breadcrumbs</code>{" "}
+          from its route&apos;s <code>beforeLoad</code>, and{" "}
+          <code>_appShell</code> draws the band. <code>trail</code> is the pages
+          above this one, root first, each a link; <code>current</code> is the
+          page you&apos;re on, plain text marked{" "}
+          <code>aria-current=&quot;page&quot;</code>. A top-level page
+          (Products, Settings) has no breadcrumbs: one crumb would only repeat
+          its h1. The root is the page&apos;s own section
           (&ldquo;Products&rdquo;, &ldquo;Settings&rdquo;), never a
           &ldquo;Home&rdquo; crumb, and a Milestone is never a crumb (#109).
         </p>

@@ -1269,15 +1269,25 @@ button.tag-more[data-popup-open] {
 }
 
 /* ── Components: breadcrumbs ───────────────────────────────── */
-/* `Breadcrumbs` (#109): one line that never wraps. CSS alone can't say
-   "shorten the ancestors before the current page" or "never below 44px,
-   but never padded out to it either", so `useBreadcrumbsFit` measures and
-   marks which crumbs may shrink (`--shrinks`), and flexbox does the
-   shrinking. Flex, not grid: this is the component's own row, not page
-   structure. */
+/* `Breadcrumbs` (#109): a white band edge to edge under `AppNav`, its
+   content column lined up with <main> via the same 3-column breakout
+   grid as .header/.footer. The trail is one line that never wraps. CSS
+   alone can't say "shorten the ancestors before the current page" or
+   "never below 44px, but never padded out to it either", so
+   `useBreadcrumbsFit` measures and marks which crumbs may shrink
+   (`--shrinks`), and flexbox does the shrinking. Flex, not grid: this is
+   the component's own row, not page structure. */
 .breadcrumbs {
   /* Read by `useBreadcrumbsFit` too, so its measure matches this CSS. */
   --breadcrumbs-min-label: 44px;
+  display: grid;
+  grid-template-columns: 1fr var(--page-width) 1fr;
+  background-color: var(--color-sheet);
+}
+
+.breadcrumbs-content {
+  grid-column: 2;
+  padding: var(--space-3) var(--space-6);
 }
 
 .breadcrumbs-list {

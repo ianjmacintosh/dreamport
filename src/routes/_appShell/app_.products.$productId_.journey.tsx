@@ -7,7 +7,7 @@ import {
 } from "@phosphor-icons/react";
 
 import ActionCard from "../../components/ActionCard";
-import Breadcrumbs from "../../components/Breadcrumbs";
+import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
 
@@ -157,7 +157,17 @@ export const Route = createFileRoute(
     const { product, ...journeyState } = (await res.json()) as {
       product: { id: string; name: string };
     } & JourneyState;
-    return { product, journeyState };
+    return {
+      product,
+      journeyState,
+      breadcrumbs: {
+        trail: [
+          { label: "Products", href: "/app" },
+          { label: product.name, href: `/app/products/${product.id}` },
+        ],
+        current: "Journey",
+      } satisfies BreadcrumbsProps,
+    };
   },
   component: ProductJourney,
 });
@@ -168,7 +178,9 @@ export const Route = createFileRoute(
  * own page so the Product home only needs a line about it.
  *
  * The Product's name is the h1 and "Journey" the h2, so the page reads as
- * part of the Product; `Breadcrumbs` between them lead back up (#109). Below them, `.journey-split` (see global.css): the
+ * part of the Product; its `breadcrumbs` (Products › the Product ›
+ * Journey) go in the band under `AppNav` (#109). Below them,
+ * `.journey-split` (see global.css): the
  * Milestones as a route on the left, the content for where you are on the
  * right — before starting, the Path's name, the pitch for it, an
  * invitation and "Start Journey"; after,
@@ -393,13 +405,6 @@ function ProductJourney() {
   return (
     <>
       <h1>{product.name}</h1>
-      <Breadcrumbs
-        trail={[
-          { label: "Products", href: "/app" },
-          { label: product.name, href: `/app/products/${product.id}` },
-        ]}
-        current="Journey"
-      />
       <h2>Journey</h2>
       <div className="journey-split">
         <ol aria-label="Milestones" className="journey-route">

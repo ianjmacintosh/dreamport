@@ -41,7 +41,7 @@ const worksheetTrail = {
 describe("Breadcrumbs", () => {
   test("is a navigation landmark named Breadcrumb, holding an ordered list", () => {
     expect(render(worksheetTrail)).toMatch(
-      /^<nav aria-label="Breadcrumb"[^>]*><ol[^>]*>.*<\/ol>.*<\/nav>$/,
+      /^<nav aria-label="Breadcrumb"[^>]*>.*<ol[^>]*>.*<\/ol>.*<\/nav>$/,
     );
   });
 

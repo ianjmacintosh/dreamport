@@ -9,7 +9,7 @@ export interface Crumb {
   href: string;
 }
 
-interface BreadcrumbsProps {
+export interface BreadcrumbsProps {
   /** Ancestor pages, root first. Always links. At least one: a top-level
    * page has no trail, since its one crumb would just repeat its h1. */
   trail: [Crumb, ...Crumb[]];
@@ -39,35 +39,37 @@ function crumbClass(shrinks: boolean) {
  */
 export function Breadcrumbs({ trail, current }: BreadcrumbsProps) {
   const parent = trail[trail.length - 1];
-  const boxRef = useRef<HTMLElement>(null);
-  const fit = useBreadcrumbsFit(boxRef, [
+  const listRef = useRef<HTMLOListElement>(null);
+  const fit = useBreadcrumbsFit(listRef, [
     ...trail.map(({ label }) => label),
     current,
   ]);
   return (
-    <nav ref={boxRef} aria-label="Breadcrumb" className="breadcrumbs">
-      <ol className="breadcrumbs-list">
-        {trail.map(({ label, href }, i) => (
-          <li
-            key={href}
-            className={crumbClass(fit.ancestorShrinks[i] ?? false)}
-          >
-            <Link className="breadcrumbs-label" href={href} current={false}>
-              {label}
-            </Link>
-            <CaretRightIcon aria-hidden className="breadcrumbs-separator" />
+    <nav aria-label="Breadcrumb" className="breadcrumbs">
+      <div className="breadcrumbs-content">
+        <ol ref={listRef} className="breadcrumbs-list">
+          {trail.map(({ label, href }, i) => (
+            <li
+              key={href}
+              className={crumbClass(fit.ancestorShrinks[i] ?? false)}
+            >
+              <Link className="breadcrumbs-label" href={href} current={false}>
+                {label}
+              </Link>
+              <CaretRightIcon aria-hidden className="breadcrumbs-separator" />
+            </li>
+          ))}
+          <li className={crumbClass(fit.currentShrinks)}>
+            <span className="breadcrumbs-label" aria-current="page">
+              {current}
+            </span>
           </li>
-        ))}
-        <li className={crumbClass(fit.currentShrinks)}>
-          <span className="breadcrumbs-label" aria-current="page">
-            {current}
-          </span>
-        </li>
-      </ol>
-      <Link className="breadcrumbs-up" href={parent.href} current={false}>
-        <CaretLeftIcon aria-hidden />
-        <span className="breadcrumbs-label">Back to {parent.label}</span>
-      </Link>
+        </ol>
+        <Link className="breadcrumbs-up" href={parent.href} current={false}>
+          <CaretLeftIcon aria-hidden />
+          <span className="breadcrumbs-label">Back to {parent.label}</span>
+        </Link>
+      </div>
     </nav>
   );
 }

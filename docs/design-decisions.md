@@ -167,6 +167,19 @@ Add an entry only once a sign-off conversation resolves something repeatable
   #125, from a prototype that compared rail/pill/marker styles and a
   bottom tab bar).
 
+- A page nested under `/app` (a Product, its Journey, a Worksheet) gets
+  `Breadcrumbs`: a white (`--color-sheet`) band edge to edge directly
+  under `AppNav`, its trail lined up with the page column. The last crumb
+  is the page you're on, unlinked (`aria-current="page"`); the root is
+  the section ("Products"), never "Home"; a Milestone is never a crumb.
+  Top-level pages (`/app`, `/app/settings`) have none: one crumb would
+  only repeat the h1. The trail stays on one line, ancestors shortening
+  with "…" (to no less than 44px) before the current page does. Below
+  640px it becomes one "‹ Back to {parent}" link. A page names its trail
+  in its route's `beforeLoad` context and `_appShell` draws the band.
+  Picked over a white box, Tag pills, and bands or rules under the h1 in
+  a prototype on branch `109-prototype-breadcrumbs` (decided in #109).
+
 - Icons use Phosphor (`@phosphor-icons/react`), imported per-icon by name
   (e.g. `CaretDownIcon`) rather than a hand-authored SVG or another icon
   library, at the `"regular"` weight unless a specific icon calls for
@@ -212,8 +225,8 @@ Add an entry only once a sign-off conversation resolves something repeatable
   7 · Next · Ends at" line: the route already says it. Picked from a
   prototype on branch `prototype/journey-ux` (decided in #137).
 
-- A Worksheet's page puts the Product's name in the h1, then its
-  `Breadcrumbs` (#109), then the Worksheet drawn as a sheet of paper (`.sheet`): white
+- A Worksheet's page puts the Product's name in the h1, then the
+  Worksheet drawn as a sheet of paper (`.sheet`): white
   (`--color-sheet`, an acknowledged addition to Solarized Light) on the
   cream page, full content width, square corners, no border, no shadow.
   On the sheet: the Worksheet's name as its h2, numbered questions ("1.
