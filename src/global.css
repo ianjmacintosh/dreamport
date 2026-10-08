@@ -1327,6 +1327,28 @@ button.tag-more[data-popup-open] {
   min-width: calc(var(--breadcrumbs-min-label) + var(--space-2) + 1em);
 }
 
+/* Below 640px the trail gives way to one link up to the parent page. */
+.breadcrumbs-up {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .breadcrumbs-list {
+    display: none;
+  }
+
+  .breadcrumbs-up {
+    display: inline-flex;
+    align-items: center;
+    column-gap: var(--space-1);
+    max-width: 100%;
+  }
+
+  .breadcrumbs-up > svg {
+    flex: none;
+  }
+}
+
 /* ── Components: check box ─────────────────────────────────── */
 /* `Checkbox` (#140): a real checkbox, restyled — 1.5rem, rounded, filled
    with the accent and a bold check (`.checkbox-mark`, drawn over it) when

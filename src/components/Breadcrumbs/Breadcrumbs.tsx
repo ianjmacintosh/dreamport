@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { CaretRightIcon } from "@phosphor-icons/react";
+import { CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react";
 
 import Link from "../Link";
 import { useBreadcrumbsFit } from "./fitBreadcrumbs";
@@ -30,10 +30,15 @@ function crumbClass(shrinks: boolean) {
  * No `title` tooltips: a shortened name is still whole in the accessible
  * text, and one tap away on its own page.
  *
+ * Below 640px the whole trail gives way to one link up to the parent
+ * page (`‹ Journey`): a phone has no room for the trail without shortening
+ * every name in it.
+ *
  * Ancestors pass `current={false}`: every one is a prefix of this page's
  * URL, so the router would otherwise mark each as the current page.
  */
 export function Breadcrumbs({ trail, current }: BreadcrumbsProps) {
+  const parent = trail[trail.length - 1];
   const boxRef = useRef<HTMLElement>(null);
   const fit = useBreadcrumbsFit(boxRef, [
     ...trail.map(({ label }) => label),
@@ -59,6 +64,10 @@ export function Breadcrumbs({ trail, current }: BreadcrumbsProps) {
           </span>
         </li>
       </ol>
+      <Link className="breadcrumbs-up" href={parent.href} current={false}>
+        <CaretLeftIcon aria-hidden />
+        <span className="breadcrumbs-label">{parent.label}</span>
+      </Link>
     </nav>
   );
 }

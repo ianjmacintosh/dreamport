@@ -41,7 +41,7 @@ const worksheetTrail = {
 describe("Breadcrumbs", () => {
   test("is a navigation landmark named Breadcrumb, holding an ordered list", () => {
     expect(render(worksheetTrail)).toMatch(
-      /^<nav aria-label="Breadcrumb"[^>]*><ol[^>]*>.*<\/ol><\/nav>$/,
+      /^<nav aria-label="Breadcrumb"[^>]*><ol[^>]*>.*<\/ol>.*<\/nav>$/,
     );
   });
 
@@ -78,5 +78,15 @@ describe("Breadcrumbs", () => {
       expect(item).toMatch(/<\/a><svg[^>]*aria-hidden="true"/);
     }
     expect(items.at(-1)).not.toContain("<svg");
+  });
+
+  test("also links up to the parent page alone, for phones", () => {
+    const up = render(worksheetTrail).match(
+      /<a ([^>]*class="breadcrumbs-up"[^>]*)>(.*?)<\/a>/,
+    );
+    expect(up?.[1]).toContain('href="/app/products/p1/journey"');
+    expect(up?.[1]).not.toContain("aria-current");
+    expect(up?.[1]).not.toContain("data-router-decides");
+    expect(up?.[2]).toMatch(/<svg[^>]*aria-hidden="true".*>Journey<\/span>$/);
   });
 });
