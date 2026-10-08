@@ -655,14 +655,14 @@ function StyleGuide() {
         />
         <p className="sg-note">
           <code>&lt;Breadcrumbs&gt;</code> goes straight under the h1 on every
-          page under <code>/app</code>, and replaces a &ldquo;Back to
+          page nested under <code>/app</code>, and replaces a &ldquo;Back to
           &hellip;&rdquo; link. <code>trail</code> is the pages above this one,
           root first, each a link; <code>current</code> is the page you&apos;re
           on, plain text marked <code>aria-current=&quot;page&quot;</code>. A
-          top-level page passes <code>trail={"{[]}"}</code>. The root is the
-          page&apos;s own section (&ldquo;Products&rdquo;,
-          &ldquo;Settings&rdquo;), never a &ldquo;Home&rdquo; crumb, and a
-          Milestone is never a crumb (#109).
+          top-level page (Products, Settings) has no breadcrumbs: one crumb
+          would only repeat its h1. The root is the page&apos;s own section
+          (&ldquo;Products&rdquo;, &ldquo;Settings&rdquo;), never a
+          &ldquo;Home&rdquo; crumb, and a Milestone is never a crumb (#109).
         </p>
         <p className="sg-note">
           It stays on one line. Narrow the window to see the ancestors shorten

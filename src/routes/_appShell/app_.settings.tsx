@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
-import Breadcrumbs from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import { authClient } from "../../utils/auth-client";
 
@@ -32,7 +31,7 @@ const CONNECTION_FAILED =
  * — every signed-in page carries that action now, not just this one — so
  * this page is delete-account only.
  *
- * Composed from `Breadcrumbs`/`Button` plus heading/paragraph primitives in plain
+ * Composed from `Button` plus heading/paragraph primitives in plain
  * document order: no page-specific CSS, no confirm-dialog or "danger zone"
  * component (that would need design sign-off, #28-adjacent). The delete
  * control is a two-step reveal rather than a native `confirm()` so a stray
@@ -70,7 +69,6 @@ function Settings() {
   return (
     <>
       <h1>Settings</h1>
-      <Breadcrumbs trail={[]} current="Settings" />
       <p>Signed in as {email}</p>
 
       <h2>Delete account</h2>

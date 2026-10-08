@@ -36,7 +36,7 @@ const worksheetTrail = {
     { label: "Journey", href: "/app/products/p1/journey" },
   ],
   current: "Product Summary",
-};
+} satisfies Parameters<typeof Breadcrumbs>[0];
 
 describe("Breadcrumbs", () => {
   test("is a navigation landmark named Breadcrumb, holding an ordered list", () => {
@@ -78,12 +78,5 @@ describe("Breadcrumbs", () => {
       expect(item).toMatch(/<\/a><svg[^>]*aria-hidden="true"/);
     }
     expect(items.at(-1)).not.toContain("<svg");
-  });
-
-  test("a top-level page is the current page alone", () => {
-    const html = render({ trail: [], current: "Products" });
-    expect(html).not.toContain("<a");
-    expect(html.match(/<li/g)).toHaveLength(1);
-    expect(html).toContain('aria-current="page">Products</span>');
   });
 });

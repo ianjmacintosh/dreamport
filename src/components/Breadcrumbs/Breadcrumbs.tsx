@@ -10,8 +10,9 @@ export interface Crumb {
 }
 
 interface BreadcrumbsProps {
-  /** Ancestor pages, root first. Always links. */
-  trail: Crumb[];
+  /** Ancestor pages, root first. Always links. At least one: a top-level
+   * page has no trail, since its one crumb would just repeat its h1. */
+  trail: [Crumb, ...Crumb[]];
   /** The page you're on: unlinked, `aria-current="page"`. */
   current: string;
 }
