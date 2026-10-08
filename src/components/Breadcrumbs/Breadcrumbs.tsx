@@ -31,8 +31,8 @@ function crumbClass(shrinks: boolean) {
  * text, and one tap away on its own page.
  *
  * Below 640px the whole trail gives way to one link up to the parent
- * page (`‹ Journey`): a phone has no room for the trail without shortening
- * every name in it.
+ * page (`‹ Back to Journey`): a phone has no room for the trail without
+ * shortening every name in it.
  *
  * Ancestors pass `current={false}`: every one is a prefix of this page's
  * URL, so the router would otherwise mark each as the current page.
@@ -66,7 +66,7 @@ export function Breadcrumbs({ trail, current }: BreadcrumbsProps) {
       </ol>
       <Link className="breadcrumbs-up" href={parent.href} current={false}>
         <CaretLeftIcon aria-hidden />
-        <span className="breadcrumbs-label">{parent.label}</span>
+        <span className="breadcrumbs-label">Back to {parent.label}</span>
       </Link>
     </nav>
   );

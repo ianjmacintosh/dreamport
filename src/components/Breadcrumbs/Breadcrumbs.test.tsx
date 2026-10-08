@@ -87,6 +87,8 @@ describe("Breadcrumbs", () => {
     expect(up?.[1]).toContain('href="/app/products/p1/journey"');
     expect(up?.[1]).not.toContain("aria-current");
     expect(up?.[1]).not.toContain("data-router-decides");
-    expect(up?.[2]).toMatch(/<svg[^>]*aria-hidden="true".*>Journey<\/span>$/);
+    expect(up?.[2]).toMatch(
+      /<svg[^>]*aria-hidden="true".*>Back to Journey<\/span>$/,
+    );
   });
 });

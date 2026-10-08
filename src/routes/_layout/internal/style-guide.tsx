@@ -666,12 +666,12 @@ function StyleGuide() {
         </p>
         <p className="sg-note">
           Below 640px the trail gives way to one link up to the parent page
-          (&ldquo;‹ Journey&rdquo;). Above that it stays on one line: narrow the
-          window to see the ancestors shorten with &ldquo;…&rdquo; first, down
-          to 44px each (a name already narrower stays as it is); the current
-          page shortens only once they all have. The separators never shorten
-          and are hidden from screen readers. There are no tooltips: the full
-          name is in the accessible text and on the page itself.
+          (&ldquo;‹ Back to Journey&rdquo;). Above that it stays on one line:
+          narrow the window to see the ancestors shorten with &ldquo;…&rdquo;
+          first, down to 44px each (a name already narrower stays as it is); the
+          current page shortens only once they all have. The separators never
+          shorten and are hidden from screen readers. There are no tooltips: the
+          full name is in the accessible text and on the page itself.
         </p>
       </Section>
 
