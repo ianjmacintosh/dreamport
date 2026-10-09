@@ -547,6 +547,84 @@ a.button {
   }
 }
 
+/* A list the User puts in order (a Path's Draft Milestones, #167): thin
+   rules between and around the rows instead of the usual gap. */
+.list--ruled {
+  row-gap: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.list--ruled > .list-row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* A row with a drag handle in a column of its own at its start:
+   handle | name | actions. */
+.list-row--sortable {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: var(--space-3);
+}
+
+.list-row--sortable > .list-row-handle {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.list-row--sortable > .list-row-name {
+  grid-column: 2;
+}
+
+.list-row--sortable > .list-row-action {
+  grid-column: 3;
+}
+
+/* The row being dragged rides over its neighbours, on the page's own
+   background so they don't show through it. */
+.list-row--dragging {
+  position: relative;
+  z-index: 1;
+  background-color: var(--color-page-bg);
+}
+
+/* Phosphor's `DotsSixVertical`, as a plain button. `touch-action: none`
+   lets a finger drag it rather than scroll the page; the rest of the row
+   still scrolls. */
+.list-row-handle {
+  display: grid;
+  place-items: center;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-primary);
+  font-size: 1.5rem;
+  cursor: grab;
+  touch-action: none;
+}
+
+.list-row-handle[aria-disabled="true"] {
+  cursor: default;
+  color: var(--color-text-muted);
+}
+
+.list-row--dragging > .list-row-handle {
+  cursor: grabbing;
+}
+
+/* Below 640px the actions stack under the name, as on every `.list-row`;
+   the handle keeps its column beside both. */
+@media (max-width: 640px) {
+  .list-row--sortable {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .list-row--sortable > .list-row-action {
+    grid-column: 2;
+  }
+}
+
 /* Reserves the Turnstile widget's footprint before it loads, so the
    challenge popping in doesn't shift the submit button down mid-
    interaction. Fixed height, not min-height — Cloudflare's own widget
