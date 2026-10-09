@@ -142,14 +142,13 @@ Add an entry only once a sign-off conversation resolves something repeatable
   for behavior (focus management, keyboard nav, outside-click/`Escape`)
   while `Dropdown` owns its panel's CSS. Its trigger is a `.button`
   (`variant`, default `"secondary"`; `"nav"` on the bar), so it shares
-  every button's size and hover outline (#125). `AppNav`'s trigger is the
-  signed-in User's email plus a chevron icon; the panel lists only the
-  menu's actual items (Settings, a separator, Log out) — the trigger
-  already shows the email, so the panel doesn't repeat it. See ADR-0014 and
-  the style guide's "Dropdown" section (decided in #119). The one panel
-  whose trigger doesn't show the email — `AppNav`'s phone ☰ menu — names
-  it in a non-clickable `Dropdown.Group` label ("Signed in as …") over
-  Settings and Log out instead (#125).
+  every button's size and hover outline (#125). `AppNav`'s trigger reads
+  "Account", after Phosphor's `UserCircle`, with a chevron; the panel
+  names who's signed in with a non-clickable `Dropdown.Group` label
+  ("Signed in as …") over Settings and Log out, the same group the phone
+  ☰ menu shows. See ADR-0014 and the style guide's "Dropdown" section
+  (decided in #119; the trigger was the email itself until #167 replaced
+  it, after trying "You", a dividing line, and a plain Settings link).
 
 - `AppNav`'s top-level sections (just Products for now) are links on the
   right of the bar, beside the account `Dropdown`, not beside the wordmark.
@@ -158,9 +157,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
   `--color-bar-link-current-tint` and goes bold. This reverses #90's "no
   active-route highlighting", which predated real sections. Everything
   clickable on the bar (section links, account trigger, ☰) is the same
-  size as a `.button` and gets the same hover outline. The account
-  trigger is capped at 16rem so a long email truncates rather than pushing
-  the links back toward the wordmark. Below 640px the links and account
+  size as a `.button` and gets the same hover outline. Below 640px the links and account
   trigger collapse into one icon-only ☰ `Dropdown` (sections, a separator,
   then the signed-in group). 640px fits one section; adding sections means
   measuring the row again and likely adding a wider breakpoint (decided in
@@ -275,8 +272,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
   inside the edit form, in the same prototype (decided in #167).
 
 - `AppNav` has a second section, Trailblazer (Phosphor `PathIcon`, the
-  `/app/paths` pages), after Products. With two sections the bar
-  collapses into the ☰ menu below about 820px, not 640px: measured with a
-  37-character email, two links at 641px left the account trigger 38px
-  wide, and it took about 820px to get back to the width one link gets at
-  641px (decided in #167).
+  `/app/paths` pages), after Products, 12px apart. With two sections and
+  the "Account" trigger the bar collapses into the ☰ menu below about
+  820px, not 640px: "Account" starts to clip below about 800px (decided
+  in #167).

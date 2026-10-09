@@ -76,10 +76,12 @@ function menu(found: NavElement | undefined) {
   return { found, items };
 }
 
-/** The account Dropdown — the one whose trigger shows the email. */
-function accountMenu(elements: NavElement[], email = "someone@example.com") {
+/** The account Dropdown — the one whose trigger reads "Account". */
+function accountMenu(elements: NavElement[]) {
   return menu(
-    elements.find((el) => el.type === Dropdown && el.props.label === email),
+    elements.find(
+      (el) => el.type === Dropdown && textOf(el.props.label) === "Account",
+    ),
   );
 }
 
@@ -152,16 +154,27 @@ describe("AppNav", () => {
     },
   );
 
-  test("the account dropdown's trigger is the signed-in email", () => {
+  test("the account dropdown's trigger reads Account, not the email", () => {
     expect(accountMenu(navElements()).found).toBeDefined();
+    expect(
+      navElements().some(
+        (el) =>
+          el.type === Dropdown &&
+          textOf(el.props.label).includes("someone@example.com"),
+      ),
+    ).toBe(false);
   });
 
-  test("the account dropdown holds Settings, a separator, then Log out", () => {
-    const [settings, separator, logout] = accountMenu(navElements()).items;
+  test("the account dropdown holds Settings and Log out under who you're signed in as", () => {
+    const [group] = accountMenu(navElements()).items;
+    expect(group.type).toBe(Dropdown.Group);
+    expect(textOf(group.props.label)).toBe("Signed in as someone@example.com");
+    const [settings, logout] = Children.toArray(group.props.children).filter(
+      isValidElement,
+    ) as NavElement[];
     expect(settings.type).toBe(Dropdown.LinkItem);
     expect(settings.props.href).toBe("/app/settings");
     expect(textOf(settings)).toBe("Settings");
-    expect(separator.type).toBe(Dropdown.Separator);
     expect(logout.type).toBe(Dropdown.Item);
     expect(textOf(logout)).toBe("Log out");
   });

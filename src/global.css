@@ -959,17 +959,6 @@ a.button {
   justify-self: end;
 }
 
-/* The account trigger fills its own track (whose width is what gives way
-   when the row runs short), so the email truncates inside it. A `.button`
-   is a flexbox, which won't shrink below its label's unwrapped text on
-   its own. It's capped so a long email truncates early instead of taking
-   the row's free space, which keeps the section links beside it rather
-   than drifting back toward the wordmark (#125). */
-.app-nav-content > .app-nav-account {
-  justify-self: stretch;
-  max-width: 16rem;
-}
-
 /* The ☰ menu that replaces the links and account trigger on narrow
    screens — hidden at every wider width (the same 820px, negated, so it
    keeps its own `.button` display wherever it does show). */
@@ -980,11 +969,18 @@ a.button {
 }
 
 /* An icon is shorter than a line of text; holding the label to one line
-   height keeps the ☰ trigger the same height as the bar's other items. */
-.app-nav-menu .dropdown-trigger-label {
+   height keeps an icon trigger (☰, the account's profile icon) the same
+   height as the bar's other items. */
+:is(.app-nav-menu, .app-nav-account) .dropdown-trigger-label {
   min-height: 1lh;
   display: grid;
   align-items: center;
+}
+
+/* The account trigger's profile icon and "Account", side by side. */
+.app-nav-account .dropdown-trigger-label {
+  grid-auto-flow: column;
+  gap: var(--space-2);
 }
 
 .app-nav-menu-email {
@@ -997,9 +993,9 @@ a.button {
 
 /* Below about 820px the section links and account trigger don't fit
    beside the wordmark, so both collapse into the ☰ menu (#125). Not
-   --breakpoint-sm: with two sections, 820px is about where the account
-   trigger gets back the width one section left it at 641px (#167, see
-   docs/design-decisions.md). Adding a section means measuring again. */
+   --breakpoint-sm: with two sections, "Account" starts to clip below
+   about 800px (#167, see docs/design-decisions.md). Adding a section
+   means measuring again. */
 @media (max-width: 820px) {
   .app-nav-content {
     grid-template-columns: auto minmax(0, 1fr);
