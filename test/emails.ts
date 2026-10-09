@@ -171,6 +171,12 @@ export const TEST_EMAILS = {
   /** The one User who owns every Product in `journeys.worker.test.ts`. Never signs in. */
   journeysModule: "delivered+journeys-module@resend.dev",
 
+  // --- The Paths module, called directly (#166) ---
+  /** Follows Dream Sequence, and must never see `pathsModuleOwner`'s Path. Never signs in. */
+  pathsModuleFollower: "delivered+paths-module-follower@resend.dev",
+  /** Owns a Path seeded by raw SQL in `paths.worker.test.ts`. Never signs in. */
+  pathsModuleOwner: "delivered+paths-module-owner@resend.dev",
+
   // --- Seam 1: the Journey routes (#137-#140), one test each ---
   /** Reads the Journey page's state before a Journey starts. */
   journeysState: "delivered+journeys-state@resend.dev",
