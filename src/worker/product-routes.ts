@@ -19,6 +19,7 @@ import {
   startJourney,
   worksheetState,
 } from "./journeys";
+import { dreamSequence } from "./paths";
 import {
   deleteProduct,
   getProduct,
@@ -250,26 +251,35 @@ productRoutes.put("/ideas/:id/tags", async (c) => {
 });
 
 /**
- * Journeys (issue #137): the Product's Journey on the default Path — the
- * only Path Phase 1 ships, so there's no Path in the URL. `journey` is
+ * Journeys (issue #137): the Product's Journey on Dream Sequence version 1
+ * — every Journey's version until #170 lets the User pick one, so there's
+ * no version in the URL. `journey` is
  * `null` until the User starts one; `path` is always there so the page can
  * name what starting would mean. Bundles the Product itself, as the Ideas
  * list does, for the Journey page's heading.
  */
 productRoutes.get("/journey", async (c) => {
   const { product } = c.var;
-  return c.json({ product, ...(await journeyState(c.env.DB, product)) });
+  const version = await dreamSequence(c.env.DB);
+  return c.json({
+    product,
+    ...(await journeyState(c.env.DB, product, version)),
+  });
 });
 
 /**
- * Start the Product's Journey on the default Path, at Milestone 1. A repeat
+ * Start the Product's Journey on Dream Sequence, at Milestone 1. A repeat
  * start is harmless: it leaves the existing Journey's progress as it was
  * and answers 200 rather than 201.
  */
 productRoutes.post("/journey", async (c) => {
   const { product } = c.var;
-  const started = await startJourney(c.env.DB, product);
-  return c.json(await journeyState(c.env.DB, product), started ? 201 : 200);
+  const version = await dreamSequence(c.env.DB);
+  const started = await startJourney(c.env.DB, product, version);
+  return c.json(
+    await journeyState(c.env.DB, product, version),
+    started ? 201 : 200,
+  );
 });
 
 /**
@@ -280,13 +290,14 @@ productRoutes.post("/journey", async (c) => {
  */
 productRoutes.post("/journey/advance", async (c) => {
   const { product } = c.var;
-  const journey = await loadJourney(c.env.DB, product);
+  const version = await dreamSequence(c.env.DB);
+  const journey = await loadJourney(c.env.DB, product, version);
   if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
 
   await advanceJourney(c.env.DB, journey);
-  return c.json(await journeyState(c.env.DB, product), 200);
+  return c.json(await journeyState(c.env.DB, product, version), 200);
 });
 
 /**
@@ -296,13 +307,14 @@ productRoutes.post("/journey/advance", async (c) => {
  */
 productRoutes.post("/journey/return", async (c) => {
   const { product } = c.var;
-  const journey = await loadJourney(c.env.DB, product);
+  const version = await dreamSequence(c.env.DB);
+  const journey = await loadJourney(c.env.DB, product, version);
   if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
 
   await returnJourney(c.env.DB, journey);
-  return c.json(await journeyState(c.env.DB, product), 200);
+  return c.json(await journeyState(c.env.DB, product, version), 200);
 });
 
 /**
@@ -313,7 +325,8 @@ productRoutes.post("/journey/return", async (c) => {
  */
 productRoutes.get("/worksheets/:worksheetId", async (c) => {
   const { product } = c.var;
-  const journey = await loadJourney(c.env.DB, product);
+  const version = await dreamSequence(c.env.DB);
+  const journey = await loadJourney(c.env.DB, product, version);
   if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
@@ -338,7 +351,8 @@ productRoutes.get("/worksheets/:worksheetId", async (c) => {
 productRoutes.put("/worksheets/:worksheetId", async (c) => {
   const { product } = c.var;
   const worksheetId = c.req.param("worksheetId");
-  const journey = await loadJourney(c.env.DB, product);
+  const version = await dreamSequence(c.env.DB);
+  const journey = await loadJourney(c.env.DB, product, version);
   if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
@@ -374,7 +388,8 @@ productRoutes.put("/worksheets/:worksheetId", async (c) => {
  */
 productRoutes.put("/tasks/:taskId", async (c) => {
   const { product } = c.var;
-  const journey = await loadJourney(c.env.DB, product);
+  const version = await dreamSequence(c.env.DB);
+  const journey = await loadJourney(c.env.DB, product, version);
   if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
@@ -395,5 +410,5 @@ productRoutes.put("/tasks/:taskId", async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  return c.json(await journeyState(c.env.DB, product), 200);
+  return c.json(await journeyState(c.env.DB, product, version), 200);
 });

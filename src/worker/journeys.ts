@@ -10,12 +10,14 @@
  * Worksheet content (`getWorksheet`, `parseAnswers`) lives in
  * `worksheets.ts`.
  *
- * Callers never name a Path: the module picks Dream Sequence. And
- * everything that needs a Journey to have started takes a
- * `StartedJourney`, which only `loadJourney` makes, so a route can't skip
- * that check.
+ * A Journey is on one saved Path version, which callers pass in as a
+ * `FollowableVersion` from `paths.ts`, so a route can't start a Journey on
+ * a version the User may not follow. And everything that needs a Journey
+ * to have started takes a `StartedJourney`, which only `loadJourney`
+ * makes, so a route can't skip that check either.
  */
 
+import type { FollowableVersion, Milestone } from "./paths";
 import type { OwnedProduct } from "./products";
 import {
   getWorksheet,
@@ -24,33 +26,9 @@ import {
 } from "./worksheets";
 
 /**
- * The one Path Phase 1 ships (seeded in `0007`, named Dream Sequence in
- * `0008`). There's no "choose your Path" step yet, so every Journey starts
- * on this one. When a second Path ships, starting a Journey is the one
- * place that has to be told which.
- */
-const PATH_ID = "starter";
-
-export interface Milestone {
-  id: string;
-  name: string;
-  description: string;
-  doneWhen: string;
-  /** A few words on the Milestone, shown under its name on the route. */
-  outcome: string;
-}
-
-export interface Path {
-  id: string;
-  name: string;
-  /** Every Milestone on the Path, in order. */
-  milestones: Milestone[];
-}
-
-/**
- * A Product's progress on one Path. Strictly sequenced: every Milestone
- * before `currentMilestoneId` (in the Path's order) is done, every one
- * after it future. `finishedAt` stays `null` until the Journey advances
+ * A Product's progress on one Path version. Strictly sequenced: every
+ * Milestone before `currentMilestoneId` (in the version's order) is done,
+ * every one after it future. `finishedAt` stays `null` until the Journey advances
  * past the last Milestone (issue #138) — `currentMilestoneId` then keeps
  * pointing at that last Milestone, since there's no Milestone after it to
  * take its place.
@@ -73,7 +51,7 @@ declare const started: unique symbol;
  */
 export type StartedJourney = {
   readonly product: OwnedProduct;
-  readonly pathId: string;
+  readonly version: FollowableVersion;
   readonly [started]: true;
 };
 
@@ -93,44 +71,52 @@ export interface WorksheetSummary {
 export interface TaskSummary {
   id: string;
   title: string;
-  /** The Milestones it's on, in their Path's order. */
+  /** The Milestones it's on, in their version's order. */
   milestoneIds: string[];
   done: boolean;
 }
 
-/** The Product's Journey, or `null` if it hasn't started one. */
+/** The Product's Journey on `version`, or `null` if it hasn't started one. */
 export async function loadJourney(
   db: D1Database,
   product: OwnedProduct,
+  version: FollowableVersion,
 ): Promise<StartedJourney | null> {
   const row = await db
     .prepare(
       'SELECT 1 FROM "journeys" WHERE "productId" = ? AND "versionId" = ?',
     )
-    .bind(product.id, PATH_ID)
+    .bind(product.id, version.id)
     .first();
-  return row ? ({ product, pathId: PATH_ID } as StartedJourney) : null;
+  return row ? ({ product, version } as StartedJourney) : null;
 }
 
 /**
- * Start the Product's Journey at its first Milestone, with its one instance of
- * each singleton Worksheet on the Path (#139). Returns whether a Journey
- * was actually started — `false` means one already existed, and it's left
- * exactly as it was (a repeat start never resets progress). A repeat start
- * still creates any singleton instance that's missing, which a Journey started
- * before #139 would be.
+ * Start the Product's Journey on `version` at its first Milestone, with its
+ * one instance of each singleton Worksheet on the version (#139). Returns
+ * whether a Journey was actually started — `false` means one already
+ * existed, and it's left exactly as it was (a repeat start never resets
+ * progress). A repeat start still creates any singleton instance that's
+ * missing, which a Journey started before #139 would be.
  */
 export async function startJourney(
   db: D1Database,
   product: OwnedProduct,
+  version: FollowableVersion,
 ): Promise<boolean> {
   const { meta } = await db
     .prepare(
-      'INSERT INTO "journeys" ("id", "productId", "versionId", "currentMilestoneId", "startedAt") SELECT ?, ?, "versionId", "id", ? FROM "milestones" WHERE "versionId" = ? AND "position" = 1 ON CONFLICT ("productId", "versionId") DO NOTHING',
+      'INSERT INTO "journeys" ("id", "productId", "versionId", "currentMilestoneId", "startedAt") VALUES (?, ?, ?, ?, ?) ON CONFLICT ("productId", "versionId") DO NOTHING',
     )
-    .bind(crypto.randomUUID(), product.id, new Date().toISOString(), PATH_ID)
+    .bind(
+      crypto.randomUUID(),
+      product.id,
+      version.id,
+      version.milestones[0].id,
+      new Date().toISOString(),
+    )
     .run();
-  await createSingletonInstances(db, product, PATH_ID);
+  await createSingletonInstances(db, product, version.id);
   return meta.changes > 0;
 }
 
@@ -182,7 +168,7 @@ export async function advanceJourney(
          END
        WHERE "productId" = ? AND "versionId" = ? AND "finishedAt" IS NULL`,
     )
-    .bind(new Date().toISOString(), journey.product.id, journey.pathId)
+    .bind(new Date().toISOString(), journey.product.id, journey.version.id)
     .run();
 }
 
@@ -228,7 +214,7 @@ export async function returnJourney(
          "finishedAt" = NULL
        WHERE "productId" = ? AND "versionId" = ?`,
     )
-    .bind(journey.product.id, journey.pathId)
+    .bind(journey.product.id, journey.version.id)
     .run();
 }
 
@@ -253,7 +239,7 @@ export async function worksheetState(
          WHERE "worksheet_instances"."productId" = ? AND "worksheet_instances"."versionId" = ?
            AND "worksheet_instances"."worksheetId" = ? AND "worksheet_instances"."singleton" = 1`,
       )
-      .bind(journey.product.id, journey.pathId, worksheetId)
+      .bind(journey.product.id, journey.version.id, worksheetId)
       .all<{ fieldId: string; value: string }>(),
   ]);
   if (!worksheet) {
@@ -271,8 +257,9 @@ export async function worksheetState(
  * first if it's missing (a Journey started before #139 has none).
  *
  * Only singleton Worksheets have any content yet (the Product Summary), so
- * the instance is addressed by (Product, Path, Worksheet). A repeatable
- * Worksheet's instances will need their own ids once one is authored (#151).
+ * the instance is addressed by (Product, Path version, Worksheet). A
+ * repeatable Worksheet's instances will need their own ids once one is
+ * authored (#151).
  *
  * One `batch`, which D1 runs as a single transaction, so a save never
  * half-applies (old answers deleted, new ones not yet written).
@@ -283,7 +270,8 @@ export async function saveAnswers(
   worksheetId: string,
   answers: WorksheetAnswers,
 ): Promise<void> {
-  const { product, pathId } = journey;
+  const { product } = journey;
+  const versionId = journey.version.id;
   const instanceId = `(SELECT "id" FROM "worksheet_instances" WHERE "productId" = ? AND "versionId" = ? AND "worksheetId" = ? AND "singleton" = 1)`;
   await db.batch([
     db
@@ -293,7 +281,7 @@ export async function saveAnswers(
       .bind(
         crypto.randomUUID(),
         product.id,
-        pathId,
+        versionId,
         worksheetId,
         new Date().toISOString(),
       ),
@@ -301,20 +289,20 @@ export async function saveAnswers(
       .prepare(
         `DELETE FROM "worksheet_answers" WHERE "instanceId" = ${instanceId}`,
       )
-      .bind(product.id, pathId, worksheetId),
+      .bind(product.id, versionId, worksheetId),
     ...Object.entries(answers).map(([fieldId, value]) =>
       db
         .prepare(
           `INSERT INTO "worksheet_answers" ("instanceId", "fieldId", "value") VALUES (${instanceId}, ?, ?)`,
         )
-        .bind(product.id, pathId, worksheetId, fieldId, value),
+        .bind(product.id, versionId, worksheetId, fieldId, value),
     ),
   ]);
 }
 
 /**
  * Check off (`done`) or uncheck a Task. Returns `false` if the Task isn't
- * on any of the Path's Milestones, changing nothing. Repeating either is
+ * on any of the version's Milestones, changing nothing. Repeating either is
  * harmless: checking an already-checked Task keeps its first
  * `completedAt`.
  *
@@ -328,12 +316,13 @@ export async function setTaskDone(
   taskId: string,
   done: boolean,
 ): Promise<boolean> {
-  const { product, pathId } = journey;
+  const { product } = journey;
+  const versionId = journey.version.id;
   const onPath = await db
     .prepare(
       'SELECT 1 FROM "milestone_tasks" JOIN "milestones" ON "milestones"."id" = "milestone_tasks"."milestoneId" WHERE "milestone_tasks"."taskId" = ? AND "milestones"."versionId" = ?',
     )
-    .bind(taskId, pathId)
+    .bind(taskId, versionId)
     .first();
   if (!onPath) {
     return false;
@@ -345,75 +334,58 @@ export async function setTaskDone(
           .prepare(
             'INSERT INTO "task_completions" ("productId", "versionId", "taskId", "completedAt") VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
           )
-          .bind(product.id, pathId, taskId, new Date().toISOString())
+          .bind(product.id, versionId, taskId, new Date().toISOString())
       : db
           .prepare(
             'DELETE FROM "task_completions" WHERE "productId" = ? AND "versionId" = ? AND "taskId" = ?',
           )
-          .bind(product.id, pathId, taskId)
+          .bind(product.id, versionId, taskId)
   ).run();
   return true;
 }
 
 /**
- * What `/api/products/:productId/journey` answers with: the Path with its
- * Milestones, the Product's Journey on it (`null` until started), the
- * Worksheets on its Milestones with how much of each is filled in (#139),
- * and the Tasks on them with whether each is checked off (#140).
+ * What `/api/products/:productId/journey` answers with: the Path version
+ * with its Milestones (still under `path`, which the page reads), the
+ * Product's Journey on it (`null` until started), the Worksheets on its
+ * Milestones with how much of each is filled in (#139), and the Tasks on
+ * them with whether each is checked off (#140).
  */
 export async function journeyState(
   db: D1Database,
   product: OwnedProduct,
+  version: FollowableVersion,
 ): Promise<{
-  path: Path;
+  path: { id: string; name: string; milestones: readonly Milestone[] };
   journey: Journey | null;
   worksheets: WorksheetSummary[];
   tasks: TaskSummary[];
 }> {
-  const [path, journey, worksheets, tasks] = await Promise.all([
-    getPath(db, PATH_ID),
+  const [journey, worksheets, tasks] = await Promise.all([
     db
       .prepare(
         'SELECT "startedAt", "currentMilestoneId", "finishedAt" FROM "journeys" WHERE "productId" = ? AND "versionId" = ?',
       )
-      .bind(product.id, PATH_ID)
+      .bind(product.id, version.id)
       .first<Journey>(),
-    worksheetSummaries(db, product, PATH_ID),
-    taskSummaries(db, product, PATH_ID),
+    worksheetSummaries(db, product, version.id),
+    taskSummaries(db, product, version.id),
   ]);
-  return { path, journey, worksheets, tasks };
-}
-
-/** A Path with its Milestones in order — shown whether or not a Journey has started. */
-async function getPath(db: D1Database, pathId: string): Promise<Path> {
-  const [path, { results: milestones }] = await Promise.all([
-    db
-      .prepare('SELECT "id", "name" FROM "path_versions" WHERE "id" = ?')
-      .bind(pathId)
-      .first<Omit<Path, "milestones">>(),
-    db
-      .prepare(
-        'SELECT "id", "name", "description", "doneWhen", "outcome" FROM "milestones" WHERE "versionId" = ? ORDER BY "position" ASC',
-      )
-      .bind(pathId)
-      .all<Milestone>(),
-  ]);
-  if (!path) {
-    throw new Error(`Path ${pathId} is not seeded`);
-  }
-  return { ...path, milestones };
+  const { id, name, milestones } = version;
+  return { path: { id, name, milestones }, journey, worksheets, tasks };
 }
 
 /**
- * Create the Product's one instance of every singleton Worksheet on `pathId`'s
- * Milestones, skipping any it already has — so it's safe to call on every
- * Journey start, repeat or not. Ids come from SQLite's `randomblob`, since
- * one `INSERT ... SELECT` can't call `crypto.randomUUID()` per row.
+ * Create the Product's one instance of every singleton Worksheet on
+ * `versionId`'s Milestones, skipping any it already has — so it's safe to
+ * call on every Journey start, repeat or not. Ids come from SQLite's
+ * `randomblob`, since one `INSERT ... SELECT` can't call
+ * `crypto.randomUUID()` per row.
  */
 async function createSingletonInstances(
   db: D1Database,
   product: OwnedProduct,
-  pathId: string,
+  versionId: string,
 ): Promise<void> {
   await db
     .prepare(
@@ -428,18 +400,18 @@ async function createSingletonInstances(
          )
        ON CONFLICT DO NOTHING`,
     )
-    .bind(product.id, pathId, new Date().toISOString(), pathId)
+    .bind(product.id, versionId, new Date().toISOString(), versionId)
     .run();
 }
 
 /**
- * Every Worksheet on `pathId`'s Milestones, in the order its first
+ * Every Worksheet on `versionId`'s Milestones, in the order its first
  * Milestone comes, with how many of the Product's answers are filled in.
  */
 async function worksheetSummaries(
   db: D1Database,
   product: OwnedProduct,
-  pathId: string,
+  versionId: string,
 ): Promise<WorksheetSummary[]> {
   const [{ results: links }, { results: filledCounts }] = await Promise.all([
     db
@@ -452,7 +424,7 @@ async function worksheetSummaries(
          WHERE "milestones"."versionId" = ?
          ORDER BY "milestones"."position" ASC, "worksheets"."id" ASC`,
       )
-      .bind(pathId)
+      .bind(versionId)
       .all<{ id: string; name: string; milestoneId: string; total: number }>(),
     db
       .prepare(
@@ -463,7 +435,7 @@ async function worksheetSummaries(
            AND "worksheet_instances"."singleton" = 1
          GROUP BY "worksheet_instances"."worksheetId"`,
       )
-      .bind(product.id, pathId)
+      .bind(product.id, versionId)
       .all<{ worksheetId: string; filled: number }>(),
   ]);
 
@@ -484,14 +456,14 @@ async function worksheetSummaries(
 }
 
 /**
- * Every Task on `pathId`'s Milestones, in the order its first Milestone
+ * Every Task on `versionId`'s Milestones, in the order its first Milestone
  * comes (then its place on that Milestone), with whether the Product has
  * checked it off.
  */
 async function taskSummaries(
   db: D1Database,
   product: OwnedProduct,
-  pathId: string,
+  versionId: string,
 ): Promise<TaskSummary[]> {
   const { results } = await db
     .prepare(
@@ -506,7 +478,7 @@ async function taskSummaries(
        WHERE "milestones"."versionId" = ?
        ORDER BY "milestones"."position" ASC, "milestone_tasks"."position" ASC`,
     )
-    .bind(product.id, pathId, pathId)
+    .bind(product.id, versionId, versionId)
     .all<{ id: string; title: string; milestoneId: string; done: number }>();
 
   const summaries = new Map<string, TaskSummary>();

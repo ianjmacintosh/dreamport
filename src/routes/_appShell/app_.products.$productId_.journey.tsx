@@ -52,7 +52,7 @@ async function withMinimumDuration<T>(
   }
 }
 
-/** A Milestone as `/api/products/:productId/journey` returns it (see `src/worker/journeys.ts`). */
+/** A Milestone as `/api/products/:productId/journey` returns it (see `Milestone` in `src/worker/paths.ts`). */
 interface Milestone {
   id: string;
   name: string;

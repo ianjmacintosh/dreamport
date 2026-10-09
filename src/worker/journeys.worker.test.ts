@@ -13,6 +13,7 @@ import {
   worksheetState,
   type StartedJourney,
 } from "./journeys";
+import { dreamSequence, getVersion } from "./paths";
 import { createProduct, getProduct, type OwnedProduct } from "./products";
 
 /**
@@ -22,6 +23,9 @@ import { createProduct, getProduct, type OwnedProduct } from "./products";
  */
 
 const USER_ID = "journeys-module-user";
+
+/** The version every Journey here is on. */
+const version = await dreamSequence(env.DB);
 
 /** A fresh Product, owned by this file's one User. */
 async function newProduct(): Promise<OwnedProduct> {
@@ -44,16 +48,16 @@ async function started(): Promise<{
   milestoneIds: string[];
 }> {
   const product = await newProduct();
-  await startJourney(env.DB, product);
-  const journey = await loadJourney(env.DB, product);
+  await startJourney(env.DB, product, version);
+  const journey = await loadJourney(env.DB, product, version);
   if (!journey) throw new Error("the Journey just started isn't there");
-  const { path } = await journeyState(env.DB, product);
+  const { path } = await journeyState(env.DB, product, version);
   return { product, journey, milestoneIds: path.milestones.map((m) => m.id) };
 }
 
 /** Where the Product's Journey stands, as the Journey page reads it. */
 async function progress(product: OwnedProduct) {
-  return (await journeyState(env.DB, product)).journey;
+  return (await journeyState(env.DB, product, version)).journey;
 }
 
 async function advanceTimes(journey: StartedJourney, times: number) {
@@ -81,8 +85,8 @@ describe("starting a Journey", () => {
   it("has no Journey to load before it starts, but still shows the Path", async () => {
     const product = await newProduct();
 
-    expect(await loadJourney(env.DB, product)).toBeNull();
-    const state = await journeyState(env.DB, product);
+    expect(await loadJourney(env.DB, product, version)).toBeNull();
+    const state = await journeyState(env.DB, product, version);
     expect(state.journey).toBeNull();
     expect(state.path.milestones.map((m) => m.name)).toEqual([
       "Rough One-Pager",
@@ -98,10 +102,11 @@ describe("starting a Journey", () => {
   it("starts on Milestone 1 with one instance of each singleton Worksheet", async () => {
     const product = await newProduct();
 
-    expect(await startJourney(env.DB, product)).toBe(true);
+    expect(await startJourney(env.DB, product, version)).toBe(true);
     const { path, journey, worksheets, tasks } = await journeyState(
       env.DB,
       product,
+      version,
     );
     expect(journey).toEqual({
       startedAt: expect.any(String),
@@ -140,12 +145,39 @@ describe("starting a Journey", () => {
     ]);
   });
 
+  it("starts on the given version's first Milestone, and only on that version", async () => {
+    const product = await newProduct();
+    // A User's own version, seeded by raw SQL until a User can save one (#169).
+    const now = new Date().toISOString();
+    await env.DB.batch([
+      env.DB.prepare(
+        'INSERT INTO "paths" ("id", "userId", "createdAt") VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
+      ).bind("journeys-own-path", USER_ID, now),
+      env.DB.prepare(
+        'INSERT INTO "path_versions" ("id", "pathId", "number", "name", "description", "savedAt") VALUES (?, ?, 1, ?, ?, ?) ON CONFLICT DO NOTHING',
+      ).bind("journeys-own-version", "journeys-own-path", "Own Path", "", now),
+      ...["own-first", "own-second"].map((id, i) =>
+        env.DB.prepare(
+          'INSERT INTO "milestones" ("id", "versionId", "position", "name", "description", "doneWhen", "outcome") VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
+        ).bind(id, "journeys-own-version", i + 1, id, "", "", ""),
+      ),
+    ]);
+    const own = await getVersion(env.DB, USER_ID, "journeys-own-version");
+    if (!own) throw new Error("the version just seeded isn't there");
+
+    expect(await startJourney(env.DB, product, own)).toBe(true);
+    const state = await journeyState(env.DB, product, own);
+    expect(state.path.id).toBe("journeys-own-version");
+    expect(state.journey?.currentMilestoneId).toBe("own-first");
+    expect(await loadJourney(env.DB, product, version)).toBeNull();
+  });
+
   it("leaves a started Journey as it was on a repeat start", async () => {
     const { product, journey } = await started();
     await advanceJourney(env.DB, journey);
     const before = await progress(product);
 
-    expect(await startJourney(env.DB, product)).toBe(false);
+    expect(await startJourney(env.DB, product, version)).toBe(false);
     expect(await progress(product)).toEqual(before);
     expect(await countWorksheetInstances(product.id, PRODUCT_SUMMARY)).toBe(1);
   });
@@ -270,7 +302,9 @@ describe("Worksheets", () => {
     expect(
       (await worksheetState(env.DB, journey, PRODUCT_SUMMARY))?.answers,
     ).toEqual({ problem: "Scales are clunky", solution: "An app" });
-    expect((await journeyState(env.DB, product)).worksheets[0]).toMatchObject({
+    expect(
+      (await journeyState(env.DB, product, version)).worksheets[0],
+    ).toMatchObject({
       id: PRODUCT_SUMMARY,
       filled: 2,
       total: 8,
@@ -297,7 +331,7 @@ describe("Worksheets", () => {
 describe("Tasks", () => {
   /** Whether the Product has `taskId` checked off, as the Journey page reads it. */
   async function isDone(product: OwnedProduct, taskId: string) {
-    const { tasks } = await journeyState(env.DB, product);
+    const { tasks } = await journeyState(env.DB, product, version);
     return tasks.find((t) => t.id === taskId)?.done;
   }
 
@@ -318,7 +352,7 @@ describe("Tasks", () => {
     const { product, journey } = await started();
 
     expect(await setTaskDone(env.DB, journey, "not-a-task", true)).toBe(false);
-    const { tasks } = await journeyState(env.DB, product);
+    const { tasks } = await journeyState(env.DB, product, version);
     expect(tasks.every((t) => !t.done)).toBe(true);
   });
 

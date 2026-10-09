@@ -119,8 +119,8 @@ describe("Dream Sequence", () => {
     const product = await getProduct(env.DB, FOLLOWER_ID, id);
     if (!product) throw new Error("the Product just created isn't there");
 
-    await startJourney(env.DB, product);
-    const journey = await loadJourney(env.DB, product);
+    await startJourney(env.DB, product, before);
+    const journey = await loadJourney(env.DB, product, before);
     if (!journey) throw new Error("the Journey just started isn't there");
     await saveAnswers(env.DB, journey, "product-summary", { problem: "Dough" });
     await setTaskDone(env.DB, journey, "talk-to-five-customers", true);
