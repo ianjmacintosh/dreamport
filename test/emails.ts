@@ -177,6 +177,16 @@ export const TEST_EMAILS = {
   /** Owns a Path seeded by raw SQL in `paths.worker.test.ts`. Never signs in. */
   pathsModuleOwner: "delivered+paths-module-owner@resend.dev",
 
+  // --- The Paths module's Drafts, called directly (#167). Never sign in. ---
+  /** Makes Paths and edits their Drafts. */
+  pathsModuleMaker: "delivered+paths-module-maker@resend.dev",
+  /** Must never see or edit `pathsModuleMaker`'s Paths. */
+  pathsModuleStranger: "delivered+paths-module-stranger@resend.dev",
+  /** Makes Paths up to the cap. */
+  pathsModuleCap: "delivered+paths-module-cap@resend.dev",
+  /** Is deleted, taking their Paths and Drafts with them. */
+  pathsModuleDeleted: "delivered+paths-module-deleted@resend.dev",
+
   // --- Seam 1: the Journey routes (#137-#140), one test each ---
   /** Reads the Journey page's state before a Journey starts. */
   journeysState: "delivered+journeys-state@resend.dev",

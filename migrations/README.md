@@ -87,6 +87,11 @@ become `versionId`. A new `paths` table holds each Path and its owner
 and its version 1 keeps the id `starter`, so existing Journeys carry over
 unchanged. Renamed rather than rebuilt, and not re-runnable.
 
+`0020_path_drafts.sql` adds a Path's Draft (issue #167): `name` and
+`description` columns on `paths`, and a `draft_milestones` table of the
+Draft's ordered Milestones, cascading off `paths`. Saved versions keep
+using `milestones`. Not re-runnable.
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order
