@@ -50,18 +50,57 @@ a Question has been answered.
 _Avoid_: response, reply
 
 **Path**:
-A fixed, Dreamport-authored route a Product can follow from idea to a
-growing, profitable product, made of ordered Milestones — not something a
-User creates. Dreamport ships one Path for now: Dream Sequence, the free
-Path every Journey starts on, based on Running Lean.
+A route a Product can follow from idea to a growing, profitable product,
+made of ordered Milestones. Any User can make one in Trailblazer; it starts
+private to its maker. A Guide can share it (free) or sell it (a Purchase).
+Dream Sequence, based on Running Lean, is the free Path Dreamport itself
+publishes.
 _Avoid_: methodology, plan, program
+
+**Path version**:
+One published state of a Path. A change to a Path produces a new version;
+a Journey stays on the version it started on. A new version is a new
+release, never a free update to existing Journeys (for now).
+_Avoid_: revision, edition, update
+
+**Trailblazer**:
+The one tool in which any User makes and edits a Path. Making a Path for
+yourself and following it on your own Product is **self-guiding**, and
+needs nothing beyond an account.
+_Avoid_: editor, builder, path builder
+
+**Guide**:
+A User with permission to share and sell Paths they made, so that other
+Users can follow them. Becoming one is by invitation at first. A Guide sees
+none of a follower's work: they write the Path and the follower walks it.
+_Avoid_: coach, author, creator, instructor, seller
+
+**Admin**:
+A User with permission to manage other Users' accounts (list, remove, change
+an email address, change permissions) and, later, to see platform finances
+such as monthly revenue and Guide payouts. Has nothing to do with making
+Paths: that is Trailblazer's job, open to any User.
+_Avoid_: system administrator, staff, superuser
+
+**Pathfinder**:
+A future directory of shared Paths. Not built yet: for now a Path is found
+only through a link its Guide gives out.
+_Avoid_: marketplace, catalog, store
+
+**Purchase**:
+A User paying, once, for a Path version that a Guide sells. Paying unlocks
+starting a Journey on that Path and keeping it as it was bought. Dreamport
+takes a cut of each; a Guide pays nothing otherwise. The Guide sets the
+price per Path version, and a new price applies only to later Purchases. A
+Guide is paid out once the buyer's refund window has passed.
+_Avoid_: subscription, order, enrollment
 
 **Milestone**:
 One ordered step on a Path (e.g. "Rough One-Pager", then "Real Talk"),
 with a one-line description of what it asks, a "done when" line for
 knowing it's finished, and a short outcome line — a few words on what it
-gets you, shown under its name on the Journey page. Fixed content that
-ships with its Path.
+gets you, shown under its name on the Journey page. Fixed content within
+a Path version.
 _Avoid_: stage, phase, step
 
 **Journey**:
@@ -117,7 +156,7 @@ if they want a blank slate.
 _Avoid_: reset, start over, start from scratch
 
 **Worksheet**:
-A fixed, Dreamport-authored set of ordered fields, each asking one thing
+A fixed (within a Path version) set of ordered fields, each asking one thing
 in plain words (e.g. the "Product Summary": problem, customer, solution,
 value proposition, unfair advantage, channel, pricing, costs), that a
 Path's Milestones hold for the User to fill in about their Product. One
@@ -136,7 +175,7 @@ _Avoid_: form, template, canvas, questionnaire
 
 **Task**:
 Something a Path's Milestone asks the User to do (e.g. "Talk to 5
-potential customers"), fixed content that ships with its Path like a
+potential customers"), fixed content within a Path version like a
 Worksheet, and checked off per Product per Path. A **standalone** Task has
 no Worksheet behind it, just a title: the User checks it off, and can
 uncheck it, by hand. Checking one off is informational only — it
@@ -148,11 +187,12 @@ _Avoid_: to-do, checklist item, step, action item
 
 **User**:
 A person with an account and a Private space of their own Products.
-Identified by an email address.
-_Avoid_: account, member, customer
+Identified by an email address. Also the word for someone following a
+Guide's Path: there is no separate "client" or "buyer" account.
+_Avoid_: account, member, customer, client, buyer
 
 **Private space**:
 The set of Products (and, later, their Ideas) belonging to one User, visible
-only to that User. The reason Dreamport needs accounts at all rather than
+only to that User — including from the Guide of any Path they follow. The reason Dreamport needs accounts at all rather than
 being a public pastebin.
 _Avoid_: workspace, vault, board
