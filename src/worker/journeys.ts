@@ -104,7 +104,9 @@ export async function loadJourney(
   product: OwnedProduct,
 ): Promise<StartedJourney | null> {
   const row = await db
-    .prepare('SELECT 1 FROM "journeys" WHERE "productId" = ? AND "pathId" = ?')
+    .prepare(
+      'SELECT 1 FROM "journeys" WHERE "productId" = ? AND "versionId" = ?',
+    )
     .bind(product.id, PATH_ID)
     .first();
   return row ? ({ product, pathId: PATH_ID } as StartedJourney) : null;
@@ -124,7 +126,7 @@ export async function startJourney(
 ): Promise<boolean> {
   const { meta } = await db
     .prepare(
-      'INSERT INTO "journeys" ("id", "productId", "pathId", "currentMilestoneId", "startedAt") SELECT ?, ?, "pathId", "id", ? FROM "milestones" WHERE "pathId" = ? AND "position" = 1 ON CONFLICT ("productId", "pathId") DO NOTHING',
+      'INSERT INTO "journeys" ("id", "productId", "versionId", "currentMilestoneId", "startedAt") SELECT ?, ?, "versionId", "id", ? FROM "milestones" WHERE "versionId" = ? AND "position" = 1 ON CONFLICT ("productId", "versionId") DO NOTHING',
     )
     .bind(crypto.randomUUID(), product.id, new Date().toISOString(), PATH_ID)
     .run();
@@ -159,7 +161,7 @@ export async function advanceJourney(
          "currentMilestoneId" = COALESCE(
            (
              SELECT "id" FROM "milestones" AS "next"
-             WHERE "next"."pathId" = "journeys"."pathId"
+             WHERE "next"."versionId" = "journeys"."versionId"
                AND "next"."position" = (
                  SELECT "position" + 1 FROM "milestones"
                  WHERE "id" = "journeys"."currentMilestoneId"
@@ -170,7 +172,7 @@ export async function advanceJourney(
          "finishedAt" = CASE
            WHEN EXISTS (
              SELECT 1 FROM "milestones" AS "next"
-             WHERE "next"."pathId" = "journeys"."pathId"
+             WHERE "next"."versionId" = "journeys"."versionId"
                AND "next"."position" = (
                  SELECT "position" + 1 FROM "milestones"
                  WHERE "id" = "journeys"."currentMilestoneId"
@@ -178,7 +180,7 @@ export async function advanceJourney(
            ) THEN "finishedAt"
            ELSE ?
          END
-       WHERE "productId" = ? AND "pathId" = ? AND "finishedAt" IS NULL`,
+       WHERE "productId" = ? AND "versionId" = ? AND "finishedAt" IS NULL`,
     )
     .bind(new Date().toISOString(), journey.product.id, journey.pathId)
     .run();
@@ -214,7 +216,7 @@ export async function returnJourney(
            ELSE COALESCE(
              (
                SELECT "id" FROM "milestones" AS "previous"
-               WHERE "previous"."pathId" = "journeys"."pathId"
+               WHERE "previous"."versionId" = "journeys"."versionId"
                  AND "previous"."position" = (
                    SELECT "position" - 1 FROM "milestones"
                    WHERE "id" = "journeys"."currentMilestoneId"
@@ -224,7 +226,7 @@ export async function returnJourney(
            )
          END,
          "finishedAt" = NULL
-       WHERE "productId" = ? AND "pathId" = ?`,
+       WHERE "productId" = ? AND "versionId" = ?`,
     )
     .bind(journey.product.id, journey.pathId)
     .run();
@@ -248,7 +250,7 @@ export async function worksheetState(
         `SELECT "worksheet_answers"."fieldId", "worksheet_answers"."value"
          FROM "worksheet_answers"
          JOIN "worksheet_instances" ON "worksheet_instances"."id" = "worksheet_answers"."instanceId"
-         WHERE "worksheet_instances"."productId" = ? AND "worksheet_instances"."pathId" = ?
+         WHERE "worksheet_instances"."productId" = ? AND "worksheet_instances"."versionId" = ?
            AND "worksheet_instances"."worksheetId" = ? AND "worksheet_instances"."singleton" = 1`,
       )
       .bind(journey.product.id, journey.pathId, worksheetId)
@@ -282,11 +284,11 @@ export async function saveAnswers(
   answers: WorksheetAnswers,
 ): Promise<void> {
   const { product, pathId } = journey;
-  const instanceId = `(SELECT "id" FROM "worksheet_instances" WHERE "productId" = ? AND "pathId" = ? AND "worksheetId" = ? AND "singleton" = 1)`;
+  const instanceId = `(SELECT "id" FROM "worksheet_instances" WHERE "productId" = ? AND "versionId" = ? AND "worksheetId" = ? AND "singleton" = 1)`;
   await db.batch([
     db
       .prepare(
-        'INSERT INTO "worksheet_instances" ("id", "productId", "pathId", "worksheetId", "singleton", "createdAt") VALUES (?, ?, ?, ?, 1, ?) ON CONFLICT DO NOTHING',
+        'INSERT INTO "worksheet_instances" ("id", "productId", "versionId", "worksheetId", "singleton", "createdAt") VALUES (?, ?, ?, ?, 1, ?) ON CONFLICT DO NOTHING',
       )
       .bind(
         crypto.randomUUID(),
@@ -329,7 +331,7 @@ export async function setTaskDone(
   const { product, pathId } = journey;
   const onPath = await db
     .prepare(
-      'SELECT 1 FROM "milestone_tasks" JOIN "milestones" ON "milestones"."id" = "milestone_tasks"."milestoneId" WHERE "milestone_tasks"."taskId" = ? AND "milestones"."pathId" = ?',
+      'SELECT 1 FROM "milestone_tasks" JOIN "milestones" ON "milestones"."id" = "milestone_tasks"."milestoneId" WHERE "milestone_tasks"."taskId" = ? AND "milestones"."versionId" = ?',
     )
     .bind(taskId, pathId)
     .first();
@@ -341,12 +343,12 @@ export async function setTaskDone(
     done
       ? db
           .prepare(
-            'INSERT INTO "task_completions" ("productId", "pathId", "taskId", "completedAt") VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
+            'INSERT INTO "task_completions" ("productId", "versionId", "taskId", "completedAt") VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
           )
           .bind(product.id, pathId, taskId, new Date().toISOString())
       : db
           .prepare(
-            'DELETE FROM "task_completions" WHERE "productId" = ? AND "pathId" = ? AND "taskId" = ?',
+            'DELETE FROM "task_completions" WHERE "productId" = ? AND "versionId" = ? AND "taskId" = ?',
           )
           .bind(product.id, pathId, taskId)
   ).run();
@@ -372,7 +374,7 @@ export async function journeyState(
     getPath(db, PATH_ID),
     db
       .prepare(
-        'SELECT "startedAt", "currentMilestoneId", "finishedAt" FROM "journeys" WHERE "productId" = ? AND "pathId" = ?',
+        'SELECT "startedAt", "currentMilestoneId", "finishedAt" FROM "journeys" WHERE "productId" = ? AND "versionId" = ?',
       )
       .bind(product.id, PATH_ID)
       .first<Journey>(),
@@ -386,12 +388,12 @@ export async function journeyState(
 async function getPath(db: D1Database, pathId: string): Promise<Path> {
   const [path, { results: milestones }] = await Promise.all([
     db
-      .prepare('SELECT "id", "name" FROM "paths" WHERE "id" = ?')
+      .prepare('SELECT "id", "name" FROM "path_versions" WHERE "id" = ?')
       .bind(pathId)
       .first<Omit<Path, "milestones">>(),
     db
       .prepare(
-        'SELECT "id", "name", "description", "doneWhen", "outcome" FROM "milestones" WHERE "pathId" = ? ORDER BY "position" ASC',
+        'SELECT "id", "name", "description", "doneWhen", "outcome" FROM "milestones" WHERE "versionId" = ? ORDER BY "position" ASC',
       )
       .bind(pathId)
       .all<Milestone>(),
@@ -415,14 +417,14 @@ async function createSingletonInstances(
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO "worksheet_instances" ("id", "productId", "pathId", "worksheetId", "singleton", "createdAt")
+      `INSERT INTO "worksheet_instances" ("id", "productId", "versionId", "worksheetId", "singleton", "createdAt")
        SELECT lower(hex(randomblob(16))), ?, ?, "worksheets"."id", 1, ?
        FROM "worksheets"
        WHERE "worksheets"."cardinality" = 'singleton'
          AND "worksheets"."id" IN (
            SELECT "milestone_worksheets"."worksheetId" FROM "milestone_worksheets"
            JOIN "milestones" ON "milestones"."id" = "milestone_worksheets"."milestoneId"
-           WHERE "milestones"."pathId" = ?
+           WHERE "milestones"."versionId" = ?
          )
        ON CONFLICT DO NOTHING`,
     )
@@ -447,7 +449,7 @@ async function worksheetSummaries(
          FROM "milestone_worksheets"
          JOIN "milestones" ON "milestones"."id" = "milestone_worksheets"."milestoneId"
          JOIN "worksheets" ON "worksheets"."id" = "milestone_worksheets"."worksheetId"
-         WHERE "milestones"."pathId" = ?
+         WHERE "milestones"."versionId" = ?
          ORDER BY "milestones"."position" ASC, "worksheets"."id" ASC`,
       )
       .bind(pathId)
@@ -457,7 +459,7 @@ async function worksheetSummaries(
         `SELECT "worksheet_instances"."worksheetId", COUNT(*) AS "filled"
          FROM "worksheet_answers"
          JOIN "worksheet_instances" ON "worksheet_instances"."id" = "worksheet_answers"."instanceId"
-         WHERE "worksheet_instances"."productId" = ? AND "worksheet_instances"."pathId" = ?
+         WHERE "worksheet_instances"."productId" = ? AND "worksheet_instances"."versionId" = ?
            AND "worksheet_instances"."singleton" = 1
          GROUP BY "worksheet_instances"."worksheetId"`,
       )
@@ -496,12 +498,12 @@ async function taskSummaries(
       `SELECT "tasks"."id", "tasks"."title", "milestone_tasks"."milestoneId",
          EXISTS (
            SELECT 1 FROM "task_completions"
-           WHERE "productId" = ? AND "pathId" = ? AND "taskId" = "tasks"."id"
+           WHERE "productId" = ? AND "versionId" = ? AND "taskId" = "tasks"."id"
          ) AS "done"
        FROM "milestone_tasks"
        JOIN "milestones" ON "milestones"."id" = "milestone_tasks"."milestoneId"
        JOIN "tasks" ON "tasks"."id" = "milestone_tasks"."taskId"
-       WHERE "milestones"."pathId" = ?
+       WHERE "milestones"."versionId" = ?
        ORDER BY "milestones"."position" ASC, "milestone_tasks"."position" ASC`,
     )
     .bind(product.id, pathId, pathId)

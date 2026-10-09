@@ -79,6 +79,14 @@ Product has checked off on a Path), cascading off `products` on delete.
 `0018_standalone_tasks_seed.sql` seeds the first three standalone Tasks,
 one `EVENT:`-prefixed — split so the seed half is re-runnable.
 
+`0019_path_versions.sql` makes Paths and their saved versions data (issue
+#166): the `paths` table becomes `path_versions`, and the `pathId` columns
+on `milestones`, `journeys`, `worksheet_instances` and `task_completions`
+become `versionId`. A new `paths` table holds each Path and its owner
+(`userId`, null for Dreamport). Dream Sequence is the Path `dream-sequence`,
+and its version 1 keeps the id `starter`, so existing Journeys carry over
+unchanged. Renamed rather than rebuilt, and not re-runnable.
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order
