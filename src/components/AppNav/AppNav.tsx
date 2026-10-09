@@ -1,4 +1,4 @@
-import { ListIcon, PackageIcon } from "@phosphor-icons/react";
+import { ListIcon, PackageIcon, PathIcon } from "@phosphor-icons/react";
 
 import Dropdown from "../Dropdown";
 import Link from "../Link";
@@ -29,6 +29,13 @@ const SECTIONS = [
     icon: <PackageIcon />,
     matches: (pathname: string) =>
       pathname === "/app" || pathname.startsWith("/app/products/"),
+  },
+  // PROTOTYPE (#167): a second section, to see whether the bar still fits.
+  {
+    label: "Trailblazer",
+    href: "/app/paths-prototype",
+    icon: <PathIcon />,
+    matches: (pathname: string) => pathname.startsWith("/app/paths"),
   },
 ];
 
