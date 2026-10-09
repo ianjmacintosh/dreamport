@@ -190,7 +190,10 @@ function PathDraft() {
   const [isReordering, setIsReordering] = useState(false);
   const [reorderError, setReorderError] = useState("");
   const { announce, announcement } = useAnnouncement();
-  const sensors = useSensors(useSensor(PointerSensor));
+  // A click on a handle only focuses it; a drag starts once the pointer moves.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
 
   const base = `/api/paths/${path.id}`;
   const isMilestoneBusy = milestonePending !== "none";
@@ -336,7 +339,7 @@ function PathDraft() {
     onDragOver: ({ active, over }) =>
       over ? `${nameOf(active.id)} is over ${position(over.id)}.` : undefined,
     onDragEnd: ({ active, over }) =>
-      over
+      over && over.id !== active.id
         ? `Moved ${nameOf(active.id)} to ${position(over.id)}.`
         : `Put ${nameOf(active.id)} back.`,
     onDragCancel: ({ active }) => `Put ${nameOf(active.id)} back.`,
