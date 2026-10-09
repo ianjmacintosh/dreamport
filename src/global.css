@@ -892,10 +892,10 @@ a.button {
   max-width: 16rem;
 }
 
-/* The ☰ menu that replaces the links and account trigger on phones —
-   hidden at every wider width (the same 640px, negated, so it keeps its
-   own `.button` display wherever it does show). */
-@media not (max-width: 640px) {
+/* The ☰ menu that replaces the links and account trigger on narrow
+   screens — hidden at every wider width (the same 820px, negated, so it
+   keeps its own `.button` display wherever it does show). */
+@media not (max-width: 820px) {
   .app-nav-content > .app-nav-menu {
     display: none;
   }
@@ -917,12 +917,12 @@ a.button {
   font-weight: 700;
 }
 
-/* Below 640px (--breakpoint-sm) the section links and account trigger
-   don't fit beside the wordmark, so both collapse into the ☰ menu (#125).
-   640px fits today's one section; a bar with several needs more room, so
-   adding sections means revisiting this breakpoint (see
-   docs/design-decisions.md). */
-@media (max-width: 640px) {
+/* Below about 820px the section links and account trigger don't fit
+   beside the wordmark, so both collapse into the ☰ menu (#125). Not
+   --breakpoint-sm: with two sections, 820px is about where the account
+   trigger gets back the width one section left it at 641px (#167, see
+   docs/design-decisions.md). Adding a section means measuring again. */
+@media (max-width: 820px) {
   .app-nav-content {
     grid-template-columns: auto minmax(0, 1fr);
   }

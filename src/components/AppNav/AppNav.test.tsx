@@ -119,13 +119,38 @@ describe("AppNav", () => {
     },
   );
 
-  test("doesn't mark Products current on /app/settings", () => {
-    const products = barLink(
-      navElements({ pathname: "/app/settings" }),
-      "Products",
+  test.each(["/app/settings", "/app/paths", "/app/paths/abc123"])(
+    "doesn't mark Products current on %s",
+    (pathname) => {
+      const products = barLink(navElements({ pathname }), "Products");
+      expect(products?.props.current).toBe(false);
+    },
+  );
+
+  test("links to Trailblazer (/app/paths) after Products", () => {
+    const links = navElements().filter((el) => el.type === Link);
+    const labels = links.map((el) => textOf(el));
+    expect(labels.indexOf("Trailblazer")).toBe(labels.indexOf("Products") + 1);
+    expect(barLink(navElements(), "Trailblazer")?.props.href).toBe(
+      "/app/paths",
     );
-    expect(products?.props.current).toBe(false);
   });
+
+  test.each(["/app/paths", "/app/paths/abc123"])(
+    "marks Trailblazer as the current section on %s",
+    (pathname) => {
+      const trailblazer = barLink(navElements({ pathname }), "Trailblazer");
+      expect(trailblazer?.props.current).toBe(true);
+    },
+  );
+
+  test.each(["/app", "/app/products/abc123", "/app/settings", "/app/pathsx"])(
+    "doesn't mark Trailblazer current on %s",
+    (pathname) => {
+      const trailblazer = barLink(navElements({ pathname }), "Trailblazer");
+      expect(trailblazer?.props.current).toBe(false);
+    },
+  );
 
   test("the account dropdown's trigger is the signed-in email", () => {
     expect(accountMenu(navElements()).found).toBeDefined();
@@ -141,12 +166,18 @@ describe("AppNav", () => {
     expect(textOf(logout)).toBe("Log out");
   });
 
-  test("the phone menu lists Products, then Settings and Log out under who you're signed in as", () => {
-    const [products, separator, group] = phoneMenu(navElements()).items;
+  test("the phone menu lists Products and Trailblazer, then Settings and Log out under who you're signed in as", () => {
+    const [products, trailblazer, separator, group] = phoneMenu(
+      navElements({ pathname: "/app/paths/abc123" }),
+    ).items;
     expect(products.type).toBe(Dropdown.LinkItem);
     expect(products.props.href).toBe("/app");
     expect(textOf(products)).toBe("Products");
-    expect(products.props.current).toBe(true);
+    expect(products.props.current).toBe(false);
+    expect(trailblazer.type).toBe(Dropdown.LinkItem);
+    expect(trailblazer.props.href).toBe("/app/paths");
+    expect(textOf(trailblazer)).toBe("Trailblazer");
+    expect(trailblazer.props.current).toBe(true);
     expect(separator.type).toBe(Dropdown.Separator);
     expect(group.type).toBe(Dropdown.Group);
     expect(textOf(group.props.label)).toBe("Signed in as someone@example.com");

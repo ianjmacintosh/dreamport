@@ -1,4 +1,4 @@
-import { ListIcon, PackageIcon } from "@phosphor-icons/react";
+import { ListIcon, PackageIcon, PathIcon } from "@phosphor-icons/react";
 
 import Dropdown from "../Dropdown";
 import Link from "../Link";
@@ -18,9 +18,8 @@ interface AppNavProps {
 }
 
 /**
- * The app's top-level sections, in bar order (#125). Just Products for
- * now; the bar is laid out for a few more (#125 prototyped three).
- * `matches` decides which pages count as "in" the section.
+ * The app's top-level sections, in bar order (#125, #167). `matches`
+ * decides which pages count as "in" the section.
  */
 const SECTIONS = [
   {
@@ -29,6 +28,13 @@ const SECTIONS = [
     icon: <PackageIcon />,
     matches: (pathname: string) =>
       pathname === "/app" || pathname.startsWith("/app/products/"),
+  },
+  {
+    label: "Trailblazer",
+    href: "/app/paths",
+    icon: <PathIcon />,
+    matches: (pathname: string) =>
+      pathname === "/app/paths" || pathname.startsWith("/app/paths/"),
   },
 ];
 
@@ -44,8 +50,8 @@ const SECTIONS = [
  * reversed #90's "no active-route highlighting" once the bar had real
  * sections rather than only a home link.
  *
- * Below 640px the section links and account dropdown can't share the row
- * with the wordmark, so both collapse into one ☰ menu — rendered here
+ * Below about 820px the section links and account dropdown can't share the
+ * row with the wordmark, so both collapse into one ☰ menu — rendered here
  * alongside the wide layout and swapped in by CSS (`.app-nav-*` in
  * global.css).
  */
