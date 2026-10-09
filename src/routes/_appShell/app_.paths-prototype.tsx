@@ -1,14 +1,12 @@
 // PROTOTYPE (#167) — throwaway. Lives on 167-prototype-trailblazer only; never merge.
-// Four ways to reorder a Draft's Milestones on one Path page, switchable with
-// ?variant=A–D, plus ?form=above|below for where the add-Milestone form sits.
+// Round 2. Rows: ?variant= C (reorder mode), D (drag handle) and E (drag
+// handle, separating lines instead of white blocks). Adding/editing:
+// ?form=inline (a button that reveals the form in place) or modal (a dialog).
 // State is in memory; every "request" is a fake 400ms wait.
-import { Fragment, useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  DotsSixVerticalIcon,
-} from "@phosphor-icons/react";
+import { Dialog } from "@base-ui/react/dialog";
+import { DotsSixVerticalIcon } from "@phosphor-icons/react";
 
 import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
@@ -29,6 +27,14 @@ interface Milestone {
   doneWhen: string;
   outcome: string;
 }
+
+const EMPTY: Milestone = {
+  id: "",
+  name: "",
+  description: "",
+  doneWhen: "",
+  outcome: "",
+};
 
 const SEED: Milestone[] = [
   {
@@ -69,16 +75,16 @@ const SEED: Milestone[] = [
 ];
 
 const VARIANTS = [
-  { key: "A", name: "Arrows on each row" },
-  { key: "B", name: "Move inside the edit panel" },
-  { key: "C", name: "Reorder mode" },
-  { key: "D", name: "Drag handle" },
+  { key: "C", name: "Reorder mode, white blocks" },
+  { key: "D", name: "Drag handle, white blocks" },
+  { key: "E", name: "Drag handle, separating lines" },
 ];
 
 export const Route = createFileRoute("/_appShell/app_/paths-prototype")({
   validateSearch: (search: Record<string, unknown>) => ({
-    variant: typeof search.variant === "string" ? search.variant : "A",
-    form: search.form === "above" ? "above" : "below",
+    variant:
+      search.variant === "D" || search.variant === "E" ? search.variant : "C",
+    form: search.form === "modal" ? "modal" : "inline",
   }),
   beforeLoad: () => ({
     breadcrumbs: {
@@ -89,17 +95,43 @@ export const Route = createFileRoute("/_appShell/app_/paths-prototype")({
   component: PathPrototype,
 });
 
+const PROTO_CSS = `
+.proto-drag-row { grid-template-columns: 1.5rem minmax(0, 1fr) auto; column-gap: var(--space-3); }
+.proto-drag-row > .proto-handle { grid-column: 1; grid-row: 1 / span 2; align-self: center; }
+.proto-drag-row > .list-row-name { grid-column: 2; }
+.proto-drag-row > .list-row-action { grid-column: 3; }
+@media (max-width: 640px) {
+  .proto-drag-row > .list-row-action { grid-column: 2; }
+}
+`;
+
 const wait = () => new Promise((resolve) => setTimeout(resolve, 400));
+
+const blockRow = (variant: string): CSSProperties =>
+  variant === "E"
+    ? {
+        padding: "var(--space-3) 0",
+        borderTop: "1px solid var(--color-border)",
+      }
+    : {
+        padding: "var(--space-3) var(--space-4)",
+        backgroundColor: "var(--color-sheet)",
+      };
 
 function PathPrototype() {
   const { variant, form } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const [milestones, setMilestones] = useState(SEED);
   const [movingId, setMovingId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  // "new" for the add form, a Milestone id for its edit form.
+  const [openForm, setOpenForm] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<number | null>(null);
+
+  const draggable = variant === "D" || variant === "E";
+  const busy = movingId !== null;
 
   async function move(id: string, delta: -1 | 1) {
     setMovingId(id);
@@ -115,55 +147,33 @@ function PathPrototype() {
     setMovingId(null);
   }
 
-  function dropOn(targetId: string) {
-    if (!dragId || dragId === targetId) return;
+  function drop() {
+    if (dragId === null || dropAt === null) return;
     setMilestones((prev) => {
-      const next = prev.filter((m) => m.id !== dragId);
-      const dragged = prev.find((m) => m.id === dragId)!;
-      next.splice(
-        next.findIndex((m) => m.id === targetId) +
-          (prev.findIndex((m) => m.id === dragId) <
-          prev.findIndex((m) => m.id === targetId)
-            ? 1
-            : 0),
-        0,
-        dragged,
-      );
+      const from = prev.findIndex((m) => m.id === dragId);
+      const next = [...prev];
+      const [dragged] = next.splice(from, 1);
+      next.splice(dropAt > from ? dropAt - 1 : dropAt, 0, dragged);
       return next;
     });
+    setDragId(null);
+    setDropAt(null);
   }
 
-  function update(updated: Milestone) {
+  function save(m: Milestone) {
     setMilestones((prev) =>
-      prev.map((m) => (m.id === updated.id ? updated : m)),
+      m.id
+        ? prev.map((x) => (x.id === m.id ? m : x))
+        : [...prev, { ...m, id: crypto.randomUUID() }],
     );
-    setEditingId(null);
+    setOpenForm(null);
   }
 
   function remove(id: string) {
     setMilestones((prev) => prev.filter((m) => m.id !== id));
     setConfirmingId(null);
-    setEditingId(null);
+    setOpenForm(null);
   }
-
-  const busy = movingId !== null;
-  const addForm = (
-    <MilestoneForm
-      key={milestones.length}
-      idPrefix="add"
-      className="form-section"
-      initial={{ id: "", name: "", description: "", doneWhen: "", outcome: "" }}
-      onSubmit={(m) =>
-        setMilestones((prev) => [...prev, { ...m, id: crypto.randomUUID() }])
-      }
-      actions={(pending) => (
-        <Button type="submit" disabled={pending} state={pending ? "p" : "r"}>
-          <Button.State name="r">Add Milestone</Button.State>
-          <Button.State name="p">Adding…</Button.State>
-        </Button>
-      )}
-    />
-  );
 
   function deleteButtons(id: string) {
     return confirmingId === id ? (
@@ -184,15 +194,49 @@ function PathPrototype() {
     );
   }
 
+  function formFor(m: Milestone) {
+    const adding = !m.id;
+    return (
+      <MilestoneForm
+        key={m.id || "new"}
+        idPrefix={m.id || "add"}
+        initial={m}
+        onSubmit={save}
+        actions={(pending) => (
+          <>
+            <Button
+              type="submit"
+              disabled={pending}
+              state={pending ? "p" : "r"}
+            >
+              <Button.State name="r">
+                {adding ? "Add Milestone" : "Update Milestone"}
+              </Button.State>
+              <Button.State name="p">
+                {adding ? "Adding…" : "Updating…"}
+              </Button.State>
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={pending}
+              onClick={() => setOpenForm(null)}
+            >
+              Cancel
+            </Button>
+            {!adding && deleteButtons(m.id)}
+          </>
+        )}
+      />
+    );
+  }
+
   function rowActions(m: Milestone, i: number) {
-    const first = i === 0;
-    const last = i === milestones.length - 1;
     if (variant === "C" && reordering) {
       return (
         <>
           <Button
             variant="secondary"
-            disabled={busy || first}
+            disabled={busy || i === 0}
             state={movingId === m.id ? "p" : "r"}
             onClick={() => void move(m.id, -1)}
           >
@@ -201,7 +245,7 @@ function PathPrototype() {
           </Button>
           <Button
             variant="secondary"
-            disabled={busy || last}
+            disabled={busy || i === milestones.length - 1}
             onClick={() => void move(m.id, 1)}
           >
             Move Down
@@ -211,50 +255,54 @@ function PathPrototype() {
     }
     return (
       <>
-        {variant === "A" && (
-          <>
-            <Button
-              variant="secondary"
-              aria-label={`Move ${m.name} up`}
-              disabled={busy || first}
-              onClick={() => void move(m.id, -1)}
-            >
-              <ArrowUpIcon />
-            </Button>
-            <Button
-              variant="secondary"
-              aria-label={`Move ${m.name} down`}
-              disabled={busy || last}
-              onClick={() => void move(m.id, 1)}
-            >
-              <ArrowDownIcon />
-            </Button>
-          </>
-        )}
         <Button
           variant="secondary"
           disabled={busy}
           onClick={() => {
             setConfirmingId(null);
-            setEditingId(m.id);
+            setOpenForm(m.id);
           }}
         >
           Edit
         </Button>
-        {deleteButtons(m.id)}
+        {form === "inline" && deleteButtons(m.id)}
       </>
     );
   }
 
+  const dropLine = (
+    <li
+      aria-hidden
+      style={{
+        height: 0,
+        outline: "2px solid var(--color-accent)",
+        margin: "-1px 0",
+      }}
+    />
+  );
+
+  const modalTarget =
+    form === "modal" && openForm !== null
+      ? openForm === "new"
+        ? EMPTY
+        : milestones.find((m) => m.id === openForm)
+      : undefined;
+
   return (
     <>
+      <style>{PROTO_CSS}</style>
       <h1>{PATH.name}</h1>
       <p>{PATH.description}</p>
-      {form === "above" && addForm}
       <h2 id="milestones-heading">Milestones</h2>
       {variant === "C" && milestones.length > 1 && (
         <p>
-          <Button variant="secondary" onClick={() => setReordering((r) => !r)}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setOpenForm(null);
+              setReordering((r) => !r);
+            }}
+          >
             {reordering ? "Done Reordering" : "Reorder"}
           </Button>
         </p>
@@ -262,82 +310,72 @@ function PathPrototype() {
       {milestones.length === 0 ? (
         <p>No Milestones yet.</p>
       ) : (
-        <ol className="list" aria-labelledby="milestones-heading">
+        <ol
+          className="list"
+          aria-labelledby="milestones-heading"
+          style={variant === "E" ? { rowGap: 0 } : undefined}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node))
+              setDropAt(null);
+          }}
+        >
           {milestones.map((m, i) => (
-            <li
+            <Row
               key={m.id}
-              className={
-                editingId === m.id ? "list-row list-row--editing" : "list-row"
-              }
-              onDragOver={
-                variant === "D" ? (e) => e.preventDefault() : undefined
-              }
-              onDrop={variant === "D" ? () => dropOn(m.id) : undefined}
-              style={
-                variant === "D" && dragId === m.id
-                  ? { opacity: 0.4 }
-                  : undefined
-              }
+              before={dropAt === i && dragId !== null ? dropLine : null}
             >
-              {editingId === m.id ? (
-                <MilestoneForm
-                  idPrefix={`edit-${m.id}`}
-                  initial={m}
-                  onSubmit={update}
-                  actions={(pending) => (
-                    <>
-                      <Button
-                        type="submit"
-                        disabled={pending}
-                        state={pending ? "p" : "r"}
-                      >
-                        <Button.State name="r">Update Milestone</Button.State>
-                        <Button.State name="p">Updating…</Button.State>
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        disabled={pending}
-                        onClick={() => setEditingId(null)}
-                      >
-                        Cancel
-                      </Button>
-                      {variant === "B" && (
-                        <>
-                          <Button
-                            variant="secondary"
-                            disabled={pending || busy || i === 0}
-                            state={movingId === m.id ? "p" : "r"}
-                            onClick={() => void move(m.id, -1)}
-                          >
-                            <Button.State name="r">Move Up</Button.State>
-                            <Button.State name="p">Moving…</Button.State>
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            disabled={
-                              pending || busy || i === milestones.length - 1
-                            }
-                            onClick={() => void move(m.id, 1)}
-                          >
-                            Move Down
-                          </Button>
-                        </>
-                      )}
-                      {deleteButtons(m.id)}
-                    </>
-                  )}
-                />
-              ) : (
-                <Fragment>
-                  <div className="list-row-name">
-                    {variant === "D" && (
+              <li
+                className={
+                  form === "inline" && openForm === m.id
+                    ? "list-row list-row--editing"
+                    : draggable
+                      ? "list-row proto-drag-row"
+                      : "list-row"
+                }
+                onDragOver={
+                  draggable && dragId
+                    ? (e) => {
+                        e.preventDefault();
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setDropAt(e.clientY < r.top + r.height / 2 ? i : i + 1);
+                      }
+                    : undefined
+                }
+                onDrop={draggable ? drop : undefined}
+                style={{
+                  ...(form === "inline" && openForm === m.id
+                    ? {}
+                    : blockRow(variant)),
+                  ...(variant === "E" && i === milestones.length - 1
+                    ? { borderBottom: "1px solid var(--color-border)" }
+                    : {}),
+                  opacity: dragId === m.id ? 0.4 : 1,
+                }}
+              >
+                {form === "inline" && openForm === m.id ? (
+                  <div style={{ gridColumn: "1 / -1" }}>{formFor(m)}</div>
+                ) : (
+                  <>
+                    {draggable && (
                       <span
+                        className="proto-handle"
                         draggable
                         tabIndex={0}
                         role="button"
-                        aria-label={`Drag ${m.name}, or press the up or down arrow key to move it`}
-                        onDragStart={() => setDragId(m.id)}
-                        onDragEnd={() => setDragId(null)}
+                        aria-label={`Move ${m.name}: drag, or press the up or down arrow key`}
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setDragImage(
+                            e.currentTarget.closest("li")!,
+                            12,
+                            12,
+                          );
+                          setDragId(m.id);
+                        }}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setDropAt(null);
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === "ArrowUp" && i > 0) {
                             e.preventDefault();
@@ -351,23 +389,89 @@ function PathPrototype() {
                             void move(m.id, 1);
                           }
                         }}
-                        style={{ cursor: "grab", marginInlineEnd: "0.5rem" }}
+                        style={{
+                          display: "grid",
+                          placeItems: "center",
+                          cursor: "grab",
+                          fontSize: "1.5rem",
+                        }}
                       >
                         <DotsSixVerticalIcon />
                       </span>
                     )}
-                    {i + 1}. {m.name}
-                  </div>
-                  <div className="list-row-action">
-                    <div className="button-group">{rowActions(m, i)}</div>
-                  </div>
-                </Fragment>
-              )}
-            </li>
+                    <div className="list-row-name">
+                      {i + 1}. {m.name}
+                    </div>
+                    <div className="list-row-action">
+                      <div className="button-group">{rowActions(m, i)}</div>
+                    </div>
+                  </>
+                )}
+              </li>
+            </Row>
           ))}
+          {dropAt === milestones.length && dragId !== null && dropLine}
         </ol>
       )}
-      {form === "below" && addForm}
+
+      {form === "inline" && openForm === "new" ? (
+        <div
+          className="list-row--editing form-section"
+          style={{ display: "grid" }}
+        >
+          {formFor(EMPTY)}
+        </div>
+      ) : (
+        !(variant === "C" && reordering) && (
+          <p className="form-section">
+            <Button
+              disabled={busy}
+              onClick={() => {
+                setConfirmingId(null);
+                setOpenForm("new");
+              }}
+            >
+              Add Milestone
+            </Button>
+          </p>
+        )
+      )}
+
+      <Dialog.Root
+        open={modalTarget !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setOpenForm(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Backdrop
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgb(0 0 0 / 0.35)",
+            }}
+          />
+          <Dialog.Popup
+            style={{
+              position: "fixed",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              width: "min(36rem, calc(100vw - 2rem))",
+              maxHeight: "calc(100vh - 2rem)",
+              overflowY: "auto",
+              padding: "var(--space-6, 2rem)",
+              background: "var(--color-sheet)",
+            }}
+          >
+            <Dialog.Title render={<h2 />}>
+              {modalTarget?.id ? "Edit Milestone" : "Add Milestone"}
+            </Dialog.Title>
+            {modalTarget && formFor(modalTarget)}
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+
       <PrototypeSwitcher
         variants={VARIANTS}
         current={variant}
@@ -381,7 +485,7 @@ function PathPrototype() {
           void navigate({
             search: (s) => ({
               ...s,
-              form: form === "above" ? "below" : "above",
+              form: form === "modal" ? "inline" : "modal",
             }),
           })
         }
@@ -400,8 +504,17 @@ function PathPrototype() {
           zIndex: 1000,
         }}
       >
-        Form {form} the list (click to flip)
+        Add/Edit: {form === "modal" ? "modal dialog" : "inline"} (click to flip)
       </button>
+    </>
+  );
+}
+
+function Row({ before, children }: { before: ReactNode; children: ReactNode }) {
+  return (
+    <>
+      {before}
+      {children}
     </>
   );
 }
@@ -411,13 +524,11 @@ function MilestoneForm({
   initial,
   onSubmit,
   actions,
-  className,
 }: {
   idPrefix: string;
   initial: Milestone;
   onSubmit: (m: Milestone) => void;
   actions: (pending: boolean) => ReactNode;
-  className?: string;
 }) {
   const [draft, setDraft] = useState(initial);
   const [pending, setPending] = useState(false);
@@ -425,7 +536,6 @@ function MilestoneForm({
     setDraft((d) => ({ ...d, [field]: e.target.value }));
   return (
     <form
-      className={className}
       onSubmit={async (e) => {
         e.preventDefault();
         setPending(true);
