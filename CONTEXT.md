@@ -57,11 +57,27 @@ Dream Sequence, based on Running Lean, is the free Path Dreamport itself
 publishes.
 _Avoid_: methodology, plan, program
 
+**Draft**:
+The editable working state of a Path in Trailblazer, kept up to date as
+its maker edits: there is no save step, so edits to a Draft are never
+called "saved". Nothing can be followed from a Draft: a Journey starts
+only on a Path version.
+_Avoid_: working copy, unsaved version
+
 **Path version**:
-One published state of a Path. A change to a Path produces a new version;
-a Journey stays on the version it started on. A new version is a new
-release, never a free update to existing Journeys (for now).
-_Avoid_: revision, edition, update
+A snapshot of a Path made from its Draft when its maker uses **Save as New
+Version**: the name, description, Milestones and Tasks exactly as they
+stood. It never changes afterwards, and it needs a name, a description and
+at least one Milestone. A Journey stays on the version it started on; a newer version is
+a new release, never a free update to existing Journeys (for now). Each
+version has its own page, independent of any Product.
+_Avoid_: revision, edition, update; final, frozen, locked, released
+
+**Publish**:
+Make a saved Path version available to other Users by its link, free or for
+a Purchase. Only a Guide can. Not built yet. Saving a version is not
+publishing it.
+_Avoid_: release, launch, go live
 
 **Trailblazer**:
 The one tool in which any User makes and edits a Path. Making a Path for
@@ -90,8 +106,9 @@ only through a link its Guide gives out.
 _Avoid_: marketplace, catalog, store
 
 **Purchase**:
-A User paying, once, for a Path version that a Guide sells. Paying unlocks
-starting a Journey on that Path and keeping it as it was bought. Dreamport
+A User paying, once, for a Path version that a Guide sells. Paying gives
+the buyer their own duplicate of that version, with its Milestones and
+Tasks, to follow as often as they like. Dreamport
 takes a cut of each; a Guide pays nothing otherwise. The Guide sets the
 price per Path version, and a new price applies only to later Purchases. A
 Guide is paid out once the buyer's refund window has passed.
@@ -106,11 +123,14 @@ a Path version.
 _Avoid_: stage, phase, step
 
 **Journey**:
-One Product's progress following one Path — started by the User, at the
-Path's first Milestone. Strictly sequenced: exactly one current Milestone,
-everything before it done, everything after it future. A Product has at
-most one Journey per Path, and can be on several Paths at once (e.g. one
-for building the product, one for marketing it), each its own Journey. A
+One Product's progress following one Path version — started by the User,
+at its first Milestone. Strictly sequenced: exactly one current Milestone,
+everything before it done, everything after it future. A Product can be on
+several Paths at once (e.g. one for building the product, one for marketing
+it) and can follow the same Path again, each time its own Journey with its
+own Worksheet answers and checked Tasks. A User can **delete** a Journey,
+which removes it and everything in it for good, after a confirmation that
+says so. A
 Journey is **in progress**, **paused** (set aside by the User, everything
 kept), or **completed** (Advanced past its last Milestone). A Journey
 always belongs to its Product — it's "Tarot's Journey," never a Journey
@@ -150,11 +170,11 @@ on. The mirror of Pause.
 _Avoid_: unpause, continue
 
 **Restart**:
-Put a paused or completed Journey back on its Path's first Milestone, in
-progress — the alternative to Resume when a User starts a Path their
-Product has been on before. Never destructive: Worksheet answers and
-checked Tasks stay as they were, for the User to revise, or clear by hand
-if they want a blank slate.
+Start a new Journey on the same Path for a Product whose Journey on it is
+paused or completed — the alternative to Resume. The new Journey is blank,
+on the Path's first Milestone, in progress. Never destructive: the earlier
+Journey stays as it was, answers and checked Tasks included, until the User
+deletes it.
 _Avoid_: reset, start over, start from scratch
 
 **Worksheet**:
@@ -167,10 +187,10 @@ Milestones 1 to 4) — the
 ones whose "done when" checks it — but its answers can be changed at any
 point in the Journey. Each
 filled-in copy is an instance. A **singleton** Worksheet has exactly one
-instance per Product per Path, the same one on every Milestone it's on; a
+instance per Journey, the same one on every Milestone it's on; a
 **repeatable** Worksheet (e.g. one per customer interview) can be filled
-in any number of times, each instance separate. Instances belong to the
-Journey's Path, so a different Path later starts fresh. Distinct from
+in any number of times, each instance separate. Instances belong to their
+Journey, so a new Journey starts fresh. Distinct from
 Question: a Question is one prompt answered against an Idea; a Worksheet
 is a whole set of fields filled in along a Journey.
 _Avoid_: form, template, canvas, questionnaire
@@ -178,7 +198,7 @@ _Avoid_: form, template, canvas, questionnaire
 **Task**:
 Something a Path's Milestone asks the User to do (e.g. "Talk to 5
 potential customers"), fixed content within a Path version like a
-Worksheet, and checked off per Product per Path. A **standalone** Task has
+Worksheet, and checked off per Journey. A **standalone** Task has
 no Worksheet behind it, just a title: the User checks it off, and can
 uncheck it, by hand. Checking one off is informational only — it
 never gates Advance. A Task titled `EVENT: …` (e.g. "EVENT: Set aside 1
