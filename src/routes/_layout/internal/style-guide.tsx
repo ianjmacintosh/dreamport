@@ -8,6 +8,7 @@ import {
 } from "@phosphor-icons/react";
 
 import ActionCard from "../../../components/ActionCard";
+import Breadcrumbs from "../../../components/Breadcrumbs";
 import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
 import AppNav from "../../../components/AppNav";
@@ -233,6 +234,7 @@ function StyleGuide() {
         <a href="#checkbox">Check box</a>
         <a href="#action-card">Action card</a>
         <a href="#dropdown">Dropdown</a>
+        <a href="#breadcrumbs">Breadcrumbs</a>
         <a href="#header-bars">Header bars</a>
         <a href="#footers">Footers</a>
         <a href="#text-inputs">Text inputs</a>
@@ -636,6 +638,46 @@ function StyleGuide() {
           <code>TagPicker</code> below). Open it with the keyboard (Enter, then
           the arrow keys) to see the item highlight, which is the same for
           pointer and keyboard.
+        </p>
+      </Section>
+
+      <Section id="breadcrumbs" label="Breadcrumbs">
+        <div className="sg-bar-demo">
+          <Breadcrumbs
+            trail={[
+              { label: "Products", href: "#breadcrumbs" },
+              { label: "Tarot", href: "#breadcrumbs" },
+              { label: "Journey", href: "#breadcrumbs" },
+            ]}
+            current="Product Summary"
+          />
+        </div>
+        <Snippet
+          code={`// In the page route's beforeLoad:\nreturn {\n  …,\n  breadcrumbs: {\n    trail: [\n      { label: "Products", href: "/app" },\n      { label: product.name, href: \`/app/products/\${product.id}\` },\n      { label: "Journey", href: \`/app/products/\${product.id}/journey\` },\n    ],\n    current: worksheet.name,\n  } satisfies BreadcrumbsProps,\n};`}
+        />
+        <p className="sg-note">
+          <code>&lt;Breadcrumbs&gt;</code> is a white band edge to edge directly
+          under <code>AppNav</code>, on every page nested under{" "}
+          <code>/app</code>, in place of a &ldquo;Back to &hellip;&rdquo; link.
+          A page doesn&apos;t render it: it returns <code>breadcrumbs</code>{" "}
+          from its route&apos;s <code>beforeLoad</code>, and{" "}
+          <code>_appShell</code> draws the band. <code>trail</code> is the pages
+          above this one, root first, each a link; <code>current</code> is the
+          page you&apos;re on, plain text marked{" "}
+          <code>aria-current=&quot;page&quot;</code>. A top-level page
+          (Products, Settings) has no breadcrumbs: one crumb would only repeat
+          its h1. The root is the page&apos;s own section
+          (&ldquo;Products&rdquo;, &ldquo;Settings&rdquo;), never a
+          &ldquo;Home&rdquo; crumb, and a Milestone is never a crumb (#109).
+        </p>
+        <p className="sg-note">
+          Below 640px the trail gives way to one link up to the parent page
+          (&ldquo;‹ Back to Journey&rdquo;). Above that it stays on one line:
+          narrow the window to see the ancestors shorten with &ldquo;…&rdquo;
+          first, down to 44px each (a name already narrower stays as it is); the
+          current page shortens only once they all have. The separators never
+          shorten and are hidden from screen readers. There are no tooltips: the
+          full name is in the accessible text and on the page itself.
         </p>
       </Section>
 

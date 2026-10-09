@@ -87,7 +87,10 @@ test("sign in, open a Product, learn about its Journey, start it, and see Milest
   );
 
   // Back on the Product home, the Journey section now names where it's at.
-  await page.getByRole("link", { name: `Back to ${productName}` }).click();
+  await page
+    .getByRole("navigation", { name: "Breadcrumb" })
+    .getByRole("link", { name: productName })
+    .click();
   await expect(
     page.getByText("Current Milestone: Real Talk (2 of 7)"),
   ).toBeVisible();
@@ -147,7 +150,10 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
     page.getByRole("button", { name: "Finish Journey" }),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: `Back to ${productName}` }).click();
+  await page
+    .getByRole("navigation", { name: "Breadcrumb" })
+    .getByRole("link", { name: productName })
+    .click();
   await expect(
     page.getByText("Current Milestone: Growth (7 of 7)"),
   ).toBeVisible();

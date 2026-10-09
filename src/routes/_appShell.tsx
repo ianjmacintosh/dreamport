@@ -3,9 +3,11 @@ import {
   Outlet,
   redirect,
   useLocation,
+  useMatches,
 } from "@tanstack/react-router";
 
 import AppNav from "../components/AppNav";
+import Breadcrumbs from "../components/Breadcrumbs";
 import Footer from "../components/Footer";
 import { useSignOut } from "../utils/use-sign-out";
 
@@ -62,14 +64,29 @@ function AppShellLayout() {
   // Sign-out used to be its own button on `/app/settings` (#26); it moved
   // to `AppNav` so every signed-in page carries the same way out.
   const { signOut, error } = useSignOut();
+  // A nested page names its own trail in its route context (`breadcrumbs`);
+  // drawn here so the band sits under `AppNav`, outside <main> (#109).
+  const breadcrumbs = useMatches({
+    select: (matches) => {
+      const context = matches[matches.length - 1]?.context;
+      return context && "breadcrumbs" in context
+        ? context.breadcrumbs
+        : undefined;
+    },
+  });
 
   return (
     <>
-      <AppNav
-        email={email}
-        onLogout={() => void signOut()}
-        pathname={pathname}
-      />
+      {/* One #root grid row for the bar and its band, so <main> keeps the
+          stretching row. */}
+      <div>
+        <AppNav
+          email={email}
+          onLogout={() => void signOut()}
+          pathname={pathname}
+        />
+        {breadcrumbs && <Breadcrumbs {...breadcrumbs} />}
+      </div>
       {error && <p role="alert">{error}</p>}
       <main>
         <Outlet />

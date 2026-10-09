@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
+import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Link from "../../components/Link";
 import TagList from "../../components/TagList";
@@ -127,7 +128,16 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
     const journey = journeyRes?.ok
       ? ((await journeyRes.json()) as JourneySummary)
       : null;
-    return { product, ideas, tagCatalog: tags, journey };
+    return {
+      product,
+      ideas,
+      tagCatalog: tags,
+      journey,
+      breadcrumbs: {
+        trail: [{ label: "Products", href: "/app" }],
+        current: product.name,
+      } satisfies BreadcrumbsProps,
+    };
   },
   component: ProductHome,
 });
@@ -168,6 +178,10 @@ const CONNECTION_FAILED =
  * (`ProductIdeas`, below). Composed from existing components plus
  * heading/paragraph primitives in plain document order.
  *
+ * The h1 is the Product's name alone, like its Journey and Worksheet pages;
+ * its `breadcrumbs` (Products › the Product) go in the band under `AppNav`
+ * (#109).
+ *
  * The Product's own description (#112) sits under the heading — its text,
  * or "No description yet." — with an "Edit Description" button that swaps
  * it for a pre-filled `TextInput` + Save / Cancel `.field-row`, the same
@@ -179,13 +193,6 @@ const CONNECTION_FAILED =
  * Milestone after — and a link styled as a button ("Learn More" / "View
  * Journey") to the Product's own Journey page, which holds the Milestones
  * and "Start Journey".
- *
- * Ends with a plain `<Link href="/app">Back to Products</Link>` — this page
- * otherwise had no way back to the Products list. Same markup
- * `/app/settings` already uses for its own "Back to Products" link, not a
- * new component; whether this grows into a dedicated nav/breadcrumb
- * component (here and retrofitted onto Settings) is its own sign-off
- * question, tracked in #109.
  */
 function ProductHome() {
   const {
@@ -246,7 +253,7 @@ function ProductHome() {
 
   return (
     <>
-      <h1>Product: {product.name}</h1>
+      <h1>{product.name}</h1>
       {isEditingDescription ? (
         <form
           className="field-row"
@@ -320,10 +327,6 @@ function ProductHome() {
         tagCatalog={tagCatalog}
       />
       {error && <p role="alert">{error}</p>}
-
-      <p>
-        <Link href="/app">Back to Products</Link>
-      </p>
     </>
   );
 }
@@ -340,7 +343,7 @@ function ProductHome() {
  * design-system elaboration, the same tier as `<h1>` over a styled `<div>`
  * — with `aria-labelledby` pointing at its own "Ideas" `<h2>` rather than
  * the page's `<h1>`, so it's announced as "Ideas, list," not
- * "Product: {name}, list" (#101).
+ * "{Product name}, list" (#101).
  *
  * Rename (#102) swaps a row in place, one row at a time. Resting, a row's
  * actions are Edit / Delete. Editing, the row becomes a form laid out like the
