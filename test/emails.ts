@@ -203,6 +203,14 @@ export const TEST_EMAILS = {
   /** Checks off a Task with no Journey (404), a bad body (400), then a good one. */
   tasksCheckOff: "delivered+tasks-check-off@resend.dev",
 
+  // --- Seam 1: the Trailblazer routes (#167), one test each ---
+  /** Lists Paths, adds one, then lists it. */
+  pathsRoutesList: "delivered+paths-routes-list@resend.dev",
+  /** Adds Paths up to the cap, then one more (409). */
+  pathsRoutesCap: "delivered+paths-routes-cap@resend.dev",
+  /** Reads and edits one Path's Draft and its Milestones. */
+  pathsRoutesDraft: "delivered+paths-routes-draft@resend.dev",
+
   // --- Seam 1f: the gates every product route crosses (#154) ---
   /** Owns the Product every product-scoped route is driven against. */
   gatesOwner: "delivered+gates-owner@resend.dev",
