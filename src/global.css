@@ -1082,6 +1082,66 @@ a.button {
   visibility: hidden;
 }
 
+/* ── Components: dialog ────────────────────────────────────── */
+/* `Dialog` (#167): a form over the page. Base UI's Dialog renders these
+   elements unstyled (ADR-0014). The panel is white (`--color-sheet`) with
+   square corners, like a Worksheet's `.sheet`, over the page dimmed with
+   its darkest Solarized tone. The viewport is what scrolls when the panel
+   is taller than the screen (a Milestone's form on a phone held
+   landscape); the panel's auto margins centre it when it fits and give
+   way to the viewport's padding when it doesn't, so its top is never cut
+   off. */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background-color: color-mix(in srgb, var(--sol-base03) 45%, transparent);
+}
+
+.dialog-viewport {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+.dialog-popup {
+  display: grid;
+  gap: var(--space-6);
+  width: min(36rem, 100%);
+  margin: auto;
+  padding: var(--space-8);
+  background-color: var(--color-sheet);
+  outline: none;
+}
+
+.dialog-title {
+  margin: 0;
+}
+
+/* Its form's fields and buttons spaced by one gap rather than each
+   field's own bottom margin, since a `TextArea` has none. */
+.dialog-popup form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.dialog-popup form .input {
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .dialog-viewport {
+    padding: var(--space-2);
+  }
+
+  .dialog-popup {
+    padding: var(--space-5) var(--space-4) var(--space-4);
+  }
+}
+
 /* ── Components: tags ──────────────────────────────────────── */
 /* A Tag pill (#113): condensed and filled, one neutral look for every Tag —
    per-Tag colors would be their own design decision. --color-text-on-surface
