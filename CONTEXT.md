@@ -66,8 +66,10 @@ _Avoid_: revision, edition, update
 **Trailblazer**:
 The one tool in which any User makes and edits a Path. Making a Path for
 yourself and following it on your own Product is **self-guiding**, and
-needs nothing beyond an account.
-_Avoid_: editor, builder, path builder
+needs nothing beyond an account. Milestones and Tasks are always called by
+name; there is no umbrella word for the two together.
+_Avoid_: editor, builder, path builder; asset or item (for Milestones and
+Tasks together)
 
 **Guide**:
 A User with permission to share and sell Paths they made, so that other
