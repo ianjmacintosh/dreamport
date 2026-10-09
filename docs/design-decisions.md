@@ -251,3 +251,32 @@ Add an entry only once a sign-off conversation resolves something repeatable
   Task's leads with a `Checkbox`. No progress bars or "n of m done"
   counts. A section with nothing in it is left out. See the style guide's
   "Action card" section (decided in #140).
+
+- A form with several fields, one of them a `TextArea` (a Milestone, a
+  Path's name and description), opens in a `Dialog` from a button rather
+  than sitting on the page all the time: "Add Milestone" at the end of the
+  list, "Edit" on a row. The same `Dialog` adds and edits; when editing,
+  Delete is inside it (the usual two-step reveal), so the row shows only
+  Edit. `Dialog` is a generic Component on `@base-ui/react`'s `Dialog`,
+  the way `Dropdown` is on its `Menu`: base-ui owns focus trapping,
+  `Escape` and outside clicks, `Dialog` owns the CSS: a white
+  (`--color-sheet`) square-cornered panel over a dimmed page, its title an
+  h2. A one- or two-field row edit (renaming an Idea) stays in place
+  (decided in #167, picked over an in-place reveal in a prototype on
+  branch `167-prototype-trailblazer`).
+
+- A list the User puts in order (a Path's Draft Milestones) has a drag
+  handle (Phosphor `DotsSixVertical`) in a column of its own at the start
+  of each row, and thin `--color-border` lines between and around the rows
+  in place of the usual row gap. A focused handle moves its row with the
+  up and down arrow keys, and drag works by touch as well as by mouse. The
+  row reads "1. {name}", then its actions. Picked over a Reorder mode,
+  the handle on white blocks, arrow buttons on each row and Move Up/Down
+  inside the edit form, in the same prototype (decided in #167).
+
+- `AppNav` has a second section, Trailblazer (Phosphor `PathIcon`, the
+  `/app/paths` pages), after Products. With two sections the bar
+  collapses into the ☰ menu below about 820px, not 640px: measured with a
+  37-character email, two links at 641px left the account trigger 38px
+  wide, and it took about 820px to get back to the width one link gets at
+  641px (decided in #167).
