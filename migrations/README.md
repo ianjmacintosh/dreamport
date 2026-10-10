@@ -110,6 +110,9 @@ a version no longer fails on foreign keys. Not re-runnable.
 - Migrations are committed and reviewed like any other schema change. Every
   environment's database converges to the same shape by replaying the same
   files.
+- Write a trigger's `BEGIN` and `END` in capitals. D1's remote API only
+  sees the trigger body as one statement that way. Lowercase works locally
+  and in tests, then fails remotely with "incomplete input" (#169).
 - D1 has no transactions (see `docs/adr/0002-better-auth-over-homegrown.md`).
   A migration that does multi-statement data changes can partially apply —
   keep each migration small and, where possible, individually re-runnable.

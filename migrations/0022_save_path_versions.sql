@@ -18,6 +18,9 @@
 -- `talk-to-five-customers`) can never start with a version's UUID and a
 -- colon.
 --
+-- `BEGIN` and `END` stay in capitals: D1's remote API reads a lowercase
+-- `begin` body's first `;` as the statement's end ("incomplete input").
+--
 -- Not re-runnable (adds a column).
 
 alter table "paths" add column "updatedAt" date not null default '';
@@ -25,45 +28,45 @@ update "paths" set "updatedAt" = "createdAt";
 
 create trigger "paths_draft_updated" after update of "name", "description" on "paths"
 when old."name" is not new."name" or old."description" is not new."description"
-begin
+BEGIN
   update "paths" set "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') where "id" = new."id";
-end;
+END;
 
 create trigger "draft_milestones_inserted" after insert on "draft_milestones"
-begin
+BEGIN
   update "paths" set "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') where "id" = new."pathId";
-end;
+END;
 
 create trigger "draft_milestones_updated" after update on "draft_milestones"
-begin
+BEGIN
   update "paths" set "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') where "id" = new."pathId";
-end;
+END;
 
 create trigger "draft_milestones_deleted" after delete on "draft_milestones"
-begin
+BEGIN
   update "paths" set "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') where "id" = old."pathId";
-end;
+END;
 
 create trigger "draft_tasks_inserted" after insert on "draft_tasks"
-begin
+BEGIN
   update "paths" set "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
   where "id" = (select "pathId" from "draft_milestones" where "id" = new."milestoneId");
-end;
+END;
 
 create trigger "draft_tasks_updated" after update on "draft_tasks"
-begin
+BEGIN
   update "paths" set "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
   where "id" = (select "pathId" from "draft_milestones" where "id" = new."milestoneId");
-end;
+END;
 
 create trigger "draft_tasks_deleted" after delete on "draft_tasks"
-begin
+BEGIN
   update "paths" set "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
   where "id" = (select "pathId" from "draft_milestones" where "id" = old."milestoneId");
-end;
+END;
 
 create trigger "path_versions_delete_contents" before delete on "path_versions"
-begin
+BEGIN
   delete from "task_completions" where "versionId" = old."id";
   delete from "worksheet_instances" where "versionId" = old."id";
   delete from "journeys" where "versionId" = old."id";
@@ -71,4 +74,4 @@ begin
   delete from "milestone_tasks" where "milestoneId" in (select "id" from "milestones" where "versionId" = old."id");
   delete from "tasks" where substr("id", 1, length(old."id") + 1) = old."id" || ':';
   delete from "milestones" where "versionId" = old."id";
-end;
+END;
