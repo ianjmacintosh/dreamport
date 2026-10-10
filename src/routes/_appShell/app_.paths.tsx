@@ -131,6 +131,17 @@ function Paths() {
     <>
       <h1 id="paths-heading">Paths</h1>
       <p>
+        If you&apos;d like your Product to follow a structured program with
+        milestones and tasks along the way to a certain goal, that&apos;s
+        exactly what Paths provide. You can follow our free &ldquo;Dream
+        Sequence&rdquo; Path to bring your product idea all the way from its
+        beginning to being a real shipped product with a growing user base,
+        using customer feedback all along the way. If you have different goals
+        or prefer taking another route, you can make your own Path for your
+        Product to follow instead. You make the milestones and tasks and put
+        your Product on that path.
+      </p>
+      <p>
         <Button onClick={openDialog}>Add Path</Button>
       </p>
       {paths.length === 0 ? (

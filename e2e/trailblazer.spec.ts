@@ -3,9 +3,6 @@ import { expect, test, type Page } from "@playwright/test";
 import { TEST_EMAILS } from "../test/emails";
 import { signIn } from "./sign-in";
 
-// Trailblazer (#167): make a Path and edit its Draft's Milestones, each
-// change sent as it's made, so a reload shows them all.
-
 async function addMilestone(page: Page, name: string) {
   await page.getByRole("button", { name: "Add Milestone" }).click();
   const dialog = page.getByRole("dialog", { name: "Add Milestone" });
@@ -16,7 +13,7 @@ async function addMilestone(page: Page, name: string) {
   await expect(dialog).toBeHidden();
 }
 
-test("add a Path, then add, reorder, edit and delete its Milestones", async ({
+test("add a Path, then add, reorder, edit and delete its Milestones, and give one a Task", async ({
   page,
 }) => {
   // The e2e database outlives a run, so this run's Path gets its own name.
@@ -95,4 +92,23 @@ test("add a Path, then add, reorder, edit and delete its Milestones", async ({
   await expect(edit.getByLabel("Outcome")).toHaveValue(
     "A problem worth a weekend",
   );
+  await edit.getByRole("button", { name: "Cancel" }).click();
+  await expect(edit).toBeHidden();
+
+  await rows.getByRole("button", { name: "Tasks", exact: true }).click();
+  const tasks = page.getByRole("dialog", { name: "Tasks for First, edited" });
+  await expect(tasks.getByText("No Tasks yet.")).toBeVisible();
+  await tasks.getByLabel("Task title").fill("Talk to 5 potential customers");
+  await tasks.getByRole("button", { name: "Add Task" }).click();
+  const taskRows = tasks
+    .getByRole("list", { name: "Tasks" })
+    .getByRole("listitem");
+  await expect(taskRows).toHaveText([/^Talk to 5 potential customers/]);
+  await expect(tasks.getByLabel("Task title")).toHaveValue("");
+  await tasks.getByRole("button", { name: "Done" }).click();
+  await expect(tasks).toBeHidden();
+
+  await page.reload();
+  await rows.getByRole("button", { name: "Tasks", exact: true }).click();
+  await expect(taskRows).toHaveText([/^Talk to 5 potential customers/]);
 });

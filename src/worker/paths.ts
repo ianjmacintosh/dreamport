@@ -1,9 +1,4 @@
 /**
- * Paths (#166, #167, spec #164): a User's Paths and their Drafts, the
- * saved Path versions, and who may follow them. Plain data access over
- * `paths`, `draft_milestones`, `path_versions` and `milestones`
- * (`migrations/0019_*.sql`, `0020_*.sql`).
- *
  * A Path belongs to Dreamport (`paths.userId` null, followable by every
  * User) or to one User (followable only by them). That check lives here and
  * nowhere else: another User's version comes back as `null`, the same as
@@ -24,6 +19,8 @@ export const MILESTONE_NAME_MAX_LENGTH = 200;
 export const MILESTONE_DESCRIPTION_MAX_LENGTH = 2000;
 export const MILESTONE_DONE_WHEN_MAX_LENGTH = 2000;
 export const MILESTONE_OUTCOME_MAX_LENGTH = 200;
+export const TASK_TITLE_MAX_LENGTH = 200;
+export const MILESTONES_AND_TASKS_PER_PATH = 150;
 
 export interface Milestone {
   readonly id: string;
@@ -141,8 +138,17 @@ export interface MilestoneFields {
   readonly outcome: string;
 }
 
+export interface TaskFields {
+  readonly title: string;
+}
+
+export interface DraftTask extends TaskFields {
+  readonly id: string;
+}
+
 export interface DraftMilestone extends MilestoneFields {
   readonly id: string;
+  readonly tasks: readonly DraftTask[];
 }
 
 /** A Path's Draft: its name, description and Milestones, as last edited. */
@@ -183,6 +189,10 @@ const MILESTONE_FIELDS: { readonly [K in keyof MilestoneFields]: FieldRule } = {
   description: { required: true, max: MILESTONE_DESCRIPTION_MAX_LENGTH },
   doneWhen: { required: true, max: MILESTONE_DONE_WHEN_MAX_LENGTH },
   outcome: { required: false, max: MILESTONE_OUTCOME_MAX_LENGTH },
+};
+
+const TASK_FIELDS: { readonly [K in keyof TaskFields]: FieldRule } = {
+  title: { required: true, max: TASK_TITLE_MAX_LENGTH },
 };
 
 /**
@@ -226,6 +236,10 @@ export function parsePathFields(body: unknown): Parsed<PathFields> {
  */
 export function parseMilestoneFields(body: unknown): Parsed<MilestoneFields> {
   return parseFields(MILESTONE_FIELDS, body);
+}
+
+export function parseTaskFields(body: unknown): Parsed<TaskFields> {
+  return parseFields(TASK_FIELDS, body);
 }
 
 /** A User's own Paths, oldest first. Never Dreamport's. */
@@ -301,23 +315,41 @@ export async function createPath(
   return { ok: true, path: path as OwnedPath };
 }
 
-/** The Path's Draft, with its Milestones in order. */
 export async function getDraft(
   db: D1Database,
   path: OwnedPath,
 ): Promise<Draft> {
-  const { results } = await db
-    .prepare(
-      'SELECT "id", "name", "description", "doneWhen", "outcome" FROM "draft_milestones" WHERE "pathId" = ? ORDER BY "position" ASC',
-    )
-    .bind(path.id)
-    .all<DraftMilestone>();
+  const [{ results: milestones }, { results: tasks }] = await Promise.all([
+    db
+      .prepare(
+        'SELECT "id", "name", "description", "doneWhen", "outcome" FROM "draft_milestones" WHERE "pathId" = ? ORDER BY "position" ASC',
+      )
+      .bind(path.id)
+      .all<Omit<DraftMilestone, "tasks">>(),
+    db
+      .prepare(
+        `SELECT "draft_tasks"."id", "draft_tasks"."milestoneId", "draft_tasks"."title"
+         FROM "draft_tasks"
+         JOIN "draft_milestones" ON "draft_milestones"."id" = "draft_tasks"."milestoneId"
+         WHERE "draft_milestones"."pathId" = ?
+         ORDER BY "draft_tasks"."position" ASC`,
+      )
+      .bind(path.id)
+      .all<DraftTask & { milestoneId: string }>(),
+  ]);
+  const tasksOf = new Map<string, DraftTask[]>();
+  for (const { milestoneId, ...task } of tasks) {
+    tasksOf.set(milestoneId, [...(tasksOf.get(milestoneId) ?? []), task]);
+  }
   return {
     id: path.id,
     name: path.name,
     description: path.description,
     createdAt: path.createdAt,
-    milestones: results,
+    milestones: milestones.map((m) => ({
+      ...m,
+      tasks: tasksOf.get(m.id) ?? [],
+    })),
   };
 }
 
@@ -335,30 +367,46 @@ export function updatePath(
     .first<OwnedPath>();
 }
 
-/** Add a Milestone at the end of the Draft. */
+/** The Draft's Milestones and Tasks together, for the Path bound as `?1`. */
+const DRAFT_SIZE = `(SELECT count(*) FROM "draft_milestones" WHERE "pathId" = ?1)
+  + (SELECT count(*) FROM "draft_tasks"
+     JOIN "draft_milestones" ON "draft_milestones"."id" = "draft_tasks"."milestoneId"
+     WHERE "draft_milestones"."pathId" = ?1)`;
+
+export type AddMilestoneResult =
+  | { readonly ok: true; readonly milestone: DraftMilestone }
+  | { readonly ok: false; readonly reason: "cap" };
+
 export async function addMilestone(
   db: D1Database,
   path: OwnedPath,
   fields: MilestoneFields,
-): Promise<DraftMilestone> {
-  const milestone: DraftMilestone = { id: crypto.randomUUID(), ...fields };
-  await db
+): Promise<AddMilestoneResult> {
+  const milestone: DraftMilestone = {
+    id: crypto.randomUUID(),
+    ...fields,
+    tasks: [],
+  };
+  const { meta } = await db
     .prepare(
       `INSERT INTO "draft_milestones" ("id", "pathId", "position", "name", "description", "doneWhen", "outcome")
-       SELECT ?, ?, coalesce(max("position"), 0) + 1, ?, ?, ?, ?
-       FROM "draft_milestones" WHERE "pathId" = ?`,
+       SELECT ?3, ?1, (SELECT coalesce(max("position"), 0) + 1 FROM "draft_milestones" WHERE "pathId" = ?1), ?4, ?5, ?6, ?7
+       WHERE ${DRAFT_SIZE} < ?2`,
     )
     .bind(
-      milestone.id,
       path.id,
+      MILESTONES_AND_TASKS_PER_PATH,
+      milestone.id,
       milestone.name,
       milestone.description,
       milestone.doneWhen,
       milestone.outcome,
-      path.id,
     )
     .run();
-  return milestone;
+  if (meta.changes === 0) {
+    return { ok: false, reason: "cap" };
+  }
+  return { ok: true, milestone };
 }
 
 /**
@@ -370,7 +418,7 @@ export function updateMilestone(
   path: OwnedPath,
   milestoneId: string,
   { name, description, doneWhen, outcome }: MilestoneFields,
-): Promise<DraftMilestone | null> {
+): Promise<Omit<DraftMilestone, "tasks"> | null> {
   return db
     .prepare(
       `UPDATE "draft_milestones" SET "name" = ?, "description" = ?, "doneWhen" = ?, "outcome" = ?
@@ -378,10 +426,9 @@ export function updateMilestone(
        RETURNING "id", "name", "description", "doneWhen", "outcome"`,
     )
     .bind(name, description, doneWhen, outcome, milestoneId, path.id)
-    .first<DraftMilestone>();
+    .first<Omit<DraftMilestone, "tasks">>();
 }
 
-/** Remove one of the Draft's Milestones. Whether one matched. */
 export async function deleteMilestone(
   db: D1Database,
   path: OwnedPath,
@@ -409,13 +456,7 @@ export async function reorderMilestones(
     .prepare('SELECT "id" FROM "draft_milestones" WHERE "pathId" = ?')
     .bind(path.id)
     .all<{ id: string }>();
-  const current = new Set(results.map(({ id }) => id));
-  const proposed = new Set(orderedIds);
-  if (
-    proposed.size !== orderedIds.length ||
-    proposed.size !== current.size ||
-    !orderedIds.every((id) => current.has(id))
-  ) {
+  if (!namesEachOnce(orderedIds, results)) {
     return false;
   }
   if (orderedIds.length === 0) {
@@ -425,5 +466,115 @@ export async function reorderMilestones(
     'UPDATE "draft_milestones" SET "position" = ? WHERE "id" = ? AND "pathId" = ?',
   );
   await db.batch(orderedIds.map((id, i) => update.bind(i + 1, id, path.id)));
+  return true;
+}
+
+function namesEachOnce(
+  orderedIds: readonly string[],
+  rows: readonly { id: string }[],
+): boolean {
+  const current = new Set(rows.map(({ id }) => id));
+  const proposed = new Set(orderedIds);
+  return (
+    proposed.size === orderedIds.length &&
+    proposed.size === current.size &&
+    orderedIds.every((id) => current.has(id))
+  );
+}
+
+export type AddTaskResult =
+  | { readonly ok: true; readonly task: DraftTask }
+  | { readonly ok: false; readonly reason: "cap" | "not-found" };
+
+export async function addTask(
+  db: D1Database,
+  path: OwnedPath,
+  milestoneId: string,
+  { title }: TaskFields,
+): Promise<AddTaskResult> {
+  const task: DraftTask = { id: crypto.randomUUID(), title };
+  const { meta } = await db
+    .prepare(
+      `INSERT INTO "draft_tasks" ("id", "milestoneId", "position", "title")
+       SELECT ?4, "id", (SELECT coalesce(max("position"), 0) + 1 FROM "draft_tasks" WHERE "milestoneId" = ?3), ?5
+       FROM "draft_milestones"
+       WHERE "id" = ?3 AND "pathId" = ?1 AND ${DRAFT_SIZE} < ?2`,
+    )
+    .bind(
+      path.id,
+      MILESTONES_AND_TASKS_PER_PATH,
+      milestoneId,
+      task.id,
+      task.title,
+    )
+    .run();
+  if (meta.changes > 0) {
+    return { ok: true, task };
+  }
+  const milestone = await db
+    .prepare('SELECT 1 FROM "draft_milestones" WHERE "id" = ? AND "pathId" = ?')
+    .bind(milestoneId, path.id)
+    .first();
+  return { ok: false, reason: milestone ? "cap" : "not-found" };
+}
+
+/** The Task bound as `?3`, on the Milestone `?2`, on the Path `?1`. */
+const TASK_ON_PATH = `"id" = ?3 AND "milestoneId" = ?2
+  AND "milestoneId" IN (SELECT "id" FROM "draft_milestones" WHERE "pathId" = ?1)`;
+
+export function updateTask(
+  db: D1Database,
+  path: OwnedPath,
+  milestoneId: string,
+  taskId: string,
+  { title }: TaskFields,
+): Promise<DraftTask | null> {
+  return db
+    .prepare(
+      `UPDATE "draft_tasks" SET "title" = ?4 WHERE ${TASK_ON_PATH} RETURNING "id", "title"`,
+    )
+    .bind(path.id, milestoneId, taskId, title)
+    .first<DraftTask>();
+}
+
+export async function deleteTask(
+  db: D1Database,
+  path: OwnedPath,
+  milestoneId: string,
+  taskId: string,
+): Promise<boolean> {
+  const { meta } = await db
+    .prepare(`DELETE FROM "draft_tasks" WHERE ${TASK_ON_PATH}`)
+    .bind(path.id, milestoneId, taskId)
+    .run();
+  return meta.changes > 0;
+}
+
+export async function reorderTasks(
+  db: D1Database,
+  path: OwnedPath,
+  milestoneId: string,
+  orderedIds: readonly string[],
+): Promise<boolean> {
+  const { results } = await db
+    .prepare(
+      `SELECT "draft_tasks"."id" FROM "draft_tasks"
+       JOIN "draft_milestones" ON "draft_milestones"."id" = "draft_tasks"."milestoneId"
+       WHERE "draft_tasks"."milestoneId" = ? AND "draft_milestones"."pathId" = ?`,
+    )
+    .bind(milestoneId, path.id)
+    .all<{ id: string }>();
+  if (!namesEachOnce(orderedIds, results)) {
+    return false;
+  }
+  if (orderedIds.length === 0) {
+    return true;
+  }
+  const update = db.prepare(
+    'UPDATE "draft_tasks" SET "position" = ? WHERE "id" = ? AND "milestoneId" = ?',
+  );
+  await db.batch(
+    orderedIds.map((id, i) => update.bind(i + 1, id, milestoneId)),
+  );
   return true;
 }
