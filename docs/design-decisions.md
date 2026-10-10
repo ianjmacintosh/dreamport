@@ -293,3 +293,17 @@ Add an entry only once a sign-off conversation resolves something repeatable
   lines tall and growing as you type. The ruled-lines look (`lined`) is
   only for a Worksheet's answers on its `.sheet`. See the style guide's
   "Text inputs" section (decided in #167).
+
+- A Milestone's Tasks on a Path's Draft are edited in a Dialog of their
+  own, "Tasks for {Milestone name}", opened from a Tasks button beside
+  the row's Edit, not under each row on the page or inside the Edit
+  Milestone Dialog. Everything in it takes effect at once, with no
+  submit, so it never mixes with a form that waits for its button. In it:
+  the Tasks as a ruled list with drag handles, each row "{title}" then
+  Edit, editing in place (a one-field row edit: Update Task, Cancel,
+  Delete, the confirming Delete taking Delete's place with no second
+  Cancel, since a fourth button leaves the field too narrow in the
+  Dialog); a "Task title" field
+  with "Add Task" beside it; and Done to close. Picked over Tasks nested
+  under each Milestone row and Tasks inside the Edit Milestone Dialog in a
+  prototype on branch `168-prototype-milestone-tasks` (decided in #168).
