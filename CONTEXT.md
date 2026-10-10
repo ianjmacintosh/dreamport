@@ -83,7 +83,9 @@ _Avoid_: release, launch, go live
 The one tool in which any User makes and edits a Path. Making a Path for
 yourself and following it on your own Product is **self-guiding**, and
 needs nothing beyond an account. Milestones and Tasks are always called by
-name; there is no umbrella word for the two together.
+name; there is no umbrella word for the two together. The app's section for
+Paths is called Paths; Trailblazer names the adding and editing inside it,
+not the section.
 _Avoid_: editor, builder, path builder; asset or item (for Milestones and
 Tasks together)
 

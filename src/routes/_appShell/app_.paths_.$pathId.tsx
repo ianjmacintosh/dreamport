@@ -128,7 +128,7 @@ export const Route = createFileRoute("/_appShell/app_/paths_/$pathId")({
     return {
       draft,
       breadcrumbs: {
-        trail: [{ label: "Trailblazer", href: "/app/paths" }],
+        trail: [{ label: "Paths", href: "/app/paths" }],
         current: draft.name,
       } satisfies BreadcrumbsProps,
     };

@@ -69,7 +69,7 @@ export const Route = createFileRoute("/_appShell/app_/paths")({
         : [];
     return { paths };
   },
-  component: Trailblazer,
+  component: Paths,
 });
 
 const ADD_PATH_FAILED = "We couldn't add that. Try again in a moment.";
@@ -77,12 +77,12 @@ const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
 /**
- * Trailblazer (#167): the User's own Paths, each linking to its Draft, and
+ * Paths (#167): the User's own Paths, each linking to its Draft, and
  * "Add Path", which opens a `Dialog` for the new Path's name and
  * description. A refusal (the 30-Path cap) shows the server's own words in
  * the Dialog, which stays open so nothing typed is lost.
  */
-function Trailblazer() {
+function Paths() {
   const { paths: initialPaths } = Route.useRouteContext();
   const [paths, setPaths] = useState<PathSummary[]>(initialPaths);
   const [isOpen, setIsOpen] = useState(false);
@@ -129,7 +129,7 @@ function Trailblazer() {
 
   return (
     <>
-      <h1 id="paths-heading">Trailblazer</h1>
+      <h1 id="paths-heading">Paths</h1>
       <p>
         <Button onClick={openDialog}>Add Path</Button>
       </p>

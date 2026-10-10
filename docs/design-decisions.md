@@ -271,8 +271,11 @@ Add an entry only once a sign-off conversation resolves something repeatable
   the handle on white blocks, arrow buttons on each row and Move Up/Down
   inside the edit form, in the same prototype (decided in #167).
 
-- `AppNav` has a second section, Trailblazer (Phosphor `PathIcon`, the
-  `/app/paths` pages), after Products, 12px apart. With two sections and
+- `AppNav` has a second section, Paths (Phosphor `PathIcon`, the
+  `/app/paths` pages), after Products, 12px apart. The section, its h1
+  and its breadcrumb say "Paths", never "Trailblazer": that name is for
+  adding and editing a Path inside the section, and would mean nothing to
+  a new User in the nav. With two sections and
   the "Account" trigger the bar collapses into the ☰ menu below about
   820px, not 640px: "Account" starts to clip below about 800px (decided
   in #167).

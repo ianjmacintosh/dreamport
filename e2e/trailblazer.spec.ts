@@ -23,9 +23,9 @@ test("add a Path, then add, reorder, edit and delete its Milestones", async ({
   const pathName = `Weekend Launch ${Date.now()}`;
   await signIn(page, TEST_EMAILS.e2eTrailblazer);
 
-  await page.getByRole("link", { name: "Trailblazer" }).click();
+  await page.getByRole("link", { name: "Paths", exact: true }).click();
   await expect(
-    page.getByRole("heading", { level: 1, name: "Trailblazer" }),
+    page.getByRole("heading", { level: 1, name: "Paths" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Add Path" }).click();
   const addPath = page.getByRole("dialog", { name: "Add Path" });

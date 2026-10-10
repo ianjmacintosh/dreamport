@@ -129,27 +129,25 @@ describe("AppNav", () => {
     },
   );
 
-  test("links to Trailblazer (/app/paths) after Products", () => {
+  test("links to Paths (/app/paths) after Products", () => {
     const links = navElements().filter((el) => el.type === Link);
     const labels = links.map((el) => textOf(el));
-    expect(labels.indexOf("Trailblazer")).toBe(labels.indexOf("Products") + 1);
-    expect(barLink(navElements(), "Trailblazer")?.props.href).toBe(
-      "/app/paths",
-    );
+    expect(labels.indexOf("Paths")).toBe(labels.indexOf("Products") + 1);
+    expect(barLink(navElements(), "Paths")?.props.href).toBe("/app/paths");
   });
 
   test.each(["/app/paths", "/app/paths/abc123"])(
-    "marks Trailblazer as the current section on %s",
+    "marks Paths as the current section on %s",
     (pathname) => {
-      const trailblazer = barLink(navElements({ pathname }), "Trailblazer");
+      const trailblazer = barLink(navElements({ pathname }), "Paths");
       expect(trailblazer?.props.current).toBe(true);
     },
   );
 
   test.each(["/app", "/app/products/abc123", "/app/settings", "/app/pathsx"])(
-    "doesn't mark Trailblazer current on %s",
+    "doesn't mark Paths current on %s",
     (pathname) => {
-      const trailblazer = barLink(navElements({ pathname }), "Trailblazer");
+      const trailblazer = barLink(navElements({ pathname }), "Paths");
       expect(trailblazer?.props.current).toBe(false);
     },
   );
@@ -179,7 +177,7 @@ describe("AppNav", () => {
     expect(textOf(logout)).toBe("Log out");
   });
 
-  test("the phone menu lists Products and Trailblazer, then Settings and Log out under who you're signed in as", () => {
+  test("the phone menu lists Products and Paths, then Settings and Log out under who you're signed in as", () => {
     const [products, trailblazer, separator, group] = phoneMenu(
       navElements({ pathname: "/app/paths/abc123" }),
     ).items;
@@ -189,7 +187,7 @@ describe("AppNav", () => {
     expect(products.props.current).toBe(false);
     expect(trailblazer.type).toBe(Dropdown.LinkItem);
     expect(trailblazer.props.href).toBe("/app/paths");
-    expect(textOf(trailblazer)).toBe("Trailblazer");
+    expect(textOf(trailblazer)).toBe("Paths");
     expect(trailblazer.props.current).toBe(true);
     expect(separator.type).toBe(Dropdown.Separator);
     expect(group.type).toBe(Dropdown.Group);
