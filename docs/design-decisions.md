@@ -269,7 +269,10 @@ Add an entry only once a sign-off conversation resolves something repeatable
   up and down arrow keys, and drag works by touch as well as by mouse. The
   row reads "1. {name}", then its actions. Picked over a Reorder mode,
   the handle on white blocks, arrow buttons on each row and Move Up/Down
-  inside the edit form, in the same prototype (decided in #167).
+  inside the edit form, in the same prototype (decided in #167). The row
+  being dragged carries dnd-kit's transform as an inline `style`, the one
+  accepted exception to "no inline styles": it follows the pointer, so no
+  class can hold it.
 
 - `AppNav` has a second section, Paths (Phosphor `PathIcon`, the
   `/app/paths` pages), after Products, 12px apart. The section, its h1
