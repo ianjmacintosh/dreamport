@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { DotsSixVerticalIcon } from "@phosphor-icons/react";
 import { LiveRegion, useAnnouncement } from "@dnd-kit/accessibility";
@@ -870,23 +870,7 @@ function TaskRow({
   const [title, setTitle] = useState("");
   const [pending, setPending] = useState<TaskPending>("none");
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task.id });
   const isBusy = pending !== "none";
-
-  function onKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      e.preventDefault();
-      onMoveKey(e.key === "ArrowUp" ? -1 : 1);
-    }
-  }
 
   async function update() {
     setPending("updating");
@@ -907,9 +891,15 @@ function TaskRow({
     setIsConfirmingDelete(false);
   }
 
-  if (isEditing) {
-    return (
-      <li ref={setNodeRef} className="list-row">
+  return (
+    <SortableRow
+      id={task.id}
+      label={task.title}
+      isReordering={isReordering}
+      onMoveKey={onMoveKey}
+      isEditing={isEditing}
+    >
+      {isEditing ? (
         <form
           className="field-row"
           onSubmit={(e) => {
@@ -958,48 +948,23 @@ function TaskRow({
             )}
           </div>
         </form>
-      </li>
-    );
-  }
-
-  return (
-    <li
-      ref={setNodeRef}
-      className={
-        isDragging
-          ? "list-row list-row--sortable list-row--dragging"
-          : "list-row list-row--sortable"
-      }
-      style={{
-        transform: CSS.Translate.toString(transform && { ...transform, x: 0 }),
-        transition,
-      }}
-    >
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        className="list-row-handle"
-        {...attributes}
-        {...listeners}
-        aria-label={`Move ${task.title}`}
-        aria-disabled={isReordering}
-        onKeyDown={onKeyDown}
-      >
-        <DotsSixVerticalIcon aria-hidden="true" />
-      </button>
-      <span className="list-row-name">{task.title}</span>
-      <div className="list-row-action">
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setTitle(task.title);
-            setIsEditing(true);
-          }}
-        >
-          Edit
-        </Button>
-      </div>
-    </li>
+      ) : (
+        <>
+          <span className="list-row-name">{task.title}</span>
+          <div className="list-row-action">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setTitle(task.title);
+                setIsEditing(true);
+              }}
+            >
+              Edit
+            </Button>
+          </div>
+        </>
+      )}
+    </SortableRow>
   );
 }
 
@@ -1018,6 +983,51 @@ function MilestoneRow({
   onTasks: () => void;
   onEdit: () => void;
 }) {
+  return (
+    <SortableRow
+      id={milestone.id}
+      label={milestone.name}
+      isReordering={isReordering}
+      onMoveKey={onMoveKey}
+    >
+      <span className="list-row-name">
+        {number}. {milestone.name}
+      </span>
+      <div className="list-row-action">
+        <div className="button-group">
+          <Button variant="secondary" onClick={onTasks}>
+            Tasks
+          </Button>
+          <Button variant="secondary" onClick={onEdit}>
+            Edit
+          </Button>
+        </div>
+      </div>
+    </SortableRow>
+  );
+}
+
+/**
+ * A row of a sortable list, moved by its handle. While `isEditing` it's a
+ * plain row with no handle, for an in-place edit form, still registered
+ * with the list so the rows around it keep their places.
+ */
+function SortableRow({
+  id,
+  label,
+  isReordering,
+  onMoveKey,
+  isEditing = false,
+  children,
+}: {
+  id: string;
+  /** The item's name, for the handle's "Move …" label. */
+  label: string;
+  isReordering: boolean;
+  onMoveKey: (delta: -1 | 1) => void;
+  isEditing?: boolean;
+  children: ReactNode;
+}) {
   const {
     attributes,
     listeners,
@@ -1026,13 +1036,21 @@ function MilestoneRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: milestone.id });
+  } = useSortable({ id });
 
   function onKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       e.preventDefault();
       onMoveKey(e.key === "ArrowUp" ? -1 : 1);
     }
+  }
+
+  if (isEditing) {
+    return (
+      <li ref={setNodeRef} className="list-row">
+        {children}
+      </li>
+    );
   }
 
   return (
@@ -1058,25 +1076,13 @@ function MilestoneRow({
         className="list-row-handle"
         {...attributes}
         {...listeners}
-        aria-label={`Move ${milestone.name}`}
+        aria-label={`Move ${label}`}
         aria-disabled={isReordering}
         onKeyDown={onKeyDown}
       >
         <DotsSixVerticalIcon aria-hidden="true" />
       </button>
-      <span className="list-row-name">
-        {number}. {milestone.name}
-      </span>
-      <div className="list-row-action">
-        <div className="button-group">
-          <Button variant="secondary" onClick={onTasks}>
-            Tasks
-          </Button>
-          <Button variant="secondary" onClick={onEdit}>
-            Edit
-          </Button>
-        </div>
-      </div>
+      {children}
     </li>
   );
 }
