@@ -2178,7 +2178,157 @@ describe("Trailblazer routes", () => {
     expect(reordered.status).toBe(200);
     expect(await order()).toEqual(["Second", "First"]);
   });
+
+  it("POST /api/paths/:pathId/milestones/:milestoneId/tasks adds a Task, 400s a blank title and 404s an unknown Milestone", async () => {
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
+    const path = await addPath(cookie);
+    const milestoneId = await addMilestoneOn(cookie, path.id);
+    const tasks = `/api/paths/${path.id}/milestones/${milestoneId}/tasks`;
+
+    const blank = await callApi("POST", tasks, cookie, { title: " " });
+    expect(blank.status).toBe(400);
+    expect(await blank.json()).toEqual({ error: "title is required" });
+    expect(
+      (
+        await callApi(
+          "POST",
+          `/api/paths/${path.id}/milestones/no-such-milestone/tasks`,
+          cookie,
+          { title: "Lost" },
+        )
+      ).status,
+    ).toBe(404);
+
+    const added = await callApi("POST", tasks, cookie, { title: " Ask " });
+    expect(added.status).toBe(201);
+    const { task } = (await added.json()) as { task: { id: string } };
+    expect(task).toEqual({ id: expect.any(String), title: "Ask" });
+    expect(await draftTasks(cookie, path.id)).toEqual([[task]]);
+  });
+
+  it("PATCH and DELETE /api/paths/:pathId/milestones/:milestoneId/tasks/:taskId edit and remove a Task", async () => {
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
+    const path = await addPath(cookie);
+    const milestoneId = await addMilestoneOn(cookie, path.id);
+    const tasks = `/api/paths/${path.id}/milestones/${milestoneId}/tasks`;
+    const taskId = await addTaskOn(cookie, tasks, "Ask");
+
+    expect(
+      (await callApi("PATCH", `${tasks}/${taskId}`, cookie, { title: "" }))
+        .status,
+    ).toBe(400);
+    const patched = await callApi("PATCH", `${tasks}/${taskId}`, cookie, {
+      title: "Ask five people",
+    });
+    expect(patched.status).toBe(200);
+    expect(await patched.json()).toEqual({
+      task: { id: taskId, title: "Ask five people" },
+    });
+    expect(
+      (
+        await callApi("PATCH", `${tasks}/no-such-task`, cookie, {
+          title: "X",
+        })
+      ).status,
+    ).toBe(404);
+
+    expect((await callApi("DELETE", `${tasks}/${taskId}`, cookie)).status).toBe(
+      200,
+    );
+    expect((await callApi("DELETE", `${tasks}/${taskId}`, cookie)).status).toBe(
+      404,
+    );
+    expect(await draftTasks(cookie, path.id)).toEqual([[]]);
+  });
+
+  it("PUT /api/paths/:pathId/milestones/:milestoneId/tasks/order reorders, or 409s on a stale list", async () => {
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
+    const path = await addPath(cookie);
+    const milestoneId = await addMilestoneOn(cookie, path.id);
+    const tasks = `/api/paths/${path.id}/milestones/${milestoneId}/tasks`;
+    const first = await addTaskOn(cookie, tasks, "First");
+    const second = await addTaskOn(cookie, tasks, "Second");
+    const titles = async () =>
+      (await draftTasks(cookie, path.id))[0].map((t) => t.title);
+
+    expect(
+      (await callApi("PUT", `${tasks}/order`, cookie, { ids: "nope" })).status,
+    ).toBe(400);
+
+    const stale = await callApi("PUT", `${tasks}/order`, cookie, {
+      ids: [second],
+    });
+    expect(stale.status).toBe(409);
+    expect(await titles()).toEqual(["First", "Second"]);
+
+    const reordered = await callApi("PUT", `${tasks}/order`, cookie, {
+      ids: [second, first],
+    });
+    expect(reordered.status).toBe(200);
+    expect(await titles()).toEqual(["Second", "First"]);
+  });
+
+  it("POST of a Milestone or a Task past 150 Milestones and Tasks combined is refused with 409", async () => {
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
+    const path = await addPath(cookie);
+    const milestoneId = await addMilestoneOn(cookie, path.id);
+    await env.DB.batch(
+      Array.from({ length: 149 }, (_, i) =>
+        env.DB.prepare(
+          'INSERT INTO "draft_tasks" ("id", "milestoneId", "position", "title") VALUES (?, ?, ?, ?)',
+        ).bind(crypto.randomUUID(), milestoneId, i + 1, `Task ${i + 1}`),
+      ),
+    );
+    const capError = {
+      error:
+        "A Path can have up to 150 Milestones and Tasks combined. Remove one to make room.",
+    };
+
+    const milestone = await callApi(
+      "POST",
+      `/api/paths/${path.id}/milestones`,
+      cookie,
+      MILESTONE,
+    );
+    expect(milestone.status).toBe(409);
+    expect(await milestone.json()).toEqual(capError);
+
+    const task = await callApi(
+      "POST",
+      `/api/paths/${path.id}/milestones/${milestoneId}/tasks`,
+      cookie,
+      { title: "One more" },
+    );
+    expect(task.status).toBe(409);
+    expect(await task.json()).toEqual(capError);
+    expect((await draftTasks(cookie, path.id)).flat()).toHaveLength(149);
+  });
 });
+
+async function addMilestoneOn(cookie: string, pathId: string) {
+  const res = await callApi(
+    "POST",
+    `/api/paths/${pathId}/milestones`,
+    cookie,
+    MILESTONE,
+  );
+  expect(res.status).toBe(201);
+  return ((await res.json()) as { milestone: { id: string } }).milestone.id;
+}
+
+async function addTaskOn(cookie: string, tasksUrl: string, title: string) {
+  const res = await callApi("POST", tasksUrl, cookie, { title });
+  expect(res.status).toBe(201);
+  return ((await res.json()) as { task: { id: string } }).task.id;
+}
+
+async function draftTasks(cookie: string, pathId: string) {
+  const res = await callApi("GET", `/api/paths/${pathId}`, cookie);
+  const { draft } = (await res.json()) as {
+    draft: { milestones: { tasks: { id: string; title: string }[] }[] };
+  };
+  return draft.milestones.map((m) => m.tasks);
+}
 
 /**
  * The two gates in front of Dreamport's own routes (#154), checked across
@@ -2311,18 +2461,16 @@ describe("request gates, across every route (#154)", () => {
       route.path.startsWith("/api/paths/:"),
     );
 
-    /** The owner's Path, with a Milestone for the routes that name one. */
     async function ownedPath() {
       const cookie = await signIn(TEST_EMAILS.gatesOwner);
       const path = await addPath(cookie);
-      const res = await callApi(
-        "POST",
-        `/api/paths/${path.id}/milestones`,
+      const milestoneId = await addMilestoneOn(cookie, path.id);
+      const taskId = await addTaskOn(
         cookie,
-        MILESTONE,
+        `/api/paths/${path.id}/milestones/${milestoneId}/tasks`,
+        "Ask",
       );
-      const { milestone } = (await res.json()) as { milestone: { id: string } };
-      return { cookie, params: { pathId: path.id, milestoneId: milestone.id } };
+      return { cookie, params: { pathId: path.id, milestoneId, taskId } };
     }
 
     it("finds the path-scoped routes", () => {

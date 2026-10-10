@@ -4,16 +4,21 @@ import { currentSession } from "./auth";
 import type { WorkerEnv } from "./env";
 import {
   addMilestone,
+  addTask,
   deleteMilestone,
+  deleteTask,
   getDraft,
   getPath,
   MILESTONES_AND_TASKS_PER_PATH,
   type OwnedPath,
   parseMilestoneFields,
   parsePathFields,
+  parseTaskFields,
   reorderMilestones,
+  reorderTasks,
   updateMilestone,
   updatePath,
+  updateTask,
 } from "./paths";
 
 type PathEnv = {
@@ -136,6 +141,84 @@ pathRoutes.delete("/milestones/:milestoneId", async (c) => {
     c.env.DB,
     c.var.path,
     c.req.param("milestoneId"),
+  );
+  if (!deleted) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  return c.json({}, 200);
+});
+
+pathRoutes.post("/milestones/:milestoneId/tasks", async (c) => {
+  const fields = parseTaskFields(await c.req.json().catch(() => null));
+  if (!fields.ok) {
+    return c.json({ error: fields.error }, 400);
+  }
+
+  const added = await addTask(
+    c.env.DB,
+    c.var.path,
+    c.req.param("milestoneId"),
+    fields.value,
+  );
+  if (!added.ok) {
+    return added.reason === "cap"
+      ? c.json({ error: AT_CAP }, 409)
+      : c.json({ error: "Not found" }, 404);
+  }
+
+  return c.json({ task: added.task }, 201);
+});
+
+pathRoutes.put("/milestones/:milestoneId/tasks/order", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const ids: unknown = body && typeof body === "object" ? body.ids : undefined;
+  if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string")) {
+    return c.json({ error: "ids must be an array of Task ids" }, 400);
+  }
+
+  const reordered = await reorderTasks(
+    c.env.DB,
+    c.var.path,
+    c.req.param("milestoneId"),
+    ids,
+  );
+  if (!reordered) {
+    return c.json(
+      { error: "The Tasks have changed. Reload to see them." },
+      409,
+    );
+  }
+
+  return c.json({}, 200);
+});
+
+pathRoutes.patch("/milestones/:milestoneId/tasks/:taskId", async (c) => {
+  const fields = parseTaskFields(await c.req.json().catch(() => null));
+  if (!fields.ok) {
+    return c.json({ error: fields.error }, 400);
+  }
+
+  const task = await updateTask(
+    c.env.DB,
+    c.var.path,
+    c.req.param("milestoneId"),
+    c.req.param("taskId"),
+    fields.value,
+  );
+  if (!task) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  return c.json({ task }, 200);
+});
+
+pathRoutes.delete("/milestones/:milestoneId/tasks/:taskId", async (c) => {
+  const deleted = await deleteTask(
+    c.env.DB,
+    c.var.path,
+    c.req.param("milestoneId"),
+    c.req.param("taskId"),
   );
   if (!deleted) {
     return c.json({ error: "Not found" }, 404);
