@@ -11,3 +11,14 @@ CDP_PORT=${VERIFY_CDP_PORT:-9235}
 # attaches to it. Its own session name keeps it off anyone else's bridge.
 export CHROME_DEVTOOLS_AXI_SESSION="verify-$PORT"
 export CHROME_DEVTOOLS_AXI_BROWSER_URL="http://127.0.0.1:$CDP_PORT"
+
+# With no verify Chromium answering, an axi command starts a bridge aimed at
+# a dead CDP port, and that bridge never exits (#175). Refuse instead. `stop`
+# passes through, so down.sh can still close the session.
+chrome-devtools-axi() {
+  if [[ "${1:-}" != stop ]] && ! curl -s --max-time 2 "$CHROME_DEVTOOLS_AXI_BROWSER_URL/json/version" | grep -q Browser; then
+    echo "verify Chromium isn't answering on $CHROME_DEVTOOLS_AXI_BROWSER_URL: run up.sh first" >&2
+    return 1
+  fi
+  command chrome-devtools-axi "$@"
+}
