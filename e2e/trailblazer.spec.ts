@@ -55,8 +55,8 @@ test("add a Path, then add, reorder, edit and delete its Milestones, and give on
   ] as const) {
     const saved = page.waitForResponse(
       (res) =>
-        res.url().endsWith("/milestones/order") &&
-        res.request().method() === "PUT",
+        /\/api\/paths\/[^/]+$/.test(res.url()) &&
+        res.request().method() === "PATCH",
     );
     await page.keyboard.press(key);
     expect((await saved).status(), `${key} saved`).toBe(200);

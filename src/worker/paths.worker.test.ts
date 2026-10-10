@@ -12,7 +12,6 @@ import {
   startJourney,
 } from "./journeys";
 import {
-  addMilestone,
   addTask,
   createPath,
   deleteMilestone,
@@ -27,11 +26,11 @@ import {
   type MilestoneFields,
   MILESTONES_AND_TASKS_PER_PATH,
   type OwnedPath,
+  type PathUpdate,
   parseMilestoneFields,
   parsePathFields,
   parseTaskFields,
   PATHS_PER_USER,
-  reorderMilestones,
   reorderTasks,
   saveVersion,
   TASK_TITLE_MAX_LENGTH,
@@ -233,10 +232,57 @@ async function makersPath(name = "Bakery Path") {
   return path;
 }
 
+/**
+ * The Draft as it stands now. `getDraft` takes the name and description
+ * from the `OwnedPath` it's given, so this loads that afresh.
+ */
+async function currentDraft(path: OwnedPath) {
+  const fresh = await env.DB.prepare(
+    'SELECT "id", "name", "description", "createdAt" FROM "paths" WHERE "id" = ?',
+  )
+    .bind(path.id)
+    .first<OwnedPath>();
+  if (!fresh) throw new Error("the Path is gone");
+  return getDraft(env.DB, fresh);
+}
+
+/** An update that leaves the Draft as it stands, for a test to change. */
+async function asItStands(path: OwnedPath): Promise<PathUpdate> {
+  const { name, description, milestones } = await currentDraft(path);
+  return {
+    name,
+    description,
+    milestones: milestones.map(({ id }) => ({ id })),
+  };
+}
+
+async function updated(path: OwnedPath, update: PathUpdate) {
+  const result = await updatePath(env.DB, path, update);
+  if (!result.ok) throw new Error(`not updated: ${result.reason}`);
+  return result.draft;
+}
+
+async function rename(path: OwnedPath, name: string, description: string) {
+  return updated(path, { ...(await asItStands(path)), name, description });
+}
+
+async function reorder(path: OwnedPath, ids: readonly string[]) {
+  return updated(path, {
+    ...(await asItStands(path)),
+    milestones: ids.map((id) => ({ id })),
+  });
+}
+
+/** Add a Milestone at the end of the Draft, the way Update Path does. */
 async function milestoneOn(path: OwnedPath, fields: MilestoneFields) {
-  const added = await addMilestone(env.DB, path, fields);
-  if (!added.ok) throw new Error("the Draft is at the cap");
-  return added.milestone;
+  const current = await asItStands(path);
+  const { milestones } = await updated(path, {
+    ...current,
+    milestones: [...current.milestones, fields],
+  });
+  const added = milestones.at(-1);
+  if (!added) throw new Error("no Milestone added");
+  return added;
 }
 
 async function taskOn(path: OwnedPath, milestoneId: string, title: string) {
@@ -374,12 +420,9 @@ describe("a Path's Draft", () => {
   it("takes a new name and description", async () => {
     const path = await makersPath();
 
-    const updated = await updatePath(env.DB, path, {
-      name: "Bread Path",
-      description: "",
-    });
+    const draft = await rename(path, "Bread Path", "");
 
-    expect(updated).toMatchObject({ name: "Bread Path", description: "" });
+    expect(draft).toMatchObject({ name: "Bread Path", description: "" });
     expect(await getPath(env.DB, MAKER_ID, path.id)).toMatchObject({
       name: "Bread Path",
       description: "",
@@ -402,23 +445,77 @@ describe("a Path's Draft", () => {
     expect(await deleteMilestone(env.DB, path, bake.id)).toBe(true);
     expect(await deleteMilestone(env.DB, path, bake.id)).toBe(false);
 
-    expect(await reorderMilestones(env.DB, path, [ship.id, sell.id])).toBe(
-      true,
-    );
-    expect(await reorderMilestones(env.DB, path, [ship.id, sell.id])).toBe(
-      true,
-    );
+    await reorder(path, [ship.id, sell.id]);
+    expect(await reorder(path, [ship.id, sell.id])).toMatchObject({
+      milestones: [
+        { id: ship.id, ...SHIP, tasks: [] },
+        { id: sell.id, ...edited, tasks: [] },
+      ],
+    });
     expect((await getDraft(env.DB, path)).milestones).toEqual([
       { id: ship.id, ...SHIP, tasks: [] },
       { id: sell.id, ...edited, tasks: [] },
     ]);
-
-    // A Milestone added after a reorder goes on the end.
-    await milestoneOn(path, BAKE);
-    expect(await milestoneNames(path)).toEqual(["Ship", "Sell It", "Bake"]);
   });
 
-  it("refuses a reorder that isn't exactly its Milestones, changing nothing", async () => {
+  it("takes a new name, description and Milestones at once, placing new Milestones among the existing ones", async () => {
+    const path = await makersPath();
+    const bake = await milestoneOn(path, BAKE);
+    const ship = await milestoneOn(path, SHIP);
+    await taskOn(path, bake.id, "Knead");
+
+    const draft = await updated(path, {
+      name: "Bread Path",
+      description: "Loaves",
+      milestones: [{ id: ship.id }, SELL, { id: bake.id }, BAKE],
+    });
+
+    const expected = [
+      { id: ship.id, ...SHIP, tasks: [] },
+      { id: expect.any(String), ...SELL, tasks: [] },
+      {
+        id: bake.id,
+        ...BAKE,
+        tasks: [{ id: expect.any(String), title: "Knead" }],
+      },
+      { id: expect.any(String), ...BAKE, tasks: [] },
+    ];
+    expect(draft).toMatchObject({
+      name: "Bread Path",
+      description: "Loaves",
+      milestones: expected,
+    });
+    expect(await currentDraft(path)).toEqual(draft);
+    const positions = await env.DB.prepare(
+      'SELECT "position" FROM "draft_milestones" WHERE "pathId" = ? ORDER BY "position"',
+    )
+      .bind(path.id)
+      .all<{ position: number }>();
+    expect(positions.results.map((r) => r.position)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("is not found once the Path is gone", async () => {
+    const path = await makersPath();
+    await env.DB.prepare('DELETE FROM "paths" WHERE "id" = ?')
+      .bind(path.id)
+      .run();
+
+    expect(
+      await updatePath(env.DB, path, {
+        name: "Gone",
+        description: "",
+        milestones: [BAKE],
+      }),
+    ).toEqual({ ok: false, reason: "not-found" });
+    const { n } = (await env.DB.prepare(
+      'SELECT count(*) AS n FROM "draft_milestones" WHERE "pathId" = ?',
+    )
+      .bind(path.id)
+      .first<{ n: number }>())!;
+    expect(n).toBe(0);
+  });
+
+  it("refuses a list whose existing Milestones aren't exactly its own, changing nothing", async () => {
     const path = await makersPath();
     const other = await makersPath("Other");
     const bake = await milestoneOn(path, BAKE);
@@ -432,9 +529,19 @@ describe("a Path's Draft", () => {
       [sell.id, foreign.id],
       [sell.id, bake.id, foreign.id],
     ]) {
-      expect(await reorderMilestones(env.DB, path, ids)).toBe(false);
+      expect(
+        await updatePath(env.DB, path, {
+          name: "Renamed",
+          description: "New",
+          milestones: [...ids.map((id) => ({ id })), SHIP],
+        }),
+      ).toEqual({ ok: false, reason: "stale" });
     }
     expect(await milestoneNames(path)).toEqual(["Bake", "Sell"]);
+    expect(await getPath(env.DB, MAKER_ID, path.id)).toMatchObject({
+      name: "Bakery Path",
+      description: "For bakers",
+    });
     expect(await milestoneNames(other)).toEqual(["Ship"]);
   });
 
@@ -555,17 +662,35 @@ describe("a Path's Draft", () => {
     expect(remaining?.n).toBe(0);
   });
 
-  it(`accepts a Milestone as the ${MILESTONES_AND_TASKS_PER_PATH}th Milestone or Task and refuses the next, adding nothing`, async () => {
+  it(`accepts new Milestones up to the ${MILESTONES_AND_TASKS_PER_PATH}th Milestone or Task and refuses one more, changing nothing`, async () => {
     const path = await makersPath();
-    await fillDraft(path, MILESTONES_AND_TASKS_PER_PATH - 1);
+    await fillDraft(path, MILESTONES_AND_TASKS_PER_PATH - 2);
+    const current = await asItStands(path);
 
-    expect((await addMilestone(env.DB, path, BAKE)).ok).toBe(true);
+    const over = await updatePath(env.DB, path, {
+      ...current,
+      name: "Renamed",
+      milestones: [...current.milestones, BAKE, SELL, SHIP],
+    });
+    expect(over).toEqual({ ok: false, reason: "cap" });
+    expect(await draftSize(path)).toBe(MILESTONES_AND_TASKS_PER_PATH - 2);
+    expect((await currentDraft(path)).name).toBe("Bakery Path");
+
+    await updated(path, {
+      ...current,
+      milestones: [...current.milestones, BAKE, SELL],
+    });
     expect(await draftSize(path)).toBe(MILESTONES_AND_TASKS_PER_PATH);
 
-    expect(await addMilestone(env.DB, path, SELL)).toEqual({
-      ok: false,
-      reason: "cap",
-    });
+    const full = await asItStands(path);
+    expect(
+      await updatePath(env.DB, path, {
+        ...full,
+        milestones: [...full.milestones, BAKE],
+      }),
+    ).toEqual({ ok: false, reason: "cap" });
+    // Reordering or renaming at the cap still works: it adds nothing.
+    await rename(path, "Full Path", "");
     expect(await draftSize(path)).toBe(MILESTONES_AND_TASKS_PER_PATH);
   });
 
@@ -607,9 +732,9 @@ describe("a Path's Draft", () => {
     const path = await makersPath();
     const bake = await milestoneOn(path, BAKE);
     const sell = await milestoneOn(path, SELL);
-    await updatePath(env.DB, path, { name: "Renamed", description: "New" });
+    await rename(path, "Renamed", "New");
     await updateMilestone(env.DB, path, bake.id, SHIP);
-    await reorderMilestones(env.DB, path, [sell.id, bake.id]);
+    await reorder(path, [sell.id, bake.id]);
     await deleteMilestone(env.DB, path, sell.id);
 
     expect(await dreamSequence(env.DB)).toEqual(before);
@@ -695,7 +820,7 @@ describe("saving a Path's Draft as a version", () => {
     const knead = await taskOn(path, bake.id, "Knead");
     await taskOn(path, sell.id, "Set a price");
     await deleteMilestone(env.DB, path, ship.id);
-    await reorderMilestones(env.DB, path, [sell.id, bake.id]);
+    await reorder(path, [sell.id, bake.id]);
     await reorderTasks(env.DB, path, bake.id, [knead.id, flour.id]);
 
     const result = await saveVersion(env.DB, path);
@@ -729,9 +854,9 @@ describe("saving a Path's Draft as a version", () => {
     const version = await saved(path);
     const before = await contentOf(version.id);
 
-    await updatePath(env.DB, path, { name: "Renamed", description: "New" });
+    await rename(path, "Renamed", "New");
     await updateMilestone(env.DB, path, bake.id, SHIP);
-    await reorderMilestones(env.DB, path, [sell.id, bake.id]);
+    await reorder(path, [sell.id, bake.id]);
     await updateTask(env.DB, path, bake.id, knead.id, { title: "Knead it" });
     await reorderTasks(env.DB, path, bake.id, [knead.id, flour.id]);
     await deleteTask(env.DB, path, bake.id, flour.id);
@@ -751,7 +876,7 @@ describe("saving a Path's Draft as a version", () => {
 
     expect(await saveVersion(env.DB, path)).toEqual(refused(["milestone"]));
 
-    await updatePath(env.DB, path, { name: path.name, description: "" });
+    await rename(path, path.name, "");
     expect(await saveVersion(env.DB, path)).toEqual(
       refused(["description", "milestone"]),
     );
@@ -801,7 +926,7 @@ describe("saving a Path's Draft as a version", () => {
     };
     await tick();
 
-    await updatePath(env.DB, path, { name: "Renamed", description: "New" });
+    await rename(path, "Renamed", "New");
     await expectMovedForward();
     const bake = await milestoneOn(path, BAKE);
     await expectMovedForward();
@@ -809,7 +934,7 @@ describe("saving a Path's Draft as a version", () => {
     await expectMovedForward();
     await updateMilestone(env.DB, path, bake.id, SHIP);
     await expectMovedForward();
-    await reorderMilestones(env.DB, path, [sell.id, bake.id]);
+    await reorder(path, [sell.id, bake.id]);
     await expectMovedForward();
     const knead = await taskOn(path, bake.id, "Knead");
     await expectMovedForward();

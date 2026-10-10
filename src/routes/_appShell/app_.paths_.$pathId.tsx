@@ -57,6 +57,12 @@ interface Milestone extends MilestoneFields {
   tasks: Task[];
 }
 
+interface Draft extends PathHead {
+  milestones: Milestone[];
+  updatedAt: string;
+  latestVersion: VersionSummary | null;
+}
+
 /** Mirror `src/worker/paths.ts`; the server enforces the real limits. */
 const PATH_NAME_MAX_LENGTH = 200;
 const PATH_DESCRIPTION_MAX_LENGTH = 2000;
@@ -170,13 +176,7 @@ export const Route = createFileRoute("/_appShell/app_/paths_/$pathId")({
     if (!res || !res.ok) {
       throw redirect({ to: "/app/paths" });
     }
-    const { draft } = (await res.json()) as {
-      draft: PathHead & {
-        milestones: Milestone[];
-        updatedAt: string;
-        latestVersion: VersionSummary | null;
-      };
-    };
+    const { draft } = (await res.json()) as { draft: Draft };
     return {
       draft,
       breadcrumbs: {
@@ -263,6 +263,27 @@ function PathDraft() {
     setUpdatedAt(new Date().toISOString());
   }
 
+  /** Update Path's body: the Draft as it stands, with `changes` applied. */
+  function pathUpdate(changes: {
+    name?: string;
+    description?: string;
+    milestones?: (Milestone | MilestoneFields)[];
+  }) {
+    return {
+      name: changes.name ?? path.name,
+      description: changes.description ?? path.description,
+      milestones: (changes.milestones ?? milestones).map((m) =>
+        "id" in m ? { id: m.id } : m,
+      ),
+    };
+  }
+
+  function showDraft(updated: Draft) {
+    setPath(updated);
+    setMilestones(updated.milestones);
+    setUpdatedAt(updated.updatedAt);
+  }
+
   function openPathDialog() {
     setPathFields({ name: path.name, description: path.description });
     setPathError("");
@@ -274,14 +295,13 @@ function PathDraft() {
     setIsUpdatingPath(true);
     try {
       const updated = await withMinimumDuration(() =>
-        send<{ path: PathHead }>(base, "PATCH", pathFields),
+        send<{ draft: Draft }>(base, "PATCH", pathUpdate(pathFields)),
       );
       if (!updated.ok) {
-        setPathError(UPDATE_FAILED);
+        setPathError(updated.conflict ?? UPDATE_FAILED);
         return;
       }
-      setPath(updated.body.path);
-      touch();
+      showDraft(updated.body.draft);
       setIsPathDialogOpen(false);
       // The breadcrumbs come from `beforeLoad`; rerun it for the new name.
       void router.invalidate();
@@ -315,36 +335,37 @@ function PathDraft() {
     setMilestoneError("");
     setMilestonePending("saving");
     try {
-      const saved = await withMinimumDuration(() =>
-        milestoneDialog.kind === "add"
-          ? send<{ milestone: Omit<Milestone, "tasks"> }>(
-              `${base}/milestones`,
-              "POST",
-              milestoneFields,
-            )
-          : send<{ milestone: Omit<Milestone, "tasks"> }>(
-              `${base}/milestones/${milestoneDialog.id}`,
-              "PATCH",
-              milestoneFields,
-            ),
-      );
-      if (!saved.ok) {
-        setMilestoneError(
-          milestoneDialog.kind === "add"
-            ? (saved.conflict ?? ADD_FAILED)
-            : UPDATE_FAILED,
+      if (milestoneDialog.kind === "add") {
+        const added = await withMinimumDuration(() =>
+          send<{ draft: Draft }>(
+            base,
+            "PATCH",
+            pathUpdate({ milestones: [...milestones, milestoneFields] }),
+          ),
         );
-        return;
+        if (!added.ok) {
+          setMilestoneError(added.conflict ?? ADD_FAILED);
+          return;
+        }
+        showDraft(added.body.draft);
+      } else {
+        const saved = await withMinimumDuration(() =>
+          send<{ milestone: Omit<Milestone, "tasks"> }>(
+            `${base}/milestones/${milestoneDialog.id}`,
+            "PATCH",
+            milestoneFields,
+          ),
+        );
+        if (!saved.ok) {
+          setMilestoneError(UPDATE_FAILED);
+          return;
+        }
+        const { milestone } = saved.body;
+        setMilestones((prev) =>
+          prev.map((m) => (m.id === milestone.id ? { ...m, ...milestone } : m)),
+        );
+        touch();
       }
-      const { milestone } = saved.body;
-      setMilestones((prev) =>
-        milestoneDialog.kind === "add"
-          ? [...prev, { ...milestone, tasks: [] }]
-          : prev.map((m) =>
-              m.id === milestone.id ? { ...m, ...milestone } : m,
-            ),
-      );
-      touch();
       setMilestoneDialog({ kind: "closed" });
     } catch {
       setMilestoneError(CONNECTION_FAILED);
@@ -381,11 +402,13 @@ function PathDraft() {
     setMilestones(next);
     setIsReordering(true);
     try {
-      const saved = await send<object>(`${base}/milestones/order`, "PUT", {
-        ids: next.map((m) => m.id),
-      });
+      const saved = await send<{ draft: Draft }>(
+        base,
+        "PATCH",
+        pathUpdate({ milestones: next }),
+      );
       if (saved.ok) {
-        touch();
+        showDraft(saved.body.draft);
       } else {
         setMilestones(previous);
         setReorderError(REORDER_FAILED);

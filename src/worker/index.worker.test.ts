@@ -2095,11 +2095,78 @@ describe("Trailblazer routes", () => {
     const patched = await callApi("PATCH", `/api/paths/${path.id}`, cookie, {
       name: "Weekday Launch",
       description: "",
+      milestones: [],
     });
     expect(patched.status).toBe(200);
     expect(await patched.json()).toEqual({
-      path: { ...path, name: "Weekday Launch", description: "" },
+      draft: {
+        ...path,
+        name: "Weekday Launch",
+        description: "",
+        milestones: [],
+        updatedAt: expect.any(String),
+        latestVersion: null,
+      },
     });
+  });
+
+  it("PATCH /api/paths/:pathId sets the name, description and Milestones at once, or 400s an invalid Milestone, or 409s a stale list changing nothing", async () => {
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
+    const path = await addPath(cookie);
+    const first = await addMilestoneOn(cookie, path.id);
+    const update = (body: unknown) =>
+      callApi("PATCH", `/api/paths/${path.id}`, cookie, body);
+    const draft = () =>
+      callApi("GET", `/api/paths/${path.id}`, cookie)
+        .then((res) => res.json())
+        .then(
+          (body) =>
+            (
+              body as {
+                draft: { name: string; milestones: { name: string }[] };
+              }
+            ).draft,
+        );
+
+    for (const milestones of [
+      "nope",
+      [{ ...MILESTONE, doneWhen: "" }],
+      [{ id: 7 }],
+    ]) {
+      const invalid = await update({ name: "Renamed", milestones });
+      expect(invalid.status).toBe(400);
+    }
+
+    const stale = await update({
+      name: "Renamed",
+      milestones: [{ id: "no-such-milestone" }, MILESTONE],
+    });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toEqual({
+      error: "The Milestones have changed. Reload to see them.",
+    });
+    expect(await draft()).toMatchObject({
+      name: "Weekend Launch",
+      milestones: [{ name: MILESTONE.name }],
+    });
+
+    const updated = await update({
+      name: "Renamed",
+      description: "",
+      milestones: [{ ...MILESTONE, name: "Before" }, { id: first }],
+    });
+    expect(updated.status).toBe(200);
+    const { draft: answered } = (await updated.json()) as {
+      draft: { milestones: { id: string; name: string }[] };
+    };
+    expect(answered).toMatchObject({
+      name: "Renamed",
+      milestones: [
+        { id: expect.any(String), name: "Before", tasks: [] },
+        { id: first, name: MILESTONE.name, tasks: [] },
+      ],
+    });
+    expect(await draft()).toEqual(answered);
   });
 
   it("POST /api/paths/:pathId/versions saves the Draft, or 409s naming what's missing, and GET shows the latest version", async () => {
@@ -2139,28 +2206,18 @@ describe("Trailblazer routes", () => {
     expect(draft.latestVersion).toEqual(version);
   });
 
-  it("POST, PATCH and DELETE /api/paths/:pathId/milestones add, edit and remove a Milestone", async () => {
+  it("PATCH and DELETE /api/paths/:pathId/milestones/:milestoneId edit and remove a Milestone", async () => {
     const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
     const path = await addPath(cookie);
     const base = `/api/paths/${path.id}/milestones`;
+    const milestone = { id: await addMilestoneOn(cookie, path.id) };
 
-    const invalid = await callApi("POST", base, cookie, {
+    const invalid = await callApi("PATCH", `${base}/${milestone.id}`, cookie, {
       ...MILESTONE,
       doneWhen: "",
     });
     expect(invalid.status).toBe(400);
     expect(await invalid.json()).toEqual({ error: "doneWhen is required" });
-
-    const added = await callApi("POST", base, cookie, MILESTONE);
-    expect(added.status).toBe(201);
-    const { milestone } = (await added.json()) as {
-      milestone: { id: string };
-    };
-    expect(milestone).toEqual({
-      id: expect.any(String),
-      ...MILESTONE,
-      tasks: [],
-    });
 
     const edited = { ...MILESTONE, outcome: "A problem worth a weekend" };
     const patched = await callApi(
@@ -2184,43 +2241,6 @@ describe("Trailblazer routes", () => {
     expect(
       (await callApi("DELETE", `${base}/${milestone.id}`, cookie)).status,
     ).toBe(404);
-  });
-
-  it("PUT /api/paths/:pathId/milestones/order reorders, or 409s on a stale list", async () => {
-    const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
-    const path = await addPath(cookie);
-    const base = `/api/paths/${path.id}/milestones`;
-    const ids: string[] = [];
-    for (const name of ["First", "Second"]) {
-      const res = await callApi("POST", base, cookie, { ...MILESTONE, name });
-      ids.push(
-        ((await res.json()) as { milestone: { id: string } }).milestone.id,
-      );
-    }
-    const order = () =>
-      callApi("GET", `/api/paths/${path.id}`, cookie)
-        .then((res) => res.json())
-        .then((body) =>
-          (
-            body as { draft: { milestones: { name: string }[] } }
-          ).draft.milestones.map((m) => m.name),
-        );
-
-    expect(
-      (await callApi("PUT", `${base}/order`, cookie, { ids: "nope" })).status,
-    ).toBe(400);
-
-    const stale = await callApi("PUT", `${base}/order`, cookie, {
-      ids: [ids[1]],
-    });
-    expect(stale.status).toBe(409);
-    expect(await order()).toEqual(["First", "Second"]);
-
-    const reordered = await callApi("PUT", `${base}/order`, cookie, {
-      ids: [ids[1], ids[0]],
-    });
-    expect(reordered.status).toBe(200);
-    expect(await order()).toEqual(["Second", "First"]);
   });
 
   it("POST /api/paths/:pathId/milestones/:milestoneId/tasks adds a Task, 400s a blank title and 404s an unknown Milestone", async () => {
@@ -2312,7 +2332,7 @@ describe("Trailblazer routes", () => {
     expect(await titles()).toEqual(["Second", "First"]);
   });
 
-  it("POST of a Milestone or a Task past 150 Milestones and Tasks combined is refused with 409", async () => {
+  it("A new Milestone or Task past 150 Milestones and Tasks combined is refused with 409", async () => {
     const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
     const path = await addPath(cookie);
     const milestoneId = await addMilestoneOn(cookie, path.id);
@@ -2328,12 +2348,10 @@ describe("Trailblazer routes", () => {
         "A Path can have up to 150 Milestones and Tasks combined. Remove one to make room.",
     };
 
-    const milestone = await callApi(
-      "POST",
-      `/api/paths/${path.id}/milestones`,
-      cookie,
-      MILESTONE,
-    );
+    const milestone = await callApi("PATCH", `/api/paths/${path.id}`, cookie, {
+      name: path.name,
+      milestones: [{ id: milestoneId }, MILESTONE],
+    });
     expect(milestone.status).toBe(409);
     expect(await milestone.json()).toEqual(capError);
 
@@ -2349,15 +2367,22 @@ describe("Trailblazer routes", () => {
   });
 });
 
+/** Add `MILESTONE` at the end of the Draft through Update Path; its new id. */
 async function addMilestoneOn(cookie: string, pathId: string) {
-  const res = await callApi(
-    "POST",
-    `/api/paths/${pathId}/milestones`,
-    cookie,
-    MILESTONE,
-  );
-  expect(res.status).toBe(201);
-  return ((await res.json()) as { milestone: { id: string } }).milestone.id;
+  const read = await callApi("GET", `/api/paths/${pathId}`, cookie);
+  const { draft } = (await read.json()) as {
+    draft: { name: string; description: string; milestones: { id: string }[] };
+  };
+  const res = await callApi("PATCH", `/api/paths/${pathId}`, cookie, {
+    name: draft.name,
+    description: draft.description,
+    milestones: [...draft.milestones.map(({ id }) => ({ id })), MILESTONE],
+  });
+  expect(res.status).toBe(200);
+  const { draft: updated } = (await res.json()) as {
+    draft: { milestones: { id: string }[] };
+  };
+  return updated.milestones[updated.milestones.length - 1].id;
 }
 
 async function addTaskOn(cookie: string, tasksUrl: string, title: string) {
