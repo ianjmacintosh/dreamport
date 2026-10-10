@@ -367,10 +367,11 @@ export function updatePath(
     .first<OwnedPath>();
 }
 
-const DRAFT_SIZE = `(SELECT count(*) FROM "draft_milestones" WHERE "pathId" = ?)
+/** The Draft's Milestones and Tasks together, for the Path bound as `?1`. */
+const DRAFT_SIZE = `(SELECT count(*) FROM "draft_milestones" WHERE "pathId" = ?1)
   + (SELECT count(*) FROM "draft_tasks"
      JOIN "draft_milestones" ON "draft_milestones"."id" = "draft_tasks"."milestoneId"
-     WHERE "draft_milestones"."pathId" = ?)`;
+     WHERE "draft_milestones"."pathId" = ?1)`;
 
 export type AddMilestoneResult =
   | { readonly ok: true; readonly milestone: DraftMilestone }
@@ -389,20 +390,17 @@ export async function addMilestone(
   const { meta } = await db
     .prepare(
       `INSERT INTO "draft_milestones" ("id", "pathId", "position", "name", "description", "doneWhen", "outcome")
-       SELECT ?, ?, (SELECT coalesce(max("position"), 0) + 1 FROM "draft_milestones" WHERE "pathId" = ?), ?, ?, ?, ?
-       WHERE ${DRAFT_SIZE} < ?`,
+       SELECT ?3, ?1, (SELECT coalesce(max("position"), 0) + 1 FROM "draft_milestones" WHERE "pathId" = ?1), ?4, ?5, ?6, ?7
+       WHERE ${DRAFT_SIZE} < ?2`,
     )
     .bind(
+      path.id,
+      MILESTONES_AND_TASKS_PER_PATH,
       milestone.id,
-      path.id,
-      path.id,
       milestone.name,
       milestone.description,
       milestone.doneWhen,
       milestone.outcome,
-      path.id,
-      path.id,
-      MILESTONES_AND_TASKS_PER_PATH,
     )
     .run();
   if (meta.changes === 0) {
@@ -498,19 +496,16 @@ export async function addTask(
   const { meta } = await db
     .prepare(
       `INSERT INTO "draft_tasks" ("id", "milestoneId", "position", "title")
-       SELECT ?, "id", (SELECT coalesce(max("position"), 0) + 1 FROM "draft_tasks" WHERE "milestoneId" = ?), ?
+       SELECT ?4, "id", (SELECT coalesce(max("position"), 0) + 1 FROM "draft_tasks" WHERE "milestoneId" = ?3), ?5
        FROM "draft_milestones"
-       WHERE "id" = ? AND "pathId" = ? AND ${DRAFT_SIZE} < ?`,
+       WHERE "id" = ?3 AND "pathId" = ?1 AND ${DRAFT_SIZE} < ?2`,
     )
     .bind(
-      task.id,
-      milestoneId,
-      task.title,
-      milestoneId,
-      path.id,
-      path.id,
       path.id,
       MILESTONES_AND_TASKS_PER_PATH,
+      milestoneId,
+      task.id,
+      task.title,
     )
     .run();
   if (meta.changes > 0) {
@@ -523,8 +518,9 @@ export async function addTask(
   return { ok: false, reason: milestone ? "cap" : "not-found" };
 }
 
-const TASK_ON_PATH = `"id" = ? AND "milestoneId" = ?
-  AND "milestoneId" IN (SELECT "id" FROM "draft_milestones" WHERE "pathId" = ?)`;
+/** The Task bound as `?3`, on the Milestone `?2`, on the Path `?1`. */
+const TASK_ON_PATH = `"id" = ?3 AND "milestoneId" = ?2
+  AND "milestoneId" IN (SELECT "id" FROM "draft_milestones" WHERE "pathId" = ?1)`;
 
 export function updateTask(
   db: D1Database,
@@ -535,9 +531,9 @@ export function updateTask(
 ): Promise<DraftTask | null> {
   return db
     .prepare(
-      `UPDATE "draft_tasks" SET "title" = ? WHERE ${TASK_ON_PATH} RETURNING "id", "title"`,
+      `UPDATE "draft_tasks" SET "title" = ?4 WHERE ${TASK_ON_PATH} RETURNING "id", "title"`,
     )
-    .bind(title, taskId, milestoneId, path.id)
+    .bind(path.id, milestoneId, taskId, title)
     .first<DraftTask>();
 }
 
@@ -549,7 +545,7 @@ export async function deleteTask(
 ): Promise<boolean> {
   const { meta } = await db
     .prepare(`DELETE FROM "draft_tasks" WHERE ${TASK_ON_PATH}`)
-    .bind(taskId, milestoneId, path.id)
+    .bind(path.id, milestoneId, taskId)
     .run();
   return meta.changes > 0;
 }
