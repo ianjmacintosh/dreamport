@@ -151,11 +151,20 @@ export interface DraftMilestone extends MilestoneFields {
   readonly tasks: readonly DraftTask[];
 }
 
+export interface VersionSummary {
+  readonly id: string;
+  readonly number: number;
+  readonly savedAt: string;
+}
+
 /** A Path's Draft: its name, description and Milestones, as last edited. */
 export interface Draft extends PathSummary {
   readonly description: string;
   /** In order. A Draft may have none. */
   readonly milestones: readonly DraftMilestone[];
+  /** When the Draft last changed. Saving a version doesn't change it. */
+  readonly updatedAt: string;
+  readonly latestVersion: VersionSummary | null;
 }
 
 declare const owned: unique symbol;
@@ -295,8 +304,8 @@ export async function createPath(
   };
   const { meta } = await db
     .prepare(
-      `INSERT INTO "paths" ("id", "userId", "name", "description", "createdAt")
-       SELECT ?, ?, ?, ?, ?
+      `INSERT INTO "paths" ("id", "userId", "name", "description", "createdAt", "updatedAt")
+       SELECT ?, ?, ?, ?, ?, ?
        WHERE (SELECT count(*) FROM "paths" WHERE "userId" = ?) < ?`,
     )
     .bind(
@@ -304,6 +313,7 @@ export async function createPath(
       userId,
       path.name,
       path.description,
+      path.createdAt,
       path.createdAt,
       userId,
       PATHS_PER_USER,
@@ -319,24 +329,35 @@ export async function getDraft(
   db: D1Database,
   path: OwnedPath,
 ): Promise<Draft> {
-  const [{ results: milestones }, { results: tasks }] = await Promise.all([
-    db
-      .prepare(
-        'SELECT "id", "name", "description", "doneWhen", "outcome" FROM "draft_milestones" WHERE "pathId" = ? ORDER BY "position" ASC',
-      )
-      .bind(path.id)
-      .all<Omit<DraftMilestone, "tasks">>(),
-    db
-      .prepare(
-        `SELECT "draft_tasks"."id", "draft_tasks"."milestoneId", "draft_tasks"."title"
+  const [{ results: milestones }, { results: tasks }, edited, latestVersion] =
+    await Promise.all([
+      db
+        .prepare(
+          'SELECT "id", "name", "description", "doneWhen", "outcome" FROM "draft_milestones" WHERE "pathId" = ? ORDER BY "position" ASC, "rowid" ASC',
+        )
+        .bind(path.id)
+        .all<Omit<DraftMilestone, "tasks">>(),
+      db
+        .prepare(
+          `SELECT "draft_tasks"."id", "draft_tasks"."milestoneId", "draft_tasks"."title"
          FROM "draft_tasks"
          JOIN "draft_milestones" ON "draft_milestones"."id" = "draft_tasks"."milestoneId"
          WHERE "draft_milestones"."pathId" = ?
-         ORDER BY "draft_tasks"."position" ASC`,
-      )
-      .bind(path.id)
-      .all<DraftTask & { milestoneId: string }>(),
-  ]);
+         ORDER BY "draft_tasks"."position" ASC, "draft_tasks"."rowid" ASC`,
+        )
+        .bind(path.id)
+        .all<DraftTask & { milestoneId: string }>(),
+      db
+        .prepare('SELECT "updatedAt" FROM "paths" WHERE "id" = ?')
+        .bind(path.id)
+        .first<{ updatedAt: string }>(),
+      db
+        .prepare(
+          'SELECT "id", "number", "savedAt" FROM "path_versions" WHERE "pathId" = ? ORDER BY "number" DESC LIMIT 1',
+        )
+        .bind(path.id)
+        .first<VersionSummary>(),
+    ]);
   const tasksOf = new Map<string, DraftTask[]>();
   for (const { milestoneId, ...task } of tasks) {
     tasksOf.set(milestoneId, [...(tasksOf.get(milestoneId) ?? []), task]);
@@ -350,7 +371,102 @@ export async function getDraft(
       ...m,
       tasks: tasksOf.get(m.id) ?? [],
     })),
+    updatedAt: edited?.updatedAt ?? path.createdAt,
+    latestVersion,
   };
+}
+
+export type DraftGap = "name" | "description" | "milestone";
+
+export type SaveVersionResult =
+  | { readonly ok: true; readonly version: VersionSummary }
+  | {
+      readonly ok: false;
+      readonly reason: "incomplete";
+      readonly missing: readonly DraftGap[];
+    };
+
+/**
+ * Copy the Draft into a new saved version, numbered one past the Path's
+ * latest. Refused, saving nothing, unless the Draft has a name, a
+ * description and at least one Milestone.
+ *
+ * One batch is one transaction, so every statement reads the same Draft
+ * and a failure leaves no half-saved version. The first statement carries
+ * the guard, and the rest copy only if its row landed. A saved row's id is
+ * the version's id, a colon and the Draft row's id, so the statements join
+ * without reading anything back, and `0022`'s delete trigger finds a
+ * version's Tasks by that prefix. Positions are renumbered 1..n, since the
+ * Draft's may have gaps or ties.
+ */
+export async function saveVersion(
+  db: D1Database,
+  path: OwnedPath,
+): Promise<SaveVersionResult> {
+  const versionId = crypto.randomUUID();
+  const versionSaved = `EXISTS (SELECT 1 FROM "path_versions" WHERE "id" = ?2)`;
+  const pathsDraftTasks = `FROM "draft_tasks"
+    JOIN "draft_milestones" ON "draft_milestones"."id" = "draft_tasks"."milestoneId"
+    WHERE "draft_milestones"."pathId" = ?1 AND ${versionSaved}`;
+  const [saved] = await db.batch<VersionSummary>([
+    db
+      .prepare(
+        `INSERT INTO "path_versions" ("id", "pathId", "number", "name", "description", "savedAt")
+         SELECT ?2, "id",
+           (SELECT coalesce(max("number"), 0) + 1 FROM "path_versions" WHERE "pathId" = ?1),
+           "name", "description", ?3
+         FROM "paths"
+         WHERE "id" = ?1 AND "name" <> '' AND "description" <> ''
+           AND EXISTS (SELECT 1 FROM "draft_milestones" WHERE "pathId" = ?1)
+         RETURNING "id", "number", "savedAt"`,
+      )
+      .bind(path.id, versionId, new Date().toISOString()),
+    db
+      .prepare(
+        `INSERT INTO "milestones" ("id", "versionId", "position", "name", "description", "doneWhen", "outcome")
+         SELECT ?2 || ':' || "id", ?2, row_number() OVER (ORDER BY "position", "rowid"),
+           "name", "description", "doneWhen", "outcome"
+         FROM "draft_milestones"
+         WHERE "pathId" = ?1 AND ${versionSaved}`,
+      )
+      .bind(path.id, versionId),
+    db
+      .prepare(
+        `INSERT INTO "tasks" ("id", "title")
+         SELECT ?2 || ':' || "draft_tasks"."id", "draft_tasks"."title"
+         ${pathsDraftTasks}`,
+      )
+      .bind(path.id, versionId),
+    db
+      .prepare(
+        `INSERT INTO "milestone_tasks" ("milestoneId", "taskId", "position")
+         SELECT ?2 || ':' || "draft_tasks"."milestoneId", ?2 || ':' || "draft_tasks"."id",
+           row_number() OVER (
+             PARTITION BY "draft_tasks"."milestoneId"
+             ORDER BY "draft_tasks"."position", "draft_tasks"."rowid"
+           )
+         ${pathsDraftTasks}`,
+      )
+      .bind(path.id, versionId),
+  ]);
+  const [version] = saved.results;
+  if (version) {
+    return { ok: true, version };
+  }
+
+  const draft = await db
+    .prepare(
+      `SELECT "name", "description",
+         EXISTS (SELECT 1 FROM "draft_milestones" WHERE "pathId" = ?1) AS "hasMilestone"
+       FROM "paths" WHERE "id" = ?1`,
+    )
+    .bind(path.id)
+    .first<{ name: string; description: string; hasMilestone: number }>();
+  const missing: DraftGap[] = [];
+  if (!draft?.name) missing.push("name");
+  if (!draft?.description) missing.push("description");
+  if (!draft?.hasMilestone) missing.push("milestone");
+  return { ok: false, reason: "incomplete", missing };
 }
 
 /** Set the Draft's name and description. Null if the Path is gone. */

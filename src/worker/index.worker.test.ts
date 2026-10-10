@@ -2078,7 +2078,14 @@ describe("Trailblazer routes", () => {
     const path = await addPath(cookie);
 
     const read = await callApi("GET", `/api/paths/${path.id}`, cookie);
-    expect(await read.json()).toEqual({ draft: { ...path, milestones: [] } });
+    expect(await read.json()).toEqual({
+      draft: {
+        ...path,
+        milestones: [],
+        updatedAt: path.createdAt,
+        latestVersion: null,
+      },
+    });
 
     const invalid = await callApi("PATCH", `/api/paths/${path.id}`, cookie, {
       name: "",

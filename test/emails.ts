@@ -186,6 +186,8 @@ export const TEST_EMAILS = {
   pathsModuleCap: "delivered+paths-module-cap@resend.dev",
   /** Is deleted, taking their Paths and Drafts with them. */
   pathsModuleDeleted: "delivered+paths-module-deleted@resend.dev",
+  /** Saves a version and follows it, then is deleted, taking both with them (#169). */
+  pathsModuleSaverDeleted: "delivered+paths-module-saver-deleted@resend.dev",
 
   // --- Seam 1: the Journey routes (#137-#140), one test each ---
   /** Reads the Journey page's state before a Journey starts. */
