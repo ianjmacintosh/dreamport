@@ -1983,6 +1983,199 @@ describe("Journey routes", () => {
   });
 });
 
+/*
+ * The Trailblazer routes (#167), one test each: status and response shape.
+ * The 401 and the 404 for someone else's Path are checked for every route
+ * under "request gates" below. What a Draft does is covered at the
+ * module's own interface in `paths.worker.test.ts`.
+ */
+
+/** A request as the signed-in browser sends it, JSON body and all. */
+function callApi(
+  method: string,
+  path: string,
+  cookie?: string,
+  body?: unknown,
+) {
+  return fetchWorker(path, {
+    method,
+    headers: {
+      ...json,
+      origin: TRUSTED_ORIGIN,
+      ...(cookie ? { cookie } : {}),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+interface PathJson {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+}
+
+async function addPath(cookie: string, name = "Weekend Launch") {
+  const res = await callApi("POST", "/api/paths", cookie, {
+    name,
+    description: "Two days to sign-ups.",
+  });
+  expect(res.status).toBe(201);
+  return ((await res.json()) as { path: PathJson }).path;
+}
+
+const MILESTONE = {
+  name: "Pick One Problem",
+  description: "Write down the one problem.",
+  doneWhen: "You can say it in one sentence.",
+  outcome: "",
+};
+
+describe("Trailblazer routes", () => {
+  it("GET and POST /api/paths list and add the User's Paths", async () => {
+    expect((await callApi("GET", "/api/paths")).status).toBe(401);
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesList);
+    expect(await (await callApi("GET", "/api/paths", cookie)).json()).toEqual({
+      paths: [],
+    });
+
+    const blank = await callApi("POST", "/api/paths", cookie, { name: " " });
+    expect(blank.status).toBe(400);
+    expect(await blank.json()).toEqual({ error: "name is required" });
+
+    const path = await addPath(cookie, "  Weekend Launch ");
+    expect(path).toEqual({
+      id: expect.any(String),
+      name: "Weekend Launch",
+      description: "Two days to sign-ups.",
+      createdAt: expect.any(String),
+    });
+    expect(await (await callApi("GET", "/api/paths", cookie)).json()).toEqual({
+      paths: [
+        { id: path.id, name: "Weekend Launch", createdAt: path.createdAt },
+      ],
+    });
+  });
+
+  it("POST /api/paths refuses a Path past the cap with 409", async () => {
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesCap);
+    for (let i = 0; i < 30; i++) {
+      await addPath(cookie, `Path ${i}`);
+    }
+
+    const res = await callApi("POST", "/api/paths", cookie, { name: "More" });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "You can have up to 30 Paths." });
+    const { paths } = (await (
+      await callApi("GET", "/api/paths", cookie)
+    ).json()) as { paths: unknown[] };
+    expect(paths).toHaveLength(30);
+  });
+
+  it("GET and PATCH /api/paths/:pathId read and edit the Draft", async () => {
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
+    const path = await addPath(cookie);
+
+    const read = await callApi("GET", `/api/paths/${path.id}`, cookie);
+    expect(await read.json()).toEqual({ draft: { ...path, milestones: [] } });
+
+    const invalid = await callApi("PATCH", `/api/paths/${path.id}`, cookie, {
+      name: "",
+    });
+    expect(invalid.status).toBe(400);
+
+    const patched = await callApi("PATCH", `/api/paths/${path.id}`, cookie, {
+      name: "Weekday Launch",
+      description: "",
+    });
+    expect(patched.status).toBe(200);
+    expect(await patched.json()).toEqual({
+      path: { ...path, name: "Weekday Launch", description: "" },
+    });
+  });
+
+  it("POST, PATCH and DELETE /api/paths/:pathId/milestones add, edit and remove a Milestone", async () => {
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
+    const path = await addPath(cookie);
+    const base = `/api/paths/${path.id}/milestones`;
+
+    const invalid = await callApi("POST", base, cookie, {
+      ...MILESTONE,
+      doneWhen: "",
+    });
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toEqual({ error: "doneWhen is required" });
+
+    const added = await callApi("POST", base, cookie, MILESTONE);
+    expect(added.status).toBe(201);
+    const { milestone } = (await added.json()) as {
+      milestone: { id: string };
+    };
+    expect(milestone).toEqual({ id: expect.any(String), ...MILESTONE });
+
+    const edited = { ...MILESTONE, outcome: "A problem worth a weekend" };
+    const patched = await callApi(
+      "PATCH",
+      `${base}/${milestone.id}`,
+      cookie,
+      edited,
+    );
+    expect(patched.status).toBe(200);
+    expect(await patched.json()).toEqual({
+      milestone: { id: milestone.id, ...edited },
+    });
+    expect(
+      (await callApi("PATCH", `${base}/no-such-milestone`, cookie, edited))
+        .status,
+    ).toBe(404);
+
+    expect(
+      (await callApi("DELETE", `${base}/${milestone.id}`, cookie)).status,
+    ).toBe(200);
+    expect(
+      (await callApi("DELETE", `${base}/${milestone.id}`, cookie)).status,
+    ).toBe(404);
+  });
+
+  it("PUT /api/paths/:pathId/milestones/order reorders, or 409s on a stale list", async () => {
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
+    const path = await addPath(cookie);
+    const base = `/api/paths/${path.id}/milestones`;
+    const ids: string[] = [];
+    for (const name of ["First", "Second"]) {
+      const res = await callApi("POST", base, cookie, { ...MILESTONE, name });
+      ids.push(
+        ((await res.json()) as { milestone: { id: string } }).milestone.id,
+      );
+    }
+    const order = () =>
+      callApi("GET", `/api/paths/${path.id}`, cookie)
+        .then((res) => res.json())
+        .then((body) =>
+          (
+            body as { draft: { milestones: { name: string }[] } }
+          ).draft.milestones.map((m) => m.name),
+        );
+
+    expect(
+      (await callApi("PUT", `${base}/order`, cookie, { ids: "nope" })).status,
+    ).toBe(400);
+
+    const stale = await callApi("PUT", `${base}/order`, cookie, {
+      ids: [ids[1]],
+    });
+    expect(stale.status).toBe(409);
+    expect(await order()).toEqual(["First", "Second"]);
+
+    const reordered = await callApi("PUT", `${base}/order`, cookie, {
+      ids: [ids[1], ids[0]],
+    });
+    expect(reordered.status).toBe(200);
+    expect(await order()).toEqual(["Second", "First"]);
+  });
+});
+
 /**
  * The two gates in front of Dreamport's own routes (#154), checked across
  * every route the app registers rather than one endpoint at a time, so a
@@ -2100,6 +2293,70 @@ describe("request gates, across every route (#154)", () => {
         expect(asStranger.status).toBe(404);
         expect(await asStranger.json()).toEqual(await nonexistent.json());
         expect(nonexistent.status).toBe(404);
+
+        // The control: the owner gets past the gate with the same params.
+        expect((await request(owner.params, owner.cookie)).status).not.toBe(
+          404,
+        );
+      },
+    );
+  });
+
+  describe("Path ownership", () => {
+    const pathScoped = routes.filter((route) =>
+      route.path.startsWith("/api/paths/:"),
+    );
+
+    /** The owner's Path, with a Milestone for the routes that name one. */
+    async function ownedPath() {
+      const cookie = await signIn(TEST_EMAILS.gatesOwner);
+      const path = await addPath(cookie);
+      const res = await callApi(
+        "POST",
+        `/api/paths/${path.id}/milestones`,
+        cookie,
+        MILESTONE,
+      );
+      const { milestone } = (await res.json()) as { milestone: { id: string } };
+      return { cookie, params: { pathId: path.id, milestoneId: milestone.id } };
+    }
+
+    it("finds the path-scoped routes", () => {
+      expect(pathScoped.length).toBeGreaterThan(0);
+    });
+
+    it.each(pathScoped.map((route) => [route.method, route.path]))(
+      "%s %s answers only the Path's owner",
+      async (method, path) => {
+        const owner = await ownedPath();
+        const stranger = await signIn(TEST_EMAILS.gatesStranger);
+        const request = (params: Record<string, string>, cookie?: string) =>
+          callApi(
+            method,
+            fill(path, params),
+            cookie,
+            method === "GET" ? undefined : {},
+          );
+
+        const signedOut = await request(owner.params);
+        expect(signedOut.status).toBe(401);
+        expect(await signedOut.json()).toEqual({ error: "Not signed in" });
+
+        // Someone else's Path, and Dreamport's own, read exactly like one
+        // that doesn't exist.
+        const nonexistent = await request(
+          { ...owner.params, pathId: "no-such-path" },
+          owner.cookie,
+        );
+        expect(nonexistent.status).toBe(404);
+        const asStranger = await request(owner.params, stranger);
+        expect(asStranger.status).toBe(404);
+        expect(await asStranger.json()).toEqual(await nonexistent.json());
+        const dreamports = await request(
+          { ...owner.params, pathId: "dream-sequence" },
+          owner.cookie,
+        );
+        expect(dreamports.status).toBe(404);
 
         // The control: the owner gets past the gate with the same params.
         expect((await request(owner.params, owner.cookie)).status).not.toBe(

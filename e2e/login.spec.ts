@@ -67,9 +67,9 @@ async function signInThroughUi(page: Page, email: string): Promise<void> {
   await expect(page).toHaveURL(/\/app$/);
 }
 
-/** Open AppNav's account menu, whose trigger is the signed-in email (#119). */
-async function openAccountMenu(page: Page, email: string): Promise<void> {
-  await page.getByRole("button", { name: email }).click();
+/** Open AppNav's account menu, a profile icon named "Account" (#119, #167). */
+async function openAccountMenu(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Account", exact: true }).click();
   await expect(page.getByRole("menu")).toBeVisible();
 }
 
@@ -80,8 +80,10 @@ test("happy path: email, then code, then /app shows the signed-in email", async 
 
   await signInThroughUi(page, email);
 
-  // The signed-in email lives in AppNav (#90), not on the page itself.
-  await expect(page.getByText(email)).toBeVisible();
+  // The signed-in email lives in AppNav's account menu (#90, #167), not on
+  // the page itself.
+  await openAccountMenu(page);
+  await expect(page.getByRole("menu").getByText(email)).toBeVisible();
 });
 
 test("the account menu closes on Escape and hands focus back to its trigger", async ({
@@ -91,7 +93,7 @@ test("the account menu closes on Escape and hands focus back to its trigger", as
 
   await signIn(page, email);
 
-  const trigger = page.getByRole("button", { name: email });
+  const trigger = page.getByRole("button", { name: "Account", exact: true });
   await trigger.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("menu")).toBeVisible();
@@ -174,7 +176,8 @@ test("persistent session: a return visit to /app stays signed in", async ({
 
   await page.goto("/app");
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByText(email)).toBeVisible();
+  await openAccountMenu(page);
+  await expect(page.getByRole("menu").getByText(email)).toBeVisible();
 });
 
 test("sign out from /app/settings returns to the homepage and forgets the session", async ({
@@ -182,12 +185,12 @@ test("sign out from /app/settings returns to the homepage and forgets the sessio
 }) => {
   await signIn(page, TEST_EMAILS.e2eSignOut);
 
-  await openAccountMenu(page, TEST_EMAILS.e2eSignOut);
+  await openAccountMenu(page);
   await page.getByRole("menuitem", { name: "Settings" }).click();
   await expect(page).toHaveURL(/\/app\/settings$/);
   // Log out lives in AppNav's account menu (#90, #119) — present on every
   // signed-in page, including this one, rather than a page-local button.
-  await openAccountMenu(page, TEST_EMAILS.e2eSignOut);
+  await openAccountMenu(page);
   await page.getByRole("menuitem", { name: "Log out" }).click();
   await expect(page).toHaveURL(/localhost:\d+\/$/);
 
@@ -206,8 +209,10 @@ test("signed in, /privacy shows AppNav and the in-app footer, not the signed-out
   await expect(
     page.getByRole("heading", { name: "Privacy Policy", level: 1 }),
   ).toBeVisible();
-  // AppNav's account trigger is the signed-in email (#119).
-  await expect(page.getByRole("button", { name: email })).toBeVisible();
+  // AppNav's account trigger is there (#119, #167).
+  await expect(
+    page.getByRole("button", { name: "Account", exact: true }),
+  ).toBeVisible();
   // Neither the Header's nor the marketing footer's "Log In" is on the page.
   await expect(
     page.getByRole("link", { name: "Log In", exact: true }),
@@ -231,14 +236,16 @@ test("log out from /terms: the page falls back to the signed-out Header", async 
   await signIn(page, email);
 
   await page.goto("/terms");
-  await openAccountMenu(page, email);
+  await openAccountMenu(page);
   await page.getByRole("menuitem", { name: "Log out" }).click();
 
   await expect(page).toHaveURL(/localhost:\d+\/$/);
   await expect(
     page.getByRole("banner").getByRole("link", { name: "Log In" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: email })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Account", exact: true }),
+  ).toHaveCount(0);
 });
 
 test("the sign-in page loads with the email field focused", async ({
@@ -396,7 +403,7 @@ test("delete account from /app/settings: confirm, follow the emailed link, sessi
 
   await signIn(page, email);
 
-  await openAccountMenu(page, email);
+  await openAccountMenu(page);
   await page.getByRole("menuitem", { name: "Settings" }).click();
   await expect(page).toHaveURL(/\/app\/settings$/);
   await page.getByRole("button", { name: "Delete Account" }).click();

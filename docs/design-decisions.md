@@ -142,14 +142,13 @@ Add an entry only once a sign-off conversation resolves something repeatable
   for behavior (focus management, keyboard nav, outside-click/`Escape`)
   while `Dropdown` owns its panel's CSS. Its trigger is a `.button`
   (`variant`, default `"secondary"`; `"nav"` on the bar), so it shares
-  every button's size and hover outline (#125). `AppNav`'s trigger is the
-  signed-in User's email plus a chevron icon; the panel lists only the
-  menu's actual items (Settings, a separator, Log out) — the trigger
-  already shows the email, so the panel doesn't repeat it. See ADR-0014 and
-  the style guide's "Dropdown" section (decided in #119). The one panel
-  whose trigger doesn't show the email — `AppNav`'s phone ☰ menu — names
-  it in a non-clickable `Dropdown.Group` label ("Signed in as …") over
-  Settings and Log out instead (#125).
+  every button's size and hover outline (#125). `AppNav`'s trigger reads
+  "Account", after Phosphor's `UserCircle`, with a chevron; the panel
+  names who's signed in with a non-clickable `Dropdown.Group` label
+  ("Signed in as …") over Settings and Log out, the same group the phone
+  ☰ menu shows. See ADR-0014 and the style guide's "Dropdown" section
+  (decided in #119; the trigger was the email itself until #167 replaced
+  it, after trying "You", a dividing line, and a plain Settings link).
 
 - `AppNav`'s top-level sections (just Products for now) are links on the
   right of the bar, beside the account `Dropdown`, not beside the wordmark.
@@ -158,9 +157,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
   `--color-bar-link-current-tint` and goes bold. This reverses #90's "no
   active-route highlighting", which predated real sections. Everything
   clickable on the bar (section links, account trigger, ☰) is the same
-  size as a `.button` and gets the same hover outline. The account
-  trigger is capped at 16rem so a long email truncates rather than pushing
-  the links back toward the wordmark. Below 640px the links and account
+  size as a `.button` and gets the same hover outline. Below 640px the links and account
   trigger collapse into one icon-only ☰ `Dropdown` (sections, a separator,
   then the signed-in group). 640px fits one section; adding sections means
   measuring the row again and likely adding a wider breakpoint (decided in
@@ -251,3 +248,48 @@ Add an entry only once a sign-off conversation resolves something repeatable
   Task's leads with a `Checkbox`. No progress bars or "n of m done"
   counts. A section with nothing in it is left out. See the style guide's
   "Action card" section (decided in #140).
+
+- A form with several fields, one of them a `TextArea` (a Milestone, a
+  Path's name and description), opens in a `Dialog` from a button rather
+  than sitting on the page all the time: "Add Milestone" at the end of the
+  list, "Edit" on a row. The same `Dialog` adds and edits; when editing,
+  Delete is inside it (the usual two-step reveal), so the row shows only
+  Edit. `Dialog` is a generic Component on `@base-ui/react`'s `Dialog`,
+  the way `Dropdown` is on its `Menu`: base-ui owns focus trapping,
+  `Escape` and outside clicks, `Dialog` owns the CSS: a square-cornered
+  panel in the page's own cream (`--color-page-bg`) over a dimmed page, its
+  title an h2. A one- or two-field row edit (renaming an Idea) stays in place
+  (decided in #167, picked over an in-place reveal in a prototype on
+  branch `167-prototype-trailblazer`).
+
+- A list the User puts in order (a Path's Draft Milestones) has a drag
+  handle (Phosphor `DotsSixVertical`) in a column of its own at the start
+  of each row, and thin `--color-border` lines between and around the rows
+  in place of the usual row gap. A focused handle moves its row with the
+  up and down arrow keys, and drag works by touch as well as by mouse. The
+  row reads "1. {name}", then its actions. Picked over a Reorder mode,
+  the handle on white blocks, arrow buttons on each row and Move Up/Down
+  inside the edit form, in the same prototype (decided in #167). The row
+  being dragged carries dnd-kit's transform as an inline `style`, the one
+  accepted exception to "no inline styles": it follows the pointer, so no
+  class can hold it.
+
+- `AppNav` has a second section, Paths (Phosphor `PathIcon`, the
+  `/app/paths` pages), after Products, 12px apart. The section, its h1
+  and its breadcrumb say "Paths", never "Trailblazer": that name is for
+  adding and editing a Path inside the section, and would mean nothing to
+  a new User in the nav. With two sections and
+  the "Account" trigger the bar collapses into the ☰ menu below about
+  820px, not 640px: "Account" starts to clip below about 800px (decided
+  in #167).
+
+- White (`--color-sheet`) is not a surface color. It's kept for a
+  Worksheet's paper (`.sheet`) and for the few places that need emphasis
+  and have no other way to get it, such as the `Breadcrumbs` band. Panels,
+  dialogs and forms sit on the page's cream (`--color-page-bg`) (decided in
+  #167).
+
+- A multi-line field is a `TextArea`: the same box as a `TextInput`, three
+  lines tall and growing as you type. The ruled-lines look (`lined`) is
+  only for a Worksheet's answers on its `.sheet`. See the style guide's
+  "Text inputs" section (decided in #167).

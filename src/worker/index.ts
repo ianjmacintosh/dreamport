@@ -23,6 +23,13 @@ import {
   PRODUCT_NAME_MAX_LENGTH,
 } from "./products";
 import { productRoutes } from "./product-routes";
+import { pathRoutes } from "./path-routes";
+import {
+  createPath,
+  listPaths,
+  parsePathFields,
+  PATHS_PER_USER,
+} from "./paths";
 import { listTags } from "./tags";
 import { isRateLimitExempt } from "./rate-limit-exemption";
 import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
@@ -326,6 +333,43 @@ export function createApp(deps: AppDeps = {}) {
   // Every route about one Product: session and ownership checked once,
   // in front of them all — see `product-routes.ts`.
   app.route("/api/products/:productId", productRoutes);
+
+  /** Trailblazer (#167): the signed-in User's own Paths, oldest first. */
+  app.get("/api/paths", async (c) => {
+    const session = await currentSession(c.env, c.req.raw);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    return c.json({ paths: await listPaths(c.env.DB, session.user.id) });
+  });
+
+  /** Make a Path with an empty Draft. 409 once the User has the most. */
+  app.post("/api/paths", async (c) => {
+    const session = await currentSession(c.env, c.req.raw);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const fields = parsePathFields(await c.req.json().catch(() => null));
+    if (!fields.ok) {
+      return c.json({ error: fields.error }, 400);
+    }
+
+    const created = await createPath(c.env.DB, session.user.id, fields.value);
+    if (!created.ok) {
+      return c.json(
+        { error: `You can have up to ${PATHS_PER_USER} Paths.` },
+        409,
+      );
+    }
+
+    return c.json({ path: created.path }, 201);
+  });
+
+  // Every route about one Path: session and ownership checked once, in
+  // front of them all. See `path-routes.ts`.
+  app.route("/api/paths/:pathId", pathRoutes);
 
   /**
    * Issue #113: the fixed Tag catalog. No session needed — it's the same

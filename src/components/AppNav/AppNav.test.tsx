@@ -76,10 +76,12 @@ function menu(found: NavElement | undefined) {
   return { found, items };
 }
 
-/** The account Dropdown — the one whose trigger shows the email. */
-function accountMenu(elements: NavElement[], email = "someone@example.com") {
+/** The account Dropdown — the one whose trigger reads "Account". */
+function accountMenu(elements: NavElement[]) {
   return menu(
-    elements.find((el) => el.type === Dropdown && el.props.label === email),
+    elements.find(
+      (el) => el.type === Dropdown && textOf(el.props.label) === "Account",
+    ),
   );
 }
 
@@ -119,34 +121,74 @@ describe("AppNav", () => {
     },
   );
 
-  test("doesn't mark Products current on /app/settings", () => {
-    const products = barLink(
-      navElements({ pathname: "/app/settings" }),
-      "Products",
-    );
-    expect(products?.props.current).toBe(false);
+  test.each(["/app/settings", "/app/paths", "/app/paths/abc123"])(
+    "doesn't mark Products current on %s",
+    (pathname) => {
+      const products = barLink(navElements({ pathname }), "Products");
+      expect(products?.props.current).toBe(false);
+    },
+  );
+
+  test("links to Paths (/app/paths) after Products", () => {
+    const links = navElements().filter((el) => el.type === Link);
+    const labels = links.map((el) => textOf(el));
+    expect(labels.indexOf("Paths")).toBe(labels.indexOf("Products") + 1);
+    expect(barLink(navElements(), "Paths")?.props.href).toBe("/app/paths");
   });
 
-  test("the account dropdown's trigger is the signed-in email", () => {
+  test.each(["/app/paths", "/app/paths/abc123"])(
+    "marks Paths as the current section on %s",
+    (pathname) => {
+      const trailblazer = barLink(navElements({ pathname }), "Paths");
+      expect(trailblazer?.props.current).toBe(true);
+    },
+  );
+
+  test.each(["/app", "/app/products/abc123", "/app/settings", "/app/pathsx"])(
+    "doesn't mark Paths current on %s",
+    (pathname) => {
+      const trailblazer = barLink(navElements({ pathname }), "Paths");
+      expect(trailblazer?.props.current).toBe(false);
+    },
+  );
+
+  test("the account dropdown's trigger reads Account, not the email", () => {
     expect(accountMenu(navElements()).found).toBeDefined();
+    expect(
+      navElements().some(
+        (el) =>
+          el.type === Dropdown &&
+          textOf(el.props.label).includes("someone@example.com"),
+      ),
+    ).toBe(false);
   });
 
-  test("the account dropdown holds Settings, a separator, then Log out", () => {
-    const [settings, separator, logout] = accountMenu(navElements()).items;
+  test("the account dropdown holds Settings and Log out under who you're signed in as", () => {
+    const [group] = accountMenu(navElements()).items;
+    expect(group.type).toBe(Dropdown.Group);
+    expect(textOf(group.props.label)).toBe("Signed in as someone@example.com");
+    const [settings, logout] = Children.toArray(group.props.children).filter(
+      isValidElement,
+    ) as NavElement[];
     expect(settings.type).toBe(Dropdown.LinkItem);
     expect(settings.props.href).toBe("/app/settings");
     expect(textOf(settings)).toBe("Settings");
-    expect(separator.type).toBe(Dropdown.Separator);
     expect(logout.type).toBe(Dropdown.Item);
     expect(textOf(logout)).toBe("Log out");
   });
 
-  test("the phone menu lists Products, then Settings and Log out under who you're signed in as", () => {
-    const [products, separator, group] = phoneMenu(navElements()).items;
+  test("the phone menu lists Products and Paths, then Settings and Log out under who you're signed in as", () => {
+    const [products, trailblazer, separator, group] = phoneMenu(
+      navElements({ pathname: "/app/paths/abc123" }),
+    ).items;
     expect(products.type).toBe(Dropdown.LinkItem);
     expect(products.props.href).toBe("/app");
     expect(textOf(products)).toBe("Products");
-    expect(products.props.current).toBe(true);
+    expect(products.props.current).toBe(false);
+    expect(trailblazer.type).toBe(Dropdown.LinkItem);
+    expect(trailblazer.props.href).toBe("/app/paths");
+    expect(textOf(trailblazer)).toBe("Paths");
+    expect(trailblazer.props.current).toBe(true);
     expect(separator.type).toBe(Dropdown.Separator);
     expect(group.type).toBe(Dropdown.Group);
     expect(textOf(group.props.label)).toBe("Signed in as someone@example.com");
