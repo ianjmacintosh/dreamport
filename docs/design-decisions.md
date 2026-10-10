@@ -256,9 +256,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
   Delete is inside it (the usual two-step reveal), so the row shows only
   Edit. `Dialog` is a generic Component on `@base-ui/react`'s `Dialog`,
   the way `Dropdown` is on its `Menu`: base-ui owns focus trapping,
-  `Escape` and outside clicks, `Dialog` owns the CSS: a white
-  (`--color-sheet`) square-cornered panel over a dimmed page, its title an
-  h2. A one- or two-field row edit (renaming an Idea) stays in place
+  `Escape` and outside clicks, `Dialog` owns the CSS: a square-cornered
+  panel in the page's own cream (`--color-page-bg`) over a dimmed page, its
+  title an h2. A one- or two-field row edit (renaming an Idea) stays in place
   (decided in #167, picked over an in-place reveal in a prototype on
   branch `167-prototype-trailblazer`).
 
@@ -276,3 +276,14 @@ Add an entry only once a sign-off conversation resolves something repeatable
   the "Account" trigger the bar collapses into the ☰ menu below about
   820px, not 640px: "Account" starts to clip below about 800px (decided
   in #167).
+
+- White (`--color-sheet`) is not a surface color. It's kept for a
+  Worksheet's paper (`.sheet`) and for the few places that need emphasis
+  and have no other way to get it, such as the `Breadcrumbs` band. Panels,
+  dialogs and forms sit on the page's cream (`--color-page-bg`) (decided in
+  #167).
+
+- A multi-line field is a `TextArea`: the same box as a `TextInput`, three
+  lines tall and growing as you type. The ruled-lines look (`lined`) is
+  only for a Worksheet's answers on its `.sheet`. See the style guide's
+  "Text inputs" section (decided in #167).

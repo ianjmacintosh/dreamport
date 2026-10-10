@@ -187,6 +187,7 @@ function ProductWorksheet() {
             <TextArea
               key={field.id}
               id={`worksheet-${field.id}`}
+              lined
               label={`${i + 1}. ${field.name}`}
               helperText={field.prompt}
               value={drafts[field.id] ?? ""}

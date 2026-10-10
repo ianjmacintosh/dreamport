@@ -73,6 +73,12 @@
      base01 ~5.4:1. */
   --color-sheet: #ffffff;
 
+  /* What a Dialog dims the page with (#167). True black at 60%, not a
+     Solarized swatch: an acknowledged addition to our palette, like
+     --color-sheet's white. Solarized's own darks are all blue-teal, which
+     tints the warm cream page cool; neutral black only darkens it. */
+  --color-overlay: rgb(0 0 0 / 60%);
+
   --color-selection-bg: var(--sol-magenta);
   /* True white, not a Solarized swatch — no in-palette color clears
      AA (4.5:1) against magenta from either direction: base3 (the

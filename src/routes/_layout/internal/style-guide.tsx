@@ -828,12 +828,22 @@ function StyleGuide() {
           <code>.input</code> with an accessible <code>.input-label</code> and
           optional <code>.input-helper</code> text.
         </p>
+        <TextArea id="sg-description" label="Description" />
+        <Snippet code={`<TextArea id="description" label="Description" />`} />
+        <p className="sg-note">
+          For more than a line, use <code>&lt;TextArea&gt;</code>: the same box
+          as a <code>TextInput</code>, three lines tall and growing as you type,
+          never hand-resizable. Its <code>lined</code> prop draws ruled lines
+          instead, for a Worksheet&apos;s answers on a <code>.sheet</code> only
+          (see Sheet).
+        </p>
       </Section>
 
       <Section id="sheet" label="Sheet">
         <article className="sheet">
           <h2>Product Summary</h2>
           <TextArea
+            lined
             id="sg-sheet-problem"
             label="1. Problem"
             helperText="What problem does your product solve?"
@@ -844,15 +854,16 @@ function StyleGuide() {
           </p>
         </article>
         <Snippet
-          code={`<article className="sheet">\n  <h2>Product Summary</h2>\n  <TextArea\n    id="problem"\n    label="1. Problem"\n    helperText="What problem does your product solve?"\n  />\n  <p className="sheet-credit">Credit: …</p>\n</article>`}
+          code={`<article className="sheet">\n  <h2>Product Summary</h2>\n  <TextArea\n    lined\n    id="problem"\n    label="1. Problem"\n    helperText="What problem does your product solve?"\n  />\n  <p className="sheet-credit">Credit: …</p>\n</article>`}
         />
         <p className="sg-note">
           A Worksheet drawn as a sheet of paper: <code>.sheet</code> is white (
           <code>--color-sheet</code>) on the cream page, square, with no border
-          or shadow. Its answers are <code>&lt;TextArea&gt;</code>s — ruled
-          lines with the prompt between the question and the lines, three lines
-          tall and growing as you type. A credit for adapted work goes last, in{" "}
-          <code>.sheet-credit</code> (see <code>docs/design-decisions.md</code>
+          or shadow. Its answers are <code>&lt;TextArea lined&gt;</code>s —
+          ruled lines with the prompt between the question and the lines, three
+          lines tall and growing as you type. A credit for adapted work goes
+          last, in <code>.sheet-credit</code> (see{" "}
+          <code>docs/design-decisions.md</code>
           ).
         </p>
       </Section>

@@ -677,21 +677,27 @@ a.button {
   margin-top: var(--space-1);
 }
 
-/* ── Primitives: lined text area ──────────────────────────── */
-/* `TextArea` (#139): a multi-line answer written on ruled lines, like
-   notebook paper — no box, a rule under every line of text. Three lines
-   tall to start, growing a line at a time with its content where the
-   browser supports `field-sizing` (Chrome, Safari); never hand-resizable.
-   The line height is pinned to the rule spacing so text sits on the
-   rules. Its helper text goes between the label and the lines, so a
-   question reads question → prompt → answer. */
+/* ── Primitives: text area ────────────────────────────────── */
+/* `TextArea`: three lines tall to start, growing a line at a time with
+   its content where the browser supports `field-sizing` (Chrome, Safari);
+   never hand-resizable. By default it's also an `.input`, the same box as
+   a one-line field (#167). Its helper text goes between the label and the
+   field, so a question reads question → prompt → answer. */
 .textarea {
+  min-height: calc(3lh + 2 * var(--space-2) + 2px);
+  field-sizing: content;
+  resize: none;
+}
+
+/* `lined` (#139): a Worksheet's answer written on ruled lines, like
+   notebook paper — no box, a rule under every line of text. The line
+   height is pinned to the rule spacing so text sits on the rules. Only on
+   a Worksheet's `.sheet`; every other form uses the box. */
+.textarea--lined {
   --textarea-rule: 1.75rem;
   display: block;
   width: 100%;
   min-height: calc(3 * var(--textarea-rule));
-  field-sizing: content;
-  resize: none;
   border: 0;
   padding: 0;
   color: var(--color-text-primary);
@@ -707,7 +713,7 @@ a.button {
   background-attachment: local;
 }
 
-.textarea:focus-visible {
+.textarea--lined:focus-visible {
   outline-offset: 4px;
 }
 
@@ -1158,18 +1164,18 @@ a.button {
 
 /* ── Components: dialog ────────────────────────────────────── */
 /* `Dialog` (#167): a form over the page. Base UI's Dialog renders these
-   elements unstyled (ADR-0014). The panel is white (`--color-sheet`) with
-   square corners, like a Worksheet's `.sheet`, over the page dimmed with
-   its darkest Solarized tone. The viewport is what scrolls when the panel
-   is taller than the screen (a Milestone's form on a phone held
-   landscape); the panel's auto margins centre it when it fits and give
-   way to the viewport's padding when it doesn't, so its top is never cut
-   off. */
+   elements unstyled (ADR-0014). The panel is the page's own cream
+   (`--color-page-bg`; white is kept for a Worksheet's paper) with square
+   corners, over the page dimmed with `--color-overlay`. The viewport is
+   what scrolls when the panel is taller than the screen (a Milestone's
+   form on a phone held landscape); the panel's auto margins centre it
+   when it fits and give way to the viewport's padding when it doesn't, so
+   its top is never cut off. */
 .dialog-backdrop {
   position: fixed;
   inset: 0;
   z-index: 20;
-  background-color: color-mix(in srgb, var(--sol-base03) 45%, transparent);
+  background-color: var(--color-overlay);
 }
 
 .dialog-viewport {
@@ -1187,7 +1193,7 @@ a.button {
   width: min(36rem, 100%);
   margin: auto;
   padding: var(--space-8);
-  background-color: var(--color-sheet);
+  background-color: var(--color-page-bg);
   outline: none;
 }
 

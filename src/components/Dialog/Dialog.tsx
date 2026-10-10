@@ -22,7 +22,7 @@ interface DialogProps {
  * button that opened it, focus kept inside, closing on `Escape` or an
  * outside click) comes from Base UI's `Dialog`, as `Dropdown`'s comes from
  * its `Menu` (ADR-0014). The look is this component's own, in global.css:
- * a white square-cornered panel over a dimmed page. A panel taller than
+ * a square-cornered panel in the page's cream over a dimmed page. A panel taller than
  * the screen scrolls with the page behind it held still.
  */
 export function Dialog({ open, onOpenChange, title, children }: DialogProps) {
