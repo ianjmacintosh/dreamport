@@ -79,6 +79,22 @@ h4 {
   letter-spacing: -0.02em;
 }
 
+/* A heading with an action at the right end of its row (Edit Path beside
+   a Path's h1, Edit Milestone beside its h3, #169), the button centred on
+   the heading. The row takes over the heading's own spacing below, so the
+   button centres on the heading's text rather than its text and margin. */
+.heading-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-4);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.heading-row > :is(h1, h2, h3, h4, h5, h6) {
+  margin-bottom: 0;
+}
+
 /* An h4 opens a section within a block of content, so it takes a
    section's worth of room above when something comes before it. */
 * + h4 {
@@ -456,6 +472,9 @@ a.button {
   row-gap: var(--space-2);
   list-style: none;
   padding: 0;
+  /* Room after the last row, so whatever follows (a form, a button, the
+     next heading) doesn't sit on it (#169). */
+  margin-bottom: var(--space-6);
 }
 
 .list-row {
@@ -547,16 +566,17 @@ a.button {
   }
 }
 
-/* A list the User puts in order (a Path's Draft Milestones, #167): thin
-   rules between and around the rows instead of the usual gap. */
-.list--ruled {
-  row-gap: 0;
-  border-top: 1px solid var(--color-border);
+/* A list the User puts in order (a Path's Milestones, a Milestone's
+   Tasks): each row a white card spaced apart from the next, the
+   `ActionCard` look, so a row reads as one thing to pick up and move.
+   Replaced #167's thin rules between the rows (#169). */
+.list--cards {
+  row-gap: var(--space-3);
 }
 
-.list--ruled > .list-row {
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--color-border);
+.list--cards > .list-row {
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-sheet);
 }
 
 /* A row with a drag handle in a column of its own at its start:
@@ -572,6 +592,13 @@ a.button {
   align-self: center;
 }
 
+/* With no actions there's no second row to span: spanning one anyway
+   leaves an empty strip under the name and lifts it off the handle's
+   centre (#169). */
+.list-row--sortable:not(:has(> .list-row-action)) > .list-row-handle {
+  grid-row: 1;
+}
+
 .list-row--sortable > .list-row-name {
   grid-column: 2;
 }
@@ -580,12 +607,11 @@ a.button {
   grid-column: 3;
 }
 
-/* The row being dragged rides over its neighbours, on the page's own
-   background so they don't show through it. */
+/* The row being dragged rides over its neighbours; its card's white keeps
+   them from showing through it. */
 .list-row--dragging {
   position: relative;
   z-index: 1;
-  background-color: var(--color-page-bg);
 }
 
 /* Phosphor's `DotsSixVertical`, as a plain button. `touch-action: none`
@@ -1765,6 +1791,25 @@ a.action-card:hover {
   color: var(--color-heading);
 }
 
+/* A stop's name as a button that picks that Milestone (a Path's page,
+   #169): no button chrome, underlined like a link until it's the picked
+   one, which takes the current stop's look. The global focus ring still
+   shows. */
+.journey-route-pick {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.journey-route-pick[aria-pressed="true"] {
+  text-decoration: none;
+}
+
 @media (max-width: 640px) {
   .journey-split {
     grid-template-columns: minmax(0, 1fr);
@@ -1773,5 +1818,11 @@ a.action-card:hover {
 
   .journey-split > section {
     grid-row: 1;
+  }
+
+  /* The route stays first instead, when picking a stop is how you reach
+     the content beside it (a Path's page, #169). */
+  .journey-split--route-first > section {
+    grid-row: auto;
   }
 }

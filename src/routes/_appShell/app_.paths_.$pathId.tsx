@@ -496,7 +496,7 @@ function PathDraft() {
             disabled={isReordering}
           >
             <ol
-              className="list list--ruled"
+              className="list list--cards"
               aria-labelledby="milestones-heading"
             >
               {milestones.map((milestone, index) => (
@@ -895,7 +895,7 @@ function MilestoneTasks({
             strategy={verticalListSortingStrategy}
             disabled={isReordering}
           >
-            <ol className="list list--ruled" aria-label="Tasks">
+            <ol className="list list--cards" aria-label="Tasks">
               {tasks.map((task, index) => (
                 <TaskRow
                   key={task.id}
