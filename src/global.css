@@ -95,6 +95,17 @@ h4 {
   margin-bottom: 0;
 }
 
+/* Below 640px the action goes under the heading instead, as a row's
+   actions go under its name: beside it, an h1 got so narrow its words
+   broke mid-word. */
+@media (max-width: 640px) {
+  .heading-row {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+    row-gap: var(--space-3);
+  }
+}
+
 /* An h4 opens a section within a block of content, so it takes a
    section's worth of room above when something comes before it. */
 * + h4 {

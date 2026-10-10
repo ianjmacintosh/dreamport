@@ -476,7 +476,8 @@ function StyleGuide() {
           <code>.heading-row</code> puts a heading&apos;s action at the right
           end of its row, centred on the heading, and keeps the heading&apos;s
           own spacing below: Edit Path beside a Path&apos;s h1, Edit Milestone
-          beside a Milestone&apos;s h3 (#169).
+          beside a Milestone&apos;s h3 (#169). Below 640px the action goes under
+          the heading, so a long h1 keeps its words whole.
         </p>
       </Section>
 
