@@ -307,3 +307,20 @@ Add an entry only once a sign-off conversation resolves something repeatable
   with "Add Task" beside it; and Done to close. Picked over Tasks nested
   under each Milestone row and Tasks inside the Edit Milestone Dialog in a
   prototype on branch `168-prototype-milestone-tasks` (decided in #168).
+- A confirming button sits bottom right, last, with Cancel (and any
+  Delete) to its left: `.button-group--end`, the Journey page's Return /
+  Advance arrangement. That covers a Dialog's or form's submit button
+  ("Update Path", "Add Milestone") and a page's own main action at its
+  end (Save as New Version). Forms and Dialogs built before this move
+  over when they're next changed (decided in #169).
+- A Path's page ends with its save state, then Save as New Version
+  bottom right: "Last edited {date and time}", then "Latest version:
+  {n}, saved {date and time}" ("No saved versions yet." before the first
+  save), the latest-version line a `role="status"` so a save is
+  announced as it changes, and a refused save's reason under the button.
+  No Draft label, no list of every version, and no Milestones-and-Tasks
+  count. A date and time shows in the browser's own locale as a long date
+  with the time ("October 10, 2026 at 2:32 PM"), in a `<time>`. Picked
+  over status lines at the top, a facts list, and a "changed since the
+  last save" sentence in a prototype on branch
+  `169-prototype-save-version` (decided in #169).
