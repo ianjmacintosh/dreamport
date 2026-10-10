@@ -16,6 +16,8 @@ import {
   parseTaskFields,
   reorderMilestones,
   reorderTasks,
+  saveVersion,
+  type DraftGap,
   updateMilestone,
   updatePath,
   updateTask,
@@ -57,7 +59,10 @@ pathRoutes.use(async (c, next) => {
   await next();
 });
 
-/** The Path's Draft: its name, description and Milestones in order. */
+/**
+ * The Path's Draft: its name, description and Milestones in order, when it
+ * was last edited, and its latest saved version.
+ */
 pathRoutes.get("/", async (c) => {
   return c.json({ draft: await getDraft(c.env.DB, c.var.path) });
 });
@@ -75,6 +80,23 @@ pathRoutes.patch("/", async (c) => {
   }
 
   return c.json({ path }, 200);
+});
+
+const GAP_NAMES: Record<DraftGap, string> = {
+  name: "a name",
+  description: "a description",
+  milestone: "a Milestone",
+};
+
+/** Save the Draft as the Path's next version. 409 if it isn't ready. */
+pathRoutes.post("/versions", async (c) => {
+  const saved = await saveVersion(c.env.DB, c.var.path);
+  if (!saved.ok) {
+    const missing = saved.missing.map((gap) => GAP_NAMES[gap]).join(" and ");
+    return c.json({ error: `Add ${missing} before saving a version.` }, 409);
+  }
+
+  return c.json({ version: saved.version }, 201);
 });
 
 const AT_CAP = `A Path can have up to ${MILESTONES_AND_TASKS_PER_PATH} Milestones and Tasks combined. Remove one to make room.`;

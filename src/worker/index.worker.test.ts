@@ -2102,6 +2102,43 @@ describe("Trailblazer routes", () => {
     });
   });
 
+  it("POST /api/paths/:pathId/versions saves the Draft, or 409s naming what's missing, and GET shows the latest version", async () => {
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
+    const bare = await callApi("POST", "/api/paths", cookie, { name: "Bare" });
+    const { path: barePath } = (await bare.json()) as { path: PathJson };
+
+    const refused = await callApi(
+      "POST",
+      `/api/paths/${barePath.id}/versions`,
+      cookie,
+    );
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({
+      error: "Add a description and a Milestone before saving a version.",
+    });
+
+    const path = await addPath(cookie);
+    await addMilestoneOn(cookie, path.id);
+    const saved = await callApi(
+      "POST",
+      `/api/paths/${path.id}/versions`,
+      cookie,
+    );
+    expect(saved.status).toBe(201);
+    const { version } = (await saved.json()) as { version: unknown };
+    expect(version).toEqual({
+      id: expect.any(String),
+      number: 1,
+      savedAt: expect.any(String),
+    });
+
+    const read = await callApi("GET", `/api/paths/${path.id}`, cookie);
+    const { draft } = (await read.json()) as {
+      draft: { latestVersion: unknown };
+    };
+    expect(draft.latestVersion).toEqual(version);
+  });
+
   it("POST, PATCH and DELETE /api/paths/:pathId/milestones add, edit and remove a Milestone", async () => {
     const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
     const path = await addPath(cookie);
