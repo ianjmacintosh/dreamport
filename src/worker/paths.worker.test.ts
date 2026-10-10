@@ -10,7 +10,24 @@ import {
   setTaskDone,
   startJourney,
 } from "./journeys";
-import { dreamSequence, getVersion } from "./paths";
+import {
+  addMilestone,
+  createPath,
+  deleteMilestone,
+  dreamSequence,
+  getDraft,
+  getPath,
+  getVersion,
+  listPaths,
+  MILESTONE_NAME_MAX_LENGTH,
+  type OwnedPath,
+  parseMilestoneFields,
+  parsePathFields,
+  PATHS_PER_USER,
+  reorderMilestones,
+  updateMilestone,
+  updatePath,
+} from "./paths";
 import { createProduct, getProduct } from "./products";
 
 /**
@@ -168,4 +185,279 @@ it("finds no version for an unknown id", async () => {
   await seedUser(FOLLOWER_ID, TEST_EMAILS.pathsModuleFollower);
 
   expect(await getVersion(env.DB, FOLLOWER_ID, "not-a-version")).toBeNull();
+});
+
+const MAKER_ID = "paths-module-maker";
+const STRANGER_ID = "paths-module-stranger";
+
+const BAKE = {
+  name: "Bake",
+  description: "Bake a loaf.",
+  doneWhen: "A loaf exists.",
+  outcome: "Bread",
+};
+const SELL = {
+  name: "Sell",
+  description: "Sell the loaf.",
+  doneWhen: "Someone paid.",
+  outcome: "",
+};
+const SHIP = {
+  name: "Ship",
+  description: "Deliver the loaf.",
+  doneWhen: "It arrived.",
+  outcome: "",
+};
+
+/** A new Path of the maker's own, as `getPath` hands it back. */
+async function makersPath(name = "Bakery Path") {
+  await seedUser(MAKER_ID, TEST_EMAILS.pathsModuleMaker);
+  const created = await createPath(env.DB, MAKER_ID, {
+    name,
+    description: "For bakers",
+  });
+  if (!created.ok) throw new Error("the maker is at the Path cap");
+  const path = await getPath(env.DB, MAKER_ID, created.path.id);
+  if (!path) throw new Error("the Path just created isn't there");
+  return path;
+}
+
+async function milestoneNames(path: OwnedPath) {
+  return (await getDraft(env.DB, path)).milestones.map((m) => m.name);
+}
+
+describe("a User's Paths", () => {
+  it(`accepts a ${PATHS_PER_USER}th Path and refuses the next, creating nothing`, async () => {
+    const userId = "paths-module-cap";
+    await seedUser(userId, TEST_EMAILS.pathsModuleCap);
+    for (let i = 1; i < PATHS_PER_USER; i++) {
+      const created = await createPath(env.DB, userId, {
+        name: `Path ${i}`,
+        description: "",
+      });
+      expect(created.ok).toBe(true);
+    }
+
+    // Two at once, one under the cap: exactly one lands.
+    const results = await Promise.all([
+      createPath(env.DB, userId, { name: "Last A", description: "" }),
+      createPath(env.DB, userId, { name: "Last B", description: "" }),
+    ]);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    expect(results.filter((r) => !r.ok)).toEqual([
+      { ok: false, reason: "cap" },
+    ]);
+
+    expect(
+      await createPath(env.DB, userId, { name: "One more", description: "" }),
+    ).toEqual({ ok: false, reason: "cap" });
+    expect(await listPaths(env.DB, userId)).toHaveLength(PATHS_PER_USER);
+  });
+
+  it("lists a User's own Paths, oldest first, and not another User's", async () => {
+    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
+    const first = await makersPath("First");
+    const second = await makersPath("Second");
+
+    const listed = await listPaths(env.DB, MAKER_ID);
+    expect(listed.find((p) => p.id === first.id)).toEqual({
+      id: first.id,
+      name: "First",
+      createdAt: first.createdAt,
+    });
+    expect(listed.findIndex((p) => p.id === first.id)).toBeLessThan(
+      listed.findIndex((p) => p.id === second.id),
+    );
+    expect(await listPaths(env.DB, STRANGER_ID)).toEqual([]);
+  });
+
+  it("finds no Path for another User, nor Dreamport's own", async () => {
+    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
+    const path = await makersPath();
+
+    expect(await getPath(env.DB, STRANGER_ID, path.id)).toBeNull();
+    expect(await getPath(env.DB, MAKER_ID, "dream-sequence")).toBeNull();
+    expect(await getPath(env.DB, MAKER_ID, "no-such-path")).toBeNull();
+  });
+
+  it("goes, with its Draft Milestones, when its User is deleted", async () => {
+    const userId = "paths-module-deleted";
+    await seedUser(userId, TEST_EMAILS.pathsModuleDeleted);
+    const created = await createPath(env.DB, userId, {
+      name: "Doomed",
+      description: "",
+    });
+    if (!created.ok) throw new Error("at the Path cap");
+    await addMilestone(env.DB, created.path, BAKE);
+
+    await env.DB.prepare('DELETE FROM "user" WHERE "id" = ?')
+      .bind(userId)
+      .run();
+
+    const remaining = await env.DB.prepare(
+      'SELECT count(*) AS n FROM "draft_milestones" WHERE "pathId" = ?',
+    )
+      .bind(created.path.id)
+      .first<{ n: number }>();
+    expect(remaining?.n).toBe(0);
+    expect(await getPath(env.DB, userId, created.path.id)).toBeNull();
+  });
+});
+
+describe("a Path's Draft", () => {
+  it("starts with its name and description and no Milestones", async () => {
+    const path = await makersPath();
+
+    expect(await getDraft(env.DB, path)).toEqual({
+      id: path.id,
+      name: "Bakery Path",
+      description: "For bakers",
+      createdAt: path.createdAt,
+      milestones: [],
+    });
+  });
+
+  it("takes a new name and description", async () => {
+    const path = await makersPath();
+
+    const updated = await updatePath(env.DB, path, {
+      name: "Bread Path",
+      description: "",
+    });
+
+    expect(updated).toMatchObject({ name: "Bread Path", description: "" });
+    expect(await getPath(env.DB, MAKER_ID, path.id)).toMatchObject({
+      name: "Bread Path",
+      description: "",
+    });
+  });
+
+  it("adds, edits, deletes and reorders Milestones", async () => {
+    const path = await makersPath();
+    const bake = await addMilestone(env.DB, path, BAKE);
+    const sell = await addMilestone(env.DB, path, SELL);
+    const ship = await addMilestone(env.DB, path, SHIP);
+    expect(await milestoneNames(path)).toEqual(["Bake", "Sell", "Ship"]);
+
+    const edited = { ...SELL, name: "Sell It", outcome: "Money" };
+    expect(await updateMilestone(env.DB, path, sell.id, edited)).toEqual({
+      id: sell.id,
+      ...edited,
+    });
+
+    expect(await deleteMilestone(env.DB, path, bake.id)).toBe(true);
+    expect(await deleteMilestone(env.DB, path, bake.id)).toBe(false);
+
+    expect(await reorderMilestones(env.DB, path, [ship.id, sell.id])).toBe(
+      true,
+    );
+    expect(await reorderMilestones(env.DB, path, [ship.id, sell.id])).toBe(
+      true,
+    );
+    expect((await getDraft(env.DB, path)).milestones).toEqual([
+      { id: ship.id, ...SHIP },
+      { id: sell.id, ...edited },
+    ]);
+
+    // A Milestone added after a reorder goes on the end.
+    await addMilestone(env.DB, path, BAKE);
+    expect(await milestoneNames(path)).toEqual(["Ship", "Sell It", "Bake"]);
+  });
+
+  it("refuses a reorder that isn't exactly its Milestones, changing nothing", async () => {
+    const path = await makersPath();
+    const other = await makersPath("Other");
+    const bake = await addMilestone(env.DB, path, BAKE);
+    const sell = await addMilestone(env.DB, path, SELL);
+    const foreign = await addMilestone(env.DB, other, SHIP);
+
+    for (const ids of [
+      [sell.id],
+      [sell.id, bake.id, "no-such-milestone"],
+      [sell.id, sell.id],
+      [sell.id, foreign.id],
+      [sell.id, bake.id, foreign.id],
+    ]) {
+      expect(await reorderMilestones(env.DB, path, ids)).toBe(false);
+    }
+    expect(await milestoneNames(path)).toEqual(["Bake", "Sell"]);
+    expect(await milestoneNames(other)).toEqual(["Ship"]);
+  });
+
+  it("can't reach another Path's Milestone", async () => {
+    const path = await makersPath();
+    const other = await makersPath("Other");
+    const foreign = await addMilestone(env.DB, other, SHIP);
+
+    expect(
+      await updateMilestone(env.DB, path, foreign.id, { ...SHIP, name: "X" }),
+    ).toBeNull();
+    expect(await deleteMilestone(env.DB, path, foreign.id)).toBe(false);
+    expect((await getDraft(env.DB, other)).milestones).toEqual([
+      { id: foreign.id, ...SHIP },
+    ]);
+  });
+
+  it("leaves the saved Dream Sequence version as it was", async () => {
+    const before = await dreamSequence(env.DB);
+    const path = await makersPath();
+    const bake = await addMilestone(env.DB, path, BAKE);
+    const sell = await addMilestone(env.DB, path, SELL);
+    await updatePath(env.DB, path, { name: "Renamed", description: "New" });
+    await updateMilestone(env.DB, path, bake.id, SHIP);
+    await reorderMilestones(env.DB, path, [sell.id, bake.id]);
+    await deleteMilestone(env.DB, path, sell.id);
+
+    expect(await dreamSequence(env.DB)).toEqual(before);
+  });
+});
+
+describe("parsing a Milestone's fields", () => {
+  it("trims each field and reads a left-out Outcome as empty", () => {
+    expect(
+      parseMilestoneFields({
+        name: "  Bake ",
+        description: "Bake a loaf.\n",
+        doneWhen: " A loaf exists.",
+      }),
+    ).toEqual({
+      ok: true,
+      value: {
+        name: "Bake",
+        description: "Bake a loaf.",
+        doneWhen: "A loaf exists.",
+        outcome: "",
+      },
+    });
+  });
+
+  it.each([
+    ["a blank name", { ...BAKE, name: "  " }, "name is required"],
+    ["no Done when", { ...BAKE, doneWhen: undefined }, "doneWhen is required"],
+    ["a non-text Outcome", { ...BAKE, outcome: 3 }, "outcome must be text"],
+    [
+      "a name over the cap",
+      { ...BAKE, name: "x".repeat(MILESTONE_NAME_MAX_LENGTH + 1) },
+      `name must be ${MILESTONE_NAME_MAX_LENGTH} characters or fewer`,
+    ],
+  ])("refuses %s", (_, body, error) => {
+    expect(parseMilestoneFields(body)).toEqual({ ok: false, error });
+  });
+});
+
+describe("parsing a Path's fields", () => {
+  it("needs a name but not a description", () => {
+    expect(parsePathFields({ name: " Bread " })).toEqual({
+      ok: true,
+      value: { name: "Bread", description: "" },
+    });
+    expect(parsePathFields({ description: "x" })).toEqual({
+      ok: false,
+      error: "name is required",
+    });
+    expect(parsePathFields(null)).toEqual({
+      ok: false,
+      error: "body must be a JSON object",
+    });
+  });
 });

@@ -547,6 +547,84 @@ a.button {
   }
 }
 
+/* A list the User puts in order (a Path's Draft Milestones, #167): thin
+   rules between and around the rows instead of the usual gap. */
+.list--ruled {
+  row-gap: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.list--ruled > .list-row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* A row with a drag handle in a column of its own at its start:
+   handle | name | actions. */
+.list-row--sortable {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: var(--space-3);
+}
+
+.list-row--sortable > .list-row-handle {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.list-row--sortable > .list-row-name {
+  grid-column: 2;
+}
+
+.list-row--sortable > .list-row-action {
+  grid-column: 3;
+}
+
+/* The row being dragged rides over its neighbours, on the page's own
+   background so they don't show through it. */
+.list-row--dragging {
+  position: relative;
+  z-index: 1;
+  background-color: var(--color-page-bg);
+}
+
+/* Phosphor's `DotsSixVertical`, as a plain button. `touch-action: none`
+   lets a finger drag it rather than scroll the page; the rest of the row
+   still scrolls. */
+.list-row-handle {
+  display: grid;
+  place-items: center;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-primary);
+  font-size: 1.5rem;
+  cursor: grab;
+  touch-action: none;
+}
+
+.list-row-handle[aria-disabled="true"] {
+  cursor: default;
+  color: var(--color-text-muted);
+}
+
+.list-row--dragging > .list-row-handle {
+  cursor: grabbing;
+}
+
+/* Below 640px the actions stack under the name, as on every `.list-row`;
+   the handle keeps its column beside both. */
+@media (max-width: 640px) {
+  .list-row--sortable {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .list-row--sortable > .list-row-action {
+    grid-column: 2;
+  }
+}
+
 /* Reserves the Turnstile widget's footprint before it loads, so the
    challenge popping in doesn't shift the submit button down mid-
    interaction. Fixed height, not min-height — Cloudflare's own widget
@@ -599,21 +677,27 @@ a.button {
   margin-top: var(--space-1);
 }
 
-/* ── Primitives: lined text area ──────────────────────────── */
-/* `TextArea` (#139): a multi-line answer written on ruled lines, like
-   notebook paper — no box, a rule under every line of text. Three lines
-   tall to start, growing a line at a time with its content where the
-   browser supports `field-sizing` (Chrome, Safari); never hand-resizable.
-   The line height is pinned to the rule spacing so text sits on the
-   rules. Its helper text goes between the label and the lines, so a
-   question reads question → prompt → answer. */
+/* ── Primitives: text area ────────────────────────────────── */
+/* `TextArea`: three lines tall to start, growing a line at a time with
+   its content where the browser supports `field-sizing` (Chrome, Safari);
+   never hand-resizable. By default it's also an `.input`, the same box as
+   a one-line field (#167). Its helper text goes between the label and the
+   field, so a question reads question → prompt → answer. */
 .textarea {
+  min-height: calc(3lh + 2 * var(--space-2) + 2px);
+  field-sizing: content;
+  resize: none;
+}
+
+/* `lined` (#139): a Worksheet's answer written on ruled lines, like
+   notebook paper — no box, a rule under every line of text. The line
+   height is pinned to the rule spacing so text sits on the rules. Only on
+   a Worksheet's `.sheet`; every other form uses the box. */
+.textarea--lined {
   --textarea-rule: 1.75rem;
   display: block;
   width: 100%;
   min-height: calc(3 * var(--textarea-rule));
-  field-sizing: content;
-  resize: none;
   border: 0;
   padding: 0;
   color: var(--color-text-primary);
@@ -629,7 +713,7 @@ a.button {
   background-attachment: local;
 }
 
-.textarea:focus-visible {
+.textarea--lined:focus-visible {
   outline-offset: 4px;
 }
 
@@ -855,7 +939,7 @@ a.button {
   grid-column: 3;
   display: grid;
   grid-auto-flow: column;
-  gap: var(--space-1);
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -881,32 +965,28 @@ a.button {
   justify-self: end;
 }
 
-/* The account trigger fills its own track (whose width is what gives way
-   when the row runs short), so the email truncates inside it. A `.button`
-   is a flexbox, which won't shrink below its label's unwrapped text on
-   its own. It's capped so a long email truncates early instead of taking
-   the row's free space, which keeps the section links beside it rather
-   than drifting back toward the wordmark (#125). */
-.app-nav-content > .app-nav-account {
-  justify-self: stretch;
-  max-width: 16rem;
-}
-
-/* The ☰ menu that replaces the links and account trigger on phones —
-   hidden at every wider width (the same 640px, negated, so it keeps its
-   own `.button` display wherever it does show). */
-@media not (max-width: 640px) {
+/* The ☰ menu that replaces the links and account trigger on narrow
+   screens — hidden at every wider width (the same 820px, negated, so it
+   keeps its own `.button` display wherever it does show). */
+@media not (max-width: 820px) {
   .app-nav-content > .app-nav-menu {
     display: none;
   }
 }
 
 /* An icon is shorter than a line of text; holding the label to one line
-   height keeps the ☰ trigger the same height as the bar's other items. */
-.app-nav-menu .dropdown-trigger-label {
+   height keeps an icon trigger (☰, the account's profile icon) the same
+   height as the bar's other items. */
+:is(.app-nav-menu, .app-nav-account) .dropdown-trigger-label {
   min-height: 1lh;
   display: grid;
   align-items: center;
+}
+
+/* The account trigger's profile icon and "Account", side by side. */
+.app-nav-account .dropdown-trigger-label {
+  grid-auto-flow: column;
+  gap: var(--space-2);
 }
 
 .app-nav-menu-email {
@@ -917,12 +997,12 @@ a.button {
   font-weight: 700;
 }
 
-/* Below 640px (--breakpoint-sm) the section links and account trigger
-   don't fit beside the wordmark, so both collapse into the ☰ menu (#125).
-   640px fits today's one section; a bar with several needs more room, so
-   adding sections means revisiting this breakpoint (see
-   docs/design-decisions.md). */
-@media (max-width: 640px) {
+/* Below about 820px the section links and account trigger don't fit
+   beside the wordmark, so both collapse into the ☰ menu (#125). Not
+   --breakpoint-sm: with two sections, "Account" starts to clip below
+   about 800px (#167, see docs/design-decisions.md). Adding a section
+   means measuring again. */
+@media (max-width: 820px) {
   .app-nav-content {
     grid-template-columns: auto minmax(0, 1fr);
   }
@@ -1080,6 +1160,66 @@ a.button {
 
 .dropdown-item-check[data-unchecked] {
   visibility: hidden;
+}
+
+/* ── Components: dialog ────────────────────────────────────── */
+/* `Dialog` (#167): a form over the page. Base UI's Dialog renders these
+   elements unstyled (ADR-0014). The panel is the page's own cream
+   (`--color-page-bg`; white is kept for a Worksheet's paper) with square
+   corners, over the page dimmed with `--color-overlay`. The viewport is
+   what scrolls when the panel is taller than the screen (a Milestone's
+   form on a phone held landscape); the panel's auto margins centre it
+   when it fits and give way to the viewport's padding when it doesn't, so
+   its top is never cut off. */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background-color: var(--color-overlay);
+}
+
+.dialog-viewport {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+.dialog-popup {
+  display: grid;
+  gap: var(--space-6);
+  width: min(36rem, 100%);
+  margin: auto;
+  padding: var(--space-8);
+  background-color: var(--color-page-bg);
+  outline: none;
+}
+
+.dialog-title {
+  margin: 0;
+}
+
+/* Its form's fields and buttons spaced by one gap rather than each
+   field's own bottom margin, since a `TextArea` has none. */
+.dialog-popup form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.dialog-popup form .input {
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .dialog-viewport {
+    padding: var(--space-2);
+  }
+
+  .dialog-popup {
+    padding: var(--space-5) var(--space-4) var(--space-4);
+  }
 }
 
 /* ── Components: tags ──────────────────────────────────────── */

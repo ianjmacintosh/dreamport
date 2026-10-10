@@ -177,6 +177,16 @@ export const TEST_EMAILS = {
   /** Owns a Path seeded by raw SQL in `paths.worker.test.ts`. Never signs in. */
   pathsModuleOwner: "delivered+paths-module-owner@resend.dev",
 
+  // --- The Paths module's Drafts, called directly (#167). Never sign in. ---
+  /** Makes Paths and edits their Drafts. */
+  pathsModuleMaker: "delivered+paths-module-maker@resend.dev",
+  /** Must never see or edit `pathsModuleMaker`'s Paths. */
+  pathsModuleStranger: "delivered+paths-module-stranger@resend.dev",
+  /** Makes Paths up to the cap. */
+  pathsModuleCap: "delivered+paths-module-cap@resend.dev",
+  /** Is deleted, taking their Paths and Drafts with them. */
+  pathsModuleDeleted: "delivered+paths-module-deleted@resend.dev",
+
   // --- Seam 1: the Journey routes (#137-#140), one test each ---
   /** Reads the Journey page's state before a Journey starts. */
   journeysState: "delivered+journeys-state@resend.dev",
@@ -192,6 +202,14 @@ export const TEST_EMAILS = {
   worksheetsSave: "delivered+worksheets-save@resend.dev",
   /** Checks off a Task with no Journey (404), a bad body (400), then a good one. */
   tasksCheckOff: "delivered+tasks-check-off@resend.dev",
+
+  // --- Seam 1: the Trailblazer routes (#167), one test each ---
+  /** Lists Paths, adds one, then lists it. */
+  pathsRoutesList: "delivered+paths-routes-list@resend.dev",
+  /** Adds Paths up to the cap, then one more (409). */
+  pathsRoutesCap: "delivered+paths-routes-cap@resend.dev",
+  /** Reads and edits one Path's Draft and its Milestones. */
+  pathsRoutesDraft: "delivered+paths-routes-draft@resend.dev",
 
   // --- Seam 1f: the gates every product route crosses (#154) ---
   /** Owns the Product every product-scoped route is driven against. */
@@ -284,6 +302,8 @@ export const TEST_EMAILS = {
   /** #102: confirming one Product row leaves the other rows' layout unchanged. */
   e2eProductRowsIndependent:
     "delivered+e2e-product-rows-independent+e2e-test@resend.dev",
+  /** #167: add a Path, add, reorder, edit and delete its Milestones, then reload. */
+  e2eTrailblazer: "delivered+e2e-trailblazer+e2e-test@resend.dev",
   /** #119: the account Dropdown opens from its trigger and closes on Escape, returning focus. */
   e2eAccountDropdown: "delivered+e2e-account-dropdown+e2e-test@resend.dev",
   /**

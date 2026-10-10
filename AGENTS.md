@@ -75,18 +75,24 @@ Rules for building or editing a page:
    layout tweak.
 2. Never create a new component on your own, even one with zero new CSS.
    If you notice a composition of components repeating across pages, or a
-   page seems to need a visual treatment that doesn't exist yet, flag it —
-   don't build it. New components and motifs always require sign-off, since
+   page seems to need a visual treatment that doesn't exist yet, flag it
+   and prototype it per rule 3 instead of building it into the issue's
+   branch. New components and motifs always require sign-off, since
    each one grows the app's surface area and maintenance cost.
 3. When you believe a page genuinely needs visual elaboration beyond what
-   existing components provide, stop and describe the proposal in words and
-   wait for a decision before writing any code. Don't build a prototype or
-   proposal branch first — an already-built proposal is harder to say no to
-   than a plain description.
+   existing components provide, state the problem and what a good answer
+   looks like in words, then go straight to a throwaway prototype with the
+   `prototype` skill: three to five structurally different variants on one
+   route, switchable from a floating bar, on an
+   `<issue-number>-prototype-<slug>` branch. The human picks (or mixes) from
+   the running variants; write the pick into `docs/design-decisions.md` and
+   build it on the issue's own branch. The prototype branch never merges.
+   Always several variants, never one: a single built proposal is harder to
+   say no to than a choice.
 
 This applies everywhere in the app, not just the pattern library.
 
-**Before applying rule 3** (stopping for sign-off), check
+**Before applying rule 3** (prototyping for sign-off), check
 `docs/design-decisions.md` — a repeatable shape may already have a binding
 one-liner decision recorded there from an earlier sign-off, in which case
 build it directly instead of re-opening the conversation.

@@ -12,6 +12,7 @@ import Breadcrumbs from "../../../components/Breadcrumbs";
 import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
 import AppNav from "../../../components/AppNav";
+import Dialog from "../../../components/Dialog";
 import Dropdown from "../../../components/Dropdown";
 import Footer from "../../../components/Footer";
 import Header from "../../../components/Header";
@@ -89,6 +90,42 @@ function ActionCardDemo() {
         </ActionCard>
       </li>
     </ul>
+  );
+}
+
+function DialogDemo() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        Edit
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen} title="Edit Path">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setOpen(false);
+          }}
+        >
+          <TextInput
+            id="sg-dialog-name"
+            label="Path name"
+            defaultValue="Weekend Launch"
+          />
+          <TextArea
+            id="sg-dialog-description"
+            label="Description"
+            defaultValue="Two days from a rough idea to a page that takes sign-ups."
+          />
+          <div className="button-group">
+            <Button type="submit">Update Path</Button>
+            <Button variant="secondary" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+    </>
   );
 }
 
@@ -234,6 +271,7 @@ function StyleGuide() {
         <a href="#checkbox">Check box</a>
         <a href="#action-card">Action card</a>
         <a href="#dropdown">Dropdown</a>
+        <a href="#dialog">Dialog</a>
         <a href="#breadcrumbs">Breadcrumbs</a>
         <a href="#header-bars">Header bars</a>
         <a href="#footers">Footers</a>
@@ -641,6 +679,30 @@ function StyleGuide() {
         </p>
       </Section>
 
+      <Section id="dialog" label="Dialog">
+        <div>
+          <DialogDemo />
+        </div>
+        <Snippet
+          code={`const [open, setOpen] = useState(false);\n\n<Button variant="secondary" onClick={() => setOpen(true)}>Edit</Button>\n<Dialog open={open} onOpenChange={setOpen} title="Edit Path">\n  <form onSubmit={…}>\n    <TextInput id="path-name" label="Path name" … />\n    <TextArea id="path-description" label="Description" … />\n    <div className="button-group">\n      <Button type="submit">Update Path</Button>\n      <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>\n    </div>\n  </form>\n</Dialog>`}
+        />
+        <p className="sg-note">
+          Use <code>&lt;Dialog&gt;</code> for a form with several fields, one of
+          them a <code>TextArea</code> (a Milestone, a Path&apos;s name and
+          description), opened from a button: &quot;Add Milestone&quot; at the
+          end of a list, &quot;Edit&quot; on a row. The same Dialog adds and
+          edits; when editing, Delete goes inside it with the usual two-step
+          reveal. A one- or two-field row edit (renaming an Idea) stays in place
+          instead. The caller owns <code>open</code>; the <code>title</code> is
+          the panel&apos;s h2. Behavior (focus moving in and back to the button,
+          focus held inside, closing on <code>Escape</code> or a click on the
+          dimmed page) comes from Base UI&apos;s <code>Dialog</code> (ADR-0014).
+          While a request is in flight, ignore <code>onOpenChange</code> so the
+          Dialog stays up until it settles. A panel taller than the screen
+          scrolls, with the page behind it held still.
+        </p>
+      </Section>
+
       <Section id="breadcrumbs" label="Breadcrumbs">
         <div className="sg-bar-demo">
           <Breadcrumbs
@@ -766,12 +828,22 @@ function StyleGuide() {
           <code>.input</code> with an accessible <code>.input-label</code> and
           optional <code>.input-helper</code> text.
         </p>
+        <TextArea id="sg-description" label="Description" />
+        <Snippet code={`<TextArea id="description" label="Description" />`} />
+        <p className="sg-note">
+          For more than a line, use <code>&lt;TextArea&gt;</code>: the same box
+          as a <code>TextInput</code>, three lines tall and growing as you type,
+          never hand-resizable. Its <code>lined</code> prop draws ruled lines
+          instead, for a Worksheet&apos;s answers on a <code>.sheet</code> only
+          (see Sheet).
+        </p>
       </Section>
 
       <Section id="sheet" label="Sheet">
         <article className="sheet">
           <h2>Product Summary</h2>
           <TextArea
+            lined
             id="sg-sheet-problem"
             label="1. Problem"
             helperText="What problem does your product solve?"
@@ -782,15 +854,16 @@ function StyleGuide() {
           </p>
         </article>
         <Snippet
-          code={`<article className="sheet">\n  <h2>Product Summary</h2>\n  <TextArea\n    id="problem"\n    label="1. Problem"\n    helperText="What problem does your product solve?"\n  />\n  <p className="sheet-credit">Credit: …</p>\n</article>`}
+          code={`<article className="sheet">\n  <h2>Product Summary</h2>\n  <TextArea\n    lined\n    id="problem"\n    label="1. Problem"\n    helperText="What problem does your product solve?"\n  />\n  <p className="sheet-credit">Credit: …</p>\n</article>`}
         />
         <p className="sg-note">
           A Worksheet drawn as a sheet of paper: <code>.sheet</code> is white (
           <code>--color-sheet</code>) on the cream page, square, with no border
-          or shadow. Its answers are <code>&lt;TextArea&gt;</code>s — ruled
-          lines with the prompt between the question and the lines, three lines
-          tall and growing as you type. A credit for adapted work goes last, in{" "}
-          <code>.sheet-credit</code> (see <code>docs/design-decisions.md</code>
+          or shadow. Its answers are <code>&lt;TextArea lined&gt;</code>s —
+          ruled lines with the prompt between the question and the lines, three
+          lines tall and growing as you type. A credit for adapted work goes
+          last, in <code>.sheet-credit</code> (see{" "}
+          <code>docs/design-decisions.md</code>
           ).
         </p>
       </Section>

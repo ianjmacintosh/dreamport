@@ -1,11 +1,16 @@
-import { ListIcon, PackageIcon } from "@phosphor-icons/react";
+import {
+  ListIcon,
+  PackageIcon,
+  PathIcon,
+  UserCircleIcon,
+} from "@phosphor-icons/react";
 
 import Dropdown from "../Dropdown";
 import Link from "../Link";
 
 interface AppNavProps {
-  /** The signed-in User's email, shown as the trigger for the account
-   * dropdown (Settings, Log out) — see `Dropdown` (#119). */
+  /** The signed-in User's email, named at the top of the account menu
+   * ("Signed in as …") above Settings and Log out (#119, #167). */
   email: string;
   /** Called on a Log out click. The caller owns the actual sign-out request
    * (see `_appShell.tsx`) — this component stays presentational, plain
@@ -18,9 +23,8 @@ interface AppNavProps {
 }
 
 /**
- * The app's top-level sections, in bar order (#125). Just Products for
- * now; the bar is laid out for a few more (#125 prototyped three).
- * `matches` decides which pages count as "in" the section.
+ * The app's top-level sections, in bar order (#125, #167). `matches`
+ * decides which pages count as "in" the section.
  */
 const SECTIONS = [
   {
@@ -30,13 +34,21 @@ const SECTIONS = [
     matches: (pathname: string) =>
       pathname === "/app" || pathname.startsWith("/app/products/"),
   },
+  {
+    label: "Paths",
+    href: "/app/paths",
+    icon: <PathIcon />,
+    matches: (pathname: string) =>
+      pathname === "/app/paths" || pathname.startsWith("/app/paths/"),
+  },
 ];
 
 /**
  * The persistent bar every signed-in page (`/app`, `/app/settings`, …) is
  * rendered inside of (#125). Left: the Dreamport wordmark, home to `/app`
- * (#118). Right: the section links, then who you're signed in as, opening
- * an account dropdown for Settings and Log out (#119). Sign-out was
+ * (#118). Right: the section links, then a profile icon opening the
+ * account menu: who you're signed in as, then Settings and Log out (#119,
+ * #167). Sign-out was
  * originally its own button on `/app/settings` (#26); it moved here so
  * every signed-in page carries the same way out.
  *
@@ -44,18 +56,26 @@ const SECTIONS = [
  * reversed #90's "no active-route highlighting" once the bar had real
  * sections rather than only a home link.
  *
- * Below 640px the section links and account dropdown can't share the row
- * with the wordmark, so both collapse into one ☰ menu — rendered here
+ * Below about 820px the section links and account dropdown can't share the
+ * row with the wordmark, so both collapse into one ☰ menu — rendered here
  * alongside the wide layout and swapped in by CSS (`.app-nav-*` in
  * global.css).
  */
 export function AppNav({ email, onLogout, pathname }: AppNavProps) {
-  // The account actions, shared by the wide layout's account menu and the
-  // phone ☰ menu so the two can't drift apart.
-  const settings = (
-    <Dropdown.LinkItem href="/app/settings">Settings</Dropdown.LinkItem>
+  // Who's signed in and the account actions, shared by the wide layout's
+  // account menu and the phone ☰ menu so the two can't drift apart.
+  const account = (
+    <Dropdown.Group
+      label={
+        <>
+          Signed in as <span className="app-nav-menu-email">{email}</span>
+        </>
+      }
+    >
+      <Dropdown.LinkItem href="/app/settings">Settings</Dropdown.LinkItem>
+      <Dropdown.Item onClick={onLogout}>Log out</Dropdown.Item>
+    </Dropdown.Group>
   );
-  const logOut = <Dropdown.Item onClick={onLogout}>Log out</Dropdown.Item>;
 
   return (
     <nav className="app-nav">
@@ -79,10 +99,17 @@ export function AppNav({ email, onLogout, pathname }: AppNavProps) {
             </li>
           ))}
         </ul>
-        <Dropdown label={email} variant="nav" className="app-nav-account">
-          {settings}
-          <Dropdown.Separator />
-          {logOut}
+        <Dropdown
+          label={
+            <>
+              <UserCircleIcon size="1.5em" />
+              Account
+            </>
+          }
+          variant="nav"
+          className="app-nav-account"
+        >
+          {account}
         </Dropdown>
         <Dropdown
           label={<ListIcon size="1.25em" />}
@@ -102,16 +129,7 @@ export function AppNav({ email, onLogout, pathname }: AppNavProps) {
             </Dropdown.LinkItem>
           ))}
           <Dropdown.Separator />
-          <Dropdown.Group
-            label={
-              <>
-                Signed in as <span className="app-nav-menu-email">{email}</span>
-              </>
-            }
-          >
-            {settings}
-            {logOut}
-          </Dropdown.Group>
+          {account}
         </Dropdown>
       </div>
     </nav>
