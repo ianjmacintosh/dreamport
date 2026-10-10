@@ -1,4 +1,11 @@
-import { useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { DotsSixVerticalIcon } from "@phosphor-icons/react";
 import { LiveRegion, useAnnouncement } from "@dnd-kit/accessibility";
@@ -34,6 +41,12 @@ interface PathHead {
   createdAt: string;
 }
 
+interface VersionSummary {
+  id: string;
+  number: number;
+  savedAt: string;
+}
+
 interface MilestoneFields {
   name: string;
   description: string;
@@ -49,6 +62,12 @@ interface Task {
 interface Milestone extends MilestoneFields {
   id: string;
   tasks: Task[];
+}
+
+interface Draft extends PathHead {
+  milestones: Milestone[];
+  updatedAt: string;
+  latestVersion: VersionSummary | null;
 }
 
 /** Mirror `src/worker/paths.ts`; the server enforces the real limits. */
@@ -164,9 +183,7 @@ export const Route = createFileRoute("/_appShell/app_/paths_/$pathId")({
     if (!res || !res.ok) {
       throw redirect({ to: "/app/paths" });
     }
-    const { draft } = (await res.json()) as {
-      draft: PathHead & { milestones: Milestone[] };
-    };
+    const { draft } = (await res.json()) as { draft: Draft };
     return {
       draft,
       breadcrumbs: {
@@ -183,491 +200,788 @@ const ADD_FAILED = "We couldn't add that. Try again in a moment.";
 const DELETE_FAILED = "We couldn't delete that. Try again in a moment.";
 const REORDER_FAILED =
   "We couldn't move that, so it's back where it was. Try again in a moment.";
+const SAVE_FAILED = "We couldn't save a version. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
-/** Which Milestone the Milestone Dialog is open on, if any. */
-type MilestoneDialog =
-  | { kind: "closed" }
-  | { kind: "add" }
-  | { kind: "edit"; id: string };
+const DATE_TIME = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "long",
+  timeStyle: "short",
+});
 
-/** What the Milestone Dialog has in flight. */
-type MilestonePending = "none" | "saving" | "deleting";
+function taskCount(n: number): string {
+  return n === 0 ? "No Tasks" : n === 1 ? "1 Task" : `${n} Tasks`;
+}
 
 /**
- * Milestones reorder by their handles: dragged by mouse or touch, or with
- * the up and down arrow keys on a focused handle. The new order shows at
- * once and goes to the server whole; if the server refuses it, the old
- * order comes back with an alert line. The handles are off while a
- * reorder is in flight.
+ * The Path's page (docs/design-decisions.md, #169): its name and
+ * description, the route of Milestones beside the picked one and its
+ * Tasks, then the save state. Name, description and the Milestones' order
+ * change together in the Edit Path Dialog; a Milestone's own fields in
+ * the Edit Milestone Dialog; its Tasks right there in the panel.
  */
 function PathDraft() {
   const { draft } = Route.useRouteContext();
   const router = useRouter();
   const [path, setPath] = useState<PathHead>(draft);
   const [milestones, setMilestones] = useState<Milestone[]>(draft.milestones);
+  const [updatedAt, setUpdatedAt] = useState(draft.updatedAt);
+  const [latestVersion, setLatestVersion] = useState(draft.latestVersion);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [pathDialog, setPathDialog] = useState<PathDialogOpening | null>(null);
+  const [isEditingMilestone, setIsEditingMilestone] = useState(false);
 
-  const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
-  const [pathFields, setPathFields] = useState({ name: "", description: "" });
-  const [isUpdatingPath, setIsUpdatingPath] = useState(false);
-  const [pathError, setPathError] = useState("");
+  const base = `/api/paths/${path.id}`;
+  // The first Milestone until one is picked, and again if the picked one
+  // is deleted.
+  const picked = milestones.find((m) => m.id === pickedId) ?? milestones[0];
 
-  const [milestoneDialog, setMilestoneDialog] = useState<MilestoneDialog>({
-    kind: "closed",
-  });
-  const [milestoneFields, setMilestoneFields] =
-    useState<MilestoneFields>(NO_MILESTONE);
-  const [milestonePending, setMilestonePending] =
-    useState<MilestonePending>("none");
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [milestoneError, setMilestoneError] = useState("");
+  /** After a Draft write lands: the server's `updatedAt` moved to about now. */
+  function touch() {
+    setUpdatedAt(new Date().toISOString());
+  }
 
-  const [tasksDialogMilestoneId, setTasksDialogMilestoneId] = useState<
-    string | null
-  >(null);
+  function showUpdatedDraft(updated: Draft) {
+    setPath(updated);
+    setMilestones(updated.milestones);
+    setUpdatedAt(updated.updatedAt);
+    setPathDialog(null);
+    // The breadcrumbs come from `beforeLoad`; rerun it for the new name.
+    void router.invalidate();
+  }
 
-  const [isReordering, setIsReordering] = useState(false);
-  const [reorderError, setReorderError] = useState("");
+  async function saveVersion() {
+    setSaveError("");
+    setIsSaving(true);
+    try {
+      const saved = await withMinimumDuration(() =>
+        send<{ version: VersionSummary }>(`${base}/versions`, "POST"),
+      );
+      if (!saved.ok) {
+        setSaveError(saved.conflict ?? SAVE_FAILED);
+        return;
+      }
+      setLatestVersion(saved.body.version);
+    } catch {
+      setSaveError(CONNECTION_FAILED);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  const manageMilestones = (
+    <p>
+      <Button variant="secondary" onClick={() => setPathDialog("milestones")}>
+        Manage Milestones
+      </Button>
+    </p>
+  );
+
+  return (
+    <>
+      <div className="heading-row">
+        <h1>{path.name}</h1>
+        <Button variant="secondary" onClick={() => setPathDialog("top")}>
+          Edit Path
+        </Button>
+      </div>
+      {path.description && <p>{path.description}</p>}
+
+      {picked ? (
+        <div className="journey-split journey-split--route-first">
+          <div>
+            <h2 id="milestones-heading">Milestones</h2>
+            <ol aria-labelledby="milestones-heading" className="journey-route">
+              {milestones.map((m, index) => (
+                <RouteStop
+                  key={m.id}
+                  milestone={m}
+                  number={index + 1}
+                  isPicked={m.id === picked.id}
+                  onPick={() => setPickedId(m.id)}
+                />
+              ))}
+            </ol>
+            {manageMilestones}
+          </div>
+          <section aria-labelledby="picked-milestone-heading">
+            <div className="heading-row">
+              <h3 id="picked-milestone-heading">{picked.name}</h3>
+              <Button
+                variant="secondary"
+                onClick={() => setIsEditingMilestone(true)}
+              >
+                Edit Milestone
+              </Button>
+            </div>
+            {picked.outcome && <p>{picked.outcome}</p>}
+            <p>{picked.description}</p>
+            <h4>Done When</h4>
+            <p>{picked.doneWhen}</p>
+            <h4>Tasks</h4>
+            <MilestoneTasks
+              key={picked.id}
+              tasksUrl={`${base}/milestones/${picked.id}/tasks`}
+              tasks={picked.tasks}
+              onTasksChange={(update) =>
+                setMilestones((prev) =>
+                  prev.map((m) =>
+                    m.id === picked.id ? { ...m, tasks: update(m.tasks) } : m,
+                  ),
+                )
+              }
+              onWriteLanded={touch}
+            />
+          </section>
+        </div>
+      ) : (
+        <>
+          <h2>Milestones</h2>
+          <p>No Milestones yet.</p>
+          {manageMilestones}
+        </>
+      )}
+
+      <p>
+        Last edited{" "}
+        <time dateTime={updatedAt}>
+          {DATE_TIME.format(new Date(updatedAt))}
+        </time>
+      </p>
+      <p role="status">
+        {latestVersion ? (
+          <>
+            Latest version: {latestVersion.number}, saved{" "}
+            <time dateTime={latestVersion.savedAt}>
+              {DATE_TIME.format(new Date(latestVersion.savedAt))}
+            </time>
+          </>
+        ) : (
+          "No saved versions yet."
+        )}
+      </p>
+      <div className="button-group button-group--end">
+        <Button
+          disabled={isSaving}
+          state={isSaving ? "pending" : "ready"}
+          onClick={() => void saveVersion()}
+        >
+          <Button.State name="ready">Save as New Version</Button.State>
+          <Button.State name="pending">Saving…</Button.State>
+        </Button>
+      </div>
+      {saveError && <p role="alert">{saveError}</p>}
+
+      <EditPathDialog
+        opening={pathDialog}
+        path={path}
+        milestones={milestones}
+        pathUrl={base}
+        onClose={() => setPathDialog(null)}
+        onUpdated={showUpdatedDraft}
+      />
+
+      <EditMilestoneDialog
+        milestone={isEditingMilestone ? picked : undefined}
+        milestonesUrl={`${base}/milestones`}
+        onClose={() => setIsEditingMilestone(false)}
+        onUpdated={(updated) => {
+          setMilestones((prev) =>
+            prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)),
+          );
+          touch();
+          setIsEditingMilestone(false);
+        }}
+        onDeleted={(id) => {
+          setMilestones((prev) => prev.filter((m) => m.id !== id));
+          touch();
+          setIsEditingMilestone(false);
+        }}
+      />
+    </>
+  );
+}
+
+function RouteStop({
+  milestone,
+  number,
+  isPicked,
+  onPick,
+}: {
+  milestone: Milestone;
+  number: number;
+  isPicked: boolean;
+  onPick: () => void;
+}) {
+  return (
+    <li
+      className="journey-route-stop"
+      data-status={isPicked ? "current" : "future"}
+    >
+      <span className="journey-route-dot">
+        <span aria-hidden="true">{number}</span>
+      </span>
+      <span className="journey-route-name">
+        <button
+          type="button"
+          className="journey-route-pick"
+          aria-pressed={isPicked}
+          onClick={onPick}
+        >
+          {milestone.name}
+        </button>
+      </span>
+      <span className="journey-route-outcome">
+        {taskCount(milestone.tasks.length)}
+      </span>
+    </li>
+  );
+}
+
+/**
+ * Where the Edit Path Dialog opens: at its top ("Edit Path"), or with its
+ * Milestones in view ("Manage Milestones").
+ */
+type PathDialogOpening = "top" | "milestones";
+
+/**
+ * One of the Edit Path Dialog's Milestones until Update Path: an existing
+ * one, sent back as its id, or one added in the Dialog, sent as its
+ * fields. `key` names the row for the sortable list either way.
+ */
+interface StagedMilestone {
+  key: string;
+  name: string;
+  entry: { id: string } | MilestoneFields;
+}
+
+function EditPathDialog({
+  opening,
+  path,
+  milestones,
+  pathUrl,
+  onClose,
+  onUpdated,
+}: {
+  opening: PathDialogOpening | null;
+  path: PathHead;
+  milestones: Milestone[];
+  pathUrl: string;
+  onClose: () => void;
+  onUpdated: (draft: Draft) => void;
+}) {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const milestonesHeading = useRef<HTMLHeadingElement>(null);
+  return (
+    <Dialog
+      open={opening !== null}
+      onOpenChange={(open) => {
+        if (!open && !isUpdating) onClose();
+      }}
+      title="Edit Path"
+      // Onto the Milestones' heading, so focusing the first field doesn't
+      // scroll the Dialog back to its top.
+      initialFocus={opening === "milestones" ? milestonesHeading : undefined}
+    >
+      <EditPathForm
+        path={path}
+        milestones={milestones}
+        pathUrl={pathUrl}
+        milestonesHeading={milestonesHeading}
+        scrollToMilestones={opening === "milestones"}
+        isUpdating={isUpdating}
+        setIsUpdating={setIsUpdating}
+        onCancel={onClose}
+        onUpdated={onUpdated}
+      />
+    </Dialog>
+  );
+}
+
+/**
+ * The Edit Path Dialog's contents, mounted afresh each time it opens.
+ * Milestones added or moved here wait for Update Path, which sends them
+ * with the name and description in one request, so Cancel really cancels.
+ */
+function EditPathForm({
+  path,
+  milestones,
+  pathUrl,
+  milestonesHeading,
+  scrollToMilestones,
+  isUpdating,
+  setIsUpdating,
+  onCancel,
+  onUpdated,
+}: {
+  path: PathHead;
+  milestones: Milestone[];
+  pathUrl: string;
+  milestonesHeading: RefObject<HTMLHeadingElement | null>;
+  scrollToMilestones: boolean;
+  isUpdating: boolean;
+  setIsUpdating: (isUpdating: boolean) => void;
+  onCancel: () => void;
+  onUpdated: (draft: Draft) => void;
+}) {
+  const [name, setName] = useState(path.name);
+  const [description, setDescription] = useState(path.description);
+  const [staged, setStaged] = useState<StagedMilestone[]>(() =>
+    milestones.map((m) => ({ key: m.id, name: m.name, entry: { id: m.id } })),
+  );
+  const [isAdding, setIsAdding] = useState(false);
+  const [error, setError] = useState("");
   const { announce, announcement } = useAnnouncement();
   // A click on a handle only focuses it; a drag starts once the pointer moves.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
 
-  const base = `/api/paths/${path.id}`;
-  const isMilestoneBusy = milestonePending !== "none";
+  // As the Dialog opens from "Manage Milestones": bring the Milestones up
+  // to the top if they start out of view.
+  useEffect(() => {
+    const heading = milestonesHeading.current;
+    if (!scrollToMilestones || !heading) return;
+    const { top, bottom } = heading.getBoundingClientRect();
+    if (top < 0 || bottom > window.innerHeight) {
+      heading.scrollIntoView({ block: "start" });
+    }
+  }, [scrollToMilestones, milestonesHeading]);
 
-  function openPathDialog() {
-    setPathFields({ name: path.name, description: path.description });
-    setPathError("");
-    setIsPathDialogOpen(true);
-  }
-
-  async function updatePath() {
-    setPathError("");
-    setIsUpdatingPath(true);
+  async function update() {
+    setError("");
+    setIsUpdating(true);
     try {
       const updated = await withMinimumDuration(() =>
-        send<{ path: PathHead }>(base, "PATCH", pathFields),
+        send<{ draft: Draft }>(pathUrl, "PATCH", {
+          name,
+          description,
+          milestones: staged.map((m) => m.entry),
+        }),
       );
       if (!updated.ok) {
-        setPathError(UPDATE_FAILED);
+        setError(updated.conflict ?? UPDATE_FAILED);
         return;
       }
-      setPath(updated.body.path);
-      setIsPathDialogOpen(false);
-      // The breadcrumbs come from `beforeLoad`; rerun it for the new name.
-      void router.invalidate();
+      onUpdated(updated.body.draft);
     } catch {
-      setPathError(CONNECTION_FAILED);
+      setError(CONNECTION_FAILED);
     } finally {
-      setIsUpdatingPath(false);
-    }
-  }
-
-  function openMilestoneDialog(milestone?: Milestone) {
-    setMilestoneFields(
-      milestone
-        ? {
-            name: milestone.name,
-            description: milestone.description,
-            doneWhen: milestone.doneWhen,
-            outcome: milestone.outcome,
-          }
-        : NO_MILESTONE,
-    );
-    setMilestoneError("");
-    setIsConfirmingDelete(false);
-    setMilestoneDialog(
-      milestone ? { kind: "edit", id: milestone.id } : { kind: "add" },
-    );
-  }
-
-  async function saveMilestone() {
-    if (milestoneDialog.kind === "closed") return;
-    setMilestoneError("");
-    setMilestonePending("saving");
-    try {
-      const saved = await withMinimumDuration(() =>
-        milestoneDialog.kind === "add"
-          ? send<{ milestone: Omit<Milestone, "tasks"> }>(
-              `${base}/milestones`,
-              "POST",
-              milestoneFields,
-            )
-          : send<{ milestone: Omit<Milestone, "tasks"> }>(
-              `${base}/milestones/${milestoneDialog.id}`,
-              "PATCH",
-              milestoneFields,
-            ),
-      );
-      if (!saved.ok) {
-        setMilestoneError(
-          milestoneDialog.kind === "add"
-            ? (saved.conflict ?? ADD_FAILED)
-            : UPDATE_FAILED,
-        );
-        return;
-      }
-      const { milestone } = saved.body;
-      setMilestones((prev) =>
-        milestoneDialog.kind === "add"
-          ? [...prev, { ...milestone, tasks: [] }]
-          : prev.map((m) =>
-              m.id === milestone.id ? { ...m, ...milestone } : m,
-            ),
-      );
-      setMilestoneDialog({ kind: "closed" });
-    } catch {
-      setMilestoneError(CONNECTION_FAILED);
-    } finally {
-      setMilestonePending("none");
-    }
-  }
-
-  async function deleteMilestone(id: string) {
-    setMilestoneError("");
-    setMilestonePending("deleting");
-    try {
-      const deleted = await withMinimumDuration(() =>
-        send<object>(`${base}/milestones/${id}`, "DELETE"),
-      );
-      if (!deleted.ok) {
-        setMilestoneError(DELETE_FAILED);
-        return;
-      }
-      setMilestones((prev) => prev.filter((m) => m.id !== id));
-      setMilestoneDialog({ kind: "closed" });
-    } catch {
-      setMilestoneError(CONNECTION_FAILED);
-    } finally {
-      setMilestonePending("none");
-      setIsConfirmingDelete(false);
-    }
-  }
-
-  /** Show `next` at once, then send it; put `previous` back if refused. */
-  async function reorder(previous: Milestone[], next: Milestone[]) {
-    setReorderError("");
-    setMilestones(next);
-    setIsReordering(true);
-    try {
-      const saved = await send<object>(`${base}/milestones/order`, "PUT", {
-        ids: next.map((m) => m.id),
-      });
-      if (!saved.ok) {
-        setMilestones(previous);
-        setReorderError(REORDER_FAILED);
-      }
-    } catch {
-      setMilestones(previous);
-      setReorderError(REORDER_FAILED);
-    } finally {
-      setIsReordering(false);
+      setIsUpdating(false);
     }
   }
 
   function onDragEnd({ active, over }: DragEndEvent) {
     if (!over || active.id === over.id) return;
-    const from = milestones.findIndex((m) => m.id === active.id);
-    const to = milestones.findIndex((m) => m.id === over.id);
-    void reorder(milestones, arrayMove(milestones, from, to));
+    const from = staged.findIndex((m) => m.key === active.id);
+    const to = staged.findIndex((m) => m.key === over.id);
+    setStaged(arrayMove(staged, from, to));
   }
 
   /** A focused handle's ↑/↓: one place up or down, announced. */
   function moveByKey(index: number, delta: -1 | 1) {
     const to = index + delta;
-    if (isReordering || to < 0 || to >= milestones.length) return;
-    const moved = milestones[index];
-    announce(`Moved ${moved.name} to ${to + 1} of ${milestones.length}.`);
-    void reorder(milestones, arrayMove(milestones, index, to));
+    if (to < 0 || to >= staged.length) return;
+    announce(`Moved ${staged[index].name} to ${to + 1} of ${staged.length}.`);
+    setStaged(arrayMove(staged, index, to));
   }
-
-  const editing =
-    milestoneDialog.kind === "edit"
-      ? milestones.find((m) => m.id === milestoneDialog.id)
-      : undefined;
-  const tasksMilestone = milestones.find(
-    (m) => m.id === tasksDialogMilestoneId,
-  );
 
   return (
     <>
-      <h1>{path.name}</h1>
-      {path.description && <p>{path.description}</p>}
-      <p>
-        <Button variant="secondary" onClick={openPathDialog}>
-          Edit
-        </Button>
-      </p>
-
-      <h2 id="milestones-heading">Milestones</h2>
-      {milestones.length === 0 ? (
-        <p>No Milestones yet.</p>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={onDragEnd}
-          accessibility={{
-            announcements: announcementsFor(milestones, (m) => m.name),
-            screenReaderInstructions: {
-              draggable:
-                "Press the up or down arrow key to move this Milestone, or drag it.",
-            },
-          }}
-        >
-          <SortableContext
-            items={milestones.map((m) => m.id)}
-            strategy={verticalListSortingStrategy}
-            disabled={isReordering}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void update();
+        }}
+      >
+        <TextInput
+          id="path-name"
+          label="Path name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={PATH_NAME_MAX_LENGTH}
+          disabled={isUpdating}
+          required
+        />
+        <TextArea
+          id="path-description"
+          label="Description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          maxLength={PATH_DESCRIPTION_MAX_LENGTH}
+          disabled={isUpdating}
+        />
+        <h3 id="path-milestones-heading" ref={milestonesHeading} tabIndex={-1}>
+          Milestones
+        </h3>
+        {staged.length === 0 ? (
+          <p>No Milestones yet.</p>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={onDragEnd}
+            accessibility={{
+              announcements: announcementsFor(
+                staged.map((m) => ({ id: m.key, name: m.name })),
+                (m) => m.name,
+              ),
+              screenReaderInstructions: {
+                draggable:
+                  "Press the up or down arrow key to move this Milestone, or drag it.",
+              },
+            }}
           >
-            <ol
-              className="list list--ruled"
-              aria-labelledby="milestones-heading"
+            <SortableContext
+              items={staged.map((m) => m.key)}
+              strategy={verticalListSortingStrategy}
+              disabled={isUpdating}
             >
-              {milestones.map((milestone, index) => (
-                <MilestoneRow
-                  key={milestone.id}
-                  milestone={milestone}
-                  number={index + 1}
-                  isReordering={isReordering}
-                  onMoveKey={(delta) => moveByKey(index, delta)}
-                  onTasks={() => setTasksDialogMilestoneId(milestone.id)}
-                  onEdit={() => openMilestoneDialog(milestone)}
-                />
-              ))}
-            </ol>
-          </SortableContext>
-        </DndContext>
-      )}
-      <LiveRegion id="milestone-moves" announcement={announcement} />
-      {reorderError && <p role="alert">{reorderError}</p>}
-      <p>
-        <Button onClick={() => openMilestoneDialog()}>Add Milestone</Button>
-      </p>
-
-      <Dialog
-        open={isPathDialogOpen}
-        onOpenChange={(open) => {
-          if (!isUpdatingPath) setIsPathDialogOpen(open);
-        }}
-        title="Edit Path"
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void updatePath();
-          }}
-        >
-          <TextInput
-            id="path-name"
-            label="Path name"
-            value={pathFields.name}
-            onChange={(e) =>
-              setPathFields((f) => ({ ...f, name: e.target.value }))
-            }
-            maxLength={PATH_NAME_MAX_LENGTH}
-            disabled={isUpdatingPath}
-            required
-          />
-          <TextArea
-            id="path-description"
-            label="Description"
-            value={pathFields.description}
-            onChange={(e) =>
-              setPathFields((f) => ({ ...f, description: e.target.value }))
-            }
-            maxLength={PATH_DESCRIPTION_MAX_LENGTH}
-            disabled={isUpdatingPath}
-          />
-          {pathError && <p role="alert">{pathError}</p>}
-          <div className="button-group">
-            <Button
-              type="submit"
-              disabled={isUpdatingPath}
-              state={isUpdatingPath ? "pending" : "ready"}
-            >
-              <Button.State name="ready">Update Path</Button.State>
-              <Button.State name="pending">Updating…</Button.State>
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={isUpdatingPath}
-              onClick={() => setIsPathDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </Dialog>
-
-      <Dialog
-        open={milestoneDialog.kind !== "closed"}
-        onOpenChange={(open) => {
-          if (!open && !isMilestoneBusy) {
-            setMilestoneDialog({ kind: "closed" });
-          }
-        }}
-        title={
-          milestoneDialog.kind === "edit" ? "Edit Milestone" : "Add Milestone"
-        }
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void saveMilestone();
-          }}
-        >
-          <TextInput
-            id="milestone-name"
-            label="Milestone name"
-            value={milestoneFields.name}
-            onChange={(e) =>
-              setMilestoneFields((f) => ({ ...f, name: e.target.value }))
-            }
-            maxLength={MILESTONE_NAME_MAX_LENGTH}
-            disabled={isMilestoneBusy}
-            required
-          />
-          <TextArea
-            id="milestone-description"
-            label="Description"
-            value={milestoneFields.description}
-            onChange={(e) =>
-              setMilestoneFields((f) => ({
-                ...f,
-                description: e.target.value,
-              }))
-            }
-            maxLength={MILESTONE_DESCRIPTION_MAX_LENGTH}
-            disabled={isMilestoneBusy}
-            required
-          />
-          <TextInput
-            id="milestone-done-when"
-            label="Done when"
-            value={milestoneFields.doneWhen}
-            onChange={(e) =>
-              setMilestoneFields((f) => ({ ...f, doneWhen: e.target.value }))
-            }
-            maxLength={MILESTONE_DONE_WHEN_MAX_LENGTH}
-            disabled={isMilestoneBusy}
-            required
-          />
-          <TextInput
-            id="milestone-outcome"
-            label="Outcome"
-            helperText="Optional"
-            value={milestoneFields.outcome}
-            onChange={(e) =>
-              setMilestoneFields((f) => ({ ...f, outcome: e.target.value }))
-            }
-            maxLength={MILESTONE_OUTCOME_MAX_LENGTH}
-            disabled={isMilestoneBusy}
-          />
-          {milestoneError && <p role="alert">{milestoneError}</p>}
-          <div className="button-group">
-            <Button
-              type="submit"
-              disabled={isMilestoneBusy}
-              state={milestonePending === "saving" ? "pending" : "ready"}
-            >
-              <Button.State name="ready">
-                {editing ? "Update Milestone" : "Add Milestone"}
-              </Button.State>
-              <Button.State name="pending">
-                {editing ? "Updating…" : "Adding…"}
-              </Button.State>
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={isMilestoneBusy}
-              onClick={() => setMilestoneDialog({ kind: "closed" })}
-            >
-              Cancel
-            </Button>
-            {editing &&
-              (isConfirmingDelete ? (
-                <>
-                  <Button
-                    disabled={isMilestoneBusy}
-                    state={
-                      milestonePending === "deleting"
-                        ? "deleting"
-                        : "confirming"
-                    }
-                    onClick={() => void deleteMilestone(editing.id)}
+              <ol
+                className="list list--cards"
+                aria-labelledby="path-milestones-heading"
+              >
+                {staged.map((milestone, index) => (
+                  <SortableRow
+                    key={milestone.key}
+                    id={milestone.key}
+                    label={milestone.name}
+                    isReordering={isUpdating}
+                    onMoveKey={(delta) => moveByKey(index, delta)}
                   >
-                    <Button.State name="confirming">Delete</Button.State>
-                    <Button.State name="deleting">Deleting…</Button.State>
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    disabled={isMilestoneBusy}
-                    onClick={() => setIsConfirmingDelete(false)}
-                  >
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="secondary"
-                  disabled={isMilestoneBusy}
-                  onClick={() => setIsConfirmingDelete(true)}
-                >
-                  Delete
-                </Button>
-              ))}
-          </div>
-        </form>
-      </Dialog>
-
-      <Dialog
-        open={tasksMilestone !== undefined}
-        onOpenChange={(open) => {
-          if (!open) setTasksDialogMilestoneId(null);
-        }}
-        title={`Tasks for ${tasksMilestone?.name ?? ""}`}
-      >
-        {tasksMilestone && (
-          <MilestoneTasks
-            key={tasksMilestone.id}
-            tasksUrl={`${base}/milestones/${tasksMilestone.id}/tasks`}
-            tasks={tasksMilestone.tasks}
-            onTasksChange={(update) =>
-              setMilestones((prev) =>
-                prev.map((m) =>
-                  m.id === tasksMilestone.id
-                    ? { ...m, tasks: update(m.tasks) }
-                    : m,
-                ),
-              )
-            }
-          />
+                    <span className="list-row-name">
+                      {index + 1}. {milestone.name}
+                    </span>
+                  </SortableRow>
+                ))}
+              </ol>
+            </SortableContext>
+          </DndContext>
         )}
-        <div className="button-group">
+        <LiveRegion id="milestone-moves" announcement={announcement} />
+        <p>
           <Button
             variant="secondary"
-            onClick={() => setTasksDialogMilestoneId(null)}
+            disabled={isUpdating}
+            onClick={() => setIsAdding(true)}
           >
-            Done
+            Add Milestone
+          </Button>
+        </p>
+        {error && <p role="alert">{error}</p>}
+        <div className="button-group button-group--end">
+          <Button variant="secondary" disabled={isUpdating} onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isUpdating}
+            state={isUpdating ? "pending" : "ready"}
+          >
+            <Button.State name="ready">Update Path</Button.State>
+            <Button.State name="pending">Updating…</Button.State>
           </Button>
         </div>
-      </Dialog>
+      </form>
+      {/* Outside the form above: React passes a submit up the component
+          tree even across a portal, so a form nested inside it would
+          submit both. */}
+      <AddMilestoneDialog
+        open={isAdding}
+        onClose={() => setIsAdding(false)}
+        onAdd={(fields) => {
+          setStaged((prev) => [
+            ...prev,
+            { key: crypto.randomUUID(), name: fields.name, entry: fields },
+          ]);
+          setIsAdding(false);
+        }}
+      />
     </>
   );
 }
 
+function MilestoneInputs({
+  fields,
+  onChange,
+  disabled,
+}: {
+  fields: MilestoneFields;
+  onChange: (fields: MilestoneFields) => void;
+  disabled: boolean;
+}) {
+  return (
+    <>
+      <TextInput
+        id="milestone-name"
+        label="Milestone name"
+        value={fields.name}
+        onChange={(e) => onChange({ ...fields, name: e.target.value })}
+        maxLength={MILESTONE_NAME_MAX_LENGTH}
+        disabled={disabled}
+        required
+      />
+      <TextArea
+        id="milestone-description"
+        label="Description"
+        value={fields.description}
+        onChange={(e) => onChange({ ...fields, description: e.target.value })}
+        maxLength={MILESTONE_DESCRIPTION_MAX_LENGTH}
+        disabled={disabled}
+        required
+      />
+      <TextInput
+        id="milestone-done-when"
+        label="Done when"
+        value={fields.doneWhen}
+        onChange={(e) => onChange({ ...fields, doneWhen: e.target.value })}
+        maxLength={MILESTONE_DONE_WHEN_MAX_LENGTH}
+        disabled={disabled}
+        required
+      />
+      <TextInput
+        id="milestone-outcome"
+        label="Outcome"
+        helperText="Optional"
+        value={fields.outcome}
+        onChange={(e) => onChange({ ...fields, outcome: e.target.value })}
+        maxLength={MILESTONE_OUTCOME_MAX_LENGTH}
+        disabled={disabled}
+      />
+    </>
+  );
+}
+
+/**
+ * Opened from the Edit Path Dialog, on top of it. The new Milestone joins
+ * that Dialog's list and is sent with Update Path, so adding sends
+ * nothing.
+ */
+function AddMilestoneDialog({
+  open,
+  onClose,
+  onAdd,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (fields: MilestoneFields) => void;
+}) {
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title="Add Milestone"
+    >
+      <AddMilestoneForm onCancel={onClose} onAdd={onAdd} />
+    </Dialog>
+  );
+}
+
+function AddMilestoneForm({
+  onCancel,
+  onAdd,
+}: {
+  onCancel: () => void;
+  onAdd: (fields: MilestoneFields) => void;
+}) {
+  const [fields, setFields] = useState<MilestoneFields>(NO_MILESTONE);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onAdd(fields);
+      }}
+    >
+      <MilestoneInputs fields={fields} onChange={setFields} disabled={false} />
+      <div className="button-group button-group--end">
+        <Button variant="secondary" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit">Add Milestone</Button>
+      </div>
+    </form>
+  );
+}
+
+/** What the Edit Milestone Dialog has in flight. */
+type MilestonePending = "none" | "saving" | "deleting";
+
+/**
+ * A Milestone's own fields, and Delete, each taking effect when sent.
+ * Open while `milestone` is set.
+ */
+function EditMilestoneDialog({
+  milestone,
+  milestonesUrl,
+  onClose,
+  onUpdated,
+  onDeleted,
+}: {
+  milestone: Milestone | undefined;
+  milestonesUrl: string;
+  onClose: () => void;
+  onUpdated: (milestone: Omit<Milestone, "tasks">) => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [pending, setPending] = useState<MilestonePending>("none");
+  return (
+    <Dialog
+      open={milestone !== undefined}
+      onOpenChange={(open) => {
+        if (!open && pending === "none") onClose();
+      }}
+      title="Edit Milestone"
+    >
+      {milestone && (
+        <EditMilestoneForm
+          milestone={milestone}
+          milestonesUrl={milestonesUrl}
+          pending={pending}
+          setPending={setPending}
+          onCancel={onClose}
+          onUpdated={onUpdated}
+          onDeleted={onDeleted}
+        />
+      )}
+    </Dialog>
+  );
+}
+
+function EditMilestoneForm({
+  milestone,
+  milestonesUrl,
+  pending,
+  setPending,
+  onCancel,
+  onUpdated,
+  onDeleted,
+}: {
+  milestone: Milestone;
+  milestonesUrl: string;
+  pending: MilestonePending;
+  setPending: (pending: MilestonePending) => void;
+  onCancel: () => void;
+  onUpdated: (milestone: Omit<Milestone, "tasks">) => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [fields, setFields] = useState<MilestoneFields>({
+    name: milestone.name,
+    description: milestone.description,
+    doneWhen: milestone.doneWhen,
+    outcome: milestone.outcome,
+  });
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [error, setError] = useState("");
+  const isBusy = pending !== "none";
+  const milestoneUrl = `${milestonesUrl}/${milestone.id}`;
+
+  async function update() {
+    setError("");
+    setPending("saving");
+    try {
+      const saved = await withMinimumDuration(() =>
+        send<{ milestone: Omit<Milestone, "tasks"> }>(
+          milestoneUrl,
+          "PATCH",
+          fields,
+        ),
+      );
+      if (!saved.ok) {
+        setError(UPDATE_FAILED);
+        return;
+      }
+      onUpdated(saved.body.milestone);
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setPending("none");
+    }
+  }
+
+  async function remove() {
+    setError("");
+    setPending("deleting");
+    try {
+      const deleted = await withMinimumDuration(() =>
+        send<object>(milestoneUrl, "DELETE"),
+      );
+      if (!deleted.ok) {
+        setError(DELETE_FAILED);
+        setIsConfirmingDelete(false);
+        return;
+      }
+      onDeleted(milestone.id);
+    } catch {
+      setError(CONNECTION_FAILED);
+      setIsConfirmingDelete(false);
+    } finally {
+      setPending("none");
+    }
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void update();
+      }}
+    >
+      <MilestoneInputs fields={fields} onChange={setFields} disabled={isBusy} />
+      {error && <p role="alert">{error}</p>}
+      <div className="button-group button-group--end">
+        {isConfirmingDelete ? (
+          <Button
+            disabled={isBusy}
+            state={pending === "deleting" ? "deleting" : "confirming"}
+            onClick={() => void remove()}
+          >
+            <Button.State name="confirming">Delete</Button.State>
+            <Button.State name="deleting">Deleting…</Button.State>
+          </Button>
+        ) : (
+          <Button
+            variant="secondary"
+            disabled={isBusy}
+            onClick={() => setIsConfirmingDelete(true)}
+          >
+            Delete
+          </Button>
+        )}
+        <Button variant="secondary" disabled={isBusy} onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          disabled={isBusy}
+          state={pending === "saving" ? "pending" : "ready"}
+        >
+          <Button.State name="ready">Update Milestone</Button.State>
+          <Button.State name="pending">Updating…</Button.State>
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * A Milestone's Tasks, each change sent at once. A reorder shows at once
+ * and goes back if the server refuses it. `onWriteLanded` hears only of
+ * writes the server took.
+ */
 function MilestoneTasks({
   tasksUrl,
   tasks,
   onTasksChange,
+  onWriteLanded,
 }: {
   tasksUrl: string;
   tasks: Task[];
   onTasksChange: (update: (tasks: Task[]) => Task[]) => void;
+  onWriteLanded: () => void;
 }) {
   const [newTitle, setNewTitle] = useState("");
   const [isAdding, setIsAdding] = useState(false);
@@ -690,6 +1004,7 @@ function MilestoneTasks({
         return;
       }
       onTasksChange((prev) => [...prev, added.body.task]);
+      onWriteLanded();
       setNewTitle("");
     } catch {
       setError(CONNECTION_FAILED);
@@ -711,6 +1026,7 @@ function MilestoneTasks({
       onTasksChange((prev) =>
         prev.map((t) => (t.id === id ? updated.body.task : t)),
       );
+      onWriteLanded();
       return true;
     } catch {
       setError(CONNECTION_FAILED);
@@ -729,6 +1045,7 @@ function MilestoneTasks({
         return false;
       }
       onTasksChange((prev) => prev.filter((t) => t.id !== id));
+      onWriteLanded();
       return true;
     } catch {
       setError(CONNECTION_FAILED);
@@ -744,7 +1061,9 @@ function MilestoneTasks({
       const saved = await send<object>(`${tasksUrl}/order`, "PUT", {
         ids: next.map((t) => t.id),
       });
-      if (!saved.ok) {
+      if (saved.ok) {
+        onWriteLanded();
+      } else {
         onTasksChange(() => previous);
         setError(REORDER_FAILED);
       }
@@ -792,7 +1111,7 @@ function MilestoneTasks({
             strategy={verticalListSortingStrategy}
             disabled={isReordering}
           >
-            <ol className="list list--ruled" aria-label="Tasks">
+            <ol className="list list--cards" aria-label="Tasks">
               {tasks.map((task, index) => (
                 <TaskRow
                   key={task.id}
@@ -952,45 +1271,6 @@ function TaskRow({
           </div>
         </>
       )}
-    </SortableRow>
-  );
-}
-
-function MilestoneRow({
-  milestone,
-  number,
-  isReordering,
-  onMoveKey,
-  onTasks,
-  onEdit,
-}: {
-  milestone: Milestone;
-  number: number;
-  isReordering: boolean;
-  onMoveKey: (delta: -1 | 1) => void;
-  onTasks: () => void;
-  onEdit: () => void;
-}) {
-  return (
-    <SortableRow
-      id={milestone.id}
-      label={milestone.name}
-      isReordering={isReordering}
-      onMoveKey={onMoveKey}
-    >
-      <span className="list-row-name">
-        {number}. {milestone.name}
-      </span>
-      <div className="list-row-action">
-        <div className="button-group">
-          <Button variant="secondary" onClick={onTasks}>
-            Tasks
-          </Button>
-          <Button variant="secondary" onClick={onEdit}>
-            Edit
-          </Button>
-        </div>
-      </div>
     </SortableRow>
   );
 }
