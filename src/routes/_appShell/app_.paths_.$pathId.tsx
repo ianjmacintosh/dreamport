@@ -34,6 +34,12 @@ interface PathHead {
   createdAt: string;
 }
 
+interface VersionSummary {
+  id: string;
+  number: number;
+  savedAt: string;
+}
+
 interface MilestoneFields {
   name: string;
   description: string;
@@ -165,7 +171,11 @@ export const Route = createFileRoute("/_appShell/app_/paths_/$pathId")({
       throw redirect({ to: "/app/paths" });
     }
     const { draft } = (await res.json()) as {
-      draft: PathHead & { milestones: Milestone[] };
+      draft: PathHead & {
+        milestones: Milestone[];
+        updatedAt: string;
+        latestVersion: VersionSummary | null;
+      };
     };
     return {
       draft,
@@ -183,8 +193,14 @@ const ADD_FAILED = "We couldn't add that. Try again in a moment.";
 const DELETE_FAILED = "We couldn't delete that. Try again in a moment.";
 const REORDER_FAILED =
   "We couldn't move that, so it's back where it was. Try again in a moment.";
+const SAVE_FAILED = "We couldn't save a version. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
+
+const DATE_TIME = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "long",
+  timeStyle: "short",
+});
 
 /** Which Milestone the Milestone Dialog is open on, if any. */
 type MilestoneDialog =
@@ -207,6 +223,10 @@ function PathDraft() {
   const router = useRouter();
   const [path, setPath] = useState<PathHead>(draft);
   const [milestones, setMilestones] = useState<Milestone[]>(draft.milestones);
+  const [updatedAt, setUpdatedAt] = useState(draft.updatedAt);
+  const [latestVersion, setLatestVersion] = useState(draft.latestVersion);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
   const [pathFields, setPathFields] = useState({ name: "", description: "" });
@@ -238,6 +258,11 @@ function PathDraft() {
   const base = `/api/paths/${path.id}`;
   const isMilestoneBusy = milestonePending !== "none";
 
+  /** After a Draft write lands: the server's `updatedAt` moved to about now. */
+  function touch() {
+    setUpdatedAt(new Date().toISOString());
+  }
+
   function openPathDialog() {
     setPathFields({ name: path.name, description: path.description });
     setPathError("");
@@ -256,6 +281,7 @@ function PathDraft() {
         return;
       }
       setPath(updated.body.path);
+      touch();
       setIsPathDialogOpen(false);
       // The breadcrumbs come from `beforeLoad`; rerun it for the new name.
       void router.invalidate();
@@ -318,6 +344,7 @@ function PathDraft() {
               m.id === milestone.id ? { ...m, ...milestone } : m,
             ),
       );
+      touch();
       setMilestoneDialog({ kind: "closed" });
     } catch {
       setMilestoneError(CONNECTION_FAILED);
@@ -338,6 +365,7 @@ function PathDraft() {
         return;
       }
       setMilestones((prev) => prev.filter((m) => m.id !== id));
+      touch();
       setMilestoneDialog({ kind: "closed" });
     } catch {
       setMilestoneError(CONNECTION_FAILED);
@@ -356,7 +384,9 @@ function PathDraft() {
       const saved = await send<object>(`${base}/milestones/order`, "PUT", {
         ids: next.map((m) => m.id),
       });
-      if (!saved.ok) {
+      if (saved.ok) {
+        touch();
+      } else {
         setMilestones(previous);
         setReorderError(REORDER_FAILED);
       }
@@ -365,6 +395,25 @@ function PathDraft() {
       setReorderError(REORDER_FAILED);
     } finally {
       setIsReordering(false);
+    }
+  }
+
+  async function saveVersion() {
+    setSaveError("");
+    setIsSaving(true);
+    try {
+      const saved = await withMinimumDuration(() =>
+        send<{ version: VersionSummary }>(`${base}/versions`, "POST"),
+      );
+      if (!saved.ok) {
+        setSaveError(saved.conflict ?? SAVE_FAILED);
+        return;
+      }
+      setLatestVersion(saved.body.version);
+    } catch {
+      setSaveError(CONNECTION_FAILED);
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -447,6 +496,36 @@ function PathDraft() {
       <p>
         <Button onClick={() => openMilestoneDialog()}>Add Milestone</Button>
       </p>
+
+      <p>
+        Last edited{" "}
+        <time dateTime={updatedAt}>
+          {DATE_TIME.format(new Date(updatedAt))}
+        </time>
+      </p>
+      <p role="status">
+        {latestVersion ? (
+          <>
+            Latest version: {latestVersion.number}, saved{" "}
+            <time dateTime={latestVersion.savedAt}>
+              {DATE_TIME.format(new Date(latestVersion.savedAt))}
+            </time>
+          </>
+        ) : (
+          "No saved versions yet."
+        )}
+      </p>
+      <div className="button-group button-group--end">
+        <Button
+          disabled={isSaving}
+          state={isSaving ? "pending" : "ready"}
+          onClick={() => void saveVersion()}
+        >
+          <Button.State name="ready">Save as New Version</Button.State>
+          <Button.State name="pending">Saving…</Button.State>
+        </Button>
+      </div>
+      {saveError && <p role="alert">{saveError}</p>}
 
       <Dialog
         open={isPathDialogOpen}
@@ -636,15 +715,16 @@ function PathDraft() {
             key={tasksMilestone.id}
             tasksUrl={`${base}/milestones/${tasksMilestone.id}/tasks`}
             tasks={tasksMilestone.tasks}
-            onTasksChange={(update) =>
+            onTasksChange={(update) => {
               setMilestones((prev) =>
                 prev.map((m) =>
                   m.id === tasksMilestone.id
                     ? { ...m, tasks: update(m.tasks) }
                     : m,
                 ),
-              )
-            }
+              );
+              touch();
+            }}
           />
         )}
         <div className="button-group">
