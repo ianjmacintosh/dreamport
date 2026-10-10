@@ -674,9 +674,6 @@ function MilestoneTasks({
   const [isReordering, setIsReordering] = useState(false);
   const [error, setError] = useState("");
   const { announce, announcement } = useAnnouncement();
-  // The Dialog hides everything outside itself from assistive tech, so
-  // dnd-kit's own announcements must live inside it to be heard.
-  const [liveContainer, setLiveContainer] = useState<HTMLElement | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
@@ -784,7 +781,6 @@ function MilestoneTasks({
           onDragEnd={onDragEnd}
           accessibility={{
             announcements: announcementsFor(tasks, (t) => t.title),
-            container: liveContainer ?? undefined,
             screenReaderInstructions: {
               draggable:
                 "Press the up or down arrow key to move this Task, or drag it.",
@@ -796,15 +792,7 @@ function MilestoneTasks({
             strategy={verticalListSortingStrategy}
             disabled={isReordering}
           >
-            <ol
-              ref={(ol) =>
-                setLiveContainer(
-                  ol?.closest<HTMLElement>("[role=dialog]") ?? null,
-                )
-              }
-              className="list list--ruled"
-              aria-label="Tasks"
-            >
+            <ol className="list list--ruled" aria-label="Tasks">
               {tasks.map((task, index) => (
                 <TaskRow
                   key={task.id}
