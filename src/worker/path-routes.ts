@@ -7,6 +7,7 @@ import {
   deleteMilestone,
   getDraft,
   getPath,
+  MILESTONES_AND_TASKS_PER_PATH,
   type OwnedPath,
   parseMilestoneFields,
   parsePathFields,
@@ -71,14 +72,20 @@ pathRoutes.patch("/", async (c) => {
   return c.json({ path }, 200);
 });
 
+const AT_CAP = `A Path can have up to ${MILESTONES_AND_TASKS_PER_PATH} Milestones and Tasks combined. Remove one to make room.`;
+
 pathRoutes.post("/milestones", async (c) => {
   const fields = parseMilestoneFields(await c.req.json().catch(() => null));
   if (!fields.ok) {
     return c.json({ error: fields.error }, 400);
   }
 
-  const milestone = await addMilestone(c.env.DB, c.var.path, fields.value);
-  return c.json({ milestone }, 201);
+  const added = await addMilestone(c.env.DB, c.var.path, fields.value);
+  if (!added.ok) {
+    return c.json({ error: AT_CAP }, 409);
+  }
+
+  return c.json({ milestone: added.milestone }, 201);
 });
 
 /**

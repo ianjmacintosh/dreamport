@@ -12,21 +12,29 @@ import {
 } from "./journeys";
 import {
   addMilestone,
+  addTask,
   createPath,
   deleteMilestone,
+  deleteTask,
   dreamSequence,
   getDraft,
   getPath,
   getVersion,
   listPaths,
   MILESTONE_NAME_MAX_LENGTH,
+  type MilestoneFields,
+  MILESTONES_AND_TASKS_PER_PATH,
   type OwnedPath,
   parseMilestoneFields,
   parsePathFields,
+  parseTaskFields,
   PATHS_PER_USER,
   reorderMilestones,
+  reorderTasks,
+  TASK_TITLE_MAX_LENGTH,
   updateMilestone,
   updatePath,
+  updateTask,
 } from "./paths";
 import { createProduct, getProduct } from "./products";
 
@@ -222,8 +230,49 @@ async function makersPath(name = "Bakery Path") {
   return path;
 }
 
+async function milestoneOn(path: OwnedPath, fields: MilestoneFields) {
+  const added = await addMilestone(env.DB, path, fields);
+  if (!added.ok) throw new Error("the Draft is at the cap");
+  return added.milestone;
+}
+
+async function taskOn(path: OwnedPath, milestoneId: string, title: string) {
+  const added = await addTask(env.DB, path, milestoneId, { title });
+  if (!added.ok) throw new Error(`no Task added: ${added.reason}`);
+  return added.task;
+}
+
 async function milestoneNames(path: OwnedPath) {
   return (await getDraft(env.DB, path)).milestones.map((m) => m.name);
+}
+
+async function taskTitles(path: OwnedPath) {
+  return Object.fromEntries(
+    (await getDraft(env.DB, path)).milestones.map((m) => [
+      m.name,
+      m.tasks.map((t) => t.title),
+    ]),
+  );
+}
+
+async function draftSize(path: OwnedPath) {
+  const { milestones } = await getDraft(env.DB, path);
+  return milestones.reduce((n, m) => n + 1 + m.tasks.length, 0);
+}
+
+async function fillDraft(path: OwnedPath, count: number) {
+  const milestoneId = crypto.randomUUID();
+  await env.DB.batch([
+    env.DB.prepare(
+      'INSERT INTO "draft_milestones" ("id", "pathId", "position", "name", "description", "doneWhen") VALUES (?, ?, 1, ?, ?, ?)',
+    ).bind(milestoneId, path.id, "Full", "A full Milestone.", "It's full."),
+    ...Array.from({ length: count - 1 }, (_, i) =>
+      env.DB.prepare(
+        'INSERT INTO "draft_tasks" ("id", "milestoneId", "position", "title") VALUES (?, ?, ?, ?)',
+      ).bind(crypto.randomUUID(), milestoneId, i + 1, `Task ${i + 1}`),
+    ),
+  ]);
+  return milestoneId;
 }
 
 describe("a User's Paths", () => {
@@ -288,7 +337,7 @@ describe("a User's Paths", () => {
       description: "",
     });
     if (!created.ok) throw new Error("at the Path cap");
-    await addMilestone(env.DB, created.path, BAKE);
+    await milestoneOn(created.path, BAKE);
 
     await env.DB.prepare('DELETE FROM "user" WHERE "id" = ?')
       .bind(userId)
@@ -334,9 +383,9 @@ describe("a Path's Draft", () => {
 
   it("adds, edits, deletes and reorders Milestones", async () => {
     const path = await makersPath();
-    const bake = await addMilestone(env.DB, path, BAKE);
-    const sell = await addMilestone(env.DB, path, SELL);
-    const ship = await addMilestone(env.DB, path, SHIP);
+    const bake = await milestoneOn(path, BAKE);
+    const sell = await milestoneOn(path, SELL);
+    const ship = await milestoneOn(path, SHIP);
     expect(await milestoneNames(path)).toEqual(["Bake", "Sell", "Ship"]);
 
     const edited = { ...SELL, name: "Sell It", outcome: "Money" };
@@ -355,21 +404,21 @@ describe("a Path's Draft", () => {
       true,
     );
     expect((await getDraft(env.DB, path)).milestones).toEqual([
-      { id: ship.id, ...SHIP },
-      { id: sell.id, ...edited },
+      { id: ship.id, ...SHIP, tasks: [] },
+      { id: sell.id, ...edited, tasks: [] },
     ]);
 
     // A Milestone added after a reorder goes on the end.
-    await addMilestone(env.DB, path, BAKE);
+    await milestoneOn(path, BAKE);
     expect(await milestoneNames(path)).toEqual(["Ship", "Sell It", "Bake"]);
   });
 
   it("refuses a reorder that isn't exactly its Milestones, changing nothing", async () => {
     const path = await makersPath();
     const other = await makersPath("Other");
-    const bake = await addMilestone(env.DB, path, BAKE);
-    const sell = await addMilestone(env.DB, path, SELL);
-    const foreign = await addMilestone(env.DB, other, SHIP);
+    const bake = await milestoneOn(path, BAKE);
+    const sell = await milestoneOn(path, SELL);
+    const foreign = await milestoneOn(other, SHIP);
 
     for (const ids of [
       [sell.id],
@@ -387,22 +436,172 @@ describe("a Path's Draft", () => {
   it("can't reach another Path's Milestone", async () => {
     const path = await makersPath();
     const other = await makersPath("Other");
-    const foreign = await addMilestone(env.DB, other, SHIP);
+    const foreign = await milestoneOn(other, SHIP);
 
     expect(
       await updateMilestone(env.DB, path, foreign.id, { ...SHIP, name: "X" }),
     ).toBeNull();
     expect(await deleteMilestone(env.DB, path, foreign.id)).toBe(false);
     expect((await getDraft(env.DB, other)).milestones).toEqual([
-      { id: foreign.id, ...SHIP },
+      { id: foreign.id, ...SHIP, tasks: [] },
     ]);
+  });
+
+  it("adds, edits, deletes and reorders a Milestone's Tasks, apart from another Milestone's", async () => {
+    const path = await makersPath();
+    const bake = await milestoneOn(path, BAKE);
+    const sell = await milestoneOn(path, SELL);
+    const flour = await taskOn(path, bake.id, "Buy flour");
+    const knead = await taskOn(path, bake.id, "Knead");
+    const proof = await taskOn(path, bake.id, "Proof");
+    const price = await taskOn(path, sell.id, "Set a price");
+    expect(await taskTitles(path)).toEqual({
+      Bake: ["Buy flour", "Knead", "Proof"],
+      Sell: ["Set a price"],
+    });
+
+    expect(
+      await updateTask(env.DB, path, bake.id, knead.id, { title: "Knead it" }),
+    ).toEqual({ id: knead.id, title: "Knead it" });
+    expect(
+      await updateTask(env.DB, path, sell.id, knead.id, { title: "X" }),
+    ).toBeNull();
+
+    expect(await deleteTask(env.DB, path, bake.id, flour.id)).toBe(true);
+    expect(await deleteTask(env.DB, path, bake.id, flour.id)).toBe(false);
+
+    expect(
+      await reorderTasks(env.DB, path, bake.id, [proof.id, knead.id]),
+    ).toBe(true);
+    expect(
+      await reorderTasks(env.DB, path, bake.id, [proof.id, knead.id]),
+    ).toBe(true);
+    await taskOn(path, bake.id, "Bake");
+    expect((await getDraft(env.DB, path)).milestones).toEqual([
+      {
+        id: bake.id,
+        ...BAKE,
+        tasks: [
+          { id: proof.id, title: "Proof" },
+          { id: knead.id, title: "Knead it" },
+          { id: expect.any(String), title: "Bake" },
+        ],
+      },
+      { id: sell.id, ...SELL, tasks: [{ id: price.id, title: "Set a price" }] },
+    ]);
+  });
+
+  it("refuses a Task reorder that isn't exactly that Milestone's Tasks, changing nothing", async () => {
+    const path = await makersPath();
+    const bake = await milestoneOn(path, BAKE);
+    const sell = await milestoneOn(path, SELL);
+    const flour = await taskOn(path, bake.id, "Buy flour");
+    const knead = await taskOn(path, bake.id, "Knead");
+    const price = await taskOn(path, sell.id, "Set a price");
+
+    for (const ids of [
+      [knead.id],
+      [knead.id, flour.id, "no-such-task"],
+      [knead.id, knead.id],
+      [knead.id, price.id],
+      [knead.id, flour.id, price.id],
+    ]) {
+      expect(await reorderTasks(env.DB, path, bake.id, ids)).toBe(false);
+    }
+    expect(await taskTitles(path)).toEqual({
+      Bake: ["Buy flour", "Knead"],
+      Sell: ["Set a price"],
+    });
+  });
+
+  it("can't reach another Path's Milestone or Task", async () => {
+    const path = await makersPath();
+    const other = await makersPath("Other");
+    const foreign = await milestoneOn(other, SHIP);
+    const task = await taskOn(other, foreign.id, "Pack it");
+
+    expect(
+      await addTask(env.DB, path, foreign.id, { title: "Sneak in" }),
+    ).toEqual({ ok: false, reason: "not-found" });
+    expect(
+      await addTask(env.DB, path, "no-such-milestone", { title: "Lost" }),
+    ).toEqual({ ok: false, reason: "not-found" });
+    expect(
+      await updateTask(env.DB, path, foreign.id, task.id, { title: "X" }),
+    ).toBeNull();
+    expect(await deleteTask(env.DB, path, foreign.id, task.id)).toBe(false);
+    expect(await reorderTasks(env.DB, path, foreign.id, [task.id])).toBe(false);
+    expect(await taskTitles(other)).toEqual({ Ship: ["Pack it"] });
+  });
+
+  it("removes a Milestone's Tasks with it", async () => {
+    const path = await makersPath();
+    const bake = await milestoneOn(path, BAKE);
+    await taskOn(path, bake.id, "Buy flour");
+    await taskOn(path, bake.id, "Knead");
+
+    expect(await deleteMilestone(env.DB, path, bake.id)).toBe(true);
+
+    const remaining = await env.DB.prepare(
+      'SELECT count(*) AS n FROM "draft_tasks" WHERE "milestoneId" = ?',
+    )
+      .bind(bake.id)
+      .first<{ n: number }>();
+    expect(remaining?.n).toBe(0);
+  });
+
+  it(`accepts a Milestone as the ${MILESTONES_AND_TASKS_PER_PATH}th Milestone or Task and refuses the next, adding nothing`, async () => {
+    const path = await makersPath();
+    await fillDraft(path, MILESTONES_AND_TASKS_PER_PATH - 1);
+
+    expect((await addMilestone(env.DB, path, BAKE)).ok).toBe(true);
+    expect(await draftSize(path)).toBe(MILESTONES_AND_TASKS_PER_PATH);
+
+    expect(await addMilestone(env.DB, path, SELL)).toEqual({
+      ok: false,
+      reason: "cap",
+    });
+    expect(await draftSize(path)).toBe(MILESTONES_AND_TASKS_PER_PATH);
+  });
+
+  it(`accepts a Task as the ${MILESTONES_AND_TASKS_PER_PATH}th Milestone or Task and refuses the next, adding nothing`, async () => {
+    const path = await makersPath();
+    const full = await fillDraft(path, MILESTONES_AND_TASKS_PER_PATH - 2);
+    const bake = await milestoneOn(path, BAKE);
+
+    const results = await Promise.all([
+      addTask(env.DB, path, bake.id, { title: "Last A" }),
+      addTask(env.DB, path, full, { title: "Last B" }),
+    ]);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    expect(results.filter((r) => !r.ok)).toEqual([
+      { ok: false, reason: "cap" },
+    ]);
+    expect(await draftSize(path)).toBe(MILESTONES_AND_TASKS_PER_PATH);
+
+    expect(await addTask(env.DB, path, bake.id, { title: "More" })).toEqual({
+      ok: false,
+      reason: "cap",
+    });
+    expect(await draftSize(path)).toBe(MILESTONES_AND_TASKS_PER_PATH);
+  });
+
+  it("counts the cap per Path", async () => {
+    const path = await makersPath();
+    const other = await makersPath("Other");
+    await fillDraft(path, MILESTONES_AND_TASKS_PER_PATH);
+
+    const bake = await milestoneOn(other, BAKE);
+    expect((await addTask(env.DB, other, bake.id, { title: "Knead" })).ok).toBe(
+      true,
+    );
   });
 
   it("leaves the saved Dream Sequence version as it was", async () => {
     const before = await dreamSequence(env.DB);
     const path = await makersPath();
-    const bake = await addMilestone(env.DB, path, BAKE);
-    const sell = await addMilestone(env.DB, path, SELL);
+    const bake = await milestoneOn(path, BAKE);
+    const sell = await milestoneOn(path, SELL);
     await updatePath(env.DB, path, { name: "Renamed", description: "New" });
     await updateMilestone(env.DB, path, bake.id, SHIP);
     await reorderMilestones(env.DB, path, [sell.id, bake.id]);
@@ -442,6 +641,25 @@ describe("parsing a Milestone's fields", () => {
     ],
   ])("refuses %s", (_, body, error) => {
     expect(parseMilestoneFields(body)).toEqual({ ok: false, error });
+  });
+});
+
+describe("parsing a Task's fields", () => {
+  it("trims the title, and refuses one blank or over the cap", () => {
+    expect(parseTaskFields({ title: " Knead " })).toEqual({
+      ok: true,
+      value: { title: "Knead" },
+    });
+    expect(parseTaskFields({ title: " " })).toEqual({
+      ok: false,
+      error: "title is required",
+    });
+    expect(
+      parseTaskFields({ title: "x".repeat(TASK_TITLE_MAX_LENGTH + 1) }),
+    ).toEqual({
+      ok: false,
+      error: `title must be ${TASK_TITLE_MAX_LENGTH} characters or fewer`,
+    });
   });
 });
 

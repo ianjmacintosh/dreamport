@@ -2112,7 +2112,11 @@ describe("Trailblazer routes", () => {
     const { milestone } = (await added.json()) as {
       milestone: { id: string };
     };
-    expect(milestone).toEqual({ id: expect.any(String), ...MILESTONE });
+    expect(milestone).toEqual({
+      id: expect.any(String),
+      ...MILESTONE,
+      tasks: [],
+    });
 
     const edited = { ...MILESTONE, outcome: "A problem worth a weekend" };
     const patched = await callApi(

@@ -92,6 +92,10 @@ unchanged. Renamed rather than rebuilt, and not re-runnable.
 Draft's ordered Milestones, cascading off `paths`. Saved versions keep
 using `milestones`. Not re-runnable.
 
+`0021_draft_tasks.sql` adds a Draft Milestone's Tasks (issue #168): a
+`draft_tasks` table of each Draft Milestone's ordered Tasks, cascading off
+`draft_milestones`. Not re-runnable.
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order
