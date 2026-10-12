@@ -17,6 +17,7 @@ async function addPath(page: Page, name: string) {
   await expect(dialog).toBeHidden();
 
   await page.getByRole("link", { name }).click();
+  await expect(page).toHaveURL(/\/app\/paths\/[^/]+\/edit$/);
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
 }
 
@@ -176,7 +177,9 @@ test("Update Path past 150 Milestones and Tasks shows the cap and changes nothin
   await addPath(page, pathName);
 
   // Fill the Draft to the cap in one request, as Update Path would.
-  const pathUrl = new URL(page.url()).pathname.replace("/app/", "/api/");
+  const pathUrl = new URL(page.url()).pathname
+    .replace("/app/", "/api/")
+    .replace(/\/edit$/, "");
   const filled = await page.request.patch(pathUrl, {
     headers: { origin: new URL(baseURL ?? "").origin },
     data: {

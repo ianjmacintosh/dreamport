@@ -299,6 +299,8 @@ export const TEST_EMAILS = {
   e2eEditIdeaTags: "delivered+e2e-edit-idea-tags+e2e-test@resend.dev",
   /** #113: an Idea with every Tag shows "+N" on desktop and every pill on a phone. */
   e2eIdeaTagOverflow: "delivered+e2e-idea-tag-overflow+e2e-test@resend.dev",
+  /** #170: make a Path in Trailblazer, save a version, and start a Journey on it from a Product. */
+  e2eFollowOwnPath: "delivered+e2e-follow-own-path+e2e-test@resend.dev",
   /** #137: open a Product, start its Journey, see Milestone 1 current — then advance and return. */
   e2eStartJourney: "delivered+e2e-start-journey+e2e-test@resend.dev",
   /** Finish a Journey, then Return from finished: un-finished, Growth still current. */
