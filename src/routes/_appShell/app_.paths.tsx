@@ -150,7 +150,10 @@ function Paths() {
         <ul className="list" aria-labelledby="paths-heading">
           {paths.map((path) => (
             <li className="list-row" key={path.id}>
-              <Link className="list-row-name" href={`/app/paths/${path.id}`}>
+              <Link
+                className="list-row-name"
+                href={`/app/paths/${path.id}/edit`}
+              >
                 {path.name}
               </Link>
             </li>

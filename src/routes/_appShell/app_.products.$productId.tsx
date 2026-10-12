@@ -75,16 +75,15 @@ interface Idea {
 }
 
 /**
- * The parts of `/api/products/:productId/journey`'s response (#137) the
- * Product home's Journey line needs — the full shape lives with the Journey
- * page (`app_.products.$productId_.journey.tsx`).
+ * The parts of a Journey in `/api/products/:productId/journeys` (#170) the
+ * Product home's Journey lines need (see `JourneySummary` in
+ * `src/worker/journeys.ts`).
  */
 interface JourneySummary {
-  path: { name: string; milestones: { id: string; name: string }[] };
-  journey: {
-    currentMilestoneId: string;
-    finishedAt: string | null;
-  } | null;
+  id: string;
+  pathName: string;
+  currentMilestoneName: string;
+  finishedAt: string | null;
 }
 
 /**
@@ -110,12 +109,13 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
     // redirects to `/app` rather than a dedicated not-found page.
     // The Tag catalog (#113) is fetched alongside — it's needed for the
     // add-Idea form's `TagPicker` — and goes through the same redirect. So is
-    // the Product's Journey (#137), but a failed Journey fetch only drops the
-    // Journey line: Ideas and the description don't depend on Journeys.
-    const [res, tagsRes, journeyRes] = await Promise.all([
+    // the Product's Journeys (#137, #170), but a failed Journeys fetch only
+    // drops the Journey lines: Ideas and the description don't depend on
+    // Journeys.
+    const [res, tagsRes, journeysRes] = await Promise.all([
       fetch(`/api/products/${params.productId}/ideas`).catch(() => null),
       fetch("/api/tags").catch(() => null),
-      fetch(`/api/products/${params.productId}/journey`).catch(() => null),
+      fetch(`/api/products/${params.productId}/journeys`).catch(() => null),
     ]);
     if (!res || !res.ok || !tagsRes || !tagsRes.ok) {
       throw redirect({ to: "/app" });
@@ -125,14 +125,14 @@ export const Route = createFileRoute("/_appShell/app_/products/$productId")({
       ideas: Idea[];
     };
     const { tags } = (await tagsRes.json()) as { tags: string[] };
-    const journey = journeyRes?.ok
-      ? ((await journeyRes.json()) as JourneySummary)
-      : null;
+    const { journeys } = journeysRes?.ok
+      ? ((await journeysRes.json()) as { journeys: JourneySummary[] })
+      : { journeys: [] };
     return {
       product,
       ideas,
       tagCatalog: tags,
-      journey,
+      journeys,
       breadcrumbs: {
         trail: [{ label: "Products", href: "/app" }],
         current: product.name,
@@ -188,27 +188,18 @@ const CONNECTION_FAILED =
  * in-place edit shape an Idea row's rename uses. Single-line on purpose:
  * no multi-line text component exists yet (see #112).
  *
- * Journey (#137) is a short `<h2>` section between the description and
- * the Ideas: one line — what the Path offers before starting, the current
- * Milestone after — and a link styled as a button ("Learn More" / "View
- * Journey") to the Product's own Journey page, which holds the Milestones
- * and "Start Journey".
+ * Journey (#137, #170) is a short `<h2>` section between the description
+ * and the Ideas: a line per Journey saying where it's at, or an invitation
+ * before there are any, and a link styled as a button: "View Journeys" to
+ * the Product's Journeys page, or "Choose a Path" to Pathfinder.
  */
 function ProductHome() {
   const {
     product: initialProduct,
     ideas: initialIdeas,
     tagCatalog,
-    journey: initialJourney,
+    journeys,
   } = Route.useRouteContext();
-  const path = initialJourney?.path;
-  const journey = initialJourney?.journey;
-  const currentIndex =
-    path && journey
-      ? path.milestones.findIndex(
-          (milestone) => milestone.id === journey.currentMilestoneId,
-        )
-      : -1;
   const [product, setProduct] = useState<Product>(initialProduct);
   const [error, setError] = useState("");
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -302,24 +293,33 @@ function ProductHome() {
         </>
       )}
       <h2>Journey</h2>
-      {path && journey ? (
-        <p>
-          {journey.finishedAt
-            ? `${path.name} complete`
-            : `Current Milestone: ${path.milestones[currentIndex]?.name} (${
-                currentIndex + 1
-              } of ${path.milestones.length})`}
-        </p>
+      {journeys.length > 0 ? (
+        journeys.map((journey) => (
+          <p key={journey.id}>
+            {journey.finishedAt
+              ? `${journey.pathName} complete`
+              : `${journey.pathName}: ${journey.currentMilestoneName}`}
+          </p>
+        ))
       ) : (
         <p>Looking for some structure? Follow a marked path to success.</p>
       )}
       <p>
-        <Link
-          href={`/app/products/${product.id}/journey`}
-          className="button button--secondary"
-        >
-          {journey ? "View Journey" : "Learn More"}
-        </Link>
+        {journeys.length > 0 ? (
+          <Link
+            href={`/app/products/${product.id}/journeys`}
+            className="button button--secondary"
+          >
+            View Journeys
+          </Link>
+        ) : (
+          <Link
+            href={`/app/products/${product.id}/pathfinder`}
+            className="button button--secondary"
+          >
+            Choose a Path
+          </Link>
+        )}
       </p>
       <ProductIdeas
         productId={product.id}

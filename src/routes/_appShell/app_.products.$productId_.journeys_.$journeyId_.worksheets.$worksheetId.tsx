@@ -84,32 +84,44 @@ const SAVE_FAILED = "We couldn't save your answers. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
-// Filename note: `$productId_` makes this a sibling of the Product home
-// rather than its child, the same as the Journey page's own route; see its
-// header comment.
+// Filename note: `$productId_` and `$journeyId_` make this a sibling of the
+// Product home and the Journey page rather than their child, the same as
+// the Journey page's own route; see its header comment.
 export const Route = createFileRoute(
-  "/_appShell/app_/products/$productId_/worksheets/$worksheetId",
+  "/_appShell/app_/products/$productId_/journeys_/$journeyId_/worksheets/$worksheetId",
 )({
   beforeLoad: async ({ params }) => {
-    const res = await fetch(
-      `/api/products/${params.productId}/worksheets/${params.worksheetId}`,
-    ).catch(() => null);
-    // Not signed in, not this User's Product, no Journey yet, offline:
-    // bounce back to `/app`, the same convention as the Journey page.
-    if (!res || !res.ok) {
+    const journeyUrl = `/api/products/${params.productId}/journeys/${params.journeyId}`;
+    // The Journey only for its Path's name, which its breadcrumb shows.
+    const [res, journeyRes] = await Promise.all([
+      fetch(`${journeyUrl}/worksheets/${params.worksheetId}`).catch(() => null),
+      fetch(journeyUrl).catch(() => null),
+    ]);
+    // Not signed in, not this User's Product or Journey, offline: bounce
+    // back to `/app`, the same convention as the Journey page.
+    if (!res || !res.ok || !journeyRes || !journeyRes.ok) {
       throw redirect({ to: "/app" });
     }
     const { product, ...worksheetState } = (await res.json()) as {
       product: { id: string; name: string };
     } & WorksheetState;
+    const { path } = (await journeyRes.json()) as { path: { name: string } };
     return {
       product,
+      journeyId: params.journeyId,
       worksheetState,
       breadcrumbs: {
         trail: [
           { label: "Products", href: "/app" },
           { label: product.name, href: `/app/products/${product.id}` },
-          { label: "Journey", href: `/app/products/${product.id}/journey` },
+          {
+            label: "Journeys",
+            href: `/app/products/${product.id}/journeys`,
+          },
+          {
+            label: path.name,
+            href: `/app/products/${product.id}/journeys/${params.journeyId}`,
+          },
         ],
         current: worksheetState.worksheet.name,
       } satisfies BreadcrumbsProps,
@@ -120,11 +132,12 @@ export const Route = createFileRoute(
 
 /**
  * One of a Product's Worksheets (#139), reached from the current
- * Milestone's content on the Journey page, on every Milestone and once
+ * Milestone's content on a Journey page, on every Milestone and once
  * finished.
  *
  * The Product's name is the h1 (its `breadcrumbs`, Products › Product ›
- * Journey › this Worksheet, go in the band under `AppNav`, #109), then the
+ * Journeys › the Path › this Worksheet, go in the band under `AppNav`,
+ * #109), then the
  * Worksheet drawn as a sheet of paper (`.sheet`, picked from a prototype on
  * branch `prototype/worksheet-design`): its name as the sheet's h2, one
  * numbered `TextArea` per field with its prompt as helper text, one Save
@@ -134,7 +147,7 @@ export const Route = createFileRoute(
  * here — the sheet is the paper.
  */
 function ProductWorksheet() {
-  const { product, worksheetState } = Route.useRouteContext();
+  const { product, journeyId, worksheetState } = Route.useRouteContext();
   const { worksheet } = worksheetState;
   const [drafts, setDrafts] = useState(worksheetState.answers);
   const [isSaving, setIsSaving] = useState(false);
@@ -148,7 +161,7 @@ function ProductWorksheet() {
     try {
       const res = await withMinimumDuration(() =>
         fetchWithTimeout(
-          `/api/products/${product.id}/worksheets/${worksheet.id}`,
+          `/api/products/${product.id}/journeys/${journeyId}/worksheets/${worksheet.id}`,
           {
             method: "PUT",
             headers: { "content-type": "application/json" },
@@ -162,8 +175,8 @@ function ProductWorksheet() {
       }
       // Saved: back to the Journey, where the work goes on.
       await navigate({
-        to: "/app/products/$productId/journey",
-        params: { productId: product.id },
+        to: "/app/products/$productId/journeys/$journeyId",
+        params: { productId: product.id, journeyId },
       });
     } catch {
       setError(CONNECTION_FAILED);
