@@ -120,9 +120,11 @@ export const Route = createFileRoute(
  * or a User's Path's description), then "Start Journey", which starts the
  * Product on Milestone 1 and goes to the new Journey's page.
  *
- * It opens on the latest version. A Path with more than one has "Use an
- * Earlier Version" under the button, and an earlier version says so,
- * linking back to the latest.
+ * It opens on the latest version. A Path with more than one has "Looking
+ * for an older version?" under the button, which opens a Dialog listing
+ * every version, and an earlier version says so, linking back to the
+ * latest. When the Product already follows the Path, "View Journey"
+ * replaces "Start Journey".
  */
 function TrailheadPage() {
   const { product, trailhead } = Route.useRouteContext();
