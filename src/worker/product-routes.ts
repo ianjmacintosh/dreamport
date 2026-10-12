@@ -252,7 +252,7 @@ productRoutes.put("/ideas/:id/tags", async (c) => {
 });
 
 /**
- * Journeys (#137, one per Path since #170): every Journey the Product is
+ * Journeys (#137; several per Product since #170): every Journey the Product is
  * on, each with its Path's name and where it's at. Bundles the Product, as
  * the Ideas list does, for the page's heading.
  */
