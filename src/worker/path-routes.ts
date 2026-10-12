@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import { currentSession } from "./auth";
 import type { WorkerEnv } from "./env";
 import {
-  addMilestone,
   addTask,
   deleteMilestone,
   deleteTask,
@@ -12,10 +11,11 @@ import {
   MILESTONES_AND_TASKS_PER_PATH,
   type OwnedPath,
   parseMilestoneFields,
-  parsePathFields,
+  parsePathUpdate,
   parseTaskFields,
-  reorderMilestones,
   reorderTasks,
+  saveVersion,
+  type DraftGap,
   updateMilestone,
   updatePath,
   updateTask,
@@ -57,63 +57,63 @@ pathRoutes.use(async (c, next) => {
   await next();
 });
 
-/** The Path's Draft: its name, description and Milestones in order. */
+/**
+ * The Path's Draft: its name, description and Milestones in order, when it
+ * was last edited, and its latest saved version.
+ */
 pathRoutes.get("/", async (c) => {
   return c.json({ draft: await getDraft(c.env.DB, c.var.path) });
 });
 
-/** Set the Draft's name and description. */
-pathRoutes.patch("/", async (c) => {
-  const fields = parsePathFields(await c.req.json().catch(() => null));
-  if (!fields.ok) {
-    return c.json({ error: fields.error }, 400);
-  }
-
-  const path = await updatePath(c.env.DB, c.var.path, fields.value);
-  if (!path) {
-    return c.json({ error: "Not found" }, 404);
-  }
-
-  return c.json({ path }, 200);
-});
-
 const AT_CAP = `A Path can have up to ${MILESTONES_AND_TASKS_PER_PATH} Milestones and Tasks combined. Remove one to make room.`;
 
-pathRoutes.post("/milestones", async (c) => {
-  const fields = parseMilestoneFields(await c.req.json().catch(() => null));
-  if (!fields.ok) {
-    return c.json({ error: fields.error }, 400);
+/**
+ * Set the Draft's name, description and Milestones at once (Update Path).
+ * `milestones` is the Draft's Milestones in their new order: `{ id }` for
+ * an existing one, its fields for a new one. 409 if the existing ones
+ * aren't exactly the Draft's (the client's list is stale, and it should
+ * reload rather than have the server guess) or the new ones would pass
+ * the cap. Answers the Draft as it now stands.
+ */
+pathRoutes.patch("/", async (c) => {
+  const update = parsePathUpdate(await c.req.json().catch(() => null));
+  if (!update.ok) {
+    return c.json({ error: update.error }, 400);
   }
 
-  const added = await addMilestone(c.env.DB, c.var.path, fields.value);
-  if (!added.ok) {
-    return c.json({ error: AT_CAP }, 409);
+  const updated = await updatePath(c.env.DB, c.var.path, update.value);
+  if (!updated.ok) {
+    switch (updated.reason) {
+      case "not-found":
+        return c.json({ error: "Not found" }, 404);
+      case "stale":
+        return c.json(
+          { error: "The Milestones have changed. Reload to see them." },
+          409,
+        );
+      case "cap":
+        return c.json({ error: AT_CAP }, 409);
+    }
   }
 
-  return c.json({ milestone: added.milestone }, 201);
+  return c.json({ draft: updated.draft }, 200);
 });
 
-/**
- * Put the Draft's Milestones in the order of `{ ids }`, which must name
- * every one of them once. Anything else is a 409: the client's list is
- * stale, and it should reload rather than have the server guess.
- */
-pathRoutes.put("/milestones/order", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const ids: unknown = body && typeof body === "object" ? body.ids : undefined;
-  if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string")) {
-    return c.json({ error: "ids must be an array of Milestone ids" }, 400);
+const GAP_NAMES: Record<DraftGap, string> = {
+  name: "a name",
+  description: "a description",
+  milestone: "a Milestone",
+};
+
+/** Save the Draft as the Path's next version. 409 if it isn't ready. */
+pathRoutes.post("/versions", async (c) => {
+  const saved = await saveVersion(c.env.DB, c.var.path);
+  if (!saved.ok) {
+    const missing = saved.missing.map((gap) => GAP_NAMES[gap]).join(" and ");
+    return c.json({ error: `Add ${missing} before saving a version.` }, 409);
   }
 
-  const reordered = await reorderMilestones(c.env.DB, c.var.path, ids);
-  if (!reordered) {
-    return c.json(
-      { error: "The Milestones have changed. Reload to see them." },
-      409,
-    );
-  }
-
-  return c.json({}, 200);
+  return c.json({ version: saved.version }, 201);
 });
 
 /** Replace one Milestone's fields. 404 for one not on this Path. */

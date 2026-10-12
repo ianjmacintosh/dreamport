@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   CalendarBlankIcon,
+  DotsSixVerticalIcon,
   FileTextIcon,
   ListIcon,
   PackageIcon,
@@ -117,15 +118,81 @@ function DialogDemo() {
             label="Description"
             defaultValue="Two days from a rough idea to a page that takes sign-ups."
           />
-          <div className="button-group">
-            <Button type="submit">Update Path</Button>
+          <div className="button-group button-group--end">
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancel
             </Button>
+            <Button type="submit">Update Path</Button>
           </div>
         </form>
       </Dialog>
     </>
+  );
+}
+
+const ROUTE_DEMO = [
+  { id: "problem", name: "Pick One Problem", tasks: "2 Tasks" },
+  { id: "talk", name: "Real Talk", tasks: "1 Task" },
+  { id: "page", name: "Sign-up Page", tasks: "No Tasks" },
+];
+
+function RouteDemo() {
+  const [picked, setPicked] = useState(ROUTE_DEMO[0].id);
+  const stop = ROUTE_DEMO.find((m) => m.id === picked) ?? ROUTE_DEMO[0];
+  return (
+    <div className="journey-split journey-split--route-first">
+      <div>
+        <ol className="journey-route" aria-label="Milestones">
+          {ROUTE_DEMO.map((m, index) => (
+            <li
+              key={m.id}
+              className="journey-route-stop"
+              data-status={m.id === picked ? "current" : "future"}
+            >
+              <span className="journey-route-dot">
+                <span aria-hidden="true">{index + 1}</span>
+              </span>
+              <span className="journey-route-name">
+                <button
+                  type="button"
+                  className="journey-route-pick"
+                  aria-pressed={m.id === picked}
+                  onClick={() => setPicked(m.id)}
+                >
+                  {m.name}
+                </button>
+              </span>
+              <span className="journey-route-outcome">{m.tasks}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <section>
+        <p>{stop.name}, picked.</p>
+      </section>
+    </div>
+  );
+}
+
+function SortableRowDemo({
+  name,
+  action,
+}: {
+  name: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <li className="list-row list-row--sortable">
+      <button
+        type="button"
+        className="list-row-handle"
+        aria-label={`Move ${name}`}
+      >
+        <DotsSixVerticalIcon aria-hidden="true" />
+      </button>
+      <span className="list-row-name">{name}</span>
+      {action && <div className="list-row-action">{action}</div>}
+    </li>
   );
 }
 
@@ -263,6 +330,7 @@ function StyleGuide() {
         <a href="#colors">Colors</a>
         <a href="#typography">Typography</a>
         <a href="#headings">Headings</a>
+        <a href="#heading-row">Heading with action</a>
         <a href="#body-text">Body text</a>
         <a href="#links">Links</a>
         <a href="#buttons">Buttons</a>
@@ -280,6 +348,8 @@ function StyleGuide() {
         <a href="#field-row">Field with action</a>
         <a href="#tags">Tags</a>
         <a href="#list-row">Row with action</a>
+        <a href="#sortable-list">Sortable list</a>
+        <a href="#route">Route</a>
         <a href="#turnstile-container">Turnstile container</a>
         <a href="#form-shell">Form shell</a>
         <a href="#spacing">Spacing</a>
@@ -391,6 +461,24 @@ function StyleGuide() {
           </h2>
         </div>
         <Snippet code={`<h2 className="text-h3">Looks like an h3</h2>`} />
+      </Section>
+
+      <Section id="heading-row" label="Heading with action">
+        <div className="heading-row">
+          <h3>Pick One Problem</h3>
+          <Button variant="secondary">Edit Milestone</Button>
+        </div>
+        <p>Write down the one problem.</p>
+        <Snippet
+          code={`<div className="heading-row">\n  <h3>Pick One Problem</h3>\n  <Button variant="secondary">Edit Milestone</Button>\n</div>`}
+        />
+        <p className="sg-note">
+          <code>.heading-row</code> puts a heading&apos;s action at the right
+          end of its row, centred on the heading, and keeps the heading&apos;s
+          own spacing below: Edit Path beside a Path&apos;s h1, Edit Milestone
+          beside a Milestone&apos;s h3 (#169). Below 640px the action goes under
+          the heading, so a long h1 keeps its words whole.
+        </p>
       </Section>
 
       <Section id="body-text" label="Body text">
@@ -1000,10 +1088,61 @@ function StyleGuide() {
           row. Each row is laid out on its own — one row switching to a wider
           action set (a Delete/Cancel reveal, an inline rename) never shifts the
           others — while rows with the same actions still share a right edge.
-          Below 640px every row stacks: name, then actions. A real{" "}
+          Below 640px every row stacks: name, then actions. A list leaves room
+          after its last row, so what follows never sits on it. A real{" "}
           <code>&lt;ul&gt;</code>/<code>&lt;li&gt;</code>, not a stack of{" "}
           <code>&lt;div&gt;</code>s — a list is a list, and assistive tech needs
           the actual markup to announce it as one.
+        </p>
+      </Section>
+
+      <Section id="sortable-list" label="Sortable list">
+        <div className="sg-list-row-demo">
+          <ol className="list list--cards" aria-label="Tasks">
+            <SortableRowDemo
+              name="Talk to 5 potential customers"
+              action={<Button variant="secondary">Edit</Button>}
+            />
+            <SortableRowDemo
+              name="Write the problem in one sentence"
+              action={<Button variant="secondary">Edit</Button>}
+            />
+          </ol>
+          <ol className="list list--cards" aria-label="Milestones">
+            <SortableRowDemo name="1. Pick One Problem" />
+            <SortableRowDemo name="2. Real Talk" />
+          </ol>
+        </div>
+        <Snippet
+          code={`<ol className="list list--cards" aria-label="Tasks">\n  <li className="list-row list-row--sortable">\n    <button type="button" className="list-row-handle" aria-label="Move …">\n      <DotsSixVerticalIcon aria-hidden="true" />\n    </button>\n    <span className="list-row-name">Talk to 5 potential customers</span>\n    <div className="list-row-action">\n      <Button variant="secondary">Edit</Button>\n    </div>\n  </li>\n</ol>`}
+        />
+        <p className="sg-note">
+          A list the User puts in order (a Path&apos;s Milestones, a
+          Milestone&apos;s Tasks) is <code>.list--cards</code>: each row a white
+          card spaced apart from the next, the <code>ActionCard</code> look,
+          with a <code>.list-row-handle</code> in a column of its own at the
+          start. A focused handle moves its row with the up and down arrow keys,
+          and the row drags by mouse or touch (dnd-kit, on the page). A row with
+          no actions keeps its text centred on the handle (#167, #169).
+        </p>
+      </Section>
+
+      <Section id="route" label="Route">
+        <RouteDemo />
+        <Snippet
+          code={`<div className="journey-split journey-split--route-first">\n  <div>\n    <ol className="journey-route">\n      <li className="journey-route-stop" data-status="current">\n        <span className="journey-route-dot"><span aria-hidden="true">1</span></span>\n        <span className="journey-route-name">\n          <button type="button" className="journey-route-pick" aria-pressed="true">\n            Pick One Problem\n          </button>\n        </span>\n        <span className="journey-route-outcome">2 Tasks</span>\n      </li>\n    </ol>\n  </div>\n  <section>…</section>\n</div>`}
+        />
+        <p className="sg-note">
+          The Journey page&apos;s route of numbered stops, beside the content
+          for one of them (<code>.journey-split</code>, #137). A stop&apos;s
+          name can be a <code>.journey-route-pick</code> button that picks it:
+          no button chrome, underlined until it&apos;s the picked one, which
+          takes the current stop&apos;s look (
+          <code>data-status=&quot;current&quot;</code>) and{" "}
+          <code>aria-pressed</code>. Below 640px the content stacks above the
+          route, unless <code>.journey-split--route-first</code> keeps the route
+          first, as on a Path&apos;s page, where picking a stop is how you reach
+          the content (#169).
         </p>
       </Section>
 

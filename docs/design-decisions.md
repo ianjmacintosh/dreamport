@@ -251,10 +251,8 @@ Add an entry only once a sign-off conversation resolves something repeatable
 
 - A form with several fields, one of them a `TextArea` (a Milestone, a
   Path's name and description), opens in a `Dialog` from a button rather
-  than sitting on the page all the time: "Add Milestone" at the end of the
-  list, "Edit" on a row. The same `Dialog` adds and edits; when editing,
-  Delete is inside it (the usual two-step reveal), so the row shows only
-  Edit. `Dialog` is a generic Component on `@base-ui/react`'s `Dialog`,
+  than sitting on the page all the time. The same `Dialog` adds and edits;
+  when editing, Delete is inside it (the usual two-step reveal). `Dialog` is a generic Component on `@base-ui/react`'s `Dialog`,
   the way `Dropdown` is on its `Menu`: base-ui owns focus trapping,
   `Escape` and outside clicks, `Dialog` owns the CSS: a square-cornered
   panel in the page's own cream (`--color-page-bg`) over a dimmed page, its
@@ -262,17 +260,19 @@ Add an entry only once a sign-off conversation resolves something repeatable
   (decided in #167, picked over an in-place reveal in a prototype on
   branch `167-prototype-trailblazer`).
 
-- A list the User puts in order (a Path's Draft Milestones) has a drag
-  handle (Phosphor `DotsSixVertical`) in a column of its own at the start
-  of each row, and thin `--color-border` lines between and around the rows
-  in place of the usual row gap. A focused handle moves its row with the
-  up and down arrow keys, and drag works by touch as well as by mouse. The
-  row reads "1. {name}", then its actions. Picked over a Reorder mode,
-  the handle on white blocks, arrow buttons on each row and Move Up/Down
-  inside the edit form, in the same prototype (decided in #167). The row
-  being dragged carries dnd-kit's transform as an inline `style`, the one
-  accepted exception to "no inline styles": it follows the pointer, so no
-  class can hold it.
+- A list the User puts in order (a Path's Milestones, a Milestone's
+  Tasks) has a drag handle (Phosphor `DotsSixVertical`) in a column of its
+  own at the start of each row. A focused handle moves its row with the up
+  and down arrow keys, and drag works by touch as well as by mouse. Each
+  row is a white card spaced apart from the next, the `ActionCard` look
+  with the handle where a Task's check box would be, then the row's text,
+  then its actions; a row with no actions keeps its text centred on the
+  handle. Picked over a Reorder mode, arrow buttons on each row and Move
+  Up/Down inside the edit form (decided in #167); the white cards replaced
+  #167's thin lines between and around the rows in #169's prototype. The
+  row being dragged carries dnd-kit's transform as an inline `style`, the
+  one accepted exception to "no inline styles": it follows the pointer, so
+  no class can hold it.
 
 - `AppNav` has a second section, Paths (Phosphor `PathIcon`, the
   `/app/paths` pages), after Products, 12px apart. The section, its h1
@@ -294,16 +294,58 @@ Add an entry only once a sign-off conversation resolves something repeatable
   only for a Worksheet's answers on its `.sheet`. See the style guide's
   "Text inputs" section (decided in #167).
 
-- A Milestone's Tasks on a Path's Draft are edited in a Dialog of their
-  own, "Tasks for {Milestone name}", opened from a Tasks button beside
-  the row's Edit, not under each row on the page or inside the Edit
-  Milestone Dialog. Everything in it takes effect at once, with no
-  submit, so it never mixes with a form that waits for its button. In it:
-  the Tasks as a ruled list with drag handles, each row "{title}" then
-  Edit, editing in place (a one-field row edit: Update Task, Cancel,
-  Delete, the confirming Delete taking Delete's place with no second
-  Cancel, since a fourth button leaves the field too narrow in the
-  Dialog); a "Task title" field
-  with "Add Task" beside it; and Done to close. Picked over Tasks nested
-  under each Milestone row and Tasks inside the Edit Milestone Dialog in a
-  prototype on branch `168-prototype-milestone-tasks` (decided in #168).
+- A Path's page is one page (decided in #169, from eleven rounds of a
+  prototype on branch `169-prototype-save-version`; it replaced #167's
+  Milestone list with row buttons and #168's Tasks Dialog):
+  - The Path's name as the h1 with "Edit Path" beside it, then the
+    description.
+  - Two columns, as on the Journey page (`.journey-split`). On the left,
+    a "Milestones" h2 over the Journey page's route: numbered dots on a
+    line, each stop's name a button that picks that Milestone, "n Tasks"
+    under it ("1 Task", "No Tasks"), the picked one in the route's
+    current-stop violet. Under the route, "Manage Milestones". On the
+    right, the picked Milestone (the first, to start): its name as an h3,
+    level with "Milestones", with "Edit Milestone" beside it, then its
+    outcome, description and "Done When", then a "Tasks" h4 and its Tasks,
+    managed right there: the white-card rows with drag handles, each
+    "{title}" then Edit, editing in place (Update Task, Cancel, Delete,
+    the confirming Delete taking Delete's place), and a "Task title" field
+    with "Add Task" beside it. Each Task change takes effect at once.
+    Below 640px the route comes first, then the picked Milestone, unlike
+    the Journey page.
+  - "Edit Path" and "Manage Milestones" open the same Edit Path Dialog:
+    name, description, then a "Milestones" h3 over the Milestones as
+    white-card rows with drag handles and no other actions, and "Add
+    Milestone", which opens the Milestone Dialog on top of it. Milestones
+    added or moved there wait for Update Path, which saves them with the
+    name and description all at once, so Cancel really cancels.
+  - A Path with no Milestones shows "No Milestones yet." and "Manage
+    Milestones" under the h2.
+  - The save state and Save as New Version end the page (below).
+
+- A heading with an action (Edit Path beside a Path's h1, Edit Milestone
+  beside a Milestone's h3) puts the button at the right end of the
+  heading's row, centred on the heading, the heading keeping its own
+  spacing below (decided in #169).
+
+- A list (`.list`) leaves room after it, so whatever follows (a form, a
+  button, the next heading) never sits on its last row (decided in #169).
+
+- A confirming button sits bottom right, last, with Cancel (and any
+  Delete) to its left: `.button-group--end`, the Journey page's Return /
+  Advance arrangement. That covers a Dialog's or form's submit button
+  ("Update Path", "Add Milestone") and a page's own main action at its
+  end (Save as New Version). Forms and Dialogs built before this move
+  over when they're next changed (decided in #169).
+
+- A Path's page ends with its save state, then Save as New Version
+  bottom right: "Last edited {date and time}", then "Latest version:
+  {n}, saved {date and time}" ("No saved versions yet." before the first
+  save), the latest-version line a `role="status"` so a save is
+  announced as it changes, and a refused save's reason under the button.
+  No Draft label, no list of every version, and no Milestones-and-Tasks
+  count. A date and time shows in the browser's own locale as a long date
+  with the time ("October 10, 2026 at 2:32 PM"), in a `<time>`. Picked
+  over status lines at the top, a facts list, and a "changed since the
+  last save" sentence in a prototype on branch
+  `169-prototype-save-version` (decided in #169).

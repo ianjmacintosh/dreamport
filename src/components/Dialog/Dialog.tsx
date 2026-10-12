@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 
 interface DialogProps {
@@ -13,6 +13,8 @@ interface DialogProps {
   title: string;
   /** The Dialog's body: usually a form, its buttons last. */
   children: ReactNode;
+  /** Where focus goes as the Dialog opens, instead of its first field. */
+  initialFocus?: RefObject<HTMLElement | null>;
 }
 
 /**
@@ -25,13 +27,22 @@ interface DialogProps {
  * a square-cornered panel in the page's cream over a dimmed page. A panel taller than
  * the screen scrolls with the page behind it held still.
  */
-export function Dialog({ open, onOpenChange, title, children }: DialogProps) {
+export function Dialog({
+  open,
+  onOpenChange,
+  title,
+  children,
+  initialFocus,
+}: DialogProps) {
   return (
     <BaseDialog.Root open={open} onOpenChange={(next) => onOpenChange(next)}>
       <BaseDialog.Portal>
         <BaseDialog.Backdrop className="dialog-backdrop" />
         <BaseDialog.Viewport className="dialog-viewport">
-          <BaseDialog.Popup className="dialog-popup">
+          <BaseDialog.Popup
+            className="dialog-popup"
+            initialFocus={initialFocus}
+          >
             <BaseDialog.Title className="dialog-title">
               {title}
             </BaseDialog.Title>

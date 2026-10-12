@@ -96,6 +96,13 @@ using `milestones`. Not re-runnable.
 `draft_tasks` table of each Draft Milestone's ordered Tasks, cascading off
 `draft_milestones`. Not re-runnable.
 
+`0022_save_path_versions.sql` prepares saving a Path's Draft as a new
+version (issue #169). It adds `paths."updatedAt"`, which triggers keep
+current on every write to the Draft, and a `before delete` trigger on
+`path_versions` that removes a version's Milestones, Tasks, Journeys,
+Worksheet instances and checked Tasks first, so deleting a User who saved
+a version no longer fails on foreign keys. Not re-runnable.
+
 ## Conventions
 
 - Files are named `NNNN_short_description.sql`, zero-padded, applied in order
@@ -103,6 +110,9 @@ using `milestones`. Not re-runnable.
 - Migrations are committed and reviewed like any other schema change. Every
   environment's database converges to the same shape by replaying the same
   files.
+- Write a trigger's `BEGIN` and `END` in capitals. D1's remote API only
+  sees the trigger body as one statement that way. Lowercase works locally
+  and in tests, then fails remotely with "incomplete input" (#169).
 - D1 has no transactions (see `docs/adr/0002-better-auth-over-homegrown.md`).
   A migration that does multi-statement data changes can partially apply —
   keep each migration small and, where possible, individually re-runnable.
