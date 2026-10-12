@@ -1810,6 +1810,7 @@ describe("Journey routes", () => {
           id: journeyId,
           pathId: "dream-sequence",
           pathName: "Dream Sequence",
+          versionNumber: 1,
           currentMilestoneName: "Rough One-Pager",
           finishedAt: null,
         },
@@ -1964,6 +1965,7 @@ describe("Journey routes", () => {
     const body = (await res.json()) as WorksheetResponse;
     expect(body).toEqual({
       product,
+      path: { id: "dream-sequence", name: "Dream Sequence" },
       worksheet: {
         id: PRODUCT_SUMMARY,
         name: "Product Summary",
@@ -2162,7 +2164,7 @@ describe("Pathfinder and Trailhead routes", () => {
       },
       versions,
       latestNumber: 2,
-      journeyId: null,
+      journey: null,
     });
     expect(await (await trailhead(path.id, "?version=1")).json()).toMatchObject(
       { version: { id: version.id, number: 1 }, versions, latestNumber: 2 },
@@ -2177,14 +2179,17 @@ describe("Pathfinder and Trailhead routes", () => {
       latestNumber: 1,
     });
 
-    // Following an earlier version still counts as following the Path.
+    // Following an earlier version still counts as following the Path,
+    // and a Journey on the later one is refused.
     const { journeyId } = (await (
       await startJourney(product.id, cookie, version.id)
     ).json()) as { journeyId: string };
     expect(await (await trailhead(path.id)).json()).toMatchObject({
       version: { number: 2 },
-      journeyId,
+      journey: { id: journeyId, versionNumber: 1 },
     });
+    const refused = await startJourney(product.id, cookie, latest.id);
+    expect(refused.status).toBe(409);
 
     const theirs = await savedPath(TEST_EMAILS.trailheadStranger);
     for (const [pathId, query] of [

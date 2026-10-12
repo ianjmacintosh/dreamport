@@ -19,6 +19,8 @@ import {
   setTaskDone,
   startJourney,
   worksheetState,
+  type JourneySummary,
+  type StartedJourney,
 } from "./journeys";
 import { getTrailheadVersion, getVersion, listFollowable } from "./paths";
 import {
@@ -266,7 +268,8 @@ productRoutes.get("/journeys", async (c) => {
  * 404s for a version the User may not follow, the same as one that doesn't
  * exist. A repeat start on the same version is harmless: it leaves that
  * Journey's progress as it was and answers 200 rather than 201, with the
- * same id.
+ * same id. 409s when the Product already follows another version of the
+ * Path, since a Product has one Journey per Path.
  */
 productRoutes.post("/journeys", async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -280,12 +283,14 @@ productRoutes.post("/journeys", async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  const { journeyId, started } = await startJourney(
-    c.env.DB,
-    c.var.product,
-    version,
-  );
-  return c.json({ journeyId }, started ? 201 : 200);
+  const start = await startJourney(c.env.DB, c.var.product, version);
+  if (!start) {
+    return c.json(
+      { error: "This Product already follows another version of this Path" },
+      409,
+    );
+  }
+  return c.json({ journeyId: start.journeyId }, start.started ? 201 : 200);
 });
 
 /** The Product's Journey named in the URL, or `null` for the 404. */
@@ -334,6 +339,11 @@ productRoutes.post("/journeys/:journeyId/return", async (c) => {
   return c.json(await journeyState(c.env.DB, journey), 200);
 });
 
+/** The Path a Journey follows, for a Worksheet page's breadcrumb. */
+function pathOf({ version }: StartedJourney) {
+  return { id: version.pathId, name: version.name };
+}
+
 /**
  * Worksheets (issue #139): the Product's instance of one Worksheet on the
  * Journey, the Worksheet and its answers. 404s for no such Journey or no
@@ -354,7 +364,7 @@ productRoutes.get("/journeys/:journeyId/worksheets/:worksheetId", async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  return c.json({ product: c.var.product, ...state });
+  return c.json({ product: c.var.product, path: pathOf(journey), ...state });
 });
 
 /**
@@ -387,7 +397,10 @@ productRoutes.put("/journeys/:journeyId/worksheets/:worksheetId", async (c) => {
   }
 
   await saveAnswers(c.env.DB, journey, worksheetId, answers);
-  return c.json({ product: c.var.product, ...state, answers }, 200);
+  return c.json(
+    { product: c.var.product, path: pathOf(journey), ...state, answers },
+    200,
+  );
 });
 
 /**
@@ -423,16 +436,15 @@ productRoutes.put("/journeys/:journeyId/tasks/:taskId", async (c) => {
 });
 
 /**
- * The Product's latest Journey on each Path it follows, by Path id. Until
- * #172 a Product has at most one Journey per version, but it can still be
- * on two versions of one Path.
+ * The Product's Journey on each Path it follows, by Path id. `startJourney`
+ * keeps it to one per Path.
  */
 async function journeysByPath(
   db: D1Database,
   product: OwnedProduct,
-): Promise<Map<string, string>> {
+): Promise<Map<string, JourneySummary>> {
   const journeys = await listJourneys(db, product);
-  return new Map(journeys.map((journey) => [journey.pathId, journey.id]));
+  return new Map(journeys.map((journey) => [journey.pathId, journey]));
 }
 
 /**
@@ -451,7 +463,7 @@ productRoutes.get("/pathfinder", async (c) => {
     paths: paths.map(({ id, name }) => ({
       id,
       name,
-      journeyId: journeys.get(id) ?? null,
+      journeyId: journeys.get(id)?.id ?? null,
     })),
   });
 });
@@ -460,7 +472,7 @@ productRoutes.get("/pathfinder", async (c) => {
  * A Path's Trailhead (#170): one of its saved versions to start a Journey
  * on, its latest unless `?version=n` names another, with every version's
  * number and save date to pick from, and the Product's Journey on the
- * Path if it already follows it. Another User's Path, an unknown one,
+ * Path, with its version's number, if it already follows any version. Another User's Path, an unknown one,
  * one with no saved version and a number it doesn't have all 404 alike.
  */
 productRoutes.get("/paths/:pathId/trailhead", async (c) => {
@@ -480,7 +492,8 @@ productRoutes.get("/paths/:pathId/trailhead", async (c) => {
   }
 
   const { owner, version, versions } = trailhead;
-  const journeys = await journeysByPath(c.env.DB, c.var.product);
+  const journey =
+    (await journeysByPath(c.env.DB, c.var.product)).get(version.pathId) ?? null;
   return c.json({
     product: c.var.product,
     path: { id: version.pathId, name: version.name, owner },
@@ -492,6 +505,9 @@ productRoutes.get("/paths/:pathId/trailhead", async (c) => {
     },
     versions: versions.map(({ number, savedAt }) => ({ number, savedAt })),
     latestNumber: versions[0].number,
-    journeyId: journeys.get(version.pathId) ?? null,
+    journey: journey && {
+      id: journey.id,
+      versionNumber: journey.versionNumber,
+    },
   });
 });

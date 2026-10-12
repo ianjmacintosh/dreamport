@@ -373,7 +373,11 @@ Add an entry only once a sign-off conversation resolves something repeatable
     the route with every outcome line on the left, the pitch and "Start
     Journey" on the right. A User's own Path shows its description as the
     pitch. If the Product already follows the Path, "{Product} is already
-    following {Path}." and "View Journey" take Start Journey's place. The
+    following {Path}." and "View Journey" take Start Journey's place, on
+    every version: a Product has one Journey per Path, so a newer version
+    of a Path it follows can't be started (the server answers 409), and
+    the line names the followed version, "(version 1)", when it isn't the
+    one shown. The
     version stays in the background: the page shows the latest, and a
     `.link-quiet` "Looking for an older version?" (only when there's more
     than one) opens a `Dialog` listing every version, the one shown

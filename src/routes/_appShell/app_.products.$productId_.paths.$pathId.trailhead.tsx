@@ -56,8 +56,8 @@ interface Trailhead {
   /** Newest first. */
   versions: { number: number; savedAt: string }[];
   latestNumber: number;
-  /** The Product's Journey on this Path, if it already follows it. */
-  journeyId: string | null;
+  /** The Product's Journey on this Path, on whichever version, if it follows it. */
+  journey: { id: string; versionNumber: number } | null;
 }
 
 const LONG_DATE = new Intl.DateTimeFormat(undefined, { dateStyle: "long" });
@@ -123,12 +123,13 @@ export const Route = createFileRoute(
  * It opens on the latest version. A Path with more than one has "Looking
  * for an older version?" under the button, which opens a Dialog listing
  * every version, and an earlier version says so, linking back to the
- * latest. When the Product already follows the Path, "View Journey"
- * replaces "Start Journey".
+ * latest. When the Product already follows the Path, on any version,
+ * "View Journey" replaces "Start Journey": a Product has one Journey per
+ * Path, and the line above it names the version when it isn't this one.
  */
 function TrailheadPage() {
   const { product, trailhead } = Route.useRouteContext();
-  const { path, version, versions, latestNumber, journeyId } = trailhead;
+  const { path, version, versions, latestNumber, journey } = trailhead;
   const search = Route.useSearch();
   const navigate = useNavigate();
   const trailheadHref = `/app/products/${product.id}/paths/${path.id}/trailhead`;
@@ -229,14 +230,17 @@ function TrailheadPage() {
               <Link href={trailheadHref}>A newer version is available.</Link>
             </p>
           )}
-          {journeyId ? (
+          {journey ? (
             <>
               <p>
-                {product.name} is already following {path.name}.
+                {product.name} is already following {path.name}
+                {journey.versionNumber !== version.number &&
+                  ` (version ${journey.versionNumber})`}
+                .
               </p>
               <div className="button-group button-group--end">
                 <Link
-                  href={`/app/products/${product.id}/journeys/${journeyId}`}
+                  href={`/app/products/${product.id}/journeys/${journey.id}`}
                   className="button button--primary"
                 >
                   View Journey

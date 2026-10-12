@@ -73,7 +73,6 @@ export interface FollowablePath {
   readonly id: string;
   /** Its latest version's name: the one its Trailhead opens on. */
   readonly name: string;
-  readonly latestVersionNumber: number;
 }
 
 /**
@@ -87,7 +86,7 @@ export async function listFollowable(
 ): Promise<FollowablePath[]> {
   const { results } = await db
     .prepare(
-      `SELECT "paths"."id", "latest"."name", "latest"."number" AS "latestVersionNumber"
+      `SELECT "paths"."id", "latest"."name"
        FROM "paths"
        JOIN "path_versions" AS "latest" ON "latest"."pathId" = "paths"."id"
          AND "latest"."number" = (SELECT max("number") FROM "path_versions" WHERE "pathId" = "paths"."id")

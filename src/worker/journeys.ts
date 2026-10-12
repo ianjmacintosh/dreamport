@@ -86,6 +86,7 @@ export interface JourneySummary {
   pathId: string;
   /** The name of the version it's on. */
   pathName: string;
+  versionNumber: number;
   currentMilestoneName: string;
   finishedAt: string | null;
 }
@@ -127,7 +128,7 @@ export async function listJourneys(
   const { results } = await db
     .prepare(
       `SELECT "journeys"."id", "path_versions"."pathId", "path_versions"."name" AS "pathName",
-         "milestones"."name" AS "currentMilestoneName", "journeys"."finishedAt"
+         "path_versions"."number" AS "versionNumber", "milestones"."name" AS "currentMilestoneName", "journeys"."finishedAt"
        FROM "journeys"
        JOIN "path_versions" ON "path_versions"."id" = "journeys"."versionId"
        JOIN "milestones" ON "milestones"."id" = "journeys"."currentMilestoneId"
@@ -146,16 +147,27 @@ export async function listJourneys(
  * left exactly as it was (a repeat start never resets progress) and whose
  * id comes back. A repeat start still creates any singleton instance
  * that's missing, which a Journey started before #139 would be.
+ *
+ * `null` when the Product already follows another version of the Path: a
+ * Product has one Journey per Path (#170), and the check sits in the
+ * insert itself so two starts at once can't both get through.
  */
 export async function startJourney(
   db: D1Database,
   product: OwnedProduct,
   version: FollowableVersion,
-): Promise<{ journeyId: string; started: boolean }> {
+): Promise<{ journeyId: string; started: boolean } | null> {
   const [inserted, journey] = await db.batch<{ id: string }>([
     db
       .prepare(
-        'INSERT INTO "journeys" ("id", "productId", "versionId", "currentMilestoneId", "startedAt") VALUES (?, ?, ?, ?, ?) ON CONFLICT ("productId", "versionId") DO NOTHING',
+        `INSERT INTO "journeys" ("id", "productId", "versionId", "currentMilestoneId", "startedAt")
+         SELECT ?, ?, ?, ?, ?
+         WHERE NOT EXISTS (
+           SELECT 1 FROM "journeys"
+           JOIN "path_versions" ON "path_versions"."id" = "journeys"."versionId"
+           WHERE "journeys"."productId" = ? AND "path_versions"."pathId" = ?
+         )
+         ON CONFLICT ("productId", "versionId") DO NOTHING`,
       )
       .bind(
         crypto.randomUUID(),
@@ -163,6 +175,8 @@ export async function startJourney(
         version.id,
         version.milestones[0].id,
         new Date().toISOString(),
+        product.id,
+        version.pathId,
       ),
     db
       .prepare(
@@ -170,6 +184,9 @@ export async function startJourney(
       )
       .bind(product.id, version.id),
   ]);
+  if (journey.results.length === 0) {
+    return null;
+  }
   await createSingletonInstances(db, product, version.id);
   return {
     journeyId: journey.results[0].id,

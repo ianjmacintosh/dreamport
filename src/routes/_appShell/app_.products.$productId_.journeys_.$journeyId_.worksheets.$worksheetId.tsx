@@ -48,7 +48,7 @@ async function withMinimumDuration<T>(
 /** Mirrors `WORKSHEET_ANSWER_MAX_LENGTH` in `src/worker/worksheets.ts` — a client-side hint only; the server enforces it. */
 const WORKSHEET_ANSWER_MAX_LENGTH = 1000;
 
-/** `/api/products/:productId/worksheets/:worksheetId`'s answer (see `worksheetState` in `src/worker/journeys.ts`). */
+/** `/api/products/:productId/journeys/:journeyId/worksheets/:worksheetId`'s answer (see `worksheetState` in `src/worker/journeys.ts`). */
 interface WorksheetState {
   worksheet: {
     id: string;
@@ -91,21 +91,18 @@ export const Route = createFileRoute(
   "/_appShell/app_/products/$productId_/journeys_/$journeyId_/worksheets/$worksheetId",
 )({
   beforeLoad: async ({ params }) => {
-    const journeyUrl = `/api/products/${params.productId}/journeys/${params.journeyId}`;
-    // The Journey only for its Path's name, which its breadcrumb shows.
-    const [res, journeyRes] = await Promise.all([
-      fetch(`${journeyUrl}/worksheets/${params.worksheetId}`).catch(() => null),
-      fetch(journeyUrl).catch(() => null),
-    ]);
+    const res = await fetch(
+      `/api/products/${params.productId}/journeys/${params.journeyId}/worksheets/${params.worksheetId}`,
+    ).catch(() => null);
     // Not signed in, not this User's Product or Journey, offline: bounce
     // back to `/app`, the same convention as the Journey page.
-    if (!res || !res.ok || !journeyRes || !journeyRes.ok) {
+    if (!res || !res.ok) {
       throw redirect({ to: "/app" });
     }
-    const { product, ...worksheetState } = (await res.json()) as {
+    const { product, path, ...worksheetState } = (await res.json()) as {
       product: { id: string; name: string };
+      path: { id: string; name: string };
     } & WorksheetState;
-    const { path } = (await journeyRes.json()) as { path: { name: string } };
     return {
       product,
       journeyId: params.journeyId,

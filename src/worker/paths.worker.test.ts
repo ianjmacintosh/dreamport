@@ -159,8 +159,9 @@ describe("Dream Sequence", () => {
     const product = await getProduct(env.DB, FOLLOWER_ID, id);
     if (!product) throw new Error("the Product just created isn't there");
 
-    const { journeyId } = await startJourney(env.DB, product, before);
-    const journey = await loadJourney(env.DB, product, journeyId);
+    const start = await startJourney(env.DB, product, before);
+    if (!start) throw new Error("the Journey didn't start");
+    const journey = await loadJourney(env.DB, product, start.journeyId);
     if (!journey) throw new Error("the Journey just started isn't there");
     await saveAnswers(env.DB, journey, "product-summary", { problem: "Dough" });
     await setTaskDone(env.DB, journey, "talk-to-five-customers", true);
@@ -772,8 +773,9 @@ async function saved(path: OwnedPath, userId = MAKER_ID) {
 /** A Journey on `version`, on a fresh Product of `userId`'s. */
 async function journeyOn(version: FollowableVersion, userId: string) {
   const product = await productOf(userId);
-  const { journeyId } = await startJourney(env.DB, product, version);
-  const journey = await loadJourney(env.DB, product, journeyId);
+  const start = await startJourney(env.DB, product, version);
+  if (!start) throw new Error("the Journey didn't start");
+  const journey = await loadJourney(env.DB, product, start.journeyId);
   if (!journey) throw new Error("the Journey just started isn't there");
   return journey;
 }
@@ -1110,9 +1112,9 @@ describe("Pathfinder (#170)", () => {
     await saved(await pathOf(STRANGER_ID, "Theirs", [BAKE]), STRANGER_ID);
 
     expect(await listFollowable(env.DB, PATHFINDER_ID)).toEqual([
-      { id: "dream-sequence", name: "Dream Sequence", latestVersionNumber: 1 },
-      { id: first.id, name: "First Again", latestVersionNumber: 2 },
-      { id: second.id, name: "Second", latestVersionNumber: 1 },
+      { id: "dream-sequence", name: "Dream Sequence" },
+      { id: first.id, name: "First Again" },
+      { id: second.id, name: "Second" },
     ]);
   });
 });

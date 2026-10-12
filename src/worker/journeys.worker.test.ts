@@ -19,6 +19,7 @@ import {
   createPath,
   type FollowableVersion,
   getVersion,
+  getPath,
   saveVersion,
   updatePath,
 } from "./paths";
@@ -102,8 +103,9 @@ async function startOn(
   product: OwnedProduct,
   on: FollowableVersion,
 ): Promise<StartedJourney> {
-  const { journeyId } = await startJourney(env.DB, product, on);
-  const journey = await loadJourney(env.DB, product, journeyId);
+  const start = await startJourney(env.DB, product, on);
+  if (!start) throw new Error("the Journey didn't start");
+  const journey = await loadJourney(env.DB, product, start.journeyId);
   if (!journey) throw new Error("the Journey just started isn't there");
   return journey;
 }
@@ -160,9 +162,10 @@ describe("starting a Journey", () => {
   it("starts on Milestone 1 with one instance of each singleton Worksheet", async () => {
     const product = await newProduct();
 
-    const { journeyId, started } = await startJourney(env.DB, product, version);
-    expect(started).toBe(true);
-    const journey = await loadJourney(env.DB, product, journeyId);
+    const start = await startJourney(env.DB, product, version);
+    expect(start?.started).toBe(true);
+    if (!start) throw new Error("the Journey didn't start");
+    const journey = await loadJourney(env.DB, product, start.journeyId);
     if (!journey) throw new Error("the Journey just started isn't there");
     const { path, worksheets, tasks, ...state } = await journeyState(
       env.DB,
@@ -178,7 +181,7 @@ describe("starting a Journey", () => {
       "Growth",
     ]);
     expect(state.journey).toEqual({
-      id: journeyId,
+      id: start.journeyId,
       startedAt: expect.any(String),
       currentMilestoneId: path.milestones[0].id,
       finishedAt: null,
@@ -263,6 +266,7 @@ describe("starting a Journey", () => {
         id: dream.id,
         pathId: "dream-sequence",
         pathName: "Dream Sequence",
+        versionNumber: 1,
         currentMilestoneName: "Real Talk",
         finishedAt: null,
       },
@@ -270,9 +274,26 @@ describe("starting a Journey", () => {
         id: mine.id,
         pathId: own.pathId,
         pathName: "Weekend Launch",
+        versionNumber: 1,
         currentMilestoneName: "Pick a Problem",
         finishedAt: null,
       },
+    ]);
+  });
+
+  it("refuses a Journey on another version of a Path the Product follows", async () => {
+    const product = await newProduct();
+    const first = await ownVersion();
+    const path = await getPath(env.DB, USER_ID, first.pathId);
+    if (!path) throw new Error("the Path just created isn't there");
+    const saved = await saveVersion(env.DB, path);
+    if (!saved.ok) throw new Error(`not saved: ${saved.missing.join(", ")}`);
+    const second = await followable(USER_ID, saved.version.id);
+    const journey = await startOn(product, first);
+
+    expect(await startJourney(env.DB, product, second)).toBeNull();
+    expect(await listJourneys(env.DB, product)).toEqual([
+      expect.objectContaining({ id: journey.id, versionNumber: 1 }),
     ]);
   });
 });
