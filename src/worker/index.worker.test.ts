@@ -1679,85 +1679,72 @@ describe("createAuth", () => {
     expect(createAuth(env)).not.toBe(createAuth(env));
   });
 });
-
 /*
- * The Journey routes (#137-#140), one test each: status, response shape,
- * and the 404 when there's no Journey. What a Journey does — Advance
- * through every Milestone, Return, saving Worksheets, checking off Tasks —
- * is covered at the module's own interface in `journeys.worker.test.ts`.
+ * The Journey, Pathfinder and Trailhead routes (#137-#140, #170), one test
+ * each: status, response shape, and the 404 for a Journey, version or Path
+ * that isn't there. What a Journey does (Advance through every Milestone,
+ * Return, saving Worksheets, checking off Tasks) is covered at the
+ * module's own interface in `journeys.worker.test.ts`.
  */
 
-function getJourney(productId: string, cookie?: string) {
-  return fetchWorker(`/api/products/${productId}/journey`, {
-    headers: cookie ? { cookie } : {},
+/** Dream Sequence version 1's id, which kept `0007`'s. */
+const DREAM_SEQUENCE_VERSION = "starter";
+
+function startJourney(
+  productId: string,
+  cookie?: string,
+  versionId = DREAM_SEQUENCE_VERSION,
+) {
+  return callApi("POST", `/api/products/${productId}/journeys`, cookie, {
+    versionId,
   });
 }
 
-function startJourney(productId: string, cookie?: string) {
-  return fetchWorker(`/api/products/${productId}/journey`, {
-    method: "POST",
-    headers: cookie
-      ? { origin: TRUSTED_ORIGIN, cookie }
-      : { origin: TRUSTED_ORIGIN },
-  });
+function journeyUrl(productId: string, journeyId: string, rest = "") {
+  return `/api/products/${productId}/journeys/${journeyId}${rest}`;
 }
 
-function advanceJourney(productId: string, cookie?: string) {
-  return fetchWorker(`/api/products/${productId}/journey/advance`, {
-    method: "POST",
-    headers: cookie
-      ? { origin: TRUSTED_ORIGIN, cookie }
-      : { origin: TRUSTED_ORIGIN },
-  });
-}
-
-function returnJourney(productId: string, cookie?: string) {
-  return fetchWorker(`/api/products/${productId}/journey/return`, {
-    method: "POST",
-    headers: cookie
-      ? { origin: TRUSTED_ORIGIN, cookie }
-      : { origin: TRUSTED_ORIGIN },
-  });
-}
-
-function getWorksheet(productId: string, worksheetId: string, cookie?: string) {
-  return fetchWorker(`/api/products/${productId}/worksheets/${worksheetId}`, {
-    headers: cookie ? { cookie } : {},
-  });
+function getWorksheet(
+  productId: string,
+  journeyId: string,
+  worksheetId: string,
+  cookie?: string,
+) {
+  return callApi(
+    "GET",
+    journeyUrl(productId, journeyId, `/worksheets/${worksheetId}`),
+    cookie,
+  );
 }
 
 function saveWorksheet(
   productId: string,
+  journeyId: string,
   worksheetId: string,
   answers: unknown,
   cookie?: string,
 ) {
-  return fetchWorker(`/api/products/${productId}/worksheets/${worksheetId}`, {
-    method: "PUT",
-    headers: {
-      ...json,
-      origin: TRUSTED_ORIGIN,
-      ...(cookie ? { cookie } : {}),
-    },
-    body: JSON.stringify({ answers }),
-  });
+  return callApi(
+    "PUT",
+    journeyUrl(productId, journeyId, `/worksheets/${worksheetId}`),
+    cookie,
+    { answers },
+  );
 }
 
 function putTask(
   productId: string,
+  journeyId: string,
   taskId: string,
   done: unknown,
   cookie?: string,
 ) {
-  return fetchWorker(`/api/products/${productId}/tasks/${taskId}`, {
-    method: "PUT",
-    headers: {
-      ...json,
-      origin: TRUSTED_ORIGIN,
-      ...(cookie ? { cookie } : {}),
-    },
-    body: JSON.stringify({ done }),
-  });
+  return callApi(
+    "PUT",
+    journeyUrl(productId, journeyId, `/tasks/${taskId}`),
+    cookie,
+    { done },
+  );
 }
 
 type JourneyResponse = Awaited<ReturnType<typeof journeyState>>;
@@ -1779,13 +1766,96 @@ async function unstartedProduct(email: string) {
   return { cookie, product };
 }
 
+/** Sign in and add a Product with a Journey on Dream Sequence. */
+async function startedProduct(email: string) {
+  const { cookie, product } = await unstartedProduct(email);
+  const res = await startJourney(product.id, cookie);
+  expect(res.status).toBe(201);
+  const { journeyId } = (await res.json()) as { journeyId: string };
+  return { cookie, product, journeyId };
+}
+
+/** Sign in, make a Path with one Milestone, and save it as version 1. */
+async function savedPath(email: string) {
+  const cookie = await signIn(email);
+  const path = await addPath(cookie);
+  await addMilestoneOn(cookie, path.id);
+  const res = await callApi("POST", `/api/paths/${path.id}/versions`, cookie);
+  expect(res.status).toBe(201);
+  const { version } = (await res.json()) as {
+    version: { id: string; number: number; savedAt: string };
+  };
+  return { cookie, path, version };
+}
+
 describe("Journey routes", () => {
-  it("GET /journey answers the Path and no Journey before one starts, with the Product", async () => {
+  it("GET /journeys lists none, then each Journey with its Path and current Milestone, with the Product", async () => {
     const { cookie, product } = await unstartedProduct(
-      TEST_EMAILS.journeysState,
+      TEST_EMAILS.journeysList,
+    );
+    const list = () =>
+      callApi("GET", `/api/products/${product.id}/journeys`, cookie);
+
+    const empty = await list();
+    expect(empty.status).toBe(200);
+    expect(await empty.json()).toEqual({ product, journeys: [] });
+
+    const { journeyId } = (await (
+      await startJourney(product.id, cookie)
+    ).json()) as { journeyId: string };
+    expect(await (await list()).json()).toEqual({
+      product,
+      journeys: [
+        {
+          id: journeyId,
+          pathId: "dream-sequence",
+          pathName: "Dream Sequence",
+          currentMilestoneName: "Rough One-Pager",
+          finishedAt: null,
+        },
+      ],
+    });
+  });
+
+  it("POST /journeys starts with a 201, answers a repeat with a 200 and the same id, and 404s a version the User can't follow", async () => {
+    const { cookie, product } = await unstartedProduct(
+      TEST_EMAILS.journeysStart,
     );
 
-    const res = await getJourney(product.id, cookie);
+    const started = await startJourney(product.id, cookie);
+    expect(started.status).toBe(201);
+    const body = (await started.json()) as { journeyId: string };
+    expect(body).toEqual({ journeyId: expect.any(String) });
+
+    const again = await startJourney(product.id, cookie);
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(body);
+
+    const theirs = await savedPath(TEST_EMAILS.trailheadStranger);
+    for (const versionId of [theirs.version.id, "no-such-version"]) {
+      const refused = await startJourney(product.id, cookie, versionId);
+      expect(refused.status).toBe(404);
+      expect(await refused.json()).toEqual({ error: "Not found" });
+    }
+    const bad = await callApi(
+      "POST",
+      `/api/products/${product.id}/journeys`,
+      cookie,
+      {},
+    );
+    expect(bad.status).toBe(400);
+  });
+
+  it("GET /journeys/:journeyId 404s an unknown Journey, else answers its state with the Product", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
+      TEST_EMAILS.journeysState,
+    );
+    expect(
+      (await callApi("GET", journeyUrl(product.id, "no-such-journey"), cookie))
+        .status,
+    ).toBe(404);
+
+    const res = await callApi("GET", journeyUrl(product.id, journeyId), cookie);
     expect(res.status).toBe(200);
     const body = (await res.json()) as JourneyResponse & {
       product: { id: string; name: string };
@@ -1793,11 +1863,16 @@ describe("Journey routes", () => {
     expect(body).toEqual({
       product,
       path: {
-        id: expect.any(String),
-        name: expect.any(String),
+        id: DREAM_SEQUENCE_VERSION,
+        name: "Dream Sequence",
         milestones: expect.any(Array),
       },
-      journey: null,
+      journey: {
+        id: journeyId,
+        startedAt: expect.any(String),
+        currentMilestoneId: body.path.milestones[0].id,
+        finishedAt: null,
+      },
       worksheets: expect.any(Array),
       tasks: expect.any(Array),
     });
@@ -1811,62 +1886,80 @@ describe("Journey routes", () => {
     });
   });
 
-  it("POST /journey starts with a 201, then answers a repeat start with a 200 and the same state", async () => {
-    const { cookie, product } = await unstartedProduct(
-      TEST_EMAILS.journeysStart,
-    );
-
-    const started = await startJourney(product.id, cookie);
-    expect(started.status).toBe(201);
-    const body = (await started.json()) as JourneyResponse;
-    expect(body.journey).toEqual({
-      startedAt: expect.any(String),
-      currentMilestoneId: body.path.milestones[0].id,
-      finishedAt: null,
-    });
-
-    const again = await startJourney(product.id, cookie);
-    expect(again.status).toBe(200);
-    expect(await again.json()).toEqual(body);
-  });
-
-  it("POST /journey/advance 404s with no Journey, then answers the advanced state", async () => {
-    const { cookie, product } = await unstartedProduct(
+  it("POST /journeys/:journeyId/advance 404s an unknown Journey, then answers the advanced state", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
       TEST_EMAILS.journeysAdvance,
     );
-    expect((await advanceJourney(product.id, cookie)).status).toBe(404);
+    expect(
+      (
+        await callApi(
+          "POST",
+          journeyUrl(product.id, "no-such-journey", "/advance"),
+          cookie,
+        )
+      ).status,
+    ).toBe(404);
 
-    await startJourney(product.id, cookie);
-    const res = await advanceJourney(product.id, cookie);
+    const res = await callApi(
+      "POST",
+      journeyUrl(product.id, journeyId, "/advance"),
+      cookie,
+    );
     expect(res.status).toBe(200);
     const body = (await res.json()) as JourneyResponse;
-    expect(body.journey?.currentMilestoneId).toBe(body.path.milestones[1].id);
+    expect(body.journey.currentMilestoneId).toBe(body.path.milestones[1].id);
   });
 
-  it("POST /journey/return 404s with no Journey, then answers the returned state", async () => {
-    const { cookie, product } = await unstartedProduct(
+  it("POST /journeys/:journeyId/return 404s an unknown Journey, then answers the returned state", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
       TEST_EMAILS.journeysReturn,
     );
-    expect((await returnJourney(product.id, cookie)).status).toBe(404);
+    expect(
+      (
+        await callApi(
+          "POST",
+          journeyUrl(product.id, "no-such-journey", "/return"),
+          cookie,
+        )
+      ).status,
+    ).toBe(404);
 
-    await startJourney(product.id, cookie);
-    await advanceJourney(product.id, cookie);
-    const res = await returnJourney(product.id, cookie);
+    await callApi(
+      "POST",
+      journeyUrl(product.id, journeyId, "/advance"),
+      cookie,
+    );
+    const res = await callApi(
+      "POST",
+      journeyUrl(product.id, journeyId, "/return"),
+      cookie,
+    );
     expect(res.status).toBe(200);
     const body = (await res.json()) as JourneyResponse;
-    expect(body.journey?.currentMilestoneId).toBe(body.path.milestones[0].id);
+    expect(body.journey.currentMilestoneId).toBe(body.path.milestones[0].id);
   });
 
-  it("GET /worksheets/:worksheetId 404s with no Journey or no such Worksheet, else answers it with the Product", async () => {
-    const { cookie, product } = await unstartedProduct(
+  it("GET /journeys/:journeyId/worksheets/:worksheetId 404s an unknown Journey or Worksheet, else answers it with the Product", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
       TEST_EMAILS.worksheetsRead,
     );
     expect(
-      (await getWorksheet(product.id, PRODUCT_SUMMARY, cookie)).status,
+      (
+        await getWorksheet(
+          product.id,
+          "no-such-journey",
+          PRODUCT_SUMMARY,
+          cookie,
+        )
+      ).status,
     ).toBe(404);
 
-    await startJourney(product.id, cookie);
-    const res = await getWorksheet(product.id, PRODUCT_SUMMARY, cookie);
+    const res = await getWorksheet(
+      product.id,
+      journeyId,
+      PRODUCT_SUMMARY,
+      cookie,
+    );
     expect(res.status).toBe(200);
     const body = (await res.json()) as WorksheetResponse;
     expect(body).toEqual({
@@ -1887,18 +1980,20 @@ describe("Journey routes", () => {
     });
 
     expect(
-      (await getWorksheet(product.id, "not-a-worksheet", cookie)).status,
+      (await getWorksheet(product.id, journeyId, "not-a-worksheet", cookie))
+        .status,
     ).toBe(404);
   });
 
-  it("PUT /worksheets/:worksheetId 404s with no Journey or no such Worksheet, 400s a bad body, else answers the trimmed answers", async () => {
-    const { cookie, product } = await unstartedProduct(
+  it("PUT /journeys/:journeyId/worksheets/:worksheetId 404s an unknown Journey or Worksheet, 400s a bad body, else answers the trimmed answers", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
       TEST_EMAILS.worksheetsSave,
     );
     expect(
       (
         await saveWorksheet(
           product.id,
+          "no-such-journey",
           PRODUCT_SUMMARY,
           { problem: "x" },
           cookie,
@@ -1906,9 +2001,9 @@ describe("Journey routes", () => {
       ).status,
     ).toBe(404);
 
-    await startJourney(product.id, cookie);
     const saved = await saveWorksheet(
       product.id,
+      journeyId,
       PRODUCT_SUMMARY,
       { problem: "  Kitchen scales are clunky  ", customer: "   " },
       cookie,
@@ -1928,14 +2023,21 @@ describe("Journey routes", () => {
       null,
     ]) {
       expect(
-        (await saveWorksheet(product.id, PRODUCT_SUMMARY, answers, cookie))
-          .status,
+        (
+          await saveWorksheet(
+            product.id,
+            journeyId,
+            PRODUCT_SUMMARY,
+            answers,
+            cookie,
+          )
+        ).status,
       ).toBe(400);
     }
     expect(
       (
         (await (
-          await getWorksheet(product.id, PRODUCT_SUMMARY, cookie)
+          await getWorksheet(product.id, journeyId, PRODUCT_SUMMARY, cookie)
         ).json()) as WorksheetResponse
       ).answers,
     ).toEqual({ problem: "Kitchen scales are clunky" });
@@ -1944,6 +2046,7 @@ describe("Journey routes", () => {
       (
         await saveWorksheet(
           product.id,
+          journeyId,
           "not-a-worksheet",
           { problem: "x" },
           cookie,
@@ -1952,34 +2055,136 @@ describe("Journey routes", () => {
     ).toBe(404);
   });
 
-  it("PUT /tasks/:taskId 404s with no Journey or no such Task, 400s a non-boolean done, else answers the Journey's state", async () => {
-    const { cookie, product } = await unstartedProduct(
+  it("PUT /journeys/:journeyId/tasks/:taskId 404s an unknown Journey or Task, 400s a non-boolean done, else answers the Journey's state", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
       TEST_EMAILS.tasksCheckOff,
     );
-    expect((await putTask(product.id, TALK_TASK, true, cookie)).status).toBe(
-      404,
-    );
+    expect(
+      (await putTask(product.id, "no-such-journey", TALK_TASK, true, cookie))
+        .status,
+    ).toBe(404);
 
-    await startJourney(product.id, cookie);
     for (const done of ["true", 1, null, undefined]) {
-      expect((await putTask(product.id, TALK_TASK, done, cookie)).status).toBe(
-        400,
-      );
+      expect(
+        (await putTask(product.id, journeyId, TALK_TASK, done, cookie)).status,
+      ).toBe(400);
     }
-    expect((await putTask(product.id, "not-a-task", true, cookie)).status).toBe(
-      404,
-    );
+    expect(
+      (await putTask(product.id, journeyId, "not-a-task", true, cookie)).status,
+    ).toBe(404);
 
-    const res = await putTask(product.id, TALK_TASK, true, cookie);
+    const res = await putTask(product.id, journeyId, TALK_TASK, true, cookie);
     expect(res.status).toBe(200);
     const body = (await res.json()) as JourneyResponse;
-    expect(body.journey).not.toBeNull();
+    expect(body.journey.id).toBe(journeyId);
     expect(body.tasks.find((t) => t.id === TALK_TASK)).toEqual({
       id: TALK_TASK,
       title: "Talk to 5 potential customers",
       milestoneIds: [body.path.milestones[1].id],
       done: true,
     });
+  });
+});
+
+describe("Pathfinder and Trailhead routes", () => {
+  it("GET /pathfinder lists Dream Sequence and the User's saved Paths, marking the ones the Product follows", async () => {
+    const { cookie, path } = await savedPath(TEST_EMAILS.pathfinderRoute);
+    await addPath(cookie, "Never Saved");
+    const { product } = (await (
+      await addProduct(cookie, "A phone-scale app")
+    ).json()) as { product: { id: string; name: string } };
+    const pathfinder = async () => {
+      const res = await callApi(
+        "GET",
+        `/api/products/${product.id}/pathfinder`,
+        cookie,
+      );
+      expect(res.status).toBe(200);
+      return res.json();
+    };
+
+    expect(await pathfinder()).toEqual({
+      product,
+      paths: [
+        { id: "dream-sequence", name: "Dream Sequence", following: false },
+        { id: path.id, name: path.name, following: false },
+      ],
+    });
+
+    await startJourney(product.id, cookie);
+    expect(await pathfinder()).toEqual({
+      product,
+      paths: [
+        { id: "dream-sequence", name: "Dream Sequence", following: true },
+        { id: path.id, name: path.name, following: false },
+      ],
+    });
+  });
+
+  it("GET /paths/:pathId/trailhead answers a version and its Path's versions, or 404s another User's Path, an unknown one, or a version it doesn't have", async () => {
+    const { cookie, path, version } = await savedPath(
+      TEST_EMAILS.trailheadRoute,
+    );
+    const second = await callApi(
+      "POST",
+      `/api/paths/${path.id}/versions`,
+      cookie,
+    );
+    const { version: latest } = (await second.json()) as {
+      version: { id: string; number: number; savedAt: string };
+    };
+    const { product } = (await (
+      await addProduct(cookie, "A phone-scale app")
+    ).json()) as { product: { id: string; name: string } };
+    const trailhead = (pathId: string, query = "") =>
+      callApi(
+        "GET",
+        `/api/products/${product.id}/paths/${pathId}/trailhead${query}`,
+        cookie,
+      );
+
+    const res = await trailhead(path.id);
+    expect(res.status).toBe(200);
+    const versions = [latest, version].map(({ number, savedAt }) => ({
+      number,
+      savedAt,
+    }));
+    expect(await res.json()).toEqual({
+      product,
+      path: { id: path.id, name: path.name, owner: "user" },
+      version: {
+        id: latest.id,
+        number: 2,
+        description: path.description,
+        milestones: [{ id: expect.any(String), ...MILESTONE }],
+      },
+      versions,
+      latestNumber: 2,
+    });
+    expect(await (await trailhead(path.id, "?version=1")).json()).toMatchObject(
+      { version: { id: version.id, number: 1 }, versions, latestNumber: 2 },
+    );
+    expect(await (await trailhead("dream-sequence")).json()).toMatchObject({
+      path: {
+        id: "dream-sequence",
+        name: "Dream Sequence",
+        owner: "dreamport",
+      },
+      version: { id: DREAM_SEQUENCE_VERSION, number: 1 },
+      latestNumber: 1,
+    });
+
+    const theirs = await savedPath(TEST_EMAILS.trailheadStranger);
+    for (const [pathId, query] of [
+      [theirs.path.id, ""],
+      ["no-such-path", ""],
+      [path.id, "?version=3"],
+      [path.id, "?version=one"],
+    ]) {
+      const missing = await trailhead(pathId, query);
+      expect(missing.status).toBe(404);
+      expect(await missing.json()).toEqual({ error: "Not found" });
+    }
   });
 });
 
@@ -2462,8 +2667,9 @@ describe("request gates, across every route (#154)", () => {
     /**
      * The owner's Product, with one of everything a product-scoped route
      * can name — an Idea, a started Journey (so its Worksheet exists), a
-     * Task — so a route that skipped the ownership check would succeed
-     * against it rather than 404 for some other reason.
+     * Task, a Path with a Trailhead — so a route that skipped the
+     * ownership check would succeed against it rather than 404 for some
+     * other reason.
      */
     async function ownedProduct() {
       const cookie = await signIn(TEST_EMAILS.gatesOwner);
@@ -2473,14 +2679,18 @@ describe("request gates, across every route (#154)", () => {
       const { idea } = (await (
         await addIdea(product.id, cookie, "Dark mode")
       ).json()) as { idea: { id: string } };
-      expect((await startJourney(product.id, cookie)).status).toBe(201);
+      const started = await startJourney(product.id, cookie);
+      expect(started.status).toBe(201);
+      const { journeyId } = (await started.json()) as { journeyId: string };
       return {
         cookie,
         params: {
           productId: product.id,
           id: idea.id,
+          journeyId,
           worksheetId: PRODUCT_SUMMARY,
           taskId: TALK_TASK,
+          pathId: "dream-sequence",
         },
       };
     }

@@ -16,11 +16,12 @@ import {
   createPath,
   deleteMilestone,
   deleteTask,
-  dreamSequence,
   type FollowableVersion,
   getDraft,
   getPath,
+  getTrailheadVersion,
   getVersion,
+  listFollowable,
   listPaths,
   MILESTONE_NAME_MAX_LENGTH,
   type MilestoneFields,
@@ -85,9 +86,21 @@ async function seedOwnersPath() {
   ]);
 }
 
+/** Dream Sequence's latest version, as any User's Trailhead opens it. */
+async function dreamSequence(): Promise<FollowableVersion> {
+  const trailhead = await getTrailheadVersion(
+    env.DB,
+    FOLLOWER_ID,
+    "dream-sequence",
+    null,
+  );
+  if (!trailhead) throw new Error("Dream Sequence is not seeded");
+  return trailhead.version;
+}
+
 describe("Dream Sequence", () => {
   it("is version 1 of Dreamport's Dream Sequence Path, with its seven Milestones in order", async () => {
-    const version = await dreamSequence(env.DB);
+    const version = await dreamSequence();
 
     expect(version).toMatchObject({
       id: "starter",
@@ -133,7 +146,7 @@ describe("Dream Sequence", () => {
   it("can be followed by any User", async () => {
     await seedUser(FOLLOWER_ID, TEST_EMAILS.pathsModuleFollower);
     await seedOwnersPath();
-    const version = await dreamSequence(env.DB);
+    const version = await dreamSequence();
 
     expect(await getVersion(env.DB, FOLLOWER_ID, "starter")).toEqual(version);
     expect(await getVersion(env.DB, OWNER_ID, "starter")).toEqual(version);
@@ -141,13 +154,13 @@ describe("Dream Sequence", () => {
 
   it("is the same after a Journey has been driven through every write", async () => {
     await seedUser(FOLLOWER_ID, TEST_EMAILS.pathsModuleFollower);
-    const before = await dreamSequence(env.DB);
+    const before = await dreamSequence();
     const { id } = await createProduct(env.DB, FOLLOWER_ID, "A bakery app");
     const product = await getProduct(env.DB, FOLLOWER_ID, id);
     if (!product) throw new Error("the Product just created isn't there");
 
-    await startJourney(env.DB, product, before);
-    const journey = await loadJourney(env.DB, product, before);
+    const { journeyId } = await startJourney(env.DB, product, before);
+    const journey = await loadJourney(env.DB, product, journeyId);
     if (!journey) throw new Error("the Journey just started isn't there");
     await saveAnswers(env.DB, journey, "product-summary", { problem: "Dough" });
     await setTaskDone(env.DB, journey, "talk-to-five-customers", true);
@@ -156,7 +169,7 @@ describe("Dream Sequence", () => {
     }
     await returnJourney(env.DB, journey);
 
-    expect(await dreamSequence(env.DB)).toEqual(before);
+    expect(await dreamSequence()).toEqual(before);
   });
 });
 
@@ -728,7 +741,7 @@ describe("a Path's Draft", () => {
   });
 
   it("leaves the saved Dream Sequence version as it was", async () => {
-    const before = await dreamSequence(env.DB);
+    const before = await dreamSequence();
     const path = await makersPath();
     const bake = await milestoneOn(path, BAKE);
     const sell = await milestoneOn(path, SELL);
@@ -737,7 +750,7 @@ describe("a Path's Draft", () => {
     await reorder(path, [sell.id, bake.id]);
     await deleteMilestone(env.DB, path, sell.id);
 
-    expect(await dreamSequence(env.DB)).toEqual(before);
+    expect(await dreamSequence()).toEqual(before);
   });
 });
 
@@ -756,15 +769,25 @@ async function saved(path: OwnedPath, userId = MAKER_ID) {
   return version;
 }
 
+/** A Journey on `version`, on a fresh Product of `userId`'s. */
+async function journeyOn(version: FollowableVersion, userId: string) {
+  const product = await productOf(userId);
+  const { journeyId } = await startJourney(env.DB, product, version);
+  const journey = await loadJourney(env.DB, product, journeyId);
+  if (!journey) throw new Error("the Journey just started isn't there");
+  return journey;
+}
+
+/** The Tasks on `version`'s Milestones, as a Journey on it reads them. */
+async function tasksOn(version: FollowableVersion, userId: string) {
+  return (await journeyState(env.DB, await journeyOn(version, userId))).tasks;
+}
+
 /** A saved version as a follower reads it: its Milestones in order, each with its Tasks. */
 async function contentOf(versionId: string, userId = MAKER_ID) {
   const version = await getVersion(env.DB, userId, versionId);
   if (!version) throw new Error(`no version ${versionId}`);
-  const { tasks } = await journeyState(
-    env.DB,
-    await productOf(userId),
-    version,
-  );
+  const tasks = await tasksOn(version, userId);
   return {
     number: version.number,
     name: version.name,
@@ -779,11 +802,7 @@ async function contentOf(versionId: string, userId = MAKER_ID) {
 }
 
 async function dreamSequenceTasks() {
-  const { tasks } = await journeyState(
-    env.DB,
-    await productOf(MAKER_ID),
-    await dreamSequence(env.DB),
-  );
+  const tasks = await tasksOn(await dreamSequence(), MAKER_ID);
   return tasks.map((t) => [t.title, t.milestoneIds]);
 }
 
@@ -956,7 +975,7 @@ describe("saving a Path's Draft as a version", () => {
     await milestoneOn(othersPath, BAKE);
     const othersVersion = await saved(othersPath);
     const othersBefore = await contentOf(othersVersion.id);
-    const dreamBefore = await dreamSequence(env.DB);
+    const dreamBefore = await dreamSequence();
     const dreamTasksBefore = await dreamSequenceTasks();
     const rowsBefore = await versionRowCounts();
 
@@ -970,11 +989,8 @@ describe("saving a Path's Draft as a version", () => {
     const bake = await milestoneOn(created.path, BAKE);
     await taskOn(created.path, bake.id, "Knead");
     const version: FollowableVersion = await saved(created.path, userId);
-    const product = await productOf(userId);
-    await startJourney(env.DB, product, version);
-    const journey = await loadJourney(env.DB, product, version);
-    if (!journey) throw new Error("the Journey just started isn't there");
-    const { tasks } = await journeyState(env.DB, product, version);
+    const journey = await journeyOn(version, userId);
+    const { tasks } = await journeyState(env.DB, journey);
     await setTaskDone(env.DB, journey, tasks[0].id, true);
     expect(await versionRowCounts()).not.toEqual(rowsBefore);
 
@@ -986,7 +1002,7 @@ describe("saving a Path's Draft as a version", () => {
     expect(await getVersion(env.DB, userId, version.id)).toBeNull();
     expect(await versionRowCounts()).toEqual(rowsBefore);
     expect(await contentOf(othersVersion.id)).toEqual(othersBefore);
-    expect(await dreamSequence(env.DB)).toEqual(dreamBefore);
+    expect(await dreamSequence()).toEqual(dreamBefore);
     expect(await dreamSequenceTasks()).toEqual(dreamTasksBefore);
   });
 });
@@ -1057,5 +1073,104 @@ describe("parsing a Path's fields", () => {
       ok: false,
       error: "body must be a JSON object",
     });
+  });
+});
+
+const PATHFINDER_ID = "paths-module-pathfinder";
+const TRAILHEAD_ID = "paths-module-trailhead";
+
+/** A new Path of `userId`'s, its Draft holding `milestones`. */
+async function pathOf(
+  userId: string,
+  name: string,
+  milestones: readonly MilestoneFields[] = [],
+) {
+  const created = await createPath(env.DB, userId, {
+    name,
+    description: "For bakers",
+  });
+  if (!created.ok) throw new Error(`${userId} is at the Path cap`);
+  for (const fields of milestones) {
+    await milestoneOn(created.path, fields);
+  }
+  return created.path;
+}
+
+describe("Pathfinder (#170)", () => {
+  it("lists Dream Sequence first, then the User's Paths with a saved version by their latest name, never another User's", async () => {
+    await seedUser(PATHFINDER_ID, TEST_EMAILS.pathsModulePathfinder);
+    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
+    const first = await pathOf(PATHFINDER_ID, "First", [BAKE]);
+    await saved(first, PATHFINDER_ID);
+    await rename(first, "First Again", "For bakers");
+    await saved(first, PATHFINDER_ID);
+    await pathOf(PATHFINDER_ID, "Draft Only", [BAKE]);
+    const second = await pathOf(PATHFINDER_ID, "Second", [BAKE]);
+    await saved(second, PATHFINDER_ID);
+    await saved(await pathOf(STRANGER_ID, "Theirs", [BAKE]), STRANGER_ID);
+
+    expect(await listFollowable(env.DB, PATHFINDER_ID)).toEqual([
+      { id: "dream-sequence", name: "Dream Sequence", latestVersionNumber: 1 },
+      { id: first.id, name: "First Again", latestVersionNumber: 2 },
+      { id: second.id, name: "Second", latestVersionNumber: 1 },
+    ]);
+  });
+});
+
+describe("a Trailhead (#170)", () => {
+  it("opens on a Path's latest version, or an earlier one by number, with every version newest first", async () => {
+    await seedUser(TRAILHEAD_ID, TEST_EMAILS.pathsModuleTrailhead);
+    const path = await pathOf(TRAILHEAD_ID, "Bakery Path", [BAKE]);
+    const one = await saved(path, TRAILHEAD_ID);
+    await milestoneOn(path, SELL);
+    const two = await saved(path, TRAILHEAD_ID);
+    const versions = [two, one].map(({ id, number, savedAt }) => ({
+      id,
+      number,
+      savedAt,
+    }));
+
+    expect(
+      await getTrailheadVersion(env.DB, TRAILHEAD_ID, path.id, null),
+    ).toEqual({ owner: "user", version: two, versions });
+    expect(await getTrailheadVersion(env.DB, TRAILHEAD_ID, path.id, 1)).toEqual(
+      { owner: "user", version: one, versions },
+    );
+    expect(
+      await getTrailheadVersion(env.DB, TRAILHEAD_ID, path.id, 3),
+    ).toBeNull();
+  });
+
+  it("opens on Dream Sequence for any User, as Dreamport's", async () => {
+    await seedUser(TRAILHEAD_ID, TEST_EMAILS.pathsModuleTrailhead);
+
+    expect(
+      await getTrailheadVersion(env.DB, TRAILHEAD_ID, "dream-sequence", null),
+    ).toMatchObject({
+      owner: "dreamport",
+      version: { id: "starter", number: 1, name: "Dream Sequence" },
+      versions: [{ id: "starter", number: 1 }],
+    });
+  });
+
+  it("doesn't open for another User's Path, an unknown one, or one with only a Draft", async () => {
+    await seedUser(TRAILHEAD_ID, TEST_EMAILS.pathsModuleTrailhead);
+    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
+    const path = await pathOf(TRAILHEAD_ID, "Bakery Path", [BAKE]);
+    await saved(path, TRAILHEAD_ID);
+    const draftOnly = await pathOf(TRAILHEAD_ID, "Draft Only", [BAKE]);
+
+    expect(
+      await getTrailheadVersion(env.DB, STRANGER_ID, path.id, null),
+    ).toBeNull();
+    expect(
+      await getTrailheadVersion(env.DB, STRANGER_ID, path.id, 1),
+    ).toBeNull();
+    expect(
+      await getTrailheadVersion(env.DB, TRAILHEAD_ID, "no-such-path", null),
+    ).toBeNull();
+    expect(
+      await getTrailheadVersion(env.DB, TRAILHEAD_ID, draftOnly.id, null),
+    ).toBeNull();
   });
 });

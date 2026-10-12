@@ -170,6 +170,8 @@ export const TEST_EMAILS = {
   // --- The Journey module, called directly (#156) ---
   /** The one User who owns every Product in `journeys.worker.test.ts`. Never signs in. */
   journeysModule: "delivered+journeys-module@resend.dev",
+  /** Owns a Path and a Product `journeysModule` must never reach (#170). Never signs in. */
+  journeysModuleStranger: "delivered+journeys-module-stranger@resend.dev",
 
   // --- The Paths module, called directly (#166) ---
   /** Follows Dream Sequence, and must never see `pathsModuleOwner`'s Path. Never signs in. */
@@ -188,22 +190,34 @@ export const TEST_EMAILS = {
   pathsModuleDeleted: "delivered+paths-module-deleted@resend.dev",
   /** Saves a version and follows it, then is deleted, taking both with them (#169). */
   pathsModuleSaverDeleted: "delivered+paths-module-saver-deleted@resend.dev",
+  /** Makes the only Paths Pathfinder lists for them (#170). */
+  pathsModulePathfinder: "delivered+paths-module-pathfinder@resend.dev",
+  /** Makes Paths and opens their Trailheads (#170). */
+  pathsModuleTrailhead: "delivered+paths-module-trailhead@resend.dev",
 
-  // --- Seam 1: the Journey routes (#137-#140), one test each ---
-  /** Reads the Journey page's state before a Journey starts. */
+  // --- Seam 1: the Journey routes (#137-#140, #170), one test each ---
+  /** Lists a Product's Journeys, none and then one. */
+  journeysList: "delivered+journeys-list@resend.dev",
+  /** Reads one Journey's state. */
   journeysState: "delivered+journeys-state@resend.dev",
   /** Starts a Journey, then starts it again. */
   journeysStart: "delivered+journeys-start@resend.dev",
-  /** Advances with no Journey (404), then with one. */
+  /** Advances an unknown Journey (404), then one. */
   journeysAdvance: "delivered+journeys-advance@resend.dev",
-  /** Returns with no Journey (404), then with one. */
+  /** Returns an unknown Journey (404), then one. */
   journeysReturn: "delivered+journeys-return@resend.dev",
-  /** Reads the Product Summary with no Journey (404), then with one. */
+  /** Reads the Product Summary on an unknown Journey (404), then on one. */
   worksheetsRead: "delivered+worksheets-read@resend.dev",
-  /** Saves the Product Summary with no Journey (404), a bad body (400), then a good one. */
+  /** Saves the Product Summary on an unknown Journey (404), a bad body (400), then a good one. */
   worksheetsSave: "delivered+worksheets-save@resend.dev",
-  /** Checks off a Task with no Journey (404), a bad body (400), then a good one. */
+  /** Checks off a Task on an unknown Journey (404), a bad body (400), then a good one. */
   tasksCheckOff: "delivered+tasks-check-off@resend.dev",
+  /** Opens Pathfinder, before and after following a Path. */
+  pathfinderRoute: "delivered+pathfinder-route@resend.dev",
+  /** Opens Trailheads: Dream Sequence's, their own Path's, and another User's (404). */
+  trailheadRoute: "delivered+trailhead-route@resend.dev",
+  /** Owns the Path whose Trailhead `trailheadRoute` must not open. */
+  trailheadStranger: "delivered+trailhead-stranger@resend.dev",
 
   // --- Seam 1: the Trailblazer routes (#167), one test each ---
   /** Lists Paths, adds one, then lists it. */

@@ -12,12 +12,13 @@
  *
  * A Journey is on one saved Path version, which callers pass in as a
  * `FollowableVersion` from `paths.ts`, so a route can't start a Journey on
- * a version the User may not follow. And everything that needs a Journey
- * to have started takes a `StartedJourney`, which only `loadJourney`
+ * a version the User may not follow. A Product can be on several Paths at
+ * once (#170), so a Journey is addressed by its own id. Everything that
+ * needs a Journey takes a `StartedJourney`, which only `loadJourney`
  * makes, so a route can't skip that check either.
  */
 
-import type { FollowableVersion, Milestone } from "./paths";
+import { getVersion, type FollowableVersion, type Milestone } from "./paths";
 import type { OwnedProduct } from "./products";
 import {
   getWorksheet,
@@ -34,6 +35,7 @@ import {
  * take its place.
  */
 export interface Journey {
+  id: string;
   startedAt: string;
   currentMilestoneId: string;
   finishedAt: string | null;
@@ -42,14 +44,16 @@ export interface Journey {
 declare const started: unique symbol;
 
 /**
- * A Product's Journey, confirmed to have started. Only `loadJourney` makes
- * one, so Advance, Return, Worksheet read/save and Task check-off — which
- * all take this — can't run against a Product that hasn't started.
+ * One of a Product's Journeys, confirmed to exist on a version the
+ * Product's User may follow. Only `loadJourney` makes one, so Advance,
+ * Return, Worksheet read/save and Task check-off, which all take this,
+ * can't run against a Journey nobody checked.
  *
  * It names the Journey rather than holding its progress, which would go
  * stale the moment it advanced; `journeyState` reads that.
  */
 export type StartedJourney = {
+  readonly id: string;
   readonly product: OwnedProduct;
   readonly version: FollowableVersion;
   readonly [started]: true;
@@ -76,48 +80,101 @@ export interface TaskSummary {
   done: boolean;
 }
 
-/** The Product's Journey on `version`, or `null` if it hasn't started one. */
+/** A Journey as the Product's list of Journeys shows it. */
+export interface JourneySummary {
+  id: string;
+  pathId: string;
+  /** The name of the version it's on. */
+  pathName: string;
+  currentMilestoneName: string;
+  finishedAt: string | null;
+}
+
+/**
+ * The Product's Journey `journeyId`, or `null` if the Product has no such
+ * Journey or its version isn't one the Product's User may follow: the
+ * version comes through `getVersion`, so the owner rule stays in
+ * `paths.ts`.
+ */
 export async function loadJourney(
   db: D1Database,
   product: OwnedProduct,
-  version: FollowableVersion,
+  journeyId: string,
 ): Promise<StartedJourney | null> {
   const row = await db
     .prepare(
-      'SELECT 1 FROM "journeys" WHERE "productId" = ? AND "versionId" = ?',
+      `SELECT "journeys"."versionId", "products"."userId"
+       FROM "journeys" JOIN "products" ON "products"."id" = "journeys"."productId"
+       WHERE "journeys"."id" = ? AND "journeys"."productId" = ?`,
     )
-    .bind(product.id, version.id)
-    .first();
-  return row ? ({ product, version } as StartedJourney) : null;
+    .bind(journeyId, product.id)
+    .first<{ versionId: string; userId: string }>();
+  const version = row ? await getVersion(db, row.userId, row.versionId) : null;
+  return version
+    ? ({ id: journeyId, product, version } as StartedJourney)
+    : null;
+}
+
+/**
+ * Every one of the Product's Journeys, oldest first. Each was started on a
+ * `FollowableVersion` of its Product's User, and a Path never changes
+ * hands, so there's no owner rule to repeat here.
+ */
+export async function listJourneys(
+  db: D1Database,
+  product: OwnedProduct,
+): Promise<JourneySummary[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT "journeys"."id", "path_versions"."pathId", "path_versions"."name" AS "pathName",
+         "milestones"."name" AS "currentMilestoneName", "journeys"."finishedAt"
+       FROM "journeys"
+       JOIN "path_versions" ON "path_versions"."id" = "journeys"."versionId"
+       JOIN "milestones" ON "milestones"."id" = "journeys"."currentMilestoneId"
+       WHERE "journeys"."productId" = ?
+       ORDER BY "journeys"."startedAt" ASC, "journeys"."rowid" ASC`,
+    )
+    .bind(product.id)
+    .all<JourneySummary>();
+  return results;
 }
 
 /**
  * Start the Product's Journey on `version` at its first Milestone, with its
- * one instance of each singleton Worksheet on the version (#139). Returns
- * whether a Journey was actually started — `false` means one already
- * existed, and it's left exactly as it was (a repeat start never resets
- * progress). A repeat start still creates any singleton instance that's
- * missing, which a Journey started before #139 would be.
+ * one instance of each singleton Worksheet on the version (#139). `started`
+ * is `false` when the Product already had a Journey on `version`, which is
+ * left exactly as it was (a repeat start never resets progress) and whose
+ * id comes back. A repeat start still creates any singleton instance
+ * that's missing, which a Journey started before #139 would be.
  */
 export async function startJourney(
   db: D1Database,
   product: OwnedProduct,
   version: FollowableVersion,
-): Promise<boolean> {
-  const { meta } = await db
-    .prepare(
-      'INSERT INTO "journeys" ("id", "productId", "versionId", "currentMilestoneId", "startedAt") VALUES (?, ?, ?, ?, ?) ON CONFLICT ("productId", "versionId") DO NOTHING',
-    )
-    .bind(
-      crypto.randomUUID(),
-      product.id,
-      version.id,
-      version.milestones[0].id,
-      new Date().toISOString(),
-    )
-    .run();
+): Promise<{ journeyId: string; started: boolean }> {
+  const [inserted, journey] = await db.batch<{ id: string }>([
+    db
+      .prepare(
+        'INSERT INTO "journeys" ("id", "productId", "versionId", "currentMilestoneId", "startedAt") VALUES (?, ?, ?, ?, ?) ON CONFLICT ("productId", "versionId") DO NOTHING',
+      )
+      .bind(
+        crypto.randomUUID(),
+        product.id,
+        version.id,
+        version.milestones[0].id,
+        new Date().toISOString(),
+      ),
+    db
+      .prepare(
+        'SELECT "id" FROM "journeys" WHERE "productId" = ? AND "versionId" = ?',
+      )
+      .bind(product.id, version.id),
+  ]);
   await createSingletonInstances(db, product, version.id);
-  return meta.changes > 0;
+  return {
+    journeyId: journey.results[0].id,
+    started: inserted.meta.changes > 0,
+  };
 }
 
 /**
@@ -166,9 +223,9 @@ export async function advanceJourney(
            ) THEN "finishedAt"
            ELSE ?
          END
-       WHERE "productId" = ? AND "versionId" = ? AND "finishedAt" IS NULL`,
+       WHERE "id" = ? AND "finishedAt" IS NULL`,
     )
-    .bind(new Date().toISOString(), journey.product.id, journey.version.id)
+    .bind(new Date().toISOString(), journey.id)
     .run();
 }
 
@@ -212,9 +269,9 @@ export async function returnJourney(
            )
          END,
          "finishedAt" = NULL
-       WHERE "productId" = ? AND "versionId" = ?`,
+       WHERE "id" = ?`,
     )
-    .bind(journey.product.id, journey.version.id)
+    .bind(journey.id)
     .run();
 }
 
@@ -345,32 +402,35 @@ export async function setTaskDone(
 }
 
 /**
- * What `/api/products/:productId/journey` answers with: the Path version
- * with its Milestones (still under `path`, which the page reads), the
- * Product's Journey on it (`null` until started), the Worksheets on its
- * Milestones with how much of each is filled in (#139), and the Tasks on
- * them with whether each is checked off (#140).
+ * What `/api/products/:productId/journeys/:journeyId` answers with: the
+ * Path version with its Milestones (still under `path`, which the page
+ * reads), the Journey's progress on it, the Worksheets on its Milestones
+ * with how much of each is filled in (#139), and the Tasks on them with
+ * whether each is checked off (#140).
  */
 export async function journeyState(
   db: D1Database,
-  product: OwnedProduct,
-  version: FollowableVersion,
+  started: StartedJourney,
 ): Promise<{
   path: { id: string; name: string; milestones: readonly Milestone[] };
-  journey: Journey | null;
+  journey: Journey;
   worksheets: WorksheetSummary[];
   tasks: TaskSummary[];
 }> {
+  const { product, version } = started;
   const [journey, worksheets, tasks] = await Promise.all([
     db
       .prepare(
-        'SELECT "startedAt", "currentMilestoneId", "finishedAt" FROM "journeys" WHERE "productId" = ? AND "versionId" = ?',
+        'SELECT "id", "startedAt", "currentMilestoneId", "finishedAt" FROM "journeys" WHERE "id" = ?',
       )
-      .bind(product.id, version.id)
+      .bind(started.id)
       .first<Journey>(),
     worksheetSummaries(db, product, version.id),
     taskSummaries(db, product, version.id),
   ]);
+  if (!journey) {
+    throw new Error(`Journey ${started.id} is gone`);
+  }
   const { id, name, milestones } = version;
   return { path: { id, name, milestones }, journey, worksheets, tasks };
 }
