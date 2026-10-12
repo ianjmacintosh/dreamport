@@ -364,16 +364,23 @@ Add an entry only once a sign-off conversation resolves something repeatable
     as the h2, then one `ActionCard` link per Path the User can follow
     (Dream Sequence first, then their own with a saved version), each
     going to its Trailhead. One the Product already follows stays in the
-    list, marked "Following". A `.link-quiet` "Make your own Path in
-    Trailblazer" ends it.
+    list, marked "Following", and goes to that Journey: a Path you're on
+    never invites you to start it again. A "Make Your Own Path" h3 ends
+    it: "Not finding a Path that does quite what you need? Make your own
+    Path", the last three words linking to Trailblazer.
   - **Trailhead** (`/app/products/:productId/paths/:pathId/trailhead`):
     the pre-start Journey page #137 drew, with the Path's name as the h1:
     the route with every outcome line on the left, the pitch and "Start
     Journey" on the right. A User's own Path shows its description as the
-    pitch. The version stays in the background: the page shows the latest,
-    and "Use an Earlier Version" (a `Dropdown`, only when there's more
-    than one) picks another; an earlier version's page says a newer one is
-    available.
+    pitch. If the Product already follows the Path, "{Product} is already
+    following {Path}." and "View Journey" take Start Journey's place. The
+    version stays in the background: the page shows the latest, and a
+    `.link-quiet` "Looking for an older version?" (only when there's more
+    than one) opens a `Dialog` listing every version, the one shown
+    unlinked. The link adds `?versions` to the URL, so Back closes the
+    Dialog. A `Dropdown` put an older version one click from Start
+    Journey, too easy to reach. An earlier version's page says a newer one
+    is available.
   - The Product page's Journey section keeps one line per Journey, and its
     button reads "View Journeys", or "Choose a Path" (to Pathfinder) when
     there are none.

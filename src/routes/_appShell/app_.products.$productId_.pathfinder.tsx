@@ -9,8 +9,8 @@ import Link from "../../components/Link";
 interface FollowablePath {
   id: string;
   name: string;
-  /** Whether the Product already has a Journey on it. */
-  following: boolean;
+  /** The Product's Journey on it, if it already follows it. */
+  journeyId: string | null;
 }
 
 // Filename note: `$productId_` makes this a sibling of the Product home
@@ -49,9 +49,10 @@ export const Route = createFileRoute(
 /**
  * Pathfinder (#170): every Path this Product can follow, Dream Sequence
  * first, then the User's own Paths that have a saved version. Each is an
- * `ActionCard` link to its Trailhead, marked "Following" when the Product
- * already has a Journey on it. Below, a quiet link to Trailblazer for
- * making another.
+ * `ActionCard` link to its Trailhead, or, when the Product already
+ * follows it, to that Journey, marked "Following", so the list never
+ * invites a second start. Below, "Make Your Own Path" links to
+ * Trailblazer.
  */
 function Pathfinder() {
   const { product, paths } = Route.useRouteContext();
@@ -63,10 +64,14 @@ function Pathfinder() {
         {paths.map((path) => (
           <li key={path.id}>
             <ActionCard
-              href={`/app/products/${product.id}/paths/${path.id}/trailhead`}
+              href={
+                path.journeyId
+                  ? `/app/products/${product.id}/journeys/${path.journeyId}`
+                  : `/app/products/${product.id}/paths/${path.id}/trailhead`
+              }
               leading={<PathIcon weight="bold" aria-hidden="true" />}
               trailing={
-                path.following && (
+                path.journeyId && (
                   <ActionCard.Status>Following</ActionCard.Status>
                 )
               }
@@ -76,10 +81,10 @@ function Pathfinder() {
           </li>
         ))}
       </ul>
+      <h3>Make Your Own Path</h3>
       <p>
-        <Link href="/app/paths" className="link-quiet">
-          Make your own Path in Trailblazer
-        </Link>
+        Not finding a Path that does quite what you need?{" "}
+        <Link href="/app/paths">Make your own Path</Link>
       </p>
     </>
   );

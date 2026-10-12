@@ -46,8 +46,8 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   await page.getByRole("link", { name: "Choose a Path" }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+\/pathfinder$/);
   await expect(
-    page.getByRole("link", { name: "Make your own Path in Trailblazer" }),
-  ).toBeVisible();
+    page.getByRole("link", { name: "Make your own Path" }),
+  ).toHaveAttribute("href", "/app/paths");
   await page.getByRole("link", { name: "Dream Sequence" }).click();
   await expect(page).toHaveURL(
     /\/app\/products\/.+\/paths\/dream-sequence\/trailhead$/,
@@ -70,7 +70,7 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   ).toBeVisible();
   // Dream Sequence has one version, so there's no other to pick.
   await expect(
-    page.getByRole("button", { name: "Use an Earlier Version" }),
+    page.getByRole("link", { name: "Looking for an older version?" }),
   ).toHaveCount(0);
 
   await page.getByRole("button", { name: "Start Journey" }).click();
@@ -127,12 +127,23 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   await expect(page.getByText("Dream Sequence: Real Talk")).toBeVisible();
   await expect(page.getByRole("link", { name: "View Journeys" })).toBeVisible();
 
-  // Pathfinder now marks Dream Sequence as followed.
+  // Pathfinder now marks Dream Sequence as followed and links to its
+  // Journey, not back to its Trailhead.
   const productUrl = page.url();
   await page.goto(`${productUrl}/pathfinder`);
+  await page.getByRole("link", { name: "Dream Sequence Following" }).click();
+  await expect(page).toHaveURL(/\/journeys\/[^/]+$/);
+
+  // Its Trailhead, reached directly, offers the Journey, not a second start.
+  await page.goto(`${productUrl}/paths/dream-sequence/trailhead`);
   await expect(
-    page.getByRole("link", { name: "Dream Sequence Following" }),
+    page.getByText(`${productName} is already following Dream Sequence.`),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start Journey" })).toHaveCount(
+    0,
+  );
+  await page.getByRole("link", { name: "View Journey" }).click();
+  await expect(page).toHaveURL(/\/journeys\/[^/]+$/);
 
   // The one-Journey page's old address lands on the Journeys page.
   await page.goto(`${productUrl}/journey`);
@@ -192,12 +203,19 @@ test("make a Path in Trailblazer with a Milestone and a Task, save a version, an
   // A User's own Path shows its description where Dream Sequence has its pitch.
   await expect(page.getByText("Two days to sign-ups.")).toBeVisible();
 
-  // An earlier version is a pick away, and says how to get back.
+  // An earlier version is in a Dialog behind a quiet link, and says how to
+  // get back.
   const earlier = page.getByText("This is version 1.");
   await expect(earlier).toHaveCount(0);
-  await page.getByRole("button", { name: "Use an Earlier Version" }).click();
-  await page.getByRole("menuitem", { name: /^Version 1, saved / }).click();
+  await page
+    .getByRole("link", { name: "Looking for an older version?" })
+    .click();
+  const versions = page.getByRole("dialog", {
+    name: `Versions of ${pathName}`,
+  });
+  await versions.getByRole("link", { name: /^Version 1, saved / }).click();
   await expect(page).toHaveURL(/\/trailhead\?version=1$/);
+  await expect(versions).toHaveCount(0);
   await expect(earlier).toBeVisible();
   await page
     .getByRole("link", { name: "A newer version is available." })

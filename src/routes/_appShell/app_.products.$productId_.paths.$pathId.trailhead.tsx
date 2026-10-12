@@ -3,7 +3,7 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
 import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
-import Dropdown from "../../components/Dropdown";
+import Dialog from "../../components/Dialog";
 import Link from "../../components/Link";
 
 /**
@@ -56,6 +56,8 @@ interface Trailhead {
   /** Newest first. */
   versions: { number: number; savedAt: string }[];
   latestNumber: number;
+  /** The Product's Journey on this Path, if it already follows it. */
+  journeyId: string | null;
 }
 
 const LONG_DATE = new Intl.DateTimeFormat(undefined, { dateStyle: "long" });
@@ -70,8 +72,12 @@ const CONNECTION_FAILED =
 export const Route = createFileRoute(
   "/_appShell/app_/products/$productId_/paths/$pathId/trailhead",
 )({
-  validateSearch: (search: Record<string, unknown>): { version?: number } =>
-    typeof search.version === "number" ? { version: search.version } : {},
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { version?: number; versions?: true } => ({
+    ...(typeof search.version === "number" && { version: search.version }),
+    ...(search.versions === true && { versions: true }),
+  }),
   beforeLoad: async ({ params, search }) => {
     const query =
       search.version === undefined ? "" : `?version=${search.version}`;
@@ -120,10 +126,22 @@ export const Route = createFileRoute(
  */
 function TrailheadPage() {
   const { product, trailhead } = Route.useRouteContext();
-  const { path, version, versions, latestNumber } = trailhead;
+  const { path, version, versions, latestNumber, journeyId } = trailhead;
+  const search = Route.useSearch();
   const navigate = useNavigate();
+  const trailheadHref = `/app/products/${product.id}/paths/${path.id}/trailhead`;
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState("");
+
+  /** Drop `?versions` without a new history entry, keeping the version shown. */
+  function closeVersions() {
+    void navigate({
+      to: "/app/products/$productId/paths/$pathId/trailhead",
+      params: { productId: product.id, pathId: path.id },
+      search: { version: search.version },
+      replace: true,
+    });
+  }
 
   async function startJourney() {
     setError("");
@@ -206,49 +224,90 @@ function TrailheadPage() {
           {version.number < latestNumber && (
             <p>
               This is version {version.number}.{" "}
-              <Link
-                href={`/app/products/${product.id}/paths/${path.id}/trailhead`}
-              >
-                A newer version is available.
-              </Link>
+              <Link href={trailheadHref}>A newer version is available.</Link>
             </p>
           )}
-          <div className="button-group button-group--end">
-            <Button
-              disabled={isStarting}
-              state={isStarting ? "pending" : "ready"}
-              onClick={() => void startJourney()}
-            >
-              <Button.State name="ready">Start Journey</Button.State>
-              <Button.State name="pending">Starting…</Button.State>
-            </Button>
-          </div>
+          {journeyId ? (
+            <>
+              <p>
+                {product.name} is already following {path.name}.
+              </p>
+              <div className="button-group button-group--end">
+                <Link
+                  href={`/app/products/${product.id}/journeys/${journeyId}`}
+                  className="button button--primary"
+                >
+                  View Journey
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div className="button-group button-group--end">
+              <Button
+                disabled={isStarting}
+                state={isStarting ? "pending" : "ready"}
+                onClick={() => void startJourney()}
+              >
+                <Button.State name="ready">Start Journey</Button.State>
+                <Button.State name="pending">Starting…</Button.State>
+              </Button>
+            </div>
+          )}
           {versions.length > 1 && (
             <p>
-              <Dropdown label="Use an Earlier Version" align="start">
-                {versions
-                  .filter((other) => other.number !== version.number)
-                  .map((other) => (
-                    <Dropdown.Item
-                      key={other.number}
-                      onClick={() =>
-                        void navigate({
-                          to: "/app/products/$productId/paths/$pathId/trailhead",
-                          params: { productId: product.id, pathId: path.id },
-                          search: { version: other.number },
-                        })
-                      }
-                    >
-                      Version {other.number}, saved{" "}
-                      {LONG_DATE.format(new Date(other.savedAt))}
-                    </Dropdown.Item>
-                  ))}
-              </Dropdown>
+              <Link
+                href={`${trailheadHref}?${search.version === undefined ? "" : `version=${search.version}&`}versions=true`}
+                className="link-quiet"
+              >
+                Looking for an older version?
+              </Link>
             </p>
           )}
           {error && <p role="alert">{error}</p>}
         </section>
       </div>
+      <Dialog
+        open={search.versions === true}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeVersions();
+          }
+        }}
+        title={`Versions of ${path.name}`}
+      >
+        <ul className="list">
+          {versions.map((other) => {
+            const label = `Version ${other.number}${
+              other.number === latestNumber ? " (latest)" : ""
+            }, saved ${LONG_DATE.format(new Date(other.savedAt))}`;
+            return (
+              <li key={other.number} className="list-row">
+                {other.number === version.number ? (
+                  <span className="list-row-name" aria-current="page">
+                    {label}
+                  </span>
+                ) : (
+                  <Link
+                    className="list-row-name"
+                    href={
+                      other.number === latestNumber
+                        ? trailheadHref
+                        : `${trailheadHref}?version=${other.number}`
+                    }
+                  >
+                    {label}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <div className="button-group button-group--end">
+          <Button variant="secondary" onClick={() => closeVersions()}>
+            Close
+          </Button>
+        </div>
+      </Dialog>
     </>
   );
 }

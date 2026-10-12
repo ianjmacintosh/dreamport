@@ -2106,17 +2106,19 @@ describe("Pathfinder and Trailhead routes", () => {
     expect(await pathfinder()).toEqual({
       product,
       paths: [
-        { id: "dream-sequence", name: "Dream Sequence", following: false },
-        { id: path.id, name: path.name, following: false },
+        { id: "dream-sequence", name: "Dream Sequence", journeyId: null },
+        { id: path.id, name: path.name, journeyId: null },
       ],
     });
 
-    await startJourney(product.id, cookie);
+    const { journeyId } = (await (
+      await startJourney(product.id, cookie)
+    ).json()) as { journeyId: string };
     expect(await pathfinder()).toEqual({
       product,
       paths: [
-        { id: "dream-sequence", name: "Dream Sequence", following: true },
-        { id: path.id, name: path.name, following: false },
+        { id: "dream-sequence", name: "Dream Sequence", journeyId },
+        { id: path.id, name: path.name, journeyId: null },
       ],
     });
   });
@@ -2160,6 +2162,7 @@ describe("Pathfinder and Trailhead routes", () => {
       },
       versions,
       latestNumber: 2,
+      journeyId: null,
     });
     expect(await (await trailhead(path.id, "?version=1")).json()).toMatchObject(
       { version: { id: version.id, number: 1 }, versions, latestNumber: 2 },
@@ -2172,6 +2175,15 @@ describe("Pathfinder and Trailhead routes", () => {
       },
       version: { id: DREAM_SEQUENCE_VERSION, number: 1 },
       latestNumber: 1,
+    });
+
+    // Following an earlier version still counts as following the Path.
+    const { journeyId } = (await (
+      await startJourney(product.id, cookie, version.id)
+    ).json()) as { journeyId: string };
+    expect(await (await trailhead(path.id)).json()).toMatchObject({
+      version: { number: 2 },
+      journeyId,
     });
 
     const theirs = await savedPath(TEST_EMAILS.trailheadStranger);

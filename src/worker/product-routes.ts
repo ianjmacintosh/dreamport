@@ -423,22 +423,35 @@ productRoutes.put("/journeys/:journeyId/tasks/:taskId", async (c) => {
 });
 
 /**
- * Pathfinder (#170): every Path the User can follow, marking the ones the
- * Product already has a Journey on.
+ * The Product's latest Journey on each Path it follows, by Path id. Until
+ * #172 a Product has at most one Journey per version, but it can still be
+ * on two versions of one Path.
+ */
+async function journeysByPath(
+  db: D1Database,
+  product: OwnedProduct,
+): Promise<Map<string, string>> {
+  const journeys = await listJourneys(db, product);
+  return new Map(journeys.map((journey) => [journey.pathId, journey.id]));
+}
+
+/**
+ * Pathfinder (#170): every Path the User can follow, with the Product's
+ * Journey on each one it already follows, so the page can link to that
+ * Journey and not invite a second start.
  */
 productRoutes.get("/pathfinder", async (c) => {
   const { product } = c.var;
   const [paths, journeys] = await Promise.all([
     listFollowable(c.env.DB, c.var.userId),
-    listJourneys(c.env.DB, product),
+    journeysByPath(c.env.DB, product),
   ]);
-  const following = new Set(journeys.map((journey) => journey.pathId));
   return c.json({
     product,
     paths: paths.map(({ id, name }) => ({
       id,
       name,
-      following: following.has(id),
+      journeyId: journeys.get(id) ?? null,
     })),
   });
 });
@@ -446,7 +459,8 @@ productRoutes.get("/pathfinder", async (c) => {
 /**
  * A Path's Trailhead (#170): one of its saved versions to start a Journey
  * on, its latest unless `?version=n` names another, with every version's
- * number and save date to pick from. Another User's Path, an unknown one,
+ * number and save date to pick from, and the Product's Journey on the
+ * Path if it already follows it. Another User's Path, an unknown one,
  * one with no saved version and a number it doesn't have all 404 alike.
  */
 productRoutes.get("/paths/:pathId/trailhead", async (c) => {
@@ -466,6 +480,7 @@ productRoutes.get("/paths/:pathId/trailhead", async (c) => {
   }
 
   const { owner, version, versions } = trailhead;
+  const journeys = await journeysByPath(c.env.DB, c.var.product);
   return c.json({
     product: c.var.product,
     path: { id: version.pathId, name: version.name, owner },
@@ -477,5 +492,6 @@ productRoutes.get("/paths/:pathId/trailhead", async (c) => {
     },
     versions: versions.map(({ number, savedAt }) => ({ number, savedAt })),
     latestNumber: versions[0].number,
+    journeyId: journeys.get(version.pathId) ?? null,
   });
 });
