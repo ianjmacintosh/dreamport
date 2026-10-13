@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import {
   CalendarBlankIcon,
   CheckIcon,
@@ -10,6 +10,7 @@ import ActionCard from "../../components/ActionCard";
 import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
+import Dialog from "../../components/Dialog";
 
 /**
  * Plain `fetch` never times out on its own — if the server accepts the TCP
@@ -133,6 +134,9 @@ const MOVE_JOURNEY_FAILED: Record<JourneyMove, string> = {
   return: "We couldn't return the journey. Try again in a moment.",
 };
 const SET_TASK_FAILED = "We couldn't save that task. Try again in a moment.";
+const RESTART_FAILED =
+  "We couldn't restart the journey. Try again in a moment.";
+const DELETE_FAILED = "We couldn't delete the journey. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -173,6 +177,9 @@ export const Route = createFileRoute(
       } satisfies BreadcrumbsProps,
     };
   },
+  // Restart goes from one Journey's page to another's: a fresh component,
+  // not the old Journey's state.
+  remountDeps: ({ params }) => params.journeyId,
   component: ProductJourney,
 });
 
@@ -207,7 +214,9 @@ function ProductJourney() {
   const [journeyState, setJourneyState] =
     useState<JourneyState>(initialJourneyState);
   /** Which way the Journey is mid-move, if it is — one move at a time. */
-  const [moving, setMoving] = useState<JourneyMove | null>(null);
+  const [moving, setMoving] = useState<JourneyMove | "restart" | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const navigate = useNavigate();
   /** The Task mid-save, if one is — shown as already toggled until it lands. */
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -246,6 +255,38 @@ function ProductJourney() {
         return;
       }
       setJourneyState(moved);
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setMoving(null);
+    }
+  }
+
+  /**
+   * Restart (CONTEXT.md): a new, blank Journey on the Path's latest
+   * version, which this page then hands over to. This one stays as it is.
+   */
+  async function restartJourney() {
+    setError("");
+    setMoving("restart");
+    try {
+      const journeyId = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(`${journeyUrl}/restart`, {
+          method: "POST",
+        });
+        if (!res.ok) {
+          return null;
+        }
+        return ((await res.json()) as { journeyId: string }).journeyId;
+      });
+      if (!journeyId) {
+        setError(RESTART_FAILED);
+        return;
+      }
+      await navigate({
+        to: "/app/products/$productId/journeys/$journeyId",
+        params: { productId: product.id, journeyId },
+      });
     } catch {
       setError(CONNECTION_FAILED);
     } finally {
@@ -412,6 +453,14 @@ function ProductJourney() {
               {worksheetSection}
               <div className="button-group button-group--end">
                 {returnButton}
+                <Button
+                  disabled={moving !== null}
+                  state={moving === "restart" ? "pending" : "ready"}
+                  onClick={() => void restartJourney()}
+                >
+                  <Button.State name="ready">Restart Journey</Button.State>
+                  <Button.State name="pending">Restarting…</Button.State>
+                </Button>
               </div>
             </>
           ) : (
@@ -442,6 +491,104 @@ function ProductJourney() {
           {error && <p role="alert">{error}</p>}
         </section>
       </div>
+      <div className="button-group button-group--end">
+        <Button variant="secondary" onClick={() => setIsDeleting(true)}>
+          Delete Journey
+        </Button>
+      </div>
+
+      <DeleteJourneyDialog
+        open={isDeleting}
+        productName={product.name}
+        pathName={path.name}
+        journeyUrl={journeyUrl}
+        onClose={() => setIsDeleting(false)}
+        onDeleted={() =>
+          void navigate({
+            to: "/app/products/$productId/journeys",
+            params: { productId: product.id },
+            replace: true,
+          })
+        }
+      />
     </>
+  );
+}
+
+/**
+ * Deleting a Journey takes its Worksheet answers and checked Tasks, which
+ * this page doesn't show, so the warning gets a Dialog of its own, and the
+ * Dialog's Delete Journey deletes on one click (decided for Paths in #171).
+ */
+function DeleteJourneyDialog({
+  open,
+  productName,
+  pathName,
+  journeyUrl,
+  onClose,
+  onDeleted,
+}: {
+  open: boolean;
+  productName: string;
+  pathName: string;
+  journeyUrl: string;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState("");
+
+  async function remove() {
+    setError("");
+    setIsPending(true);
+    try {
+      const ok = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(journeyUrl, { method: "DELETE" });
+        return res.ok;
+      });
+      if (ok) {
+        onDeleted();
+        return;
+      }
+      setError(DELETE_FAILED);
+    } catch {
+      setError(CONNECTION_FAILED);
+    }
+    setIsPending(false);
+  }
+
+  function close() {
+    setError("");
+    onClose();
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !isPending) close();
+      }}
+      title="Delete Journey Permanently?"
+    >
+      <p>
+        This will remove {productName}&rsquo;s Journey on "{pathName}" and
+        everything in it, including Worksheet answers and checked Tasks. This
+        cannot be undone!
+      </p>
+      {error && <p role="alert">{error}</p>}
+      <div className="button-group button-group--end">
+        <Button variant="secondary" disabled={isPending} onClick={close}>
+          Cancel
+        </Button>
+        <Button
+          disabled={isPending}
+          state={isPending ? "deleting" : "ready"}
+          onClick={() => void remove()}
+        >
+          <Button.State name="ready">Delete Journey</Button.State>
+          <Button.State name="deleting">Deleting…</Button.State>
+        </Button>
+      </div>
+    </Dialog>
   );
 }

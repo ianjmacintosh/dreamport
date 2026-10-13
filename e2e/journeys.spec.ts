@@ -10,7 +10,8 @@ import { signIn } from "./sign-in";
 // returning to Milestone 1 and advancing again, and filling out the
 // Product Summary Worksheet on Milestone 1 and finding it kept on
 // Milestone 2 (#139), with a Task ticked along the way (#140), and
-// starting a Journey on a Path of the User's own (#170). Signs in through
+// starting a Journey on a Path of the User's own (#170), and restarting a
+// finished Journey and deleting the old one (#172). Signs in through
 // the API with `signIn` (see `./sign-in.ts`).
 
 /** Add a Product from `/app` and open it. */
@@ -351,4 +352,65 @@ test("tick a Task and fill out the Product Summary from Milestone 1, land back o
     "Kitchen scales are clunky",
   );
   await expect(page.getByLabel("2. Customer")).toHaveValue("Home bakers");
+});
+
+test("finish a Journey with a Task ticked, Restart it into a blank Journey, then delete the finished one", async ({
+  page,
+}) => {
+  await signIn(page, TEST_EMAILS.e2eRestartJourney);
+  await openNewProduct(page, `A restarted app ${Date.now()}`);
+  await startDreamSequence(page);
+  const finishedUrl = page.url();
+
+  const task = page.getByRole("checkbox", {
+    name: "Complete the Product Summary",
+  });
+  await task.check();
+  await expect(task).toBeChecked();
+  const advanceButton = page.getByRole("button", {
+    name: "Advance to Next Milestone",
+  });
+  const current = page
+    .getByRole("list", { name: "Milestones" })
+    .locator('[aria-current="step"]');
+  for (const name of [
+    "Real Talk",
+    "Solution Matchmaking",
+    "Make It Real",
+    "Observe & Refine",
+    "Open Enrollment",
+    "Growth",
+  ]) {
+    await advanceButton.click();
+    await expect(current).toContainText(name);
+  }
+  await page.getByRole("button", { name: "Finish Journey" }).click();
+
+  await page.getByRole("button", { name: "Restart Journey" }).click();
+  await expect(current).toContainText("Rough One-Pager");
+  expect(page.url()).not.toBe(finishedUrl);
+  await expect(task).not.toBeChecked();
+
+  await page
+    .getByRole("navigation", { name: "Breadcrumb" })
+    .getByRole("link", { name: "Journeys" })
+    .click();
+  const journeys = page.getByRole("link", { name: /^Dream Sequence/ });
+  await expect(journeys).toHaveCount(2);
+  await expect(journeys.first()).toContainText("Completed");
+  await expect(journeys.last()).toContainText(
+    "Current Milestone: Rough One-Pager",
+  );
+
+  await journeys.first().click();
+  await page.getByRole("button", { name: "Delete Journey" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Delete Journey Permanently?",
+  });
+  await expect(dialog).toContainText("Worksheet answers and checked Tasks");
+  await dialog.getByRole("button", { name: "Delete Journey" }).click();
+
+  await expect(page).toHaveURL(/\/journeys$/);
+  await expect(journeys).toHaveCount(1);
+  await expect(journeys).toContainText("Current Milestone: Rough One-Pager");
 });

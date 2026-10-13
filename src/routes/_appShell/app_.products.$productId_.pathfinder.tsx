@@ -9,8 +9,10 @@ import Link from "../../components/Link";
 interface FollowablePath {
   id: string;
   name: string;
-  /** The Product's Journey on it, if it already follows it. */
+  /** The Product's Journey in progress on it, if there is one. */
   journeyId: string | null;
+  /** Whether the Product has completed a Journey on it. */
+  completed: boolean;
 }
 
 // Filename note: `$productId_` makes this a sibling of the Product home
@@ -49,10 +51,11 @@ export const Route = createFileRoute(
 /**
  * Pathfinder (#170): every Path this Product can follow, Dream Sequence
  * first, then the User's own Paths that have a saved version. Each is an
- * `ActionCard` link to its Trailhead, or, when the Product already
- * follows it, to that Journey, marked "Following", so the list never
- * invites a second start. Below, "Make Your Own Path" links to
- * Trailblazer.
+ * `ActionCard` link to its Trailhead, or, when the Product has a Journey
+ * in progress on it, to that Journey, marked "Following", so the list never
+ * invites a second start. One the Product has only completed is marked
+ * "Completed" and goes to its Trailhead, to start again (#172). Below,
+ * "Make Your Own Path" links to Trailblazer.
  */
 function Pathfinder() {
   const { product, paths } = Route.useRouteContext();
@@ -71,8 +74,12 @@ function Pathfinder() {
               }
               leading={<PathIcon weight="bold" aria-hidden="true" />}
               trailing={
-                path.journeyId && (
+                path.journeyId ? (
                   <ActionCard.Status>Following</ActionCard.Status>
+                ) : (
+                  path.completed && (
+                    <ActionCard.Status>Completed</ActionCard.Status>
+                  )
                 )
               }
             >

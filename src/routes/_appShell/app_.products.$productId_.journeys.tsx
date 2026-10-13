@@ -10,8 +10,11 @@ interface JourneySummary {
   id: string;
   pathName: string;
   currentMilestoneName: string;
+  startedAt: string;
   finishedAt: string | null;
 }
+
+const LONG_DATE = new Intl.DateTimeFormat(undefined, { dateStyle: "long" });
 
 // Filename note: `$productId_` makes this a sibling of the Product home
 // rather than its child; see the Journey page's own header comment.
@@ -47,8 +50,9 @@ export const Route = createFileRoute(
 });
 
 /**
- * A Product's Journeys (#170), one per Path it follows: each an
- * `ActionCard` link to its Journey page, saying where it's at. Below them,
+ * A Product's Journeys (#170), oldest first: each an `ActionCard` link to
+ * its Journey page, saying where it's at and when it started, which tells
+ * apart two Journeys on one Path (#172). Below them,
  * "Follow Another Path" points to Pathfinder, which lists the Paths to
  * start on. With no Journeys yet, the page says so rather than sending the
  * User straight to Pathfinder.
@@ -71,6 +75,10 @@ function ProductJourneys() {
                     {journey.finishedAt
                       ? "Completed"
                       : `Current Milestone: ${journey.currentMilestoneName}`}
+                    {" · Started "}
+                    <time dateTime={journey.startedAt}>
+                      {LONG_DATE.format(new Date(journey.startedAt))}
+                    </time>
                   </ActionCard.Status>
                 }
               >

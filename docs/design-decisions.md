@@ -354,8 +354,10 @@ Add an entry only once a sign-off conversation resolves something repeatable
   under the Product, each with the Product's name as the h1 except the
   Trailhead (decided in #170, in words, without a prototype):
   - **Journeys** (`/app/products/:productId/journeys`): "Journeys" as the
-    h2, then one `ActionCard` link per Journey, the Path's name with
-    "Current Milestone: {name}" or "Completed" as its status. A list of one
+    h2, then one `ActionCard` link per Journey, oldest first, the Path's
+    name with "Current Milestone: {name}" or "Completed", then " · Started
+    {long date}", as its status, so two Journeys on one Path can be told
+    apart (#172). A list of one
     is still a list. With none, "This Product is not following any Paths
     yet." Then a "Follow Another Path" h3, one line, and "Open Pathfinder".
     Checking on a Journey under way comes first; choosing a new Path comes
@@ -363,19 +365,22 @@ Add an entry only once a sign-off conversation resolves something repeatable
   - **Pathfinder** (`/app/products/:productId/pathfinder`): "Pathfinder"
     as the h2, then one `ActionCard` link per Path the User can follow
     (Dream Sequence first, then their own with a saved version), each
-    going to its Trailhead. One the Product already follows stays in the
-    list, marked "Following", and goes to that Journey: a Path you're on
-    never invites you to start it again. A "Make Your Own Path" h3 ends
+    going to its Trailhead. One the Product has a Journey in progress on
+    stays in the list, marked "Following", and goes to that Journey: a Path
+    you're on never invites you to start it again. One it has only
+    completed is marked "Completed" and goes to its Trailhead, to start
+    again (#172). A "Make Your Own Path" h3 ends
     it: "Not finding a Path that does quite what you need? Make your own
     Path", the last three words linking to Trailblazer.
   - **Trailhead** (`/app/products/:productId/paths/:pathId/trailhead`):
     the pre-start Journey page #137 drew, with the Path's name as the h1:
     the route with every outcome line on the left, the pitch and "Start
     Journey" on the right. A User's own Path shows its description as the
-    pitch. If the Product already follows the Path, "{Product} is already
-    following {Path}." and "View Journey" take Start Journey's place, on
-    every version: a Product has one Journey per Path, so a newer version
-    of a Path it follows can't be started (the server answers 409), and
+    pitch. If the Product has a Journey in progress on the Path, "{Product}
+    is already following {Path}." and "View Journey" take Start Journey's
+    place, on every version: a Product has at most one Journey in progress
+    per Path (#172), so a newer version can't be started while one is (the
+    server answers 409), and
     the line names the followed version, "(version 1)", when it isn't the
     one shown. The
     version stays in the background: the page shows the latest, and a
@@ -411,3 +416,16 @@ Add an entry only once a sign-off conversation resolves something repeatable
     it is the first click, and its heading and text are the confirming
     step. A reveal inside it only changed the button's color and said
     nothing new, so it read as broken rather than careful.
+
+- A completed Journey's page ends its column with Return, then "Restart
+  Journey" bottom right, the confirming position. One click starts a new,
+  blank Journey on the Path's latest version and goes to it; the completed
+  one stays as it was. It asks nothing first, since nothing is lost. Every
+  Journey page ends with "Delete Journey", a secondary button bottom right
+  under the two columns, which opens a "Delete Journey Permanently?"
+  `Dialog` the way Delete Path does (above): the answers and checked Tasks
+  it removes aren't on the page. Its text is "This will remove
+  {Product}'s Journey on "{Path}" and everything in it, including
+  Worksheet answers and checked Tasks. This cannot be undone!", and its
+  "Delete Journey" deletes on one click, then goes to the Journeys list
+  (decided in #172, in words, without a prototype).

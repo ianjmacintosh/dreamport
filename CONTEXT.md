@@ -142,7 +142,8 @@ at its first Milestone. Strictly sequenced: exactly one current Milestone,
 everything before it done, everything after it future. A Product can be on
 several Paths at once (e.g. one for building the product, one for marketing
 it) and can follow the same Path again, each time its own Journey with its
-own Worksheet answers and checked Tasks. A User can **delete** a Journey,
+own Worksheet answers and checked Tasks, though only one of its Journeys on
+a Path is in progress at a time. A User can **delete** a Journey,
 which removes it and everything in it for good, after a confirmation that
 says so. A
 Journey is **in progress**, **paused** (set aside by the User, everything

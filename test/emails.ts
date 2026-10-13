@@ -312,6 +312,8 @@ export const TEST_EMAILS = {
   /** Finish a Journey, then Return from finished: un-finished, Growth still current. */
   e2eReturnFromFinished:
     "delivered+e2e-return-from-finished+e2e-test@resend.dev",
+  /** Finish a Journey, Restart it, then delete the finished one (#172). */
+  e2eRestartJourney: "delivered+e2e-restart-journey+e2e-test@resend.dev",
   /** #139: fill out the Product Summary from the Journey page, see it saved. */
   e2eFillOnePager: "delivered+e2e-fill-one-pager+e2e-test@resend.dev",
   /** #112: set a Product's description, see it persist across a reload, then clear it. */
