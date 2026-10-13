@@ -64,6 +64,14 @@ called "saved". Nothing can be followed from a Draft: a Journey starts
 only on a Path version.
 _Avoid_: working copy, unsaved version
 
+**Discard Changes**:
+Put a Path's Draft back the way its latest Path version saved it: its
+name, description, Milestones and Tasks. Saved versions and the Journeys
+on them don't change. A Path with no saved version has nothing to go back
+to, so it can't. Not the same as **Return**, which moves a Journey back a
+Milestone, or as deleting the Path.
+_Avoid_: revert, reset, undo
+
 **Path version**:
 A snapshot of a Path made from its Draft when its maker uses **Save as New
 Version**: the name, description, Milestones and Tasks exactly as they
