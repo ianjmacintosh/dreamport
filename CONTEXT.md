@@ -53,11 +53,11 @@ _Avoid_: response, reply
 A route a Product can follow from idea to a growing, profitable product,
 made of ordered Milestones. Any User can make one in Trailblazer; it starts
 private to the User who made it. A Guide can Publish it, free or for a
-Purchase. A Path can be deleted only until it has been published; after
-that its Guide can Unpublish it but never delete it, so nothing a User has
-Added disappears under them. Only Dreamport can destroy a published Path
-(spam, legal trouble, harm), and that removes everything on it, every
-Journey included. Dream Sequence, based on Running Lean, is the free Path
+Purchase. Its Guide can delete it at any time, published or not: Users who
+Added it keep their copies, the way a book's owner keeps it when it goes
+out of print. Only Dreamport can destroy a published Path (spam, legal
+trouble, harm), and that removes it everywhere, every copy and every
+Journey on them included. Dream Sequence, based on Running Lean, is the free Path
 Dreamport itself publishes.
 _Avoid_: methodology, plan, program
 
@@ -96,18 +96,19 @@ _Avoid_: release, launch, go live, share (as a noun for this)
 
 **Unpublish**:
 Stop a Path's link offering it to Users who haven't Added it yet. Users who
-already Added it keep it, and their Journeys on it carry on. The mirror of
-Publish, and all a Guide can do once a published Path has been Added:
-they can't delete it.
+already Added it keep their copies, and their Journeys on them carry on.
+The mirror of Publish.
 _Avoid_: retract, withdraw, take down, hide
 
 **Add**:
-Put a published Path version in your own Paths, from the link its Guide
-gives out, so Pathfinder offers it on every one of your Products. You get
-that version, read-only, and not later ones (for now). Adding is free for a
-free Path; a Purchase Adds the version it pays for. You can remove an Added
-Path from your Paths while no Journey is on it.
-_Avoid_: import, save, subscribe, install, copy, follow (for this)
+Take your own copy of a published Path version, from the link its Guide
+gives out, so Pathfinder offers it on every one of your Products. Like a
+bought book: the copy is yours, it doesn't change when the Guide publishes
+a later version (no later versions reach you, for now), and you can't
+change it either. Adding is free for a free Path; a Purchase Adds the
+version it pays for. You can remove an Added Path from your Paths while no
+Journey is on it.
+_Avoid_: import, save, subscribe, install, clone, fork, follow (for this)
 
 **Trailblazer**:
 The one tool in which any User makes and edits a Path. Making a Path for
@@ -144,8 +145,8 @@ _Avoid_: marketplace, catalog, store
 
 **Purchase**:
 A User paying, once, for a Path version that a Guide sells. Paying Adds
-that version to the buyer's Paths, with its Milestones and Tasks, to follow
-as often as they like. Dreamport
+that version: the buyer gets their own read-only copy, with its Milestones
+and Tasks, to follow as often as they like. Dreamport
 takes a cut of each; a Guide pays nothing otherwise. The Guide sets the
 price per Path version, and a new price applies only to later Purchases. A
 Guide is paid out once the buyer's refund window has passed.

@@ -25,11 +25,7 @@ now. Saving a version is separate from publishing it to other Users.
 A Path's content is stored per version, not once. Existing buyers can be
 left on an old version indefinitely. A buyer receives their own copy of the
 version they bought, so deleting the Guide's original never reaches them.
-_(Amended in the PW10 sharing plan, #161: a User who Adds a published
-version, free or by Purchase, gets a reference to the Guide's version, not a
-copy. A copy would land in their Trailblazer as an editable Path, count
-toward their Path cap, and lose which Guide and version it came from, which
-a Purchase is recorded against. Deleting the original is handled instead by
-never allowing it once the Path has been published: its Guide can only
-Unpublish it. Only Dreamport can destroy a published Path, and that removes
-every Journey on it too.)_
+_(Extended in the PW10 sharing plan, #161: a free Add gets a copy the same
+way. The copy is read-only and remembers which version it came from. The
+one thing that reaches copies is Dreamport destroying a Path for spam, legal
+trouble or harm.)_
