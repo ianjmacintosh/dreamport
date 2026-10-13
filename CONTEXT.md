@@ -52,21 +52,25 @@ _Avoid_: response, reply
 **Path**:
 A route a Product can follow from idea to a growing, profitable product,
 made of ordered Milestones. Any User can make one in Trailblazer; it starts
-private to its maker. A Guide can share it (free) or sell it (a Purchase).
-Dream Sequence, based on Running Lean, is the free Path Dreamport itself
-publishes.
+private to the User who made it. A Guide can Publish it, free or for a
+Purchase. A Path can be deleted only until it has been published; after
+that its Guide can Unpublish it but never delete it, so nothing a User has
+Added disappears under them. Only Dreamport can destroy a published Path
+(spam, legal trouble, harm), and that removes everything on it, every
+Journey included. Dream Sequence, based on Running Lean, is the free Path
+Dreamport itself publishes.
 _Avoid_: methodology, plan, program
 
 **Draft**:
 The editable working state of a Path in Trailblazer, kept up to date as
-its maker edits: there is no save step, so edits to a Draft are never
+the User who made it edits: there is no save step, so edits to a Draft are never
 called "saved". Nothing can be followed from a Draft: a Journey starts
 only on a Path version.
 _Avoid_: working copy, unsaved version
 
 **Path version**:
-A snapshot of a Path made from its Draft when its maker uses **Save as New
-Version**: the name, description, Milestones and Tasks exactly as they
+A snapshot of a Path made from its Draft when the User who made it uses
+**Save as New Version**: the name, description, Milestones and Tasks exactly as they
 stood. It never changes afterwards, and it needs a name, a description and
 at least one Milestone. A Journey stays on the version it started on; a newer version is
 a new release, never a free update to existing Journeys (for now). A
@@ -83,10 +87,27 @@ description in its place.
 _Avoid_: intro, introduction, summary, landing page, version page
 
 **Publish**:
-Make a saved Path version available to other Users by its link, free or for
-a Purchase. Only a Guide can. Not built yet. Saving a version is not
-publishing it.
-_Avoid_: release, launch, go live
+Make a saved Path version available to other Users, free or for a
+Purchase. Only a Guide can. Publishing is per version, but a Path has one
+link, which always offers its newest published version: a Guide shares the
+link once and keeps publishing to it. Saving a version is not publishing
+it.
+_Avoid_: release, launch, go live, share (as a noun for this)
+
+**Unpublish**:
+Stop a Path's link offering it to Users who haven't Added it yet. Users who
+already Added it keep it, and their Journeys on it carry on. The mirror of
+Publish, and all a Guide can do once a published Path has been Added:
+they can't delete it.
+_Avoid_: retract, withdraw, take down, hide
+
+**Add**:
+Put a published Path version in your own Paths, from the link its Guide
+gives out, so Pathfinder offers it on every one of your Products. You get
+that version, read-only, and not later ones (for now). Adding is free for a
+free Path; a Purchase Adds the version it pays for. You can remove an Added
+Path from your Paths while no Journey is on it.
+_Avoid_: import, save, subscribe, install, copy, follow (for this)
 
 **Trailblazer**:
 The one tool in which any User makes and edits a Path. Making a Path for
@@ -100,9 +121,11 @@ Tasks together)
 
 **Guide**:
 A User with permission to share and sell Paths they made, so that other
-Users can follow them. Becoming one is by invitation at first. A Guide sees
-none of a follower's work: they write the Path and the follower walks it.
-_Avoid_: coach, author, creator, instructor, seller
+Users can follow them. Becoming one is by invitation at first. Neither side
+sees the other: a Guide sees none of the work of Users who've Added their
+Path, and those Users see nothing about the Guide (no name, no email
+address).
+_Avoid_: coach, author, creator, instructor, seller, maker
 
 **Admin**:
 A User with permission to manage other Users' accounts (list, remove, change
@@ -113,16 +136,16 @@ _Avoid_: system administrator, staff, superuser
 
 **Pathfinder**:
 Where a Product finds a Path to follow. For now it's a plain list of Dream
-Sequence and the User's own Paths that have a saved version, marking the
-ones the Product already follows. It grows into the directory of shared
+Sequence, the User's own Paths that have a saved version, and the Paths
+they've Added, marking the ones the Product already follows. It grows into the directory of shared
 Paths, with search, filters and sorting; until then a shared Path is found
 only through a link its Guide gives out.
 _Avoid_: marketplace, catalog, store
 
 **Purchase**:
-A User paying, once, for a Path version that a Guide sells. Paying gives
-the buyer their own duplicate of that version, with its Milestones and
-Tasks, to follow as often as they like. Dreamport
+A User paying, once, for a Path version that a Guide sells. Paying Adds
+that version to the buyer's Paths, with its Milestones and Tasks, to follow
+as often as they like. Dreamport
 takes a cut of each; a Guide pays nothing otherwise. The Guide sets the
 price per Path version, and a new price applies only to later Purchases. A
 Guide is paid out once the buyer's refund window has passed.
@@ -234,7 +257,7 @@ _Avoid_: to-do, checklist item, step, action item
 A person with an account and a Private space of their own Products.
 Identified by an email address. Also the word for someone following a
 Guide's Path: there is no separate "client" or "buyer" account.
-_Avoid_: account, member, customer, client, buyer
+_Avoid_: account, member, customer, client, buyer, follower
 
 **Private space**:
 The set of Products (and, later, their Ideas) belonging to one User, visible
