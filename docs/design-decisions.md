@@ -355,9 +355,8 @@ Add an entry only once a sign-off conversation resolves something repeatable
   Trailhead (decided in #170, in words, without a prototype):
   - **Journeys** (`/app/products/:productId/journeys`): "Journeys" as the
     h2, then one `ActionCard` link per Journey, oldest first, the Path's
-    name with "Current Milestone: {name}" or "Completed", then " · Started
-    {long date}", as its status, so two Journeys on one Path can be told
-    apart (#172). A list of one
+    name with "In Progress" or "Completed" as its status: no current
+    Milestone and no start date (#172). A list of one
     is still a list. With none, "This Product is not following any Paths
     yet." Then a "Follow Another Path" h3, one line, and "Open Pathfinder".
     Checking on a Journey under way comes first; choosing a new Path comes

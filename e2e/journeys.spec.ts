@@ -114,13 +114,11 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
     "Real Talk",
   );
 
-  // The Journeys page lists it with where it's at.
+  // The Journeys page lists it as in progress.
   const breadcrumbs = page.getByRole("navigation", { name: "Breadcrumb" });
   await breadcrumbs.getByRole("link", { name: "Journeys" }).click();
   await expect(
-    page.getByRole("link", {
-      name: "Dream Sequence Current Milestone: Real Talk",
-    }),
+    page.getByRole("link", { name: "Dream Sequence In Progress" }),
   ).toBeVisible();
 
   // Back on the Product home, the Journey section now names where it's at.
@@ -398,9 +396,7 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, then
   const journeys = page.getByRole("link", { name: /^Dream Sequence/ });
   await expect(journeys).toHaveCount(2);
   await expect(journeys.first()).toContainText("Completed");
-  await expect(journeys.last()).toContainText(
-    "Current Milestone: Rough One-Pager",
-  );
+  await expect(journeys.last()).toContainText("In Progress");
 
   await journeys.first().click();
   await page.getByRole("button", { name: "Delete Journey" }).click();
@@ -412,5 +408,5 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, then
 
   await expect(page).toHaveURL(/\/journeys$/);
   await expect(journeys).toHaveCount(1);
-  await expect(journeys).toContainText("Current Milestone: Rough One-Pager");
+  await expect(journeys).toContainText("In Progress");
 });
