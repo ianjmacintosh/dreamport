@@ -11,6 +11,7 @@ import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
 import Dialog from "../../components/Dialog";
+import Link from "../../components/Link";
 
 /**
  * Plain `fetch` never times out on its own — if the server accepts the TCP
@@ -221,6 +222,8 @@ function ProductJourney() {
   const [moving, setMoving] = useState<JourneyMove | "restart" | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isConfirmingAbandon, setIsConfirmingAbandon] = useState(false);
+  /** The Journey in progress on this Path that a refused Resume names. */
+  const [activeJourneyId, setActiveJourneyId] = useState<string | null>(null);
   const navigate = useNavigate();
   /** The Task mid-save, if one is — shown as already toggled until it lands. */
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
@@ -249,30 +252,28 @@ function ProductJourney() {
    */
   async function moveJourney(direction: JourneyMove) {
     setError("");
+    setActiveJourneyId(null);
     setMoving(direction);
     try {
       const moved = await withMinimumDuration(async () => {
         const res = await fetchWithTimeout(`${journeyUrl}/${direction}`, {
           method: "POST",
         });
-        // A 409 says why in its own words (Resume while another Journey on
-        // the Path is in progress).
-        const body = (await res.json().catch(() => null)) as
-          | JourneyState
-          | { error?: string }
-          | null;
-        return res.ok
-          ? { ok: true as const, state: body as JourneyState }
-          : {
-              ok: false as const,
-              error:
-                res.status === 409 && body && "error" in body
-                  ? body.error
-                  : undefined,
-            };
+        if (!res.ok) {
+          // A refused Resume names the Journey in progress on the Path.
+          const body = (await res.json().catch(() => null)) as {
+            activeJourneyId?: string | null;
+          } | null;
+          return { ok: false as const, activeJourneyId: body?.activeJourneyId };
+        }
+        return { ok: true as const, state: (await res.json()) as JourneyState };
       });
       if (!moved.ok) {
-        setError(moved.error ?? MOVE_JOURNEY_FAILED[direction]);
+        if (moved.activeJourneyId) {
+          setActiveJourneyId(moved.activeJourneyId);
+        } else {
+          setError(MOVE_JOURNEY_FAILED[direction]);
+        }
         return;
       }
       setJourneyState(moved.state);
@@ -538,6 +539,24 @@ function ProductJourney() {
             </>
           )}
           {error && <p role="alert">{error}</p>}
+          {activeJourneyId && (
+            <p role="alert">
+              {product.name} already has an{" "}
+              <Link
+                href={`/app/products/${product.id}/journeys/${activeJourneyId}`}
+              >
+                active journey
+              </Link>{" "}
+              on the "{path.name}" Path. A Product cannot have multiple
+              simultaneous journeys on the same Path. You can go to that{" "}
+              <Link
+                href={`/app/products/${product.id}/journeys/${activeJourneyId}`}
+              >
+                active journey
+              </Link>{" "}
+              screen and either continue that journey or abandon it.
+            </p>
+          )}
         </section>
       </div>
       {status === "in-progress" ? (

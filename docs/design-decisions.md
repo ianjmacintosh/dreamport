@@ -438,8 +438,11 @@ Add an entry only once a sign-off conversation resolves something repeatable
     Journey" and "Resume Journey" bottom right; no Advance or Return.
     Resume puts it back in progress where it was left; while another
     Journey on the Path is in progress the server refuses, and the page
-    shows its reason ("Another Journey on this Path is in progress.
-    Abandon it to resume this one."). The page ends with "Delete
+    says why under the buttons: "{Product} already has an active journey
+    on the "{Path}" Path. A Product cannot have multiple simultaneous
+    journeys on the same Path. You can go to that active journey screen
+    and either continue that journey or abandon it.", both "active
+    journey"s linking to that Journey. The page ends with "Delete
     Journey".
   - "Restart Journey" starts a new, blank Journey on the Path's latest
     version in one click and goes to it, asking nothing first, since
@@ -457,3 +460,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
     following but has followed with how its latest Journey ended (decided
     in #172, in words, without a prototype; Pause was dropped for
     Abandon).
+
+- Why an action didn't go through (a refused save, start or resume) is a
+  `role="alert"` paragraph right after the action's `.button-group`, with
+  `--space-4` above it from `global.css`, so it reads as its own message
+  rather than part of the button row. Covers every such message, not just
+  the one it was noticed on (decided in #172).

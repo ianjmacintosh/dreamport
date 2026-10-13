@@ -361,7 +361,7 @@ productRoutes.post("/journeys/:journeyId/abandon", async (c) => {
 /**
  * Resume an abandoned Journey (#172): back in progress where it was left,
  * answering its state. 409 while another of the Product's Journeys on the
- * Path is in progress.
+ * Path is in progress, with that one's id for the page to link to.
  */
 productRoutes.post("/journeys/:journeyId/resume", async (c) => {
   const journey = await journeyIn(c);
@@ -369,11 +369,12 @@ productRoutes.post("/journeys/:journeyId/resume", async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  if (!(await resumeJourney(c.env.DB, journey))) {
+  const resume = await resumeJourney(c.env.DB, journey);
+  if (!resume.resumed) {
     return c.json(
       {
-        error:
-          "Another Journey on this Path is in progress. Abandon it to resume this one.",
+        error: "Another Journey on this Path is in progress",
+        activeJourneyId: resume.activeJourneyId,
       },
       409,
     );

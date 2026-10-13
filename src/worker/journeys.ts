@@ -247,14 +247,17 @@ export async function abandonJourney(
 
 /**
  * Resume (CONTEXT.md): an abandoned Journey goes back in progress, on the
- * Milestone it was left on. `false`, changing nothing, while another of the
- * Product's Journeys on the Path is in progress, since only one can be; the
- * check sits in the update itself. `true` for one already in progress.
+ * Milestone it was left on, and so does one already in progress. While
+ * another of the Product's Journeys on the Path is in progress, since only
+ * one can be, nothing changes and that one's id comes back; the check sits
+ * in the update itself. A completed Journey doesn't resume, with no other.
  */
 export async function resumeJourney(
   db: D1Database,
   journey: StartedJourney,
-): Promise<boolean> {
+): Promise<
+  { resumed: true } | { resumed: false; activeJourneyId: string | null }
+> {
   const { meta } = await db
     .prepare(
       `UPDATE "journeys" SET "abandonedAt" = NULL
@@ -268,7 +271,19 @@ export async function resumeJourney(
     )
     .bind(journey.id, journey.version.pathId)
     .run();
-  return meta.changes > 0 || (await isInProgress(db, journey));
+  if (meta.changes > 0 || (await isInProgress(db, journey))) {
+    return { resumed: true };
+  }
+  const active = await db
+    .prepare(
+      `SELECT "journeys"."id" FROM "journeys"
+       JOIN "path_versions" ON "path_versions"."id" = "journeys"."versionId"
+       WHERE "journeys"."productId" = ? AND "path_versions"."pathId" = ?
+         AND ${IN_PROGRESS}`,
+    )
+    .bind(journey.product.id, journey.version.pathId)
+    .first<{ id: string }>();
+  return { resumed: false, activeJourneyId: active?.id ?? null };
 }
 
 /**

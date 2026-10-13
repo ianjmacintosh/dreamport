@@ -735,7 +735,7 @@ describe("abandoning a Journey (#172)", () => {
     await saveAnswers(env.DB, journey, PRODUCT_SUMMARY, { problem: "Kept" });
     await abandonJourney(env.DB, journey);
 
-    expect(await resumeJourney(env.DB, journey)).toBe(true);
+    expect(await resumeJourney(env.DB, journey)).toEqual({ resumed: true });
 
     expect(await progress(journey)).toMatchObject({
       currentMilestoneId: milestoneIds[1],
@@ -753,11 +753,14 @@ describe("abandoning a Journey (#172)", () => {
     await abandonJourney(env.DB, first);
     const second = await startOn(product, version);
 
-    expect(await resumeJourney(env.DB, first)).toBe(false);
+    expect(await resumeJourney(env.DB, first)).toEqual({
+      resumed: false,
+      activeJourneyId: second.id,
+    });
     expect((await progress(first)).abandonedAt).not.toBeNull();
 
     await abandonJourney(env.DB, second);
-    expect(await resumeJourney(env.DB, first)).toBe(true);
+    expect(await resumeJourney(env.DB, first)).toEqual({ resumed: true });
     expect((await listJourneys(env.DB, product)).map((j) => j.status)).toEqual([
       "in-progress",
       "abandoned",

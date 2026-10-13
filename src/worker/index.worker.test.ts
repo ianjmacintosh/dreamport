@@ -1943,8 +1943,8 @@ describe("Journey routes", () => {
     const refused = await resume();
     expect(refused.status).toBe(409);
     expect(await refused.json()).toEqual({
-      error:
-        "Another Journey on this Path is in progress. Abandon it to resume this one.",
+      error: "Another Journey on this Path is in progress",
+      activeJourneyId: otherId,
     });
 
     await callApi("POST", journeyUrl(product.id, otherId, "/abandon"), cookie);
