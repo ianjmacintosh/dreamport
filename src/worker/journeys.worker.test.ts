@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { TEST_EMAILS } from "../../test/emails";
 import {
+  abandonJourney,
   advanceJourney,
   deleteJourney,
   journeyState,
@@ -186,6 +187,7 @@ describe("starting a Journey", () => {
       startedAt: expect.any(String),
       currentMilestoneId: path.milestones[0].id,
       finishedAt: null,
+      abandonedAt: null,
     });
     expect(await countWorksheetInstances(journey.id, PRODUCT_SUMMARY)).toBe(1);
     expect(worksheets).toEqual([
@@ -272,7 +274,7 @@ describe("starting a Journey", () => {
         versionNumber: 1,
         currentMilestoneName: "Real Talk",
         startedAt: expect.any(String),
-        finishedAt: null,
+        status: "in-progress",
       },
       {
         id: mine.id,
@@ -281,7 +283,7 @@ describe("starting a Journey", () => {
         versionNumber: 1,
         currentMilestoneName: "Pick a Problem",
         startedAt: expect.any(String),
-        finishedAt: null,
+        status: "in-progress",
       },
     ]);
   });
@@ -378,6 +380,7 @@ describe("Advance", () => {
         startedAt: expect.any(String),
         currentMilestoneId: milestoneId,
         finishedAt: null,
+        abandonedAt: null,
       });
     }
 
@@ -389,6 +392,7 @@ describe("Advance", () => {
       startedAt: expect.any(String),
       currentMilestoneId: milestoneIds[6],
       finishedAt: expect.any(String),
+      abandonedAt: null,
     });
   });
 
@@ -413,6 +417,7 @@ describe("Return", () => {
       startedAt: expect.any(String),
       currentMilestoneId: milestoneIds[6],
       finishedAt: null,
+      abandonedAt: null,
     });
 
     for (const milestoneId of milestoneIds.slice(0, 6).reverse()) {
@@ -600,10 +605,10 @@ describe("following a Path again (#172)", () => {
     });
     expect(await progress(first)).toEqual(firstBefore);
     expect(
-      (await listJourneys(env.DB, product)).map((j) => [j.id, j.finishedAt]),
+      (await listJourneys(env.DB, product)).map((j) => [j.id, j.status]),
     ).toEqual([
-      [first.id, firstBefore.finishedAt],
-      [second.id, null],
+      [first.id, "completed"],
+      [second.id, "in-progress"],
     ]);
   });
 
@@ -672,5 +677,65 @@ describe("following a Path again (#172)", () => {
     expect((await listJourneys(env.DB, product)).map((j) => j.id)).toEqual([
       second.id,
     ]);
+  });
+});
+
+describe("abandoning a Journey (#172)", () => {
+  it("takes it out of progress, keeping its answers and checks, and Advance and Return leave it alone", async () => {
+    const { journey, milestoneIds } = await started();
+    await advanceJourney(env.DB, journey);
+    await saveAnswers(env.DB, journey, PRODUCT_SUMMARY, { problem: "Kept" });
+    await setTaskDone(env.DB, journey, TALK_TASK, true);
+
+    await abandonJourney(env.DB, journey);
+    const abandoned = await progress(journey);
+    expect(abandoned).toMatchObject({
+      currentMilestoneId: milestoneIds[1],
+      finishedAt: null,
+      abandonedAt: expect.any(String),
+    });
+
+    await advanceJourney(env.DB, journey);
+    await returnJourney(env.DB, journey);
+    await abandonJourney(env.DB, journey);
+    expect(await progress(journey)).toEqual(abandoned);
+    expect(
+      (await worksheetState(env.DB, journey, PRODUCT_SUMMARY))?.answers,
+    ).toEqual({ problem: "Kept" });
+    const { tasks } = await journeyState(env.DB, journey);
+    expect(tasks.find((t) => t.id === TALK_TASK)?.done).toBe(true);
+  });
+
+  it("leaves a completed Journey completed", async () => {
+    const { journey } = await started();
+    await advanceTimes(journey, version.milestones.length);
+    const completed = await progress(journey);
+
+    await abandonJourney(env.DB, journey);
+
+    expect(await progress(journey)).toEqual(completed);
+  });
+
+  it("lets the Path start again, or the Journey restart, blank", async () => {
+    const { product, journey } = await started();
+    await abandonJourney(env.DB, journey);
+
+    const restart = await restartJourney(env.DB, journey, version);
+    expect(restart?.started).toBe(true);
+    expect((await listJourneys(env.DB, product)).map((j) => j.status)).toEqual([
+      "abandoned",
+      "in-progress",
+    ]);
+  });
+
+  it("deletes only a Journey that's completed or abandoned", async () => {
+    const { product, journey } = await started();
+
+    expect(await deleteJourney(env.DB, journey)).toBe(false);
+    expect(await loadJourney(env.DB, product, journey.id)).not.toBeNull();
+
+    await abandonJourney(env.DB, journey);
+    expect(await deleteJourney(env.DB, journey)).toBe(true);
+    expect(await loadJourney(env.DB, product, journey.id)).toBeNull();
   });
 });

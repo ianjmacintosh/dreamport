@@ -34,14 +34,19 @@ import {
  * every one after it future. `finishedAt` stays `null` until the Journey advances
  * past the last Milestone (issue #138) — `currentMilestoneId` then keeps
  * pointing at that last Milestone, since there's no Milestone after it to
- * take its place.
+ * take its place. `abandonedAt` is set when the User abandons it partway
+ * (#172), and never alongside `finishedAt`.
  */
 export interface Journey {
   id: string;
   startedAt: string;
   currentMilestoneId: string;
   finishedAt: string | null;
+  abandonedAt: string | null;
 }
+
+/** A Journey neither completed nor abandoned, as a condition on `journeys`. */
+const IN_PROGRESS = `"journeys"."finishedAt" IS NULL AND "journeys"."abandonedAt" IS NULL`;
 
 declare const started: unique symbol;
 
@@ -82,6 +87,9 @@ export interface TaskSummary {
   done: boolean;
 }
 
+/** Where a Journey stands: under way, Advanced past its end, or Abandoned (#172). */
+export type JourneyStatus = "in-progress" | "completed" | "abandoned";
+
 /** A Journey as the Product's list of Journeys shows it. */
 export interface JourneySummary {
   id: string;
@@ -91,7 +99,7 @@ export interface JourneySummary {
   versionNumber: number;
   currentMilestoneName: string;
   startedAt: string;
-  finishedAt: string | null;
+  status: JourneyStatus;
 }
 
 /**
@@ -131,7 +139,10 @@ export async function listJourneys(
   const { results } = await db
     .prepare(
       `SELECT "journeys"."id", "path_versions"."pathId", "path_versions"."name" AS "pathName",
-         "path_versions"."number" AS "versionNumber", "milestones"."name" AS "currentMilestoneName", "journeys"."startedAt", "journeys"."finishedAt"
+         "path_versions"."number" AS "versionNumber", "milestones"."name" AS "currentMilestoneName", "journeys"."startedAt",
+         CASE WHEN "journeys"."finishedAt" IS NOT NULL THEN 'completed'
+           WHEN "journeys"."abandonedAt" IS NOT NULL THEN 'abandoned'
+           ELSE 'in-progress' END AS "status"
        FROM "journeys"
        JOIN "path_versions" ON "path_versions"."id" = "journeys"."versionId"
        JOIN "milestones" ON "milestones"."id" = "journeys"."currentMilestoneId"
@@ -160,7 +171,7 @@ export async function startJourney(
   const inProgress = `SELECT "journeys"."id", "journeys"."versionId" FROM "journeys"
     JOIN "path_versions" ON "path_versions"."id" = "journeys"."versionId"
     WHERE "journeys"."productId" = ? AND "path_versions"."pathId" = ?
-      AND "journeys"."finishedAt" IS NULL`;
+      AND ${IN_PROGRESS}`;
   const [inserted, current] = await db.batch<{ id: string; versionId: string }>(
     [
       db
@@ -197,20 +208,16 @@ export async function startJourney(
 
 /**
  * Restart (CONTEXT.md): a new, blank Journey on `latest`, the Path's latest
- * version, from a completed one, which stays as it was. `null` while
- * `journey` is still in progress. Otherwise it's a start, so a Journey
- * already in progress on the Path is the one that comes back.
+ * version, from a completed or abandoned one, which stays as it was.
+ * `null` while `journey` is still in progress. Otherwise it's a start, so a
+ * Journey already in progress on the Path is the one that comes back.
  */
 export async function restartJourney(
   db: D1Database,
   journey: StartedJourney,
   latest: FollowableVersion,
 ): Promise<{ journeyId: string; started: boolean } | null> {
-  const row = await db
-    .prepare('SELECT "finishedAt" FROM "journeys" WHERE "id" = ?')
-    .bind(journey.id)
-    .first<{ finishedAt: string | null }>();
-  if (!row?.finishedAt) {
+  if (await isInProgress(db, journey)) {
     return null;
   }
   const { journeyId, started } = await startJourney(
@@ -221,20 +228,55 @@ export async function restartJourney(
   return { journeyId, started };
 }
 
-/** Delete a Journey for good, with its Worksheet answers and checked Tasks. */
-export async function deleteJourney(
+/**
+ * Abandon (CONTEXT.md): the User steps away from a Journey in progress.
+ * It keeps its answers and checked Tasks, and can't be picked up again;
+ * Restart starts a new one. A no-op on a completed or abandoned Journey.
+ */
+export async function abandonJourney(
   db: D1Database,
   journey: StartedJourney,
 ): Promise<void> {
   await db
-    .prepare('DELETE FROM "journeys" WHERE "id" = ?')
-    .bind(journey.id)
+    .prepare(
+      `UPDATE "journeys" SET "abandonedAt" = ? WHERE "id" = ? AND ${IN_PROGRESS}`,
+    )
+    .bind(new Date().toISOString(), journey.id)
     .run();
 }
 
 /**
- * Advance the Journey by exactly one Milestone. Once completed, this is a
- * no-op — the same "repeat is harmless" shape `startJourney` has.
+ * Delete a Journey for good, with its Worksheet answers and checked Tasks.
+ * Only a completed or abandoned one: `false`, deleting nothing, for one in
+ * progress, which has to be abandoned first (#172).
+ */
+export async function deleteJourney(
+  db: D1Database,
+  journey: StartedJourney,
+): Promise<boolean> {
+  const { meta } = await db
+    .prepare(`DELETE FROM "journeys" WHERE "id" = ? AND NOT (${IN_PROGRESS})`)
+    .bind(journey.id)
+    .run();
+  return meta.changes > 0;
+}
+
+async function isInProgress(
+  db: D1Database,
+  journey: StartedJourney,
+): Promise<boolean> {
+  return (
+    (await db
+      .prepare(`SELECT 1 FROM "journeys" WHERE "id" = ? AND ${IN_PROGRESS}`)
+      .bind(journey.id)
+      .first()) !== null
+  );
+}
+
+/**
+ * Advance the Journey by exactly one Milestone. Once completed or
+ * abandoned, this is a no-op — the same "repeat is harmless" shape
+ * `startJourney` has.
  *
  * Advancing from the last Milestone (Growth) has no next Milestone to move
  * to, so it sets `finishedAt` instead (issue #138, confirmed on #133:
@@ -278,7 +320,7 @@ export async function advanceJourney(
            ) THEN "finishedAt"
            ELSE ?
          END
-       WHERE "id" = ? AND "finishedAt" IS NULL`,
+       WHERE "id" = ? AND ${IN_PROGRESS}`,
     )
     .bind(new Date().toISOString(), journey.id)
     .run();
@@ -295,7 +337,8 @@ export async function advanceJourney(
  *
  * On Milestone 1 there's no previous Milestone, so this is a no-op, the
  * same way `advanceJourney` is once completed. The Journey page hides
- * Return there; a request anyway leaves the Journey as it was.
+ * Return there; a request anyway leaves the Journey as it was. So it is on
+ * an abandoned Journey, which can't be picked up again.
  *
  * One atomic `UPDATE` for the same race reason `advanceJourney` gives.
  * SQLite evaluates every `SET` expression against the row as it was before
@@ -324,7 +367,7 @@ export async function returnJourney(
            )
          END,
          "finishedAt" = NULL
-       WHERE "id" = ?`,
+       WHERE "id" = ? AND "abandonedAt" IS NULL`,
     )
     .bind(journey.id)
     .run();
@@ -472,7 +515,7 @@ export async function journeyState(
   const [journey, worksheets, tasks] = await Promise.all([
     db
       .prepare(
-        'SELECT "id", "startedAt", "currentMilestoneId", "finishedAt" FROM "journeys" WHERE "id" = ?',
+        'SELECT "id", "startedAt", "currentMilestoneId", "finishedAt", "abandonedAt" FROM "journeys" WHERE "id" = ?',
       )
       .bind(started.id)
       .first<Journey>(),

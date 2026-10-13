@@ -10,6 +10,7 @@ import {
   renameIdea,
 } from "./ideas";
 import {
+  abandonJourney,
   advanceJourney,
   deleteJourney,
   journeyState,
@@ -21,6 +22,7 @@ import {
   setTaskDone,
   startJourney,
   worksheetState,
+  type JourneyStatus,
   type JourneySummary,
   type StartedJourney,
 } from "./journeys";
@@ -342,9 +344,24 @@ productRoutes.post("/journeys/:journeyId/return", async (c) => {
 });
 
 /**
- * Restart a completed Journey: a new, blank Journey on the Path's latest
- * version, 201 with its id. 409 while the Journey is in progress. If the
- * Path already has a Journey in progress, it answers 200 with that one.
+ * Abandon the Journey (#172): it stops being in progress, keeping its
+ * answers and checked Tasks. Harmless on a completed or abandoned one.
+ */
+productRoutes.post("/journeys/:journeyId/abandon", async (c) => {
+  const journey = await journeyIn(c);
+  if (!journey) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  await abandonJourney(c.env.DB, journey);
+  return c.json(await journeyState(c.env.DB, journey), 200);
+});
+
+/**
+ * Restart a completed or abandoned Journey: a new, blank Journey on the
+ * Path's latest version, 201 with its id. 409 while the Journey is in
+ * progress. If the Path already has a Journey in progress, it answers 200
+ * with that one.
  */
 productRoutes.post("/journeys/:journeyId/restart", async (c) => {
   const journey = await journeyIn(c);
@@ -362,19 +379,30 @@ productRoutes.post("/journeys/:journeyId/restart", async (c) => {
 
   const restart = await restartJourney(c.env.DB, journey, latest.version);
   if (!restart) {
-    return c.json({ error: "Only a completed Journey can restart" }, 409);
+    return c.json(
+      { error: "Only a completed or abandoned Journey can restart" },
+      409,
+    );
   }
   return c.json({ journeyId: restart.journeyId }, restart.started ? 201 : 200);
 });
 
-/** Delete the Journey for good, with its Worksheet answers and checked Tasks. */
+/**
+ * Delete the Journey for good, with its Worksheet answers and checked
+ * Tasks. 409 for one in progress, which has to be abandoned first.
+ */
 productRoutes.delete("/journeys/:journeyId", async (c) => {
   const journey = await journeyIn(c);
   if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
 
-  await deleteJourney(c.env.DB, journey);
+  if (!(await deleteJourney(c.env.DB, journey))) {
+    return c.json(
+      { error: "Abandon a Journey in progress before deleting it" },
+      409,
+    );
+  }
   return c.json({}, 200);
 });
 
@@ -476,35 +504,34 @@ productRoutes.put("/journeys/:journeyId/tasks/:taskId", async (c) => {
 
 /**
  * The Product's Journeys by Path id: the one in progress on each Path, if
- * any (`startJourney` keeps it to one), and the Paths it has completed.
+ * any (`startJourney` keeps it to one), and how the latest of the rest
+ * ended.
  */
 async function journeysByPath(
   db: D1Database,
   product: OwnedProduct,
 ): Promise<{
   inProgress: Map<string, JourneySummary>;
-  completed: Set<string>;
+  lastEnded: Map<string, Exclude<JourneyStatus, "in-progress">>;
 }> {
-  const journeys = await listJourneys(db, product);
-  return {
-    inProgress: new Map(
-      journeys
-        .filter((journey) => journey.finishedAt === null)
-        .map((journey) => [journey.pathId, journey]),
-    ),
-    completed: new Set(
-      journeys
-        .filter((journey) => journey.finishedAt !== null)
-        .map((journey) => journey.pathId),
-    ),
-  };
+  const inProgress = new Map<string, JourneySummary>();
+  const lastEnded = new Map<string, Exclude<JourneyStatus, "in-progress">>();
+  // Oldest first, so a later Journey on a Path overwrites an earlier one.
+  for (const journey of await listJourneys(db, product)) {
+    if (journey.status === "in-progress") {
+      inProgress.set(journey.pathId, journey);
+    } else {
+      lastEnded.set(journey.pathId, journey.status);
+    }
+  }
+  return { inProgress, lastEnded };
 }
 
 /**
  * Pathfinder (#170): every Path the User can follow, with the Product's
  * Journey in progress on each one it's following, so the page can link to
- * that Journey and not invite a second start, and whether it has completed
- * the Path before (#172).
+ * that Journey and not invite a second start, and how its latest other
+ * Journey on the Path ended, if it has one (#172).
  */
 productRoutes.get("/pathfinder", async (c) => {
   const { product } = c.var;
@@ -518,7 +545,7 @@ productRoutes.get("/pathfinder", async (c) => {
       id,
       name,
       journeyId: journeys.inProgress.get(id)?.id ?? null,
-      completed: journeys.completed.has(id),
+      lastEnded: journeys.lastEnded.get(id) ?? null,
     })),
   });
 });

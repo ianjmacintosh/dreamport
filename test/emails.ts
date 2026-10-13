@@ -200,7 +200,9 @@ export const TEST_EMAILS = {
   journeysList: "delivered+journeys-list@resend.dev",
   /** Restarts a Journey before and after completing it (#172). */
   journeysRestart: "delivered+journeys-restart@resend.dev",
-  /** Deletes a Journey (#172). */
+  /** Abandons a Journey (#172). */
+  journeysAbandon: "delivered+journeys-abandon@resend.dev",
+  /** Abandons a Journey, then deletes it (#172). */
   journeysDelete: "delivered+journeys-delete@resend.dev",
   /** Reads one Journey's state. */
   journeysState: "delivered+journeys-state@resend.dev",

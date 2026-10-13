@@ -1842,7 +1842,7 @@ describe("Journey routes", () => {
           versionNumber: 1,
           currentMilestoneName: "Rough One-Pager",
           startedAt: expect.any(String),
-          finishedAt: null,
+          status: "in-progress",
         },
       ],
     });
@@ -1887,7 +1887,7 @@ describe("Journey routes", () => {
     const early = await restart();
     expect(early.status).toBe(409);
     expect(await early.json()).toEqual({
-      error: "Only a completed Journey can restart",
+      error: "Only a completed or abandoned Journey can restart",
     });
 
     await finishJourney(product.id, journeyId, cookie);
@@ -1904,16 +1904,46 @@ describe("Journey routes", () => {
     expect(await again.json()).toEqual({ journeyId: newId });
   });
 
-  it("DELETE /journeys/:journeyId deletes the Journey, and it 404s afterwards", async () => {
+  it("POST /journeys/:journeyId/abandon takes the Journey out of progress, answering its state", async () => {
     const { cookie, product, journeyId } = await startedProduct(
-      TEST_EMAILS.journeysDelete,
+      TEST_EMAILS.journeysAbandon,
     );
 
     const res = await callApi(
-      "DELETE",
-      journeyUrl(product.id, journeyId),
+      "POST",
+      journeyUrl(product.id, journeyId, "/abandon"),
       cookie,
     );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      journey: { id: journeyId, abandonedAt: expect.any(String) },
+    });
+    expect(await listOf(product.id, cookie)).toMatchObject([
+      { id: journeyId, status: "abandoned" },
+    ]);
+  });
+
+  it("DELETE /journeys/:journeyId 409s a Journey in progress, then deletes it once abandoned, and it 404s afterwards", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
+      TEST_EMAILS.journeysDelete,
+    );
+    const remove = () =>
+      callApi("DELETE", journeyUrl(product.id, journeyId), cookie);
+
+    const early = await remove();
+    expect(early.status).toBe(409);
+    expect(await early.json()).toEqual({
+      error: "Abandon a Journey in progress before deleting it",
+    });
+    expect(await listOf(product.id, cookie)).toHaveLength(1);
+
+    await callApi(
+      "POST",
+      journeyUrl(product.id, journeyId, "/abandon"),
+      cookie,
+    );
+    const res = await remove();
 
     expect(res.status).toBe(200);
     expect(await listOf(product.id, cookie)).toEqual([]);
@@ -1951,6 +1981,7 @@ describe("Journey routes", () => {
         startedAt: expect.any(String),
         currentMilestoneId: body.path.milestones[0].id,
         finishedAt: null,
+        abandonedAt: null,
       },
       worksheets: expect.any(Array),
       tasks: expect.any(Array),
@@ -2167,7 +2198,7 @@ describe("Journey routes", () => {
 });
 
 describe("Pathfinder and Trailhead routes", () => {
-  it("GET /pathfinder lists Dream Sequence and the User's saved Paths, marking the ones the Product is following or has completed", async () => {
+  it("GET /pathfinder lists Dream Sequence and the User's saved Paths, marking the ones the Product is following and how its last Journey on the rest ended", async () => {
     const { cookie, path } = await savedPath(TEST_EMAILS.pathfinderRoute);
     await addPath(cookie, "Never Saved");
     const { product } = (await (
@@ -2190,9 +2221,9 @@ describe("Pathfinder and Trailhead routes", () => {
           id: "dream-sequence",
           name: "Dream Sequence",
           journeyId: null,
-          completed: false,
+          lastEnded: null,
         },
-        { id: path.id, name: path.name, journeyId: null, completed: false },
+        { id: path.id, name: path.name, journeyId: null, lastEnded: null },
       ],
     });
 
@@ -2206,17 +2237,17 @@ describe("Pathfinder and Trailhead routes", () => {
           id: "dream-sequence",
           name: "Dream Sequence",
           journeyId,
-          completed: false,
+          lastEnded: null,
         },
-        { id: path.id, name: path.name, journeyId: null, completed: false },
+        { id: path.id, name: path.name, journeyId: null, lastEnded: null },
       ],
     });
 
     await finishJourney(product.id, journeyId, cookie);
     expect(await pathfinder()).toMatchObject({
       paths: [
-        { id: "dream-sequence", journeyId: null, completed: true },
-        { id: path.id, journeyId: null, completed: false },
+        { id: "dream-sequence", journeyId: null, lastEnded: "completed" },
+        { id: path.id, journeyId: null, lastEnded: null },
       ],
     });
   });
