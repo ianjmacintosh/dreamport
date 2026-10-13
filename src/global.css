@@ -122,13 +122,6 @@ a:not(.button):hover {
   color: var(--color-link-hover);
 }
 
-/* Fine print beside a page's main content, such as when a Path was last
-   edited: smaller and italic, so it reads as a note rather than body copy. */
-small {
-  font-size: var(--text-sm);
-  font-style: italic;
-}
-
 /* Quiet link: the text's own near-black instead of --color-link, with the
    underline alone marking it as a link; hover drops the underline rather
    than swapping color. For links that shouldn't draw the eye (e.g. the
