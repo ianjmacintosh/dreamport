@@ -374,10 +374,12 @@ function PathDraft() {
       </div>
       {saveError && <p role="alert">{saveError}</p>}
       <p className="text-sm">
-        Last edited{" "}
-        <time dateTime={updatedAt}>
-          {DATE_TIME.format(new Date(updatedAt))}
-        </time>
+        <em>
+          Last edited{" "}
+          <time dateTime={updatedAt}>
+            {DATE_TIME.format(new Date(updatedAt))}
+          </time>
+        </em>
       </p>
 
       <EditPathDialog
