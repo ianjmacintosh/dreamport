@@ -198,6 +198,10 @@ export const TEST_EMAILS = {
   // --- Seam 1: the Journey routes (#137-#140, #170), one test each ---
   /** Lists a Product's Journeys, none and then one. */
   journeysList: "delivered+journeys-list@resend.dev",
+  /** Restarts a Journey before and after completing it (#172). */
+  journeysRestart: "delivered+journeys-restart@resend.dev",
+  /** Deletes a Journey (#172). */
+  journeysDelete: "delivered+journeys-delete@resend.dev",
   /** Reads one Journey's state. */
   journeysState: "delivered+journeys-state@resend.dev",
   /** Starts a Journey, then starts it again. */

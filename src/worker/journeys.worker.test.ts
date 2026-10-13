@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 import { TEST_EMAILS } from "../../test/emails";
 import {
   advanceJourney,
+  deleteJourney,
   journeyState,
   listJourneys,
   loadJourney,
+  restartJourney,
   returnJourney,
   saveAnswers,
   setTaskDone,
@@ -141,12 +143,12 @@ const COMPLETE_SUMMARY_TASK = "complete-product-summary";
 const EVENT_TASK = "event-schedule-product-summary";
 const TALK_TASK = "talk-to-five-customers";
 
-/** How many instances of a Worksheet a Product has. */
-async function countWorksheetInstances(productId: string, worksheetId: string) {
+/** How many instances of a Worksheet a Journey has. */
+async function countWorksheetInstances(journeyId: string, worksheetId: string) {
   const row = await env.DB.prepare(
-    'SELECT COUNT(*) AS n FROM "worksheet_instances" WHERE "productId" = ? AND "worksheetId" = ?',
+    'SELECT COUNT(*) AS n FROM "worksheet_instances" WHERE "journeyId" = ? AND "worksheetId" = ?',
   )
-    .bind(productId, worksheetId)
+    .bind(journeyId, worksheetId)
     .first<{ n: number }>();
   return row?.n;
 }
@@ -163,8 +165,7 @@ describe("starting a Journey", () => {
     const product = await newProduct();
 
     const start = await startJourney(env.DB, product, version);
-    expect(start?.started).toBe(true);
-    if (!start) throw new Error("the Journey didn't start");
+    expect(start.started).toBe(true);
     const journey = await loadJourney(env.DB, product, start.journeyId);
     if (!journey) throw new Error("the Journey just started isn't there");
     const { path, worksheets, tasks, ...state } = await journeyState(
@@ -186,7 +187,7 @@ describe("starting a Journey", () => {
       currentMilestoneId: path.milestones[0].id,
       finishedAt: null,
     });
-    expect(await countWorksheetInstances(product.id, PRODUCT_SUMMARY)).toBe(1);
+    expect(await countWorksheetInstances(journey.id, PRODUCT_SUMMARY)).toBe(1);
     expect(worksheets).toEqual([
       {
         id: PRODUCT_SUMMARY,
@@ -247,10 +248,12 @@ describe("starting a Journey", () => {
 
     expect(await startJourney(env.DB, product, version)).toEqual({
       journeyId: journey.id,
+      versionId: version.id,
       started: false,
     });
     expect(await progress(journey)).toEqual(before);
-    expect(await countWorksheetInstances(product.id, PRODUCT_SUMMARY)).toBe(1);
+    expect(await countWorksheetInstances(journey.id, PRODUCT_SUMMARY)).toBe(1);
+    expect(await listJourneys(env.DB, product)).toHaveLength(1);
   });
 
   it("keeps a Journey per version: Dream Sequence and the User's own, listed oldest first", async () => {
@@ -268,6 +271,7 @@ describe("starting a Journey", () => {
         pathName: "Dream Sequence",
         versionNumber: 1,
         currentMilestoneName: "Real Talk",
+        startedAt: expect.any(String),
         finishedAt: null,
       },
       {
@@ -276,12 +280,13 @@ describe("starting a Journey", () => {
         pathName: "Weekend Launch",
         versionNumber: 1,
         currentMilestoneName: "Pick a Problem",
+        startedAt: expect.any(String),
         finishedAt: null,
       },
     ]);
   });
 
-  it("refuses a Journey on another version of a Path the Product follows", async () => {
+  it("starts nothing on another version of a Path the Product has a Journey in progress on", async () => {
     const product = await newProduct();
     const first = await ownVersion();
     const path = await getPath(env.DB, USER_ID, first.pathId);
@@ -291,7 +296,11 @@ describe("starting a Journey", () => {
     const second = await followable(USER_ID, saved.version.id);
     const journey = await startOn(product, first);
 
-    expect(await startJourney(env.DB, product, second)).toBeNull();
+    expect(await startJourney(env.DB, product, second)).toEqual({
+      journeyId: journey.id,
+      versionId: first.id,
+      started: false,
+    });
     expect(await listJourneys(env.DB, product)).toEqual([
       expect.objectContaining({ id: journey.id, versionNumber: 1 }),
     ]);
@@ -442,7 +451,7 @@ describe("Worksheets", () => {
   });
 
   it("saves on any Milestone, past the ones it's on, and once completed, into the one instance", async () => {
-    const { product, journey } = await started();
+    const { journey } = await started();
 
     for (let milestone = 1; milestone <= 7; milestone++) {
       await saveAnswers(env.DB, journey, PRODUCT_SUMMARY, {
@@ -462,7 +471,7 @@ describe("Worksheets", () => {
     expect(
       (await worksheetState(env.DB, journey, PRODUCT_SUMMARY))?.answers,
     ).toEqual({ problem: "Completed", customer: "Home bakers" });
-    expect(await countWorksheetInstances(product.id, PRODUCT_SUMMARY)).toBe(1);
+    expect(await countWorksheetInstances(journey.id, PRODUCT_SUMMARY)).toBe(1);
   });
 
   it("replaces every answer on a save, and the Journey page counts what's filled", async () => {
@@ -487,19 +496,19 @@ describe("Worksheets", () => {
   });
 
   it("creates the instance on save when a Journey started without one", async () => {
-    const { product, journey } = await started();
+    const { journey } = await started();
     // A Journey started before #139 has no Worksheet instances.
     await env.DB.prepare(
-      'DELETE FROM "worksheet_instances" WHERE "productId" = ?',
+      'DELETE FROM "worksheet_instances" WHERE "journeyId" = ?',
     )
-      .bind(product.id)
+      .bind(journey.id)
       .run();
 
     await saveAnswers(env.DB, journey, PRODUCT_SUMMARY, { problem: "Late" });
     expect(
       (await worksheetState(env.DB, journey, PRODUCT_SUMMARY))?.answers,
     ).toEqual({ problem: "Late" });
-    expect(await countWorksheetInstances(product.id, PRODUCT_SUMMARY)).toBe(1);
+    expect(await countWorksheetInstances(journey.id, PRODUCT_SUMMARY)).toBe(1);
   });
 });
 
@@ -549,5 +558,119 @@ describe("Tasks", () => {
     await advanceJourney(env.DB, journey);
     expect((await progress(journey)).currentMilestoneId).toBe(milestoneIds[1]);
     expect(await isDone(journey, EVENT_TASK)).toBe(true);
+  });
+});
+
+describe("following a Path again (#172)", () => {
+  /** What the Journey has written down: its answers and its checked Tasks. */
+  async function recordsOf(journey: StartedJourney) {
+    const [answers, { tasks }] = await Promise.all([
+      worksheetState(env.DB, journey, PRODUCT_SUMMARY),
+      journeyState(env.DB, journey),
+    ]);
+    return {
+      answers: answers?.answers,
+      checked: tasks.filter((t) => t.done).map((t) => t.id),
+    };
+  }
+
+  /** A Dream Sequence Journey with an answer and a checked Task, completed. */
+  async function completedWithRecords() {
+    const { product, journey } = await started();
+    await saveAnswers(env.DB, journey, PRODUCT_SUMMARY, { problem: "First" });
+    await setTaskDone(env.DB, journey, TALK_TASK, true);
+    await advanceTimes(journey, version.milestones.length);
+    return { product, journey };
+  }
+
+  it("starts a blank Journey once the last one is completed, leaving the old one as it was", async () => {
+    const { product, journey: first } = await completedWithRecords();
+    const firstBefore = await progress(first);
+
+    const second = await startOn(product, version);
+
+    expect(second.id).not.toBe(first.id);
+    expect(await recordsOf(second)).toEqual({ answers: {}, checked: [] });
+    expect((await progress(second)).currentMilestoneId).toBe(
+      version.milestones[0].id,
+    );
+    expect(await recordsOf(first)).toEqual({
+      answers: { problem: "First" },
+      checked: [TALK_TASK],
+    });
+    expect(await progress(first)).toEqual(firstBefore);
+    expect(
+      (await listJourneys(env.DB, product)).map((j) => [j.id, j.finishedAt]),
+    ).toEqual([
+      [first.id, firstBefore.finishedAt],
+      [second.id, null],
+    ]);
+  });
+
+  it("keeps two Products' Journeys on one Path apart", async () => {
+    const { journey: mine } = await started();
+    const { journey: other } = await started();
+
+    await saveAnswers(env.DB, mine, PRODUCT_SUMMARY, { problem: "Mine" });
+    await setTaskDone(env.DB, mine, TALK_TASK, true);
+
+    expect(await recordsOf(other)).toEqual({ answers: {}, checked: [] });
+  });
+
+  it("restarts only a completed Journey, onto the Path's latest version", async () => {
+    const product = await newProduct();
+    const first = await ownVersion();
+    const journey = await startOn(product, first);
+    const path = await getPath(env.DB, USER_ID, first.pathId);
+    if (!path) throw new Error("the Path just created isn't there");
+    const saved = await saveVersion(env.DB, path);
+    if (!saved.ok) throw new Error(`not saved: ${saved.missing.join(", ")}`);
+    const latest = await followable(USER_ID, saved.version.id);
+
+    expect(await restartJourney(env.DB, journey, latest)).toBeNull();
+    expect(await listJourneys(env.DB, product)).toHaveLength(1);
+
+    await advanceTimes(journey, first.milestones.length);
+    const restart = await restartJourney(env.DB, journey, latest);
+    if (!restart) throw new Error("the completed Journey didn't restart");
+    expect(restart.started).toBe(true);
+    const restarted = await loadJourney(env.DB, product, restart.journeyId);
+    expect(restarted?.version.id).toBe(latest.id);
+    expect((await progress(journey)).finishedAt).not.toBeNull();
+
+    // A second Restart finds the new Journey in progress and starts nothing.
+    expect(await restartJourney(env.DB, journey, latest)).toEqual({
+      journeyId: restart.journeyId,
+      started: false,
+    });
+  });
+
+  it("deletes one Journey with its answers and checked Tasks, leaving the Product's others", async () => {
+    const { product, journey: first } = await completedWithRecords();
+    const second = await startOn(product, version);
+    await saveAnswers(env.DB, second, PRODUCT_SUMMARY, { problem: "Second" });
+
+    await deleteJourney(env.DB, first);
+
+    expect(await loadJourney(env.DB, product, first.id)).toBeNull();
+    const left = await env.DB.batch<{ n: number }>([
+      env.DB.prepare(
+        'SELECT count(*) AS n FROM "worksheet_instances" WHERE "journeyId" = ?',
+      ).bind(first.id),
+      env.DB.prepare(
+        'SELECT count(*) AS n FROM "task_completions" WHERE "journeyId" = ?',
+      ).bind(first.id),
+      env.DB.prepare(
+        'SELECT count(*) AS n FROM "worksheet_answers" WHERE "instanceId" NOT IN (SELECT "id" FROM "worksheet_instances")',
+      ),
+    ]);
+    expect(left.map((r) => r.results[0].n)).toEqual([0, 0, 0]);
+    expect(await recordsOf(second)).toEqual({
+      answers: { problem: "Second" },
+      checked: [],
+    });
+    expect((await listJourneys(env.DB, product)).map((j) => j.id)).toEqual([
+      second.id,
+    ]);
   });
 });
