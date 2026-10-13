@@ -207,6 +207,8 @@ const DELETE_FAILED = "We couldn't delete that. Try again in a moment.";
 const REORDER_FAILED =
   "We couldn't move that, so it's back where it was. Try again in a moment.";
 const SAVE_FAILED = "We couldn't save a version. Try again in a moment.";
+const DISCARD_FAILED =
+  "We couldn't discard your changes. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -239,6 +241,7 @@ function PathDraft() {
   const [pathDialog, setPathDialog] = useState<PathDialogOpening | null>(null);
   const [isEditingMilestone, setIsEditingMilestone] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
 
   const base = `/api/paths/${path.id}`;
   // The first Milestone until one is picked, and again if the picked one
@@ -367,6 +370,11 @@ function PathDraft() {
         <Button variant="secondary" onClick={() => setIsDeleting(true)}>
           Delete Path
         </Button>
+        {latestVersion && (
+          <Button variant="secondary" onClick={() => setIsDiscarding(true)}>
+            Discard Changes
+          </Button>
+        )}
         <Button
           disabled={isSaving}
           state={isSaving ? "pending" : "ready"}
@@ -404,6 +412,21 @@ function PathDraft() {
           void router.navigate({ to: "/app/paths", replace: true })
         }
       />
+
+      {latestVersion && (
+        <DiscardChangesDialog
+          open={isDiscarding}
+          path={path}
+          version={latestVersion}
+          pathUrl={base}
+          onClose={() => setIsDiscarding(false)}
+          onDiscarded={(restored) => {
+            showUpdatedDraft(restored);
+            setPickedId(null);
+            setIsDiscarding(false);
+          }}
+        />
+      )}
 
       <EditMilestoneDialog
         milestone={isEditingMilestone ? picked : undefined}
@@ -869,6 +892,105 @@ function DeletePathForm({
         >
           <Button.State name="ready">Delete Path</Button.State>
           <Button.State name="deleting">Deleting…</Button.State>
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function DiscardChangesDialog({
+  open,
+  path,
+  version,
+  pathUrl,
+  onClose,
+  onDiscarded,
+}: {
+  open: boolean;
+  path: PathHead;
+  version: VersionSummary;
+  pathUrl: string;
+  onClose: () => void;
+  onDiscarded: (draft: Draft) => void;
+}) {
+  const [isPending, setIsPending] = useState(false);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !isPending) onClose();
+      }}
+      title={`Discard your changes since Version ${version.number}?`}
+    >
+      <DiscardChangesForm
+        path={path}
+        version={version}
+        pathUrl={pathUrl}
+        isPending={isPending}
+        setIsPending={setIsPending}
+        onCancel={onClose}
+        onDiscarded={onDiscarded}
+      />
+    </Dialog>
+  );
+}
+
+function DiscardChangesForm({
+  path,
+  version,
+  pathUrl,
+  isPending,
+  setIsPending,
+  onCancel,
+  onDiscarded,
+}: {
+  path: PathHead;
+  version: VersionSummary;
+  pathUrl: string;
+  isPending: boolean;
+  setIsPending: (isPending: boolean) => void;
+  onCancel: () => void;
+  onDiscarded: (draft: Draft) => void;
+}) {
+  const [error, setError] = useState("");
+
+  async function discard() {
+    setError("");
+    setIsPending(true);
+    try {
+      const discarded = await withMinimumDuration(() =>
+        send<{ draft: Draft }>(`${pathUrl}/discard-changes`, "POST"),
+      );
+      if (discarded.ok) {
+        setIsPending(false);
+        onDiscarded(discarded.body.draft);
+        return;
+      }
+      setError(discarded.conflict ?? DISCARD_FAILED);
+    } catch {
+      setError(CONNECTION_FAILED);
+    }
+    setIsPending(false);
+  }
+
+  return (
+    <>
+      <p>
+        This will put "{path.name}" back the way Version {version.number} saved
+        it: its name, description, Milestones and Tasks. This cannot be undone!
+      </p>
+      {error && <p role="alert">{error}</p>}
+      <div className="button-group button-group--end">
+        <Button variant="secondary" disabled={isPending} onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          disabled={isPending}
+          state={isPending ? "discarding" : "ready"}
+          onClick={() => void discard()}
+        >
+          <Button.State name="ready">Discard Changes</Button.State>
+          <Button.State name="discarding">Discarding…</Button.State>
         </Button>
       </div>
     </>
