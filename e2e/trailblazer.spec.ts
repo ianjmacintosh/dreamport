@@ -3,20 +3,18 @@ import { expect, test, type Page } from "@playwright/test";
 import { TEST_EMAILS } from "../test/emails";
 import { signIn } from "./sign-in";
 
-/** Make a Path from the Paths list and open its page. */
+/** Make a Path from the Paths list, which opens its editor. */
 async function addPath(page: Page, name: string) {
   await page.getByRole("link", { name: "Paths", exact: true }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: "Paths" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Add Path" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add Path" });
+  await page.getByRole("button", { name: "Make New Path" }).click();
+  const dialog = page.getByRole("dialog", { name: "Make New Path" });
   await dialog.getByLabel("Path name").fill(name);
   await dialog.getByLabel("Description").fill("Two days to sign-ups.");
-  await dialog.getByRole("button", { name: "Add Path" }).click();
-  await expect(dialog).toBeHidden();
+  await dialog.getByRole("button", { name: "Make New Path" }).click();
 
-  await page.getByRole("link", { name }).click();
   await expect(page).toHaveURL(/\/app\/paths\/[^/]+\/edit$/);
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
 }

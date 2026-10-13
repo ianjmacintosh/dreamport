@@ -159,13 +159,11 @@ test("make a Path in Trailblazer with a Milestone and a Task, save a version, an
   await signIn(page, TEST_EMAILS.e2eFollowOwnPath);
 
   await page.getByRole("link", { name: "Paths", exact: true }).click();
-  await page.getByRole("button", { name: "Add Path" }).click();
-  const addPath = page.getByRole("dialog", { name: "Add Path" });
-  await addPath.getByLabel("Path name").fill(pathName);
-  await addPath.getByLabel("Description").fill("Two days to sign-ups.");
-  await addPath.getByRole("button", { name: "Add Path" }).click();
-  await expect(addPath).toBeHidden();
-  await page.getByRole("link", { name: pathName }).click();
+  await page.getByRole("button", { name: "Make New Path" }).click();
+  const makePath = page.getByRole("dialog", { name: "Make New Path" });
+  await makePath.getByLabel("Path name").fill(pathName);
+  await makePath.getByLabel("Description").fill("Two days to sign-ups.");
+  await makePath.getByRole("button", { name: "Make New Path" }).click();
   await expect(page).toHaveURL(/\/app\/paths\/[^/]+\/edit$/);
 
   await page.getByRole("button", { name: "Manage Milestones" }).click();

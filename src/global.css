@@ -116,8 +116,17 @@ a {
   color: var(--color-link);
 }
 
-a:hover {
+/* `.button` renders on <a> too (via Link); a button keeps its variant's
+   text color on hover, its outline being the only hover affordance. */
+a:not(.button):hover {
   color: var(--color-link-hover);
+}
+
+/* Fine print beside a page's main content, such as when a Path was last
+   edited: smaller and italic, so it reads as a note rather than body copy. */
+small {
+  font-size: var(--text-sm);
+  font-style: italic;
 }
 
 /* Quiet link: the text's own near-black instead of --color-link, with the
@@ -237,14 +246,6 @@ a.button {
   color: var(--color-accent-text);
 }
 
-.button--primary:hover {
-  /* Locks the hover text color against the global `a:hover` rule, which
-     would otherwise outrank this on an <a>-rendered button and paint the
-     text cyan (#50) — background no longer changes on hover, but the
-     color still needs pinning to the button's own token. */
-  color: var(--color-accent-text);
-}
-
 .button--secondary {
   background-color: transparent;
   border-color: var(--color-border);
@@ -253,10 +254,8 @@ a.button {
 
 /* For a button on the header bar (#120) — see the --color-bar-* tokens.
    Chosen explicitly via `variant="bar"`, rather than repainting whatever
-   button happens to be rendered inside the bar. `:hover` pins the color
-   against the global `a:hover` rule, same as `.button--primary`. */
-.button--bar,
-.button--bar:hover {
+   button happens to be rendered inside the bar. */
+.button--bar {
   background-color: var(--color-bar-button-bg);
   border-color: var(--color-bar-button-bg);
   color: var(--color-bar-button-text);
@@ -267,10 +266,8 @@ a.button {
    the dark wash that lifts normal-size cream text to AA against the
    gradient (see the --color-bar-* tokens). Regular weight rather than
    `.button`'s 600, so the current section (`aria-current="page"`, on a
-   stronger wash) can stand out by going bold. `:hover` pins the color
-   against the global `a:hover` rule, same as `.button--primary`. */
-.button--nav,
-.button--nav:hover {
+   stronger wash) can stand out by going bold. */
+.button--nav {
   background-color: var(--color-bar-trigger-tint);
   color: var(--color-bar-text);
   font-weight: 400;
