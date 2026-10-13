@@ -438,11 +438,11 @@ Add an entry only once a sign-off conversation resolves something repeatable
     Journey" and "Resume Journey" bottom right; no Advance or Return.
     Resume puts it back in progress where it was left; while another
     Journey on the Path is in progress the server refuses, and the page
-    says why under the buttons: "{Product} already has an active journey
+    says why under the buttons: "{Product} already has an active Journey
     on the "{Path}" Path. A Product cannot have multiple simultaneous
-    journeys on the same Path. You can go to that active journey screen
-    and either continue that journey or abandon it.", both "active
-    journey"s linking to that Journey. The page ends with "Delete
+    Journeys on the same Path. You can go to that active Journey screen
+    and either continue that Journey or abandon it.", both "active
+    Journey"s linking to that Journey. The page ends with "Delete
     Journey".
   - "Restart Journey" starts a new, blank Journey on the Path's latest
     version in one click and goes to it, asking nothing first, since

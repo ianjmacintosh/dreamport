@@ -545,16 +545,16 @@ function ProductJourney() {
               <Link
                 href={`/app/products/${product.id}/journeys/${activeJourneyId}`}
               >
-                active journey
+                active Journey
               </Link>{" "}
               on the "{path.name}" Path. A Product cannot have multiple
-              simultaneous journeys on the same Path. You can go to that{" "}
+              simultaneous Journeys on the same Path. You can go to that{" "}
               <Link
                 href={`/app/products/${product.id}/journeys/${activeJourneyId}`}
               >
-                active journey
+                active Journey
               </Link>{" "}
-              screen and either continue that journey or abandon it.
+              screen and either continue that Journey or abandon it.
             </p>
           )}
         </section>
