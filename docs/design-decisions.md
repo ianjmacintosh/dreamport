@@ -439,8 +439,10 @@ Add an entry only once a sign-off conversation resolves something repeatable
     Journey on "{Path}" and everything in it, including Worksheet answers
     and checked Tasks. This cannot be undone!", and its "Delete Journey"
     deletes on one click, then goes to the Journeys list.
-  - The Journeys list says "In Progress", "Completed" or "Abandoned" on
-    each card; the Product home says "{Path}: {Milestone}", "{Path}
+  - The Journeys list splits into an "Active Journeys" h3 (in progress)
+    and an "Inactive Journeys" h3 (completed or abandoned), each oldest
+    first and left out when empty, every card still saying "In Progress",
+    "Completed" or "Abandoned"; the Product home says "{Path}: {Milestone}", "{Path}
     complete" or "{Path} abandoned"; Pathfinder marks a Path it isn't
     following but has followed with how its latest Journey ended (decided
     in #172, in words, without a prototype; Pause was dropped for

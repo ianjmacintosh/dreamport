@@ -394,11 +394,19 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, dele
     .getByRole("link", { name: "Journeys" })
     .click();
   const journeys = page.getByRole("link", { name: /^Dream Sequence/ });
+  const active = page.getByRole("list", {
+    name: "Active Journeys",
+    exact: true,
+  });
+  const inactive = page.getByRole("list", {
+    name: "Inactive Journeys",
+    exact: true,
+  });
   await expect(journeys).toHaveCount(2);
-  await expect(journeys.first()).toContainText("Completed");
-  await expect(journeys.last()).toContainText("In Progress");
+  await expect(active.getByRole("link")).toHaveText(/In Progress/);
+  await expect(inactive.getByRole("link")).toHaveText(/Completed/);
 
-  await journeys.first().click();
+  await inactive.getByRole("link").click();
   await page.getByRole("button", { name: "Delete Journey" }).click();
   const dialog = page.getByRole("dialog", {
     name: "Delete Journey Permanently?",
@@ -408,7 +416,8 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, dele
 
   await expect(page).toHaveURL(/\/journeys$/);
   await expect(journeys).toHaveCount(1);
-  await expect(journeys).toContainText("In Progress");
+  await expect(inactive).toHaveCount(0);
+  await expect(active.getByRole("link")).toHaveText(/In Progress/);
 
   // A Journey in progress can't be deleted until it's abandoned.
   await journeys.click();
@@ -426,4 +435,7 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, dele
   await dialog.getByRole("button", { name: "Delete Journey" }).click();
   await expect(page).toHaveURL(/\/journeys$/);
   await expect(journeys).toHaveCount(0);
+  await expect(
+    page.getByText("This Product is not following any Paths yet."),
+  ).toBeVisible();
 });

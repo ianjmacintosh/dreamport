@@ -145,14 +145,15 @@ it) and can follow the same Path again, each time its own Journey with its
 own Worksheet answers and checked Tasks, though only one of its Journeys on
 a Path is in progress at a time. A Journey is **in progress**,
 **completed** (Advanced past its last Milestone) or **abandoned** (see
-Abandon). One the User simply stops working on stays in progress. A User
+Abandon); in progress is **active**, and completed or abandoned is
+**inactive**. One the User simply stops working on stays in progress. A User
 can **delete** a completed or abandoned Journey, which removes it and
 everything in it for good, after a confirmation that says so; one in
 progress has to be abandoned first. A Journey
 always belongs to its Product — it's "Tarot's Journey," never a Journey
 called "Tarot." Its page is just "the Journey," the same way the
 Product's Ideas section is "Ideas."
-_Avoid_: progress, roadmap, track; active (say in progress); finished
+_Avoid_: progress, roadmap, track; finished
 (say completed); paused, stopped (say abandoned, or just in progress)
 
 **Advance**:
