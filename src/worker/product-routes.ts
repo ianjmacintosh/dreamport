@@ -10,15 +10,20 @@ import {
   renameIdea,
 } from "./ideas";
 import {
+  abandonJourney,
   advanceJourney,
+  deleteJourney,
   journeyState,
   listJourneys,
   loadJourney,
+  restartJourney,
+  resumeJourney,
   returnJourney,
   saveAnswers,
   setTaskDone,
   startJourney,
   worksheetState,
+  type JourneyStatus,
   type JourneySummary,
   type StartedJourney,
 } from "./journeys";
@@ -266,10 +271,10 @@ productRoutes.get("/journeys", async (c) => {
 /**
  * Start a Journey on the saved version `versionId`, at its Milestone 1.
  * 404s for a version the User may not follow, the same as one that doesn't
- * exist. A repeat start on the same version is harmless: it leaves that
- * Journey's progress as it was and answers 200 rather than 201, with the
- * same id. 409s when the Product already follows another version of the
- * Path, since a Product has one Journey per Path.
+ * exist. A Product has at most one Journey in progress per Path (#172): a
+ * repeat start while one is in progress on the same version is harmless,
+ * leaving its progress as it was and answering 200 with its id, and one
+ * in progress on another version answers 409.
  */
 productRoutes.post("/journeys", async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -284,7 +289,7 @@ productRoutes.post("/journeys", async (c) => {
   }
 
   const start = await startJourney(c.env.DB, c.var.product, version);
-  if (!start) {
+  if (start.versionId !== version.id) {
     return c.json(
       { error: "This Product already follows another version of this Path" },
       409,
@@ -337,6 +342,93 @@ productRoutes.post("/journeys/:journeyId/return", async (c) => {
 
   await returnJourney(c.env.DB, journey);
   return c.json(await journeyState(c.env.DB, journey), 200);
+});
+
+/**
+ * Abandon the Journey (#172): it stops being in progress, keeping its
+ * answers and checked Tasks. Harmless on a completed or abandoned one.
+ */
+productRoutes.post("/journeys/:journeyId/abandon", async (c) => {
+  const journey = await journeyIn(c);
+  if (!journey) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  await abandonJourney(c.env.DB, journey);
+  return c.json(await journeyState(c.env.DB, journey), 200);
+});
+
+/**
+ * Resume an abandoned Journey (#172): back in progress where it was left,
+ * answering its state. 409 while another of the Product's Journeys on the
+ * Path is in progress, with that one's id for the page to link to.
+ */
+productRoutes.post("/journeys/:journeyId/resume", async (c) => {
+  const journey = await journeyIn(c);
+  if (!journey) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  const resume = await resumeJourney(c.env.DB, journey);
+  if (!resume.resumed) {
+    return c.json(
+      {
+        error: "Another Journey on this Path is in progress",
+        activeJourneyId: resume.activeJourneyId,
+      },
+      409,
+    );
+  }
+  return c.json(await journeyState(c.env.DB, journey), 200);
+});
+
+/**
+ * Restart a completed or abandoned Journey: a new, blank Journey on the
+ * Path's latest version, 201 with its id. 409 while the Journey is in
+ * progress. If the Path already has a Journey in progress, it answers 200
+ * with that one.
+ */
+productRoutes.post("/journeys/:journeyId/restart", async (c) => {
+  const journey = await journeyIn(c);
+  const latest =
+    journey &&
+    (await getTrailheadVersion(
+      c.env.DB,
+      c.var.userId,
+      journey.version.pathId,
+      null,
+    ));
+  if (!journey || !latest) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  const restart = await restartJourney(c.env.DB, journey, latest.version);
+  if (!restart) {
+    return c.json(
+      { error: "Only a completed or abandoned Journey can restart" },
+      409,
+    );
+  }
+  return c.json({ journeyId: restart.journeyId }, restart.started ? 201 : 200);
+});
+
+/**
+ * Delete the Journey for good, with its Worksheet answers and checked
+ * Tasks. 409 for one in progress, which has to be abandoned first.
+ */
+productRoutes.delete("/journeys/:journeyId", async (c) => {
+  const journey = await journeyIn(c);
+  if (!journey) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  if (!(await deleteJourney(c.env.DB, journey))) {
+    return c.json(
+      { error: "Abandon a Journey in progress before deleting it" },
+      409,
+    );
+  }
+  return c.json({}, 200);
 });
 
 /** The Path a Journey follows, for a Worksheet page's breadcrumb. */
@@ -436,21 +528,35 @@ productRoutes.put("/journeys/:journeyId/tasks/:taskId", async (c) => {
 });
 
 /**
- * The Product's Journey on each Path it follows, by Path id. `startJourney`
- * keeps it to one per Path.
+ * The Product's Journeys by Path id: the one in progress on each Path, if
+ * any (`startJourney` keeps it to one), and how the latest of the rest
+ * ended.
  */
 async function journeysByPath(
   db: D1Database,
   product: OwnedProduct,
-): Promise<Map<string, JourneySummary>> {
-  const journeys = await listJourneys(db, product);
-  return new Map(journeys.map((journey) => [journey.pathId, journey]));
+): Promise<{
+  inProgress: Map<string, JourneySummary>;
+  lastEnded: Map<string, Exclude<JourneyStatus, "in-progress">>;
+}> {
+  const inProgress = new Map<string, JourneySummary>();
+  const lastEnded = new Map<string, Exclude<JourneyStatus, "in-progress">>();
+  // Oldest first, so a later Journey on a Path overwrites an earlier one.
+  for (const journey of await listJourneys(db, product)) {
+    if (journey.status === "in-progress") {
+      inProgress.set(journey.pathId, journey);
+    } else {
+      lastEnded.set(journey.pathId, journey.status);
+    }
+  }
+  return { inProgress, lastEnded };
 }
 
 /**
  * Pathfinder (#170): every Path the User can follow, with the Product's
- * Journey on each one it already follows, so the page can link to that
- * Journey and not invite a second start.
+ * Journey in progress on each one it's following, so the page can link to
+ * that Journey and not invite a second start, and how its latest other
+ * Journey on the Path ended, if it has one (#172).
  */
 productRoutes.get("/pathfinder", async (c) => {
   const { product } = c.var;
@@ -463,7 +569,8 @@ productRoutes.get("/pathfinder", async (c) => {
     paths: paths.map(({ id, name }) => ({
       id,
       name,
-      journeyId: journeys.get(id)?.id ?? null,
+      journeyId: journeys.inProgress.get(id)?.id ?? null,
+      lastEnded: journeys.lastEnded.get(id) ?? null,
     })),
   });
 });
@@ -472,7 +579,7 @@ productRoutes.get("/pathfinder", async (c) => {
  * A Path's Trailhead (#170): one of its saved versions to start a Journey
  * on, its latest unless `?version=n` names another, with every version's
  * number and save date to pick from, and the Product's Journey on the
- * Path, with its version's number, if it already follows any version. Another User's Path, an unknown one,
+ * Path in progress, with its version's number, if there is one. Another User's Path, an unknown one,
  * one with no saved version and a number it doesn't have all 404 alike.
  */
 productRoutes.get("/paths/:pathId/trailhead", async (c) => {
@@ -493,7 +600,9 @@ productRoutes.get("/paths/:pathId/trailhead", async (c) => {
 
   const { owner, version, versions } = trailhead;
   const journey =
-    (await journeysByPath(c.env.DB, c.var.product)).get(version.pathId) ?? null;
+    (await journeysByPath(c.env.DB, c.var.product)).inProgress.get(
+      version.pathId,
+    ) ?? null;
   return c.json({
     product: c.var.product,
     path: { id: version.pathId, name: version.name, owner },

@@ -142,16 +142,19 @@ at its first Milestone. Strictly sequenced: exactly one current Milestone,
 everything before it done, everything after it future. A Product can be on
 several Paths at once (e.g. one for building the product, one for marketing
 it) and can follow the same Path again, each time its own Journey with its
-own Worksheet answers and checked Tasks. A User can **delete** a Journey,
-which removes it and everything in it for good, after a confirmation that
-says so. A
-Journey is **in progress**, **paused** (set aside by the User, everything
-kept), or **completed** (Advanced past its last Milestone). A Journey
+own Worksheet answers and checked Tasks, though only one of its Journeys on
+a Path is in progress at a time. A Journey is **in progress**,
+**completed** (Advanced past its last Milestone) or **abandoned** (see
+Abandon); in progress is **active**, and completed or abandoned is
+**inactive**. One the User simply stops working on stays in progress. A User
+can **delete** a completed or abandoned Journey, which removes it and
+everything in it for good, after a confirmation that says so; one in
+progress has to be abandoned first. A Journey
 always belongs to its Product — it's "Tarot's Journey," never a Journey
 called "Tarot." Its page is just "the Journey," the same way the
 Product's Ideas section is "Ideas."
-_Avoid_: progress, roadmap, track; active (say in progress); finished
-(say completed); stopped, abandoned (say paused)
+_Avoid_: progress, roadmap, track; finished
+(say completed); paused, stopped (say abandoned, or just in progress)
 
 **Advance**:
 Move a Journey's current Milestone forward by one, something the User
@@ -171,21 +174,27 @@ Milestone is fixed content, not something a User's own work is attached
 to.
 _Avoid_: step back, go back, revert, undo, retreat
 
-**Pause**:
-Set an in-progress Journey aside, for a User taking time away from that
-Path. Everything is kept — the current Milestone, Worksheet answers,
-checked Tasks — and the Journey waits, paused, until the User resumes or
-restarts it. Not the same as completed: a paused Journey was set aside partway.
-_Avoid_: stop, abandon, archive
+**Abandon**:
+Step away from a Journey in progress, for a User getting off that Path
+partway. Everything is kept — the Milestone they stopped on, Worksheet
+answers, checked Tasks — and Advance and Return no longer move it until
+the User resumes it, or restarts the Path instead. Not the same as
+completed: an abandoned Journey was left partway. Abandoning comes before
+deleting a Journey in progress. There's no pausing: a Journey the User
+isn't working on just stays in progress (#172).
+_Avoid_: pause, stop, quit, archive, cancel
 
 **Resume**:
-Put a paused Journey back in progress, on the Milestone the User left it
-on. The mirror of Pause.
-_Avoid_: unpause, continue
+Put an abandoned Journey back in progress, on the Milestone the User left
+it on, answers and checked Tasks as they were. The mirror of Abandon. Not
+while another of the Product's Journeys on the Path is in progress, since
+only one can be; the User abandons that one first.
+_Avoid_: unabandon, continue, reopen
 
 **Restart**:
 Start a new Journey on the same Path for a Product whose Journey on it is
-paused or completed — the alternative to Resume. The new Journey is blank,
+completed or abandoned, on the Path's latest version — the alternative to
+Resume. The new Journey is blank,
 on the Path's first Milestone, in progress. Never destructive: the earlier
 Journey stays as it was, answers and checked Tasks included, until the User
 deletes it.

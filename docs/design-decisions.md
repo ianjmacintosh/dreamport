@@ -353,29 +353,35 @@ Add an entry only once a sign-off conversation resolves something repeatable
 - A Product's Journeys, Pathfinder and a Path's Trailhead are three pages
   under the Product, each with the Product's name as the h1 except the
   Trailhead (decided in #170, in words, without a prototype):
-  - **Journeys** (`/app/products/:productId/journeys`): "Journeys" as the
-    h2, then one `ActionCard` link per Journey, the Path's name with
-    "Current Milestone: {name}" or "Completed" as its status. A list of one
-    is still a list. With none, "This Product is not following any Paths
-    yet." Then a "Follow Another Path" h3, one line, and "Open Pathfinder".
+  - **Journeys** (`/app/products/:productId/journeys`): no "Journeys"
+    heading; straight to an "Active Journeys" h2 and an "Inactive
+    Journeys" h2 (#172), each one `ActionCard` link per Journey, oldest
+    first, the Path's name with "In Progress", "Completed" or "Abandoned"
+    as its status: no current Milestone and no start date. A section with
+    none is left out, and a list of one is still a list. With no Journeys
+    at all, "This Product is not following any Paths yet." Then a "Follow
+    Another Path" h2, one line, and "Open Pathfinder".
     Checking on a Journey under way comes first; choosing a new Path comes
     second, and the page never redirects to Pathfinder.
   - **Pathfinder** (`/app/products/:productId/pathfinder`): "Pathfinder"
     as the h2, then one `ActionCard` link per Path the User can follow
     (Dream Sequence first, then their own with a saved version), each
-    going to its Trailhead. One the Product already follows stays in the
-    list, marked "Following", and goes to that Journey: a Path you're on
-    never invites you to start it again. A "Make Your Own Path" h3 ends
+    going to its Trailhead. One the Product has a Journey in progress on
+    stays in the list, marked "Following", and goes to that Journey: a Path
+    you're on never invites you to start it again. One it has followed
+    before, but isn't now, is marked "Completed" or "Abandoned" for its
+    latest Journey and goes to its Trailhead, to start again (#172). A "Make Your Own Path" h3 ends
     it: "Not finding a Path that does quite what you need? Make your own
     Path", the last three words linking to Trailblazer.
   - **Trailhead** (`/app/products/:productId/paths/:pathId/trailhead`):
     the pre-start Journey page #137 drew, with the Path's name as the h1:
     the route with every outcome line on the left, the pitch and "Start
     Journey" on the right. A User's own Path shows its description as the
-    pitch. If the Product already follows the Path, "{Product} is already
-    following {Path}." and "View Journey" take Start Journey's place, on
-    every version: a Product has one Journey per Path, so a newer version
-    of a Path it follows can't be started (the server answers 409), and
+    pitch. If the Product has a Journey in progress on the Path, "{Product}
+    is already following {Path}." and "View Journey" take Start Journey's
+    place, on every version: a Product has at most one Journey in progress
+    per Path (#172), so a newer version can't be started while one is (the
+    server answers 409), and
     the line names the followed version, "(version 1)", when it isn't the
     one shown. The
     version stays in the background: the page shows the latest, and a
@@ -385,9 +391,13 @@ Add an entry only once a sign-off conversation resolves something repeatable
     Dialog. A `Dropdown` put an older version one click from Start
     Journey, too easy to reach. An earlier version's page says a newer one
     is available.
-  - The Product page's Journey section keeps one line per Journey, and its
-    button reads "View Journeys", or "Choose a Path" (to Pathfinder) when
-    there are none.
+  - The Product page's section is "Journey List" (#172): a singular
+    "Journey" was wrong with several, and "Journey(s)" or plural logic is
+    worse. It shows only the active Journeys, as the Journeys page's
+    `ActionCard`s (path icon, white card, "In Progress"), or "Looking for
+    some structure? Follow a marked path to success." when there are none.
+    Its button reads "View Journeys", or "Choose a Path" (to Pathfinder)
+    when the Product has no Journeys at all.
   - A Path's editor is `/app/paths/:pathId/edit`, its crumb "Edit", so the
     Path's own URL is free for a page about the Path later.
 
@@ -411,3 +421,48 @@ Add an entry only once a sign-off conversation resolves something repeatable
     it is the first click, and its heading and text are the confirming
     step. A reveal inside it only changed the button's color and said
     nothing new, so it read as broken rather than careful.
+
+- A Journey is In Progress, Completed or Abandoned (#172), and its page
+  follows suit, in the right column and at the page's end, bottom right
+  under the two columns:
+  - **In Progress**: the column as before, and the page ends with
+    "Abandon Journey", a secondary button, as the usual two-step reveal in
+    place (Cancel, then a confirming "Abandon Journey"). Abandoning loses
+    nothing, so there's nothing to explain and no `Dialog`. There's no
+    Delete: a Journey in progress has to be abandoned first.
+  - **Completed**: Return, then "Restart Journey" bottom right, the
+    confirming position. The page ends with "Delete Journey".
+  - **Abandoned**: "{Path} abandoned" as the h3, then "You stepped away
+    from this Journey on {Milestone}. Resume it there, or restart the Path
+    from the beginning.", the Worksheets, then a secondary "Restart
+    Journey" and "Resume Journey" bottom right; no Advance or Return.
+    Resume puts it back in progress where it was left; while another
+    Journey on the Path is in progress the server refuses, and the page
+    says why under the buttons: "{Product} already has an active Journey
+    on the "{Path}" Path. A Product cannot have multiple simultaneous
+    Journeys on the same Path. You can go to that active Journey screen
+    and either continue that Journey or abandon it.", both "active
+    Journey"s linking to that Journey. The page ends with "Delete
+    Journey".
+  - "Restart Journey" starts a new, blank Journey on the Path's latest
+    version in one click and goes to it, asking nothing first, since
+    nothing is lost.
+  - "Delete Journey" opens a "Delete Journey Permanently?" `Dialog` the
+    way Delete Path does (above), since the answers and checked Tasks it
+    removes aren't on the page. Its text is "This will remove {Product}'s
+    Journey on "{Path}" and everything in it, including Worksheet answers
+    and checked Tasks. This cannot be undone!", and its "Delete Journey"
+    deletes on one click, then goes to the Journeys list.
+  - The Journeys page goes straight to "Active Journeys" (in progress)
+    and "Inactive Journeys" (completed or abandoned), with no "Journeys"
+    heading above them (see the Journeys page above); the Product page's
+    Journey List shows only the active ones (above); Pathfinder marks a Path it isn't
+    following but has followed with how its latest Journey ended (decided
+    in #172, in words, without a prototype; Pause was dropped for
+    Abandon).
+
+- Why an action didn't go through (a refused save, start or resume) is a
+  `role="alert"` paragraph right after the action's `.button-group`, with
+  `--space-4` above it from `global.css`, so it reads as its own message
+  rather than part of the button row. Covers every such message, not just
+  the one it was noticed on (decided in #172).

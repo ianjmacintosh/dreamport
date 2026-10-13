@@ -340,6 +340,13 @@ a.button {
   margin-top: var(--space-6);
 }
 
+/* Why the action just tried didn't go through, right under its buttons:
+   room above it, so it reads as its own message rather than part of the
+   button row (#172). */
+.button-group + [role="alert"] {
+  margin-top: var(--space-4);
+}
+
 /* Below 640px (same breakpoint as `.field-row`/`.list-row`'s own stacking),
    a group can be wider than the screen — an Idea row's Edit / Delete /
    Cancel is ~312px against ~291px of content at 375px (#102) — and a

@@ -198,6 +198,14 @@ export const TEST_EMAILS = {
   // --- Seam 1: the Journey routes (#137-#140, #170), one test each ---
   /** Lists a Product's Journeys, none and then one. */
   journeysList: "delivered+journeys-list@resend.dev",
+  /** Restarts a Journey before and after completing it (#172). */
+  journeysRestart: "delivered+journeys-restart@resend.dev",
+  /** Abandons a Journey (#172). */
+  journeysAbandon: "delivered+journeys-abandon@resend.dev",
+  /** Abandons a Journey and resumes it around another (#172). */
+  journeysResume: "delivered+journeys-resume@resend.dev",
+  /** Abandons a Journey, then deletes it (#172). */
+  journeysDelete: "delivered+journeys-delete@resend.dev",
   /** Reads one Journey's state. */
   journeysState: "delivered+journeys-state@resend.dev",
   /** Starts a Journey, then starts it again. */
@@ -308,6 +316,8 @@ export const TEST_EMAILS = {
   /** Finish a Journey, then Return from finished: un-finished, Growth still current. */
   e2eReturnFromFinished:
     "delivered+e2e-return-from-finished+e2e-test@resend.dev",
+  /** Finish a Journey, Restart it, then delete the finished one (#172). */
+  e2eRestartJourney: "delivered+e2e-restart-journey+e2e-test@resend.dev",
   /** #139: fill out the Product Summary from the Journey page, see it saved. */
   e2eFillOnePager: "delivered+e2e-fill-one-pager+e2e-test@resend.dev",
   /** #112: set a Product's description, see it persist across a reload, then clear it. */

@@ -1704,6 +1704,35 @@ function journeyUrl(productId: string, journeyId: string, rest = "") {
   return `/api/products/${productId}/journeys/${journeyId}${rest}`;
 }
 
+/** The Product's Journeys, as `GET /journeys` lists them. */
+async function listOf(productId: string, cookie: string) {
+  const res = await callApi(
+    "GET",
+    `/api/products/${productId}/journeys`,
+    cookie,
+  );
+  return ((await res.json()) as { journeys: { id: string }[] }).journeys;
+}
+
+/** Advance a Journey until it's completed. */
+async function finishJourney(
+  productId: string,
+  journeyId: string,
+  cookie: string,
+) {
+  for (;;) {
+    const res = await callApi(
+      "POST",
+      journeyUrl(productId, journeyId, "/advance"),
+      cookie,
+    );
+    const { journey } = (await res.json()) as {
+      journey: { finishedAt: string | null };
+    };
+    if (journey.finishedAt) return;
+  }
+}
+
 function getWorksheet(
   productId: string,
   journeyId: string,
@@ -1812,7 +1841,8 @@ describe("Journey routes", () => {
           pathName: "Dream Sequence",
           versionNumber: 1,
           currentMilestoneName: "Rough One-Pager",
-          finishedAt: null,
+          startedAt: expect.any(String),
+          status: "in-progress",
         },
       ],
     });
@@ -1847,6 +1877,115 @@ describe("Journey routes", () => {
     expect(bad.status).toBe(400);
   });
 
+  it("POST /journeys/:journeyId/restart 409s a Journey in progress, then starts a new one once it's completed", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
+      TEST_EMAILS.journeysRestart,
+    );
+    const restart = () =>
+      callApi("POST", journeyUrl(product.id, journeyId, "/restart"), cookie);
+
+    const early = await restart();
+    expect(early.status).toBe(409);
+    expect(await early.json()).toEqual({
+      error: "Only a completed or abandoned Journey can restart",
+    });
+
+    await finishJourney(product.id, journeyId, cookie);
+    const res = await restart();
+    expect(res.status).toBe(201);
+    const { journeyId: newId } = (await res.json()) as { journeyId: string };
+    expect((await listOf(product.id, cookie)).map((j) => j.id)).toEqual([
+      journeyId,
+      newId,
+    ]);
+
+    const again = await restart();
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual({ journeyId: newId });
+  });
+
+  it("POST /journeys/:journeyId/abandon takes the Journey out of progress, answering its state", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
+      TEST_EMAILS.journeysAbandon,
+    );
+
+    const res = await callApi(
+      "POST",
+      journeyUrl(product.id, journeyId, "/abandon"),
+      cookie,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      journey: { id: journeyId, abandonedAt: expect.any(String) },
+    });
+    expect(await listOf(product.id, cookie)).toMatchObject([
+      { id: journeyId, status: "abandoned" },
+    ]);
+  });
+
+  it("POST /journeys/:journeyId/resume puts an abandoned Journey back in progress, or 409s while another on the Path is", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
+      TEST_EMAILS.journeysResume,
+    );
+    const resume = () =>
+      callApi("POST", journeyUrl(product.id, journeyId, "/resume"), cookie);
+    await callApi(
+      "POST",
+      journeyUrl(product.id, journeyId, "/abandon"),
+      cookie,
+    );
+    const other = await startJourney(product.id, cookie);
+    const { journeyId: otherId } = (await other.json()) as {
+      journeyId: string;
+    };
+
+    const refused = await resume();
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({
+      error: "Another Journey on this Path is in progress",
+      activeJourneyId: otherId,
+    });
+
+    await callApi("POST", journeyUrl(product.id, otherId, "/abandon"), cookie);
+    const res = await resume();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      journey: { id: journeyId, abandonedAt: null },
+    });
+  });
+
+  it("DELETE /journeys/:journeyId 409s a Journey in progress, then deletes it once abandoned, and it 404s afterwards", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
+      TEST_EMAILS.journeysDelete,
+    );
+    const remove = () =>
+      callApi("DELETE", journeyUrl(product.id, journeyId), cookie);
+
+    const early = await remove();
+    expect(early.status).toBe(409);
+    expect(await early.json()).toEqual({
+      error: "Abandon a Journey in progress before deleting it",
+    });
+    expect(await listOf(product.id, cookie)).toHaveLength(1);
+
+    await callApi(
+      "POST",
+      journeyUrl(product.id, journeyId, "/abandon"),
+      cookie,
+    );
+    const res = await remove();
+
+    expect(res.status).toBe(200);
+    expect(await listOf(product.id, cookie)).toEqual([]);
+    const gone = await callApi(
+      "GET",
+      journeyUrl(product.id, journeyId),
+      cookie,
+    );
+    expect(gone.status).toBe(404);
+  });
+
   it("GET /journeys/:journeyId 404s an unknown Journey, else answers its state with the Product", async () => {
     const { cookie, product, journeyId } = await startedProduct(
       TEST_EMAILS.journeysState,
@@ -1873,6 +2012,7 @@ describe("Journey routes", () => {
         startedAt: expect.any(String),
         currentMilestoneId: body.path.milestones[0].id,
         finishedAt: null,
+        abandonedAt: null,
       },
       worksheets: expect.any(Array),
       tasks: expect.any(Array),
@@ -2089,7 +2229,7 @@ describe("Journey routes", () => {
 });
 
 describe("Pathfinder and Trailhead routes", () => {
-  it("GET /pathfinder lists Dream Sequence and the User's saved Paths, marking the ones the Product follows", async () => {
+  it("GET /pathfinder lists Dream Sequence and the User's saved Paths, marking the ones the Product is following and how its last Journey on the rest ended", async () => {
     const { cookie, path } = await savedPath(TEST_EMAILS.pathfinderRoute);
     await addPath(cookie, "Never Saved");
     const { product } = (await (
@@ -2108,8 +2248,13 @@ describe("Pathfinder and Trailhead routes", () => {
     expect(await pathfinder()).toEqual({
       product,
       paths: [
-        { id: "dream-sequence", name: "Dream Sequence", journeyId: null },
-        { id: path.id, name: path.name, journeyId: null },
+        {
+          id: "dream-sequence",
+          name: "Dream Sequence",
+          journeyId: null,
+          lastEnded: null,
+        },
+        { id: path.id, name: path.name, journeyId: null, lastEnded: null },
       ],
     });
 
@@ -2119,8 +2264,21 @@ describe("Pathfinder and Trailhead routes", () => {
     expect(await pathfinder()).toEqual({
       product,
       paths: [
-        { id: "dream-sequence", name: "Dream Sequence", journeyId },
-        { id: path.id, name: path.name, journeyId: null },
+        {
+          id: "dream-sequence",
+          name: "Dream Sequence",
+          journeyId,
+          lastEnded: null,
+        },
+        { id: path.id, name: path.name, journeyId: null, lastEnded: null },
+      ],
+    });
+
+    await finishJourney(product.id, journeyId, cookie);
+    expect(await pathfinder()).toMatchObject({
+      paths: [
+        { id: "dream-sequence", journeyId: null, lastEnded: "completed" },
+        { id: path.id, journeyId: null, lastEnded: null },
       ],
     });
   });
