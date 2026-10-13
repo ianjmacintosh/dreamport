@@ -224,6 +224,7 @@ test("Discard Changes puts the Draft back as its latest version saved it", async
   const addTask = page.getByRole("button", { name: "Add Task" });
   await taskTitle.fill("Kept Task");
   await addTask.click();
+  await expect(taskTitle).toHaveValue("");
   await page.getByRole("button", { name: "Save as New Version" }).click();
   await expect(
     page.getByRole("status").filter({ hasText: /Latest version/ }),
