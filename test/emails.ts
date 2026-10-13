@@ -226,6 +226,8 @@ export const TEST_EMAILS = {
   pathsRoutesCap: "delivered+paths-routes-cap@resend.dev",
   /** Reads and edits one Path's Draft and its Milestones. */
   pathsRoutesDraft: "delivered+paths-routes-draft@resend.dev",
+  /** Saves a version, follows it, then deletes the Path (#171). */
+  pathsRoutesDelete: "delivered+paths-routes-delete@resend.dev",
 
   // --- Seam 1f: the gates every product route crosses (#154) ---
   /** Owns the Product every product-scoped route is driven against. */

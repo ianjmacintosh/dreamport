@@ -5,6 +5,7 @@ import type { WorkerEnv } from "./env";
 import {
   addTask,
   deleteMilestone,
+  deletePath,
   deleteTask,
   getDraft,
   getPath,
@@ -63,6 +64,18 @@ pathRoutes.use(async (c, next) => {
  */
 pathRoutes.get("/", async (c) => {
   return c.json({ draft: await getDraft(c.env.DB, c.var.path) });
+});
+
+/**
+ * Delete the Path, its Draft, every saved version and every Journey on any
+ * of them, for good.
+ */
+pathRoutes.delete("/", async (c) => {
+  if (!(await deletePath(c.env.DB, c.var.path))) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  return c.json({}, 200);
 });
 
 const AT_CAP = `A Path can have up to ${MILESTONES_AND_TASKS_PER_PATH} Milestones and Tasks combined. Remove one to make room.`;

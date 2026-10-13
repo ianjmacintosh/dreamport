@@ -390,3 +390,24 @@ Add an entry only once a sign-off conversation resolves something repeatable
     there are none.
   - A Path's editor is `/app/paths/:pathId/edit`, its crumb "Edit", so the
     Path's own URL is free for a page about the Path later.
+
+- Deleting a Path is "Delete Path", a secondary button to the left of
+  Save as New Version at the end of the Path's page. It opens a `Dialog`
+  titled "Delete Path Permanently?" that says what goes ("This will remove
+  "{Path name}" and everything associated with it, including history
+  entries, tasks, worksheets, etc. This cannot be undone!"), then Cancel
+  and "Delete Path", a primary button that deletes on one click. Deleting
+  goes to the Paths list (decided in #171, in words, without a prototype;
+  it replaced a Delete inside the Edit Path Dialog).
+  - Why a Dialog, and not the usual reveal in place: the action reaches
+    far past what the page shows. It removes the Path and much that isn't
+    on screen, such as Tasks, Worksheets and history entries. A User has
+    to be told that before confirming, and there's no room to say it
+    where the button sits. The Dialog gives the explanation space of its
+    own. Needing a confirmation doesn't call for a Dialog on its own: the
+    reveal in place already gives one. A Dialog is for when the
+    explanation doesn't fit beside the button.
+  - The Dialog replaces the two-step reveal; it doesn't hold one. Opening
+    it is the first click, and its heading and text are the confirming
+    step. A reveal inside it only changed the button's color and said
+    nothing new, so it read as broken rather than careful.
