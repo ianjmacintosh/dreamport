@@ -238,6 +238,7 @@ function PathDraft() {
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [pathDialog, setPathDialog] = useState<PathDialogOpening | null>(null);
   const [isEditingMilestone, setIsEditingMilestone] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const base = `/api/paths/${path.id}`;
   // The first Milestone until one is picked, and again if the picked one
@@ -363,6 +364,9 @@ function PathDraft() {
         )}
       </p>
       <div className="button-group button-group--end">
+        <Button variant="secondary" onClick={() => setIsDeleting(true)}>
+          Delete Path
+        </Button>
         <Button
           disabled={isSaving}
           state={isSaving ? "pending" : "ready"}
@@ -389,6 +393,16 @@ function PathDraft() {
         pathUrl={base}
         onClose={() => setPathDialog(null)}
         onUpdated={showUpdatedDraft}
+      />
+
+      <DeletePathDialog
+        open={isDeleting}
+        path={path}
+        pathUrl={base}
+        onClose={() => setIsDeleting(false)}
+        onDeleted={() =>
+          void router.navigate({ to: "/app/paths", replace: true })
+        }
       />
 
       <EditMilestoneDialog
@@ -767,6 +781,100 @@ function MilestoneInputs({
  * that Dialog's list and is sent with Update Path, so adding sends
  * nothing.
  */
+function DeletePathDialog({
+  open,
+  path,
+  pathUrl,
+  onClose,
+  onDeleted,
+}: {
+  open: boolean;
+  path: PathHead;
+  pathUrl: string;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [isPending, setIsPending] = useState(false);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !isPending) onClose();
+      }}
+      title="Delete Path Permanently?"
+    >
+      <DeletePathForm
+        path={path}
+        pathUrl={pathUrl}
+        isPending={isPending}
+        setIsPending={setIsPending}
+        onCancel={onClose}
+        onDeleted={onDeleted}
+      />
+    </Dialog>
+  );
+}
+
+function DeletePathForm({
+  path,
+  pathUrl,
+  isPending,
+  setIsPending,
+  onCancel,
+  onDeleted,
+}: {
+  path: PathHead;
+  pathUrl: string;
+  isPending: boolean;
+  setIsPending: (isPending: boolean) => void;
+  onCancel: () => void;
+  onDeleted: () => void;
+}) {
+  const [error, setError] = useState("");
+
+  async function remove() {
+    setError("");
+    setIsPending(true);
+    try {
+      const deleted = await withMinimumDuration(() =>
+        send<object>(pathUrl, "DELETE"),
+      );
+      if (deleted.ok) {
+        onDeleted();
+        return;
+      }
+      setError(DELETE_FAILED);
+    } catch {
+      setError(CONNECTION_FAILED);
+    }
+    setIsPending(false);
+  }
+
+  return (
+    <>
+      <p>
+        This will remove "{path.name}" and everything associated with it,
+        including history entries, tasks, worksheets, etc. This cannot be
+        undone!
+      </p>
+      {error && <p role="alert">{error}</p>}
+      <div className="button-group button-group--end">
+        <Button variant="secondary" disabled={isPending} onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          disabled={isPending}
+          state={isPending ? "deleting" : "ready"}
+          onClick={() => void remove()}
+        >
+          <Button.State name="ready">Delete Path</Button.State>
+          <Button.State name="deleting">Deleting…</Button.State>
+        </Button>
+      </div>
+    </>
+  );
+}
+
 function AddMilestoneDialog({
   open,
   onClose,

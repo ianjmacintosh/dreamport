@@ -387,6 +387,23 @@ export async function createPath(
   return { ok: true, path: path as OwnedPath };
 }
 
+/**
+ * Delete a Path for good. The rows under it cascade: its Draft's
+ * Milestones and Tasks, and its saved versions, each of which takes its
+ * Journeys and their records with it (migration `0022`'s trigger). Saved
+ * versions belong to one Path, so no other Path loses anything.
+ */
+export async function deletePath(
+  db: D1Database,
+  path: OwnedPath,
+): Promise<boolean> {
+  const { meta } = await db
+    .prepare('DELETE FROM "paths" WHERE "id" = ?')
+    .bind(path.id)
+    .run();
+  return meta.changes > 0;
+}
+
 export async function getDraft(
   db: D1Database,
   path: OwnedPath,

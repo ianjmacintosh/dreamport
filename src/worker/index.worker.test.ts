@@ -2587,6 +2587,32 @@ describe("Trailblazer routes", () => {
     expect(await task.json()).toEqual(capError);
     expect((await draftTasks(cookie, path.id)).flat()).toHaveLength(149);
   });
+
+  it("DELETE /api/paths/:pathId deletes the Path and the Journeys on it, and its pages stop opening", async () => {
+    const { cookie, path, version } = await savedPath(
+      TEST_EMAILS.pathsRoutesDelete,
+    );
+    const { product } = (await (
+      await addProduct(cookie, "A phone-scale app")
+    ).json()) as { product: { id: string } };
+    const { journeyId } = (await (
+      await startJourney(product.id, cookie, version.id)
+    ).json()) as { journeyId: string };
+
+    const res = await callApi("DELETE", `/api/paths/${path.id}`, cookie);
+
+    expect(res.status).toBe(200);
+    for (const url of [
+      `/api/paths/${path.id}`,
+      `/api/products/${product.id}/paths/${path.id}/trailhead`,
+      journeyUrl(product.id, journeyId),
+    ]) {
+      expect((await callApi("GET", url, cookie)).status).toBe(404);
+    }
+    expect(await (await callApi("GET", "/api/paths", cookie)).json()).toEqual({
+      paths: [],
+    });
+  });
 });
 
 /** Add `MILESTONE` at the end of the Draft through Update Path; its new id. */

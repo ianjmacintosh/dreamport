@@ -15,6 +15,7 @@ import {
   addTask,
   createPath,
   deleteMilestone,
+  deletePath,
   deleteTask,
   type FollowableVersion,
   getDraft,
@@ -339,7 +340,7 @@ async function fillDraft(path: OwnedPath, count: number) {
 }
 
 describe("a User's Paths", () => {
-  it(`accepts a ${PATHS_PER_USER}th Path and refuses the next, creating nothing`, async () => {
+  it(`accepts a ${PATHS_PER_USER}th Path and refuses the next, creating nothing, until one is deleted`, async () => {
     const userId = "paths-module-cap";
     await seedUser(userId, TEST_EMAILS.pathsModuleCap);
     for (let i = 1; i < PATHS_PER_USER; i++) {
@@ -364,6 +365,14 @@ describe("a User's Paths", () => {
       await createPath(env.DB, userId, { name: "One more", description: "" }),
     ).toEqual({ ok: false, reason: "cap" });
     expect(await listPaths(env.DB, userId)).toHaveLength(PATHS_PER_USER);
+
+    const [oldest] = await listPaths(env.DB, userId);
+    const path = await getPath(env.DB, userId, oldest.id);
+    if (!path) throw new Error("the listed Path isn't there");
+    expect(await deletePath(env.DB, path)).toBe(true);
+    expect(
+      (await createPath(env.DB, userId, { name: "Room", description: "" })).ok,
+    ).toBe(true);
   });
 
   it("lists a User's own Paths, oldest first, and not another User's", async () => {
@@ -1006,6 +1015,75 @@ describe("saving a Path's Draft as a version", () => {
     expect(await contentOf(othersVersion.id)).toEqual(othersBefore);
     expect(await dreamSequence()).toEqual(dreamBefore);
     expect(await dreamSequenceTasks()).toEqual(dreamTasksBefore);
+  });
+});
+
+describe("deleting a Path (#171)", () => {
+  it("takes its Draft, every version and every Journey on them, leaving other Paths and Journeys alone", async () => {
+    const othersPath = await makersPath();
+    await milestoneOn(othersPath, BAKE);
+    const othersVersion = await saved(othersPath);
+    const othersBefore = await contentOf(othersVersion.id);
+
+    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
+    const created = await createPath(env.DB, STRANGER_ID, {
+      name: "Stranger's",
+      description: "Not the maker's",
+    });
+    if (!created.ok) throw new Error("the stranger is at the Path cap");
+    await milestoneOn(created.path, SELL);
+    const strangersJourney = await journeyOn(
+      await saved(created.path, STRANGER_ID),
+      STRANGER_ID,
+    );
+
+    const product = await productOf(MAKER_ID);
+    const dreamStart = await startJourney(
+      env.DB,
+      product,
+      await dreamSequence(),
+    );
+    if (!dreamStart) throw new Error("the Dream Sequence Journey didn't start");
+
+    const rowsBefore = await versionRowCounts();
+
+    const doomed = await makersPath("Doomed");
+    const bake = await milestoneOn(doomed, BAKE);
+    await taskOn(doomed, bake.id, "Knead");
+    const first = await saved(doomed);
+    const second = await saved(doomed);
+    const start = await startJourney(env.DB, product, first);
+    const journey =
+      start && (await loadJourney(env.DB, product, start.journeyId));
+    if (!journey) throw new Error("the Journey didn't start");
+    const { tasks } = await journeyState(env.DB, journey);
+    await setTaskDone(env.DB, journey, tasks[0].id, true);
+    await journeyOn(second, MAKER_ID);
+
+    expect(await deletePath(env.DB, doomed)).toBe(true);
+
+    expect(await getPath(env.DB, MAKER_ID, doomed.id)).toBeNull();
+    expect(await getVersion(env.DB, MAKER_ID, first.id)).toBeNull();
+    expect(await getVersion(env.DB, MAKER_ID, second.id)).toBeNull();
+    expect(
+      await getTrailheadVersion(env.DB, MAKER_ID, doomed.id, null),
+    ).toBeNull();
+    expect(await loadJourney(env.DB, product, journey.id)).toBeNull();
+    const draftRows = await env.DB.prepare(
+      'SELECT count(*) AS n FROM "draft_milestones" WHERE "pathId" = ?',
+    )
+      .bind(doomed.id)
+      .first<{ n: number }>();
+    expect(draftRows?.n).toBe(0);
+
+    expect(await versionRowCounts()).toEqual(rowsBefore);
+    expect(
+      await loadJourney(env.DB, product, dreamStart.journeyId),
+    ).not.toBeNull();
+    expect(await contentOf(othersVersion.id)).toEqual(othersBefore);
+    expect(
+      await loadJourney(env.DB, strangersJourney.product, strangersJourney.id),
+    ).not.toBeNull();
   });
 });
 
