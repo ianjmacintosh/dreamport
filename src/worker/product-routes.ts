@@ -12,14 +12,17 @@ import {
 import {
   advanceJourney,
   journeyState,
+  listJourneys,
   loadJourney,
   returnJourney,
   saveAnswers,
   setTaskDone,
   startJourney,
   worksheetState,
+  type JourneySummary,
+  type StartedJourney,
 } from "./journeys";
-import { dreamSequence } from "./paths";
+import { getTrailheadVersion, getVersion, listFollowable } from "./paths";
 import {
   deleteProduct,
   getProduct,
@@ -251,82 +254,103 @@ productRoutes.put("/ideas/:id/tags", async (c) => {
 });
 
 /**
- * Journeys (issue #137): the Product's Journey on Dream Sequence version 1
- * — every Journey's version until #170 lets the User pick one, so there's
- * no version in the URL. `journey` is
- * `null` until the User starts one; `path` is always there so the page can
- * name what starting would mean. Bundles the Product itself, as the Ideas
- * list does, for the Journey page's heading.
+ * Journeys (#137; several per Product since #170): every Journey the Product is
+ * on, each with its Path's name and where it's at. Bundles the Product, as
+ * the Ideas list does, for the page's heading.
  */
-productRoutes.get("/journey", async (c) => {
+productRoutes.get("/journeys", async (c) => {
   const { product } = c.var;
-  const version = await dreamSequence(c.env.DB);
+  return c.json({ product, journeys: await listJourneys(c.env.DB, product) });
+});
+
+/**
+ * Start a Journey on the saved version `versionId`, at its Milestone 1.
+ * 404s for a version the User may not follow, the same as one that doesn't
+ * exist. A repeat start on the same version is harmless: it leaves that
+ * Journey's progress as it was and answers 200 rather than 201, with the
+ * same id. 409s when the Product already follows another version of the
+ * Path, since a Product has one Journey per Path.
+ */
+productRoutes.post("/journeys", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const versionId: unknown =
+    body && typeof body === "object" ? body.versionId : undefined;
+  if (typeof versionId !== "string") {
+    return c.json({ error: "versionId is required" }, 400);
+  }
+  const version = await getVersion(c.env.DB, c.var.userId, versionId);
+  if (!version) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  const start = await startJourney(c.env.DB, c.var.product, version);
+  if (!start) {
+    return c.json(
+      { error: "This Product already follows another version of this Path" },
+      409,
+    );
+  }
+  return c.json({ journeyId: start.journeyId }, start.started ? 201 : 200);
+});
+
+/** The Product's Journey named in the URL, or `null` for the 404. */
+function journeyIn(c: Context<ProductEnv>) {
+  return loadJourney(c.env.DB, c.var.product, c.req.param("journeyId") ?? "");
+}
+
+/**
+ * One Journey: its version's Milestones, its progress, and its Worksheets
+ * and Tasks. Bundles the Product for the Journey page's heading.
+ */
+productRoutes.get("/journeys/:journeyId", async (c) => {
+  const journey = await journeyIn(c);
+  if (!journey) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
   return c.json({
-    product,
-    ...(await journeyState(c.env.DB, product, version)),
+    product: c.var.product,
+    ...(await journeyState(c.env.DB, journey)),
   });
 });
 
-/**
- * Start the Product's Journey on Dream Sequence, at Milestone 1. A repeat
- * start is harmless: it leaves the existing Journey's progress as it was
- * and answers 200 rather than 201.
- */
-productRoutes.post("/journey", async (c) => {
-  const { product } = c.var;
-  const version = await dreamSequence(c.env.DB);
-  const started = await startJourney(c.env.DB, product, version);
-  return c.json(
-    await journeyState(c.env.DB, product, version),
-    started ? 201 : 200,
-  );
-});
-
-/**
- * Advance the Product's Journey one Milestone (issue #138). 404s when
- * there's no Journey to advance — the Journey page only ever shows this
- * action once one's started, so reaching this with none is a stale
- * request, not a real "nothing to do" case worth a 200 for.
- */
-productRoutes.post("/journey/advance", async (c) => {
-  const { product } = c.var;
-  const version = await dreamSequence(c.env.DB);
-  const journey = await loadJourney(c.env.DB, product, version);
+/** Advance the Journey one Milestone, or finish it from the last (#138). */
+productRoutes.post("/journeys/:journeyId/advance", async (c) => {
+  const journey = await journeyIn(c);
   if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
 
   await advanceJourney(c.env.DB, journey);
-  return c.json(await journeyState(c.env.DB, product, version), 200);
+  return c.json(await journeyState(c.env.DB, journey), 200);
 });
 
 /**
- * Return the Product's Journey by one Milestone, or put it back in
- * progress if it's completed — see `returnJourney`. The same 404 as
- * advancing when there's no Journey to return.
+ * Return the Journey by one Milestone, or put it back in progress if it's
+ * completed; see `returnJourney`.
  */
-productRoutes.post("/journey/return", async (c) => {
-  const { product } = c.var;
-  const version = await dreamSequence(c.env.DB);
-  const journey = await loadJourney(c.env.DB, product, version);
+productRoutes.post("/journeys/:journeyId/return", async (c) => {
+  const journey = await journeyIn(c);
   if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
 
   await returnJourney(c.env.DB, journey);
-  return c.json(await journeyState(c.env.DB, product, version), 200);
+  return c.json(await journeyState(c.env.DB, journey), 200);
 });
 
+/** The Path a Journey follows, for a Worksheet page's breadcrumb. */
+function pathOf({ version }: StartedJourney) {
+  return { id: version.pathId, name: version.name };
+}
+
 /**
- * Worksheets (issue #139): the Product's instance of one Worksheet on its
- * Journey — the Worksheet and its answers. 404s when the Product hasn't
- * started its Journey or there's no such Worksheet. Bundles the Product
- * for the Worksheet page's heading.
+ * Worksheets (issue #139): the Product's instance of one Worksheet on the
+ * Journey, the Worksheet and its answers. 404s for no such Journey or no
+ * such Worksheet. Bundles the Product for the Worksheet page's heading.
  */
-productRoutes.get("/worksheets/:worksheetId", async (c) => {
-  const { product } = c.var;
-  const version = await dreamSequence(c.env.DB);
-  const journey = await loadJourney(c.env.DB, product, version);
+productRoutes.get("/journeys/:journeyId/worksheets/:worksheetId", async (c) => {
+  const journey = await journeyIn(c);
   if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
@@ -340,7 +364,7 @@ productRoutes.get("/worksheets/:worksheetId", async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  return c.json({ product, ...state });
+  return c.json({ product: c.var.product, path: pathOf(journey), ...state });
 });
 
 /**
@@ -348,11 +372,9 @@ productRoutes.get("/worksheets/:worksheetId", async (c) => {
  * left out reads as blank). The same 404s as reading it. Saving works at
  * any point in the Journey, completed or not.
  */
-productRoutes.put("/worksheets/:worksheetId", async (c) => {
-  const { product } = c.var;
+productRoutes.put("/journeys/:journeyId/worksheets/:worksheetId", async (c) => {
   const worksheetId = c.req.param("worksheetId");
-  const version = await dreamSequence(c.env.DB);
-  const journey = await loadJourney(c.env.DB, product, version);
+  const journey = await journeyIn(c);
   if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
@@ -375,21 +397,21 @@ productRoutes.put("/worksheets/:worksheetId", async (c) => {
   }
 
   await saveAnswers(c.env.DB, journey, worksheetId, answers);
-  return c.json({ product, ...state, answers }, 200);
+  return c.json(
+    { product: c.var.product, path: pathOf(journey), ...state, answers },
+    200,
+  );
 });
 
 /**
- * Tasks (issue #140): check off or uncheck one of the Product's Tasks on
- * its Journey, with `{ "done": true | false }`. The same 404s as a
- * Worksheet when the Product hasn't started its Journey or there's no such
- * Task on the Path. Works on any Task, not just the current Milestone's,
- * and never moves the Journey. Answers with the Journey's state, like
- * Advance and Return.
+ * Tasks (issue #140): check off or uncheck one of the Journey's Tasks,
+ * with `{ "done": true | false }`. 404s for no such Journey or no such
+ * Task on its version. Works on any Task, not just the current
+ * Milestone's, and never moves the Journey. Answers with the Journey's
+ * state, like Advance and Return.
  */
-productRoutes.put("/tasks/:taskId", async (c) => {
-  const { product } = c.var;
-  const version = await dreamSequence(c.env.DB);
-  const journey = await loadJourney(c.env.DB, product, version);
+productRoutes.put("/journeys/:journeyId/tasks/:taskId", async (c) => {
+  const journey = await journeyIn(c);
   if (!journey) {
     return c.json({ error: "Not found" }, 404);
   }
@@ -410,5 +432,82 @@ productRoutes.put("/tasks/:taskId", async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  return c.json(await journeyState(c.env.DB, product, version), 200);
+  return c.json(await journeyState(c.env.DB, journey), 200);
+});
+
+/**
+ * The Product's Journey on each Path it follows, by Path id. `startJourney`
+ * keeps it to one per Path.
+ */
+async function journeysByPath(
+  db: D1Database,
+  product: OwnedProduct,
+): Promise<Map<string, JourneySummary>> {
+  const journeys = await listJourneys(db, product);
+  return new Map(journeys.map((journey) => [journey.pathId, journey]));
+}
+
+/**
+ * Pathfinder (#170): every Path the User can follow, with the Product's
+ * Journey on each one it already follows, so the page can link to that
+ * Journey and not invite a second start.
+ */
+productRoutes.get("/pathfinder", async (c) => {
+  const { product } = c.var;
+  const [paths, journeys] = await Promise.all([
+    listFollowable(c.env.DB, c.var.userId),
+    journeysByPath(c.env.DB, product),
+  ]);
+  return c.json({
+    product,
+    paths: paths.map(({ id, name }) => ({
+      id,
+      name,
+      journeyId: journeys.get(id)?.id ?? null,
+    })),
+  });
+});
+
+/**
+ * A Path's Trailhead (#170): one of its saved versions to start a Journey
+ * on, its latest unless `?version=n` names another, with every version's
+ * number and save date to pick from, and the Product's Journey on the
+ * Path, with its version's number, if it already follows any version. Another User's Path, an unknown one,
+ * one with no saved version and a number it doesn't have all 404 alike.
+ */
+productRoutes.get("/paths/:pathId/trailhead", async (c) => {
+  const raw = c.req.query("version");
+  const number = raw === undefined ? null : Number(raw);
+  const trailhead =
+    number === null || Number.isInteger(number)
+      ? await getTrailheadVersion(
+          c.env.DB,
+          c.var.userId,
+          c.req.param("pathId"),
+          number,
+        )
+      : null;
+  if (!trailhead) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  const { owner, version, versions } = trailhead;
+  const journey =
+    (await journeysByPath(c.env.DB, c.var.product)).get(version.pathId) ?? null;
+  return c.json({
+    product: c.var.product,
+    path: { id: version.pathId, name: version.name, owner },
+    version: {
+      id: version.id,
+      number: version.number,
+      description: version.description,
+      milestones: version.milestones,
+    },
+    versions: versions.map(({ number, savedAt }) => ({ number, savedAt })),
+    latestNumber: versions[0].number,
+    journey: journey && {
+      id: journey.id,
+      versionNumber: journey.versionNumber,
+    },
+  });
 });

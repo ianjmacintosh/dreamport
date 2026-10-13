@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
 import Dialog from "../../components/Dialog";
@@ -78,13 +78,13 @@ const CONNECTION_FAILED =
 
 /**
  * Paths (#167): the User's own Paths, each linking to its Draft, and
- * "Add Path", which opens a `Dialog` for the new Path's name and
- * description. A refusal (the 30-Path cap) shows the server's own words in
+ * "Make New Path", which opens a `Dialog` for the new Path's name and
+ * description and then goes straight to the new Path's editor. A refusal (the 30-Path cap) shows the server's own words in
  * the Dialog, which stays open so nothing typed is lost.
  */
 function Paths() {
-  const { paths: initialPaths } = Route.useRouteContext();
-  const [paths, setPaths] = useState<PathSummary[]>(initialPaths);
+  const { paths } = Route.useRouteContext();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -117,8 +117,10 @@ function Paths() {
           return;
         }
         const { path } = (await res.json()) as { path: PathSummary };
-        setPaths((prev) => [...prev, path]);
-        setIsOpen(false);
+        await navigate({
+          to: "/app/paths/$pathId/edit",
+          params: { pathId: path.id },
+        });
       });
     } catch {
       setError(CONNECTION_FAILED);
@@ -142,7 +144,7 @@ function Paths() {
         your Product on that path.
       </p>
       <p>
-        <Button onClick={openDialog}>Add Path</Button>
+        <Button onClick={openDialog}>Make New Path</Button>
       </p>
       {paths.length === 0 ? (
         <p>No Paths yet.</p>
@@ -150,7 +152,10 @@ function Paths() {
         <ul className="list" aria-labelledby="paths-heading">
           {paths.map((path) => (
             <li className="list-row" key={path.id}>
-              <Link className="list-row-name" href={`/app/paths/${path.id}`}>
+              <Link
+                className="list-row-name"
+                href={`/app/paths/${path.id}/edit`}
+              >
                 {path.name}
               </Link>
             </li>
@@ -163,7 +168,7 @@ function Paths() {
         onOpenChange={(open) => {
           if (!isAdding) setIsOpen(open);
         }}
-        title="Add Path"
+        title="Make New Path"
       >
         <form
           onSubmit={(e) => {
@@ -195,8 +200,8 @@ function Paths() {
               disabled={isAdding}
               state={isAdding ? "pending" : "ready"}
             >
-              <Button.State name="ready">Add Path</Button.State>
-              <Button.State name="pending">Adding…</Button.State>
+              <Button.State name="ready">Make New Path</Button.State>
+              <Button.State name="pending">Making…</Button.State>
             </Button>
             <Button
               variant="secondary"

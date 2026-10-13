@@ -243,7 +243,7 @@ test("the Product home still opens when its Journey can't be fetched", async ({
 
   // A missing Path or unmigrated Journey tables make this endpoint 500; the
   // Product's Ideas and description don't depend on it (#133 review).
-  await page.route("**/api/products/*/journey", (route) =>
+  await page.route("**/api/products/*/journeys", (route) =>
     route.fulfill({ status: 500, json: { error: "Internal error" } }),
   );
   await page.getByRole("link", { name: productName }).click();
@@ -253,5 +253,5 @@ test("the Product home still opens when its Journey can't be fetched", async ({
     page.getByRole("heading", { name: productName, level: 1 }),
   ).toBeVisible();
   await expect(page.getByText("No description yet.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Learn More" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Choose a Path" })).toBeVisible();
 });

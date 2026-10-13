@@ -349,3 +349,44 @@ Add an entry only once a sign-off conversation resolves something repeatable
   over status lines at the top, a facts list, and a "changed since the
   last save" sentence in a prototype on branch
   `169-prototype-save-version` (decided in #169).
+
+- A Product's Journeys, Pathfinder and a Path's Trailhead are three pages
+  under the Product, each with the Product's name as the h1 except the
+  Trailhead (decided in #170, in words, without a prototype):
+  - **Journeys** (`/app/products/:productId/journeys`): "Journeys" as the
+    h2, then one `ActionCard` link per Journey, the Path's name with
+    "Current Milestone: {name}" or "Completed" as its status. A list of one
+    is still a list. With none, "This Product is not following any Paths
+    yet." Then a "Follow Another Path" h3, one line, and "Open Pathfinder".
+    Checking on a Journey under way comes first; choosing a new Path comes
+    second, and the page never redirects to Pathfinder.
+  - **Pathfinder** (`/app/products/:productId/pathfinder`): "Pathfinder"
+    as the h2, then one `ActionCard` link per Path the User can follow
+    (Dream Sequence first, then their own with a saved version), each
+    going to its Trailhead. One the Product already follows stays in the
+    list, marked "Following", and goes to that Journey: a Path you're on
+    never invites you to start it again. A "Make Your Own Path" h3 ends
+    it: "Not finding a Path that does quite what you need? Make your own
+    Path", the last three words linking to Trailblazer.
+  - **Trailhead** (`/app/products/:productId/paths/:pathId/trailhead`):
+    the pre-start Journey page #137 drew, with the Path's name as the h1:
+    the route with every outcome line on the left, the pitch and "Start
+    Journey" on the right. A User's own Path shows its description as the
+    pitch. If the Product already follows the Path, "{Product} is already
+    following {Path}." and "View Journey" take Start Journey's place, on
+    every version: a Product has one Journey per Path, so a newer version
+    of a Path it follows can't be started (the server answers 409), and
+    the line names the followed version, "(version 1)", when it isn't the
+    one shown. The
+    version stays in the background: the page shows the latest, and a
+    `.link-quiet` "Looking for an older version?" (only when there's more
+    than one) opens a `Dialog` listing every version, the one shown
+    unlinked. The link adds `?versions` to the URL, so Back closes the
+    Dialog. A `Dropdown` put an older version one click from Start
+    Journey, too easy to reach. An earlier version's page says a newer one
+    is available.
+  - The Product page's Journey section keeps one line per Journey, and its
+    button reads "View Journeys", or "Choose a Path" (to Pathfinder) when
+    there are none.
+  - A Path's editor is `/app/paths/:pathId/edit`, its crumb "Edit", so the
+    Path's own URL is free for a page about the Path later.

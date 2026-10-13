@@ -53,9 +53,6 @@ declare const followable: unique symbol;
  */
 export type FollowableVersion = PathVersion & { readonly [followable]: true };
 
-/** Dream Sequence's version 1, which kept `0007`'s id. */
-const DREAM_SEQUENCE_VERSION_ID = "starter";
-
 /**
  * A saved version with its Milestones, if the User may follow it. `null` if
  * it doesn't exist or belongs to another User.
@@ -68,25 +65,90 @@ export function getVersion(
   return loadVersion(db, versionId, userId);
 }
 
-/**
- * Dream Sequence version 1, the version every Journey starts on until #170
- * lets the User pick one. Dreamport's, so it needs no User.
- */
-export async function dreamSequence(
-  db: D1Database,
-): Promise<FollowableVersion> {
-  const version = await loadVersion(db, DREAM_SEQUENCE_VERSION_ID, null);
-  if (!version) {
-    throw new Error("Dream Sequence is not seeded");
-  }
-  return version;
+/** Whose a Path is: Dreamport's own (Dream Sequence) or one User's. */
+export type PathOwner = "dreamport" | "user";
+
+/** A Path the User can start a Journey on, as Pathfinder lists it. */
+export interface FollowablePath {
+  readonly id: string;
+  /** Its latest version's name: the one its Trailhead opens on. */
+  readonly name: string;
 }
 
-/** `userId` null matches only Dreamport's versions: `NULL = NULL` is never true. */
+/**
+ * Every Path the User can follow: Dreamport's first, then the User's own
+ * that have a saved version, in `listPaths` order. A Path with only a
+ * Draft has nothing to follow yet, so it's left out.
+ */
+export async function listFollowable(
+  db: D1Database,
+  userId: string,
+): Promise<FollowablePath[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT "paths"."id", "latest"."name"
+       FROM "paths"
+       JOIN "path_versions" AS "latest" ON "latest"."pathId" = "paths"."id"
+         AND "latest"."number" = (SELECT max("number") FROM "path_versions" WHERE "pathId" = "paths"."id")
+       WHERE "paths"."userId" IS NULL OR "paths"."userId" = ?
+       ORDER BY "paths"."userId" IS NOT NULL, "paths"."createdAt" ASC, "paths"."rowid" ASC`,
+    )
+    .bind(userId)
+    .all<FollowablePath>();
+  return results;
+}
+
+/** A version to start a Journey on, with its Path's versions to pick from. */
+export interface TrailheadVersion {
+  readonly owner: PathOwner;
+  readonly version: FollowableVersion;
+  /** Every saved version of the Path, newest first. */
+  readonly versions: readonly VersionSummary[];
+}
+
+/**
+ * Version `number` of a Path the User may follow, or its latest for
+ * `null`. `null` for another User's Path, an unknown one, one with no
+ * saved version, or a number it doesn't have: all read the same.
+ */
+export async function getTrailheadVersion(
+  db: D1Database,
+  userId: string,
+  pathId: string,
+  number: number | null,
+): Promise<TrailheadVersion | null> {
+  const { results } = await db
+    .prepare(
+      `SELECT "path_versions"."id", "path_versions"."number", "path_versions"."savedAt",
+         "paths"."userId" IS NULL AS "dreamports"
+       FROM "path_versions"
+       JOIN "paths" ON "paths"."id" = "path_versions"."pathId"
+       WHERE "path_versions"."pathId" = ? AND ("paths"."userId" IS NULL OR "paths"."userId" = ?)
+       ORDER BY "path_versions"."number" DESC`,
+    )
+    .bind(pathId, userId)
+    .all<VersionSummary & { dreamports: number }>();
+  const picked =
+    number === null ? results[0] : results.find((v) => v.number === number);
+  const version = picked ? await loadVersion(db, picked.id, userId) : null;
+  if (!picked || !version) {
+    return null;
+  }
+  return {
+    owner: picked.dreamports ? "dreamport" : "user",
+    version,
+    versions: results.map(({ id, number, savedAt }) => ({
+      id,
+      number,
+      savedAt,
+    })),
+  };
+}
+
 async function loadVersion(
   db: D1Database,
   versionId: string,
-  userId: string | null,
+  userId: string,
 ): Promise<FollowableVersion | null> {
   const [version, { results: milestones }] = await Promise.all([
     db

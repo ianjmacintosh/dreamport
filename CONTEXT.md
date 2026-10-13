@@ -69,9 +69,18 @@ A snapshot of a Path made from its Draft when its maker uses **Save as New
 Version**: the name, description, Milestones and Tasks exactly as they
 stood. It never changes afterwards, and it needs a name, a description and
 at least one Milestone. A Journey stays on the version it started on; a newer version is
-a new release, never a free update to existing Journeys (for now). Each
-version has its own page, independent of any Product.
+a new release, never a free update to existing Journeys (for now). A
+Product sees a version on its Trailhead.
 _Avoid_: revision, edition, update; final, frozen, locked, released
+
+**Trailhead**:
+The page a Product sees for a Path before starting a Journey on it: the
+Path's name, its pitch, and its Milestones with their outcomes, then
+**Start Journey**. It shows the Path's latest version unless the User picks
+an earlier one. Always reached from a Product, never on its own. Dream
+Sequence's pitch is written by Dreamport; a User's own Path shows its
+description in its place.
+_Avoid_: intro, introduction, summary, landing page, version page
 
 **Publish**:
 Make a saved Path version available to other Users by its link, free or for
@@ -103,7 +112,10 @@ Paths: that is Trailblazer's job, open to any User.
 _Avoid_: system administrator, staff, superuser
 
 **Pathfinder**:
-A future directory of shared Paths. Not built yet: for now a Path is found
+Where a Product finds a Path to follow. For now it's a plain list of Dream
+Sequence and the User's own Paths that have a saved version, marking the
+ones the Product already follows. It grows into the directory of shared
+Paths, with search, filters and sorting; until then a shared Path is found
 only through a link its Guide gives out.
 _Avoid_: marketplace, catalog, store
 
