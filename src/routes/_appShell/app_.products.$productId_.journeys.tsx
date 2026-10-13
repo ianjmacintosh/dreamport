@@ -89,23 +89,22 @@ function ProductJourneys() {
   return (
     <>
       <h1>{product.name}</h1>
-      <h2>Journeys</h2>
       {journeys.length === 0 && (
         <p>This Product is not following any Paths yet.</p>
       )}
       {active.length > 0 && (
         <>
-          <h3 id="active-journeys">Active Journeys</h3>
+          <h2 id="active-journeys">Active Journeys</h2>
           {cards(active, "active-journeys")}
         </>
       )}
       {inactive.length > 0 && (
         <>
-          <h3 id="inactive-journeys">Inactive Journeys</h3>
+          <h2 id="inactive-journeys">Inactive Journeys</h2>
           {cards(inactive, "inactive-journeys")}
         </>
       )}
-      <h3>Follow Another Path</h3>
+      <h2>Follow Another Path</h2>
       <p>Pathfinder lists every Path this Product can follow.</p>
       <p>
         <Link

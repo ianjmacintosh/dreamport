@@ -353,12 +353,14 @@ Add an entry only once a sign-off conversation resolves something repeatable
 - A Product's Journeys, Pathfinder and a Path's Trailhead are three pages
   under the Product, each with the Product's name as the h1 except the
   Trailhead (decided in #170, in words, without a prototype):
-  - **Journeys** (`/app/products/:productId/journeys`): "Journeys" as the
-    h2, then one `ActionCard` link per Journey, oldest first, the Path's
-    name with "In Progress", "Completed" or "Abandoned" as its status: no
-    current Milestone and no start date (#172). A list of one
-    is still a list. With none, "This Product is not following any Paths
-    yet." Then a "Follow Another Path" h3, one line, and "Open Pathfinder".
+  - **Journeys** (`/app/products/:productId/journeys`): no "Journeys"
+    heading; straight to an "Active Journeys" h2 and an "Inactive
+    Journeys" h2 (#172), each one `ActionCard` link per Journey, oldest
+    first, the Path's name with "In Progress", "Completed" or "Abandoned"
+    as its status: no current Milestone and no start date. A section with
+    none is left out, and a list of one is still a list. With no Journeys
+    at all, "This Product is not following any Paths yet." Then a "Follow
+    Another Path" h2, one line, and "Open Pathfinder".
     Checking on a Journey under way comes first; choosing a new Path comes
     second, and the page never redirects to Pathfinder.
   - **Pathfinder** (`/app/products/:productId/pathfinder`): "Pathfinder"
@@ -439,10 +441,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
     Journey on "{Path}" and everything in it, including Worksheet answers
     and checked Tasks. This cannot be undone!", and its "Delete Journey"
     deletes on one click, then goes to the Journeys list.
-  - The Journeys list splits into an "Active Journeys" h3 (in progress)
-    and an "Inactive Journeys" h3 (completed or abandoned), each oldest
-    first and left out when empty, every card still saying "In Progress",
-    "Completed" or "Abandoned"; the Product home says "{Path}: {Milestone}", "{Path}
+  - The Journeys page goes straight to "Active Journeys" (in progress)
+    and "Inactive Journeys" (completed or abandoned), with no "Journeys"
+    heading above them (see the Journeys page above); the Product home says "{Path}: {Milestone}", "{Path}
     complete" or "{Path} abandoned"; Pathfinder marks a Path it isn't
     following but has followed with how its latest Journey ended (decided
     in #172, in words, without a prototype; Pause was dropped for
