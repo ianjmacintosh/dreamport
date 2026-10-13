@@ -125,16 +125,17 @@ function taskDisplay(title: string): { title: string; isEvent: boolean } {
 }
 
 /**
- * Advance, Return or Abandon (CONTEXT.md) — also each one's endpoint under
+ * Advance, Return, Abandon or Resume (CONTEXT.md) — also each one's endpoint under
  * `/api/products/:productId/journeys/:journeyId/`, each answering with the
  * Journey's state.
  */
-type JourneyMove = "advance" | "return" | "abandon";
+type JourneyMove = "advance" | "return" | "abandon" | "resume";
 
 const MOVE_JOURNEY_FAILED: Record<JourneyMove, string> = {
   advance: "We couldn't advance the journey. Try again in a moment.",
   return: "We couldn't return the journey. Try again in a moment.",
   abandon: "We couldn't abandon the journey. Try again in a moment.",
+  resume: "We couldn't resume the journey. Try again in a moment.",
 };
 const SET_TASK_FAILED = "We couldn't save that task. Try again in a moment.";
 const RESTART_FAILED =
@@ -254,16 +255,28 @@ function ProductJourney() {
         const res = await fetchWithTimeout(`${journeyUrl}/${direction}`, {
           method: "POST",
         });
-        if (!res.ok) {
-          return null;
-        }
-        return (await res.json()) as JourneyState;
+        // A 409 says why in its own words (Resume while another Journey on
+        // the Path is in progress).
+        const body = (await res.json().catch(() => null)) as
+          | JourneyState
+          | { error?: string }
+          | null;
+        return res.ok
+          ? { ok: true as const, state: body as JourneyState }
+          : {
+              ok: false as const,
+              error:
+                res.status === 409 && body && "error" in body
+                  ? body.error
+                  : undefined,
+            };
       });
-      if (!moved) {
-        setError(MOVE_JOURNEY_FAILED[direction]);
+      if (!moved.ok) {
+        setError(moved.error ?? MOVE_JOURNEY_FAILED[direction]);
         return;
       }
-      setJourneyState(moved);
+      setJourneyState(moved.state);
+      setIsConfirmingAbandon(false);
     } catch {
       setError(CONNECTION_FAILED);
     } finally {
@@ -405,6 +418,7 @@ function ProductJourney() {
 
   const restartButton = (
     <Button
+      variant={status === "abandoned" ? "secondary" : "primary"}
       disabled={moving !== null}
       state={moving === "restart" ? "pending" : "ready"}
       onClick={() => void restartJourney()}
@@ -482,10 +496,19 @@ function ProductJourney() {
               <h3>{path.name} abandoned</h3>
               <p>
                 You stepped away from this Journey on {currentMilestone.name}.
+                Resume it there, or restart the Path from the beginning.
               </p>
               {worksheetSection}
               <div className="button-group button-group--end">
                 {restartButton}
+                <Button
+                  disabled={moving !== null}
+                  state={moving === "resume" ? "pending" : "ready"}
+                  onClick={() => void moveJourney("resume")}
+                >
+                  <Button.State name="ready">Resume Journey</Button.State>
+                  <Button.State name="pending">Resuming…</Button.State>
+                </Button>
               </div>
             </>
           )}

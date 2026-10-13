@@ -230,8 +230,8 @@ export async function restartJourney(
 
 /**
  * Abandon (CONTEXT.md): the User steps away from a Journey in progress.
- * It keeps its answers and checked Tasks, and can't be picked up again;
- * Restart starts a new one. A no-op on a completed or abandoned Journey.
+ * It keeps its answers and checked Tasks, and stays on its Milestone until
+ * it's resumed. A no-op on a completed or abandoned Journey.
  */
 export async function abandonJourney(
   db: D1Database,
@@ -243,6 +243,32 @@ export async function abandonJourney(
     )
     .bind(new Date().toISOString(), journey.id)
     .run();
+}
+
+/**
+ * Resume (CONTEXT.md): an abandoned Journey goes back in progress, on the
+ * Milestone it was left on. `false`, changing nothing, while another of the
+ * Product's Journeys on the Path is in progress, since only one can be; the
+ * check sits in the update itself. `true` for one already in progress.
+ */
+export async function resumeJourney(
+  db: D1Database,
+  journey: StartedJourney,
+): Promise<boolean> {
+  const { meta } = await db
+    .prepare(
+      `UPDATE "journeys" SET "abandonedAt" = NULL
+       WHERE "id" = ? AND "abandonedAt" IS NOT NULL AND NOT EXISTS (
+         SELECT 1 FROM "journeys" AS "other"
+         JOIN "path_versions" ON "path_versions"."id" = "other"."versionId"
+         WHERE "other"."productId" = "journeys"."productId"
+           AND "path_versions"."pathId" = ?
+           AND "other"."finishedAt" IS NULL AND "other"."abandonedAt" IS NULL
+       )`,
+    )
+    .bind(journey.id, journey.version.pathId)
+    .run();
+  return meta.changes > 0 || (await isInProgress(db, journey));
 }
 
 /**

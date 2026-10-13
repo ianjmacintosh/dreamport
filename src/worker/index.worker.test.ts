@@ -1924,6 +1924,37 @@ describe("Journey routes", () => {
     ]);
   });
 
+  it("POST /journeys/:journeyId/resume puts an abandoned Journey back in progress, or 409s while another on the Path is", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
+      TEST_EMAILS.journeysResume,
+    );
+    const resume = () =>
+      callApi("POST", journeyUrl(product.id, journeyId, "/resume"), cookie);
+    await callApi(
+      "POST",
+      journeyUrl(product.id, journeyId, "/abandon"),
+      cookie,
+    );
+    const other = await startJourney(product.id, cookie);
+    const { journeyId: otherId } = (await other.json()) as {
+      journeyId: string;
+    };
+
+    const refused = await resume();
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({
+      error:
+        "Another Journey on this Path is in progress. Abandon it to resume this one.",
+    });
+
+    await callApi("POST", journeyUrl(product.id, otherId, "/abandon"), cookie);
+    const res = await resume();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      journey: { id: journeyId, abandonedAt: null },
+    });
+  });
+
   it("DELETE /journeys/:journeyId 409s a Journey in progress, then deletes it once abandoned, and it 404s afterwards", async () => {
     const { cookie, product, journeyId } = await startedProduct(
       TEST_EMAILS.journeysDelete,

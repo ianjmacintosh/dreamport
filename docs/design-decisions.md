@@ -429,9 +429,14 @@ Add an entry only once a sign-off conversation resolves something repeatable
   - **Completed**: Return, then "Restart Journey" bottom right, the
     confirming position. The page ends with "Delete Journey".
   - **Abandoned**: "{Path} abandoned" as the h3, then "You stepped away
-    from this Journey on {Milestone}.", the Worksheets, and "Restart
-    Journey" bottom right; no Advance or Return. The page ends with
-    "Delete Journey".
+    from this Journey on {Milestone}. Resume it there, or restart the Path
+    from the beginning.", the Worksheets, then a secondary "Restart
+    Journey" and "Resume Journey" bottom right; no Advance or Return.
+    Resume puts it back in progress where it was left; while another
+    Journey on the Path is in progress the server refuses, and the page
+    shows its reason ("Another Journey on this Path is in progress.
+    Abandon it to resume this one."). The page ends with "Delete
+    Journey".
   - "Restart Journey" starts a new, blank Journey on the Path's latest
     version in one click and goes to it, asking nothing first, since
     nothing is lost.

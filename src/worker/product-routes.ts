@@ -17,6 +17,7 @@ import {
   listJourneys,
   loadJourney,
   restartJourney,
+  resumeJourney,
   returnJourney,
   saveAnswers,
   setTaskDone,
@@ -354,6 +355,29 @@ productRoutes.post("/journeys/:journeyId/abandon", async (c) => {
   }
 
   await abandonJourney(c.env.DB, journey);
+  return c.json(await journeyState(c.env.DB, journey), 200);
+});
+
+/**
+ * Resume an abandoned Journey (#172): back in progress where it was left,
+ * answering its state. 409 while another of the Product's Journeys on the
+ * Path is in progress.
+ */
+productRoutes.post("/journeys/:journeyId/resume", async (c) => {
+  const journey = await journeyIn(c);
+  if (!journey) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  if (!(await resumeJourney(c.env.DB, journey))) {
+    return c.json(
+      {
+        error:
+          "Another Journey on this Path is in progress. Abandon it to resume this one.",
+      },
+      409,
+    );
+  }
   return c.json(await journeyState(c.env.DB, journey), 200);
 });
 

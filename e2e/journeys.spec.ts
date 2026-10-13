@@ -352,7 +352,7 @@ test("tick a Task and fill out the Product Summary from Milestone 1, land back o
   await expect(page.getByLabel("2. Customer")).toHaveValue("Home bakers");
 });
 
-test("finish a Journey with a Task ticked, Restart it into a blank Journey, delete the finished one, then abandon and delete the new one", async ({
+test("finish a Journey with a Task ticked, Restart it into a blank Journey, delete the finished one, then abandon, resume, abandon and delete the new one", async ({
   page,
 }) => {
   await signIn(page, TEST_EMAILS.e2eRestartJourney);
@@ -430,6 +430,17 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, dele
     page.getByRole("heading", { name: "Dream Sequence abandoned" }),
   ).toBeVisible();
   await expect(advanceButton).toHaveCount(0);
+
+  // Resuming puts it back where it was, with no Abandon half-confirmed.
+  await page.getByRole("button", { name: "Resume Journey" }).click();
+  await expect(current).toContainText("Rough One-Pager");
+  await expect(advanceButton).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Abandon Journey" }).click();
+  await page.getByRole("button", { name: "Abandon Journey" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Dream Sequence abandoned" }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Delete Journey" }).click();
   await dialog.getByRole("button", { name: "Delete Journey" }).click();

@@ -10,6 +10,7 @@ import {
   listJourneys,
   loadJourney,
   restartJourney,
+  resumeJourney,
   returnJourney,
   saveAnswers,
   setTaskDone,
@@ -725,6 +726,41 @@ describe("abandoning a Journey (#172)", () => {
     expect((await listJourneys(env.DB, product)).map((j) => j.status)).toEqual([
       "abandoned",
       "in-progress",
+    ]);
+  });
+
+  it("resumes on the Milestone it was left on, with its answers", async () => {
+    const { journey, milestoneIds } = await started();
+    await advanceJourney(env.DB, journey);
+    await saveAnswers(env.DB, journey, PRODUCT_SUMMARY, { problem: "Kept" });
+    await abandonJourney(env.DB, journey);
+
+    expect(await resumeJourney(env.DB, journey)).toBe(true);
+
+    expect(await progress(journey)).toMatchObject({
+      currentMilestoneId: milestoneIds[1],
+      abandonedAt: null,
+    });
+    expect(
+      (await worksheetState(env.DB, journey, PRODUCT_SUMMARY))?.answers,
+    ).toEqual({ problem: "Kept" });
+    await advanceJourney(env.DB, journey);
+    expect((await progress(journey)).currentMilestoneId).toBe(milestoneIds[2]);
+  });
+
+  it("won't resume while another Journey on the Path is in progress, until that one is abandoned", async () => {
+    const { product, journey: first } = await started();
+    await abandonJourney(env.DB, first);
+    const second = await startOn(product, version);
+
+    expect(await resumeJourney(env.DB, first)).toBe(false);
+    expect((await progress(first)).abandonedAt).not.toBeNull();
+
+    await abandonJourney(env.DB, second);
+    expect(await resumeJourney(env.DB, first)).toBe(true);
+    expect((await listJourneys(env.DB, product)).map((j) => j.status)).toEqual([
+      "in-progress",
+      "abandoned",
     ]);
   });
 

@@ -177,16 +177,24 @@ _Avoid_: step back, go back, revert, undo, retreat
 **Abandon**:
 Step away from a Journey in progress, for a User getting off that Path
 partway. Everything is kept — the Milestone they stopped on, Worksheet
-answers, checked Tasks — but the Journey can't be picked up again, and
-Advance and Return no longer move it; Restart starts a new one. Not the
-same as completed: an abandoned Journey was left partway. Abandoning
-comes before deleting a Journey in progress. There's no pausing: a
-Journey the User isn't working on just stays in progress (#172).
+answers, checked Tasks — and Advance and Return no longer move it until
+the User resumes it, or restarts the Path instead. Not the same as
+completed: an abandoned Journey was left partway. Abandoning comes before
+deleting a Journey in progress. There's no pausing: a Journey the User
+isn't working on just stays in progress (#172).
 _Avoid_: pause, stop, quit, archive, cancel
+
+**Resume**:
+Put an abandoned Journey back in progress, on the Milestone the User left
+it on, answers and checked Tasks as they were. The mirror of Abandon. Not
+while another of the Product's Journeys on the Path is in progress, since
+only one can be; the User abandons that one first.
+_Avoid_: unabandon, continue, reopen
 
 **Restart**:
 Start a new Journey on the same Path for a Product whose Journey on it is
-completed or abandoned, on the Path's latest version. The new Journey is blank,
+completed or abandoned, on the Path's latest version — the alternative to
+Resume. The new Journey is blank,
 on the Path's first Milestone, in progress. Never destructive: the earlier
 Journey stays as it was, answers and checked Tasks included, until the User
 deletes it.
