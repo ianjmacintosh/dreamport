@@ -83,7 +83,7 @@ interface JourneySummary {
   id: string;
   pathName: string;
   currentMilestoneName: string;
-  finishedAt: string | null;
+  status: "in-progress" | "completed" | "abandoned";
 }
 
 /**
@@ -296,9 +296,9 @@ function ProductHome() {
       {journeys.length > 0 ? (
         journeys.map((journey) => (
           <p key={journey.id}>
-            {journey.finishedAt
-              ? `${journey.pathName} complete`
-              : `${journey.pathName}: ${journey.currentMilestoneName}`}
+            {journey.status === "in-progress"
+              ? `${journey.pathName}: ${journey.currentMilestoneName}`
+              : `${journey.pathName} ${journey.status === "completed" ? "complete" : "abandoned"}`}
           </p>
         ))
       ) : (

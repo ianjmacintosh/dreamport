@@ -9,8 +9,15 @@ import Link from "../../components/Link";
 interface JourneySummary {
   id: string;
   pathName: string;
-  finishedAt: string | null;
+  status: "in-progress" | "completed" | "abandoned";
 }
+
+/** What a Journey's card says it is (#172). */
+const STATUS_LABEL = {
+  "in-progress": "In Progress",
+  completed: "Completed",
+  abandoned: "Abandoned",
+} as const;
 
 // Filename note: `$productId_` makes this a sibling of the Product home
 // rather than its child; see the Journey page's own header comment.
@@ -47,7 +54,8 @@ export const Route = createFileRoute(
 
 /**
  * A Product's Journeys (#170), oldest first: each an `ActionCard` link to
- * its Journey page, saying whether it's in progress or completed. Below them,
+ * its Journey page, saying whether it's in progress, completed or
+ * abandoned. Below them,
  * "Follow Another Path" points to Pathfinder, which lists the Paths to
  * start on. With no Journeys yet, the page says so rather than sending the
  * User straight to Pathfinder.
@@ -67,7 +75,7 @@ function ProductJourneys() {
                 leading={<PathIcon weight="bold" aria-hidden="true" />}
                 trailing={
                   <ActionCard.Status>
-                    {journey.finishedAt ? "Completed" : "In Progress"}
+                    {STATUS_LABEL[journey.status]}
                   </ActionCard.Status>
                 }
               >

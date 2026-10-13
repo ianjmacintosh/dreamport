@@ -355,8 +355,8 @@ Add an entry only once a sign-off conversation resolves something repeatable
   Trailhead (decided in #170, in words, without a prototype):
   - **Journeys** (`/app/products/:productId/journeys`): "Journeys" as the
     h2, then one `ActionCard` link per Journey, oldest first, the Path's
-    name with "In Progress" or "Completed" as its status: no current
-    Milestone and no start date (#172). A list of one
+    name with "In Progress", "Completed" or "Abandoned" as its status: no
+    current Milestone and no start date (#172). A list of one
     is still a list. With none, "This Product is not following any Paths
     yet." Then a "Follow Another Path" h3, one line, and "Open Pathfinder".
     Checking on a Journey under way comes first; choosing a new Path comes
@@ -366,9 +366,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
     (Dream Sequence first, then their own with a saved version), each
     going to its Trailhead. One the Product has a Journey in progress on
     stays in the list, marked "Following", and goes to that Journey: a Path
-    you're on never invites you to start it again. One it has only
-    completed is marked "Completed" and goes to its Trailhead, to start
-    again (#172). A "Make Your Own Path" h3 ends
+    you're on never invites you to start it again. One it has followed
+    before, but isn't now, is marked "Completed" or "Abandoned" for its
+    latest Journey and goes to its Trailhead, to start again (#172). A "Make Your Own Path" h3 ends
     it: "Not finding a Path that does quite what you need? Make your own
     Path", the last three words linking to Trailblazer.
   - **Trailhead** (`/app/products/:productId/paths/:pathId/trailhead`):
@@ -416,15 +416,32 @@ Add an entry only once a sign-off conversation resolves something repeatable
     step. A reveal inside it only changed the button's color and said
     nothing new, so it read as broken rather than careful.
 
-- A completed Journey's page ends its column with Return, then "Restart
-  Journey" bottom right, the confirming position. One click starts a new,
-  blank Journey on the Path's latest version and goes to it; the completed
-  one stays as it was. It asks nothing first, since nothing is lost. Every
-  Journey page ends with "Delete Journey", a secondary button bottom right
-  under the two columns, which opens a "Delete Journey Permanently?"
-  `Dialog` the way Delete Path does (above): the answers and checked Tasks
-  it removes aren't on the page. Its text is "This will remove
-  {Product}'s Journey on "{Path}" and everything in it, including
-  Worksheet answers and checked Tasks. This cannot be undone!", and its
-  "Delete Journey" deletes on one click, then goes to the Journeys list
-  (decided in #172, in words, without a prototype).
+- A Journey is In Progress, Completed or Abandoned (#172), and its page
+  follows suit, in the right column and at the page's end, bottom right
+  under the two columns:
+  - **In Progress**: the column as before, and the page ends with
+    "Abandon Journey", a secondary button, as the usual two-step reveal in
+    place (Cancel, then a confirming "Abandon Journey"). Abandoning loses
+    nothing, so there's nothing to explain and no `Dialog`. There's no
+    Delete: a Journey in progress has to be abandoned first.
+  - **Completed**: Return, then "Restart Journey" bottom right, the
+    confirming position. The page ends with "Delete Journey".
+  - **Abandoned**: "{Path} abandoned" as the h3, then "You stepped away
+    from this Journey on {Milestone}.", the Worksheets, and "Restart
+    Journey" bottom right; no Advance or Return. The page ends with
+    "Delete Journey".
+  - "Restart Journey" starts a new, blank Journey on the Path's latest
+    version in one click and goes to it, asking nothing first, since
+    nothing is lost.
+  - "Delete Journey" opens a "Delete Journey Permanently?" `Dialog` the
+    way Delete Path does (above), since the answers and checked Tasks it
+    removes aren't on the page. Its text is "This will remove {Product}'s
+    Journey on "{Path}" and everything in it, including Worksheet answers
+    and checked Tasks. This cannot be undone!", and its "Delete Journey"
+    deletes on one click, then goes to the Journeys list.
+  - The Journeys list says "In Progress", "Completed" or "Abandoned" on
+    each card; the Product home says "{Path}: {Milestone}", "{Path}
+    complete" or "{Path} abandoned"; Pathfinder marks a Path it isn't
+    following but has followed with how its latest Journey ended (decided
+    in #172, in words, without a prototype; Pause was dropped for
+    Abandon).

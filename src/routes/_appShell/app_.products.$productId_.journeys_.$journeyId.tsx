@@ -79,6 +79,7 @@ interface JourneyState {
     startedAt: string;
     currentMilestoneId: string;
     finishedAt: string | null;
+    abandonedAt: string | null;
   };
   /** The Worksheets on the Path's Milestones, with how much is filled in (#139). */
   worksheets: {
@@ -124,14 +125,16 @@ function taskDisplay(title: string): { title: string; isEvent: boolean } {
 }
 
 /**
- * Advance or Return (CONTEXT.md) — also each one's endpoint under
- * `/api/products/:productId/journeys/:journeyId/`.
+ * Advance, Return or Abandon (CONTEXT.md) — also each one's endpoint under
+ * `/api/products/:productId/journeys/:journeyId/`, each answering with the
+ * Journey's state.
  */
-type JourneyMove = "advance" | "return";
+type JourneyMove = "advance" | "return" | "abandon";
 
 const MOVE_JOURNEY_FAILED: Record<JourneyMove, string> = {
   advance: "We couldn't advance the journey. Try again in a moment.",
   return: "We couldn't return the journey. Try again in a moment.",
+  abandon: "We couldn't abandon the journey. Try again in a moment.",
 };
 const SET_TASK_FAILED = "We couldn't save that task. Try again in a moment.";
 const RESTART_FAILED =
@@ -216,6 +219,7 @@ function ProductJourney() {
   /** Which way the Journey is mid-move, if it is — one move at a time. */
   const [moving, setMoving] = useState<JourneyMove | "restart" | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isConfirmingAbandon, setIsConfirmingAbandon] = useState(false);
   const navigate = useNavigate();
   /** The Task mid-save, if one is — shown as already toggled until it lands. */
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
@@ -225,12 +229,17 @@ function ProductJourney() {
   const currentIndex = path.milestones.findIndex(
     (milestone) => milestone.id === journey.currentMilestoneId,
   );
-  const isFinished = journey.finishedAt !== null;
+  const status = journey.finishedAt
+    ? "completed"
+    : journey.abandonedAt
+      ? "abandoned"
+      : "in-progress";
+  const isFinished = status === "completed";
   const currentMilestone = path.milestones[currentIndex];
   const isLastMilestone = currentIndex === path.milestones.length - 1;
   // Nothing comes before Milestone 1, so Return is hidden there rather than
   // disabled — unlike Advance, there's nothing else for it to do instead.
-  const canReturn = currentIndex > 0 || isFinished;
+  const canReturn = status !== "abandoned" && (currentIndex > 0 || isFinished);
 
   /**
    * Advance to the next Milestone, or finish the Journey from the last one
@@ -394,6 +403,17 @@ function ProductJourney() {
     </>
   );
 
+  const restartButton = (
+    <Button
+      disabled={moving !== null}
+      state={moving === "restart" ? "pending" : "ready"}
+      onClick={() => void restartJourney()}
+    >
+      <Button.State name="ready">Restart Journey</Button.State>
+      <Button.State name="pending">Restarting…</Button.State>
+    </Button>
+  );
+
   const returnButton = canReturn && (
     <Button
       variant="secondary"
@@ -415,25 +435,25 @@ function ProductJourney() {
           {path.milestones.map((milestone, index) => {
             // Finished: nothing is current any more, every stop (including
             // the last) reads as done.
-            const status = isFinished
+            const stop = isFinished
               ? "done"
               : milestoneStatus(index, currentIndex);
             return (
               <li
                 key={milestone.id}
                 className="journey-route-stop"
-                data-status={status}
-                aria-current={status === "current" ? "step" : undefined}
+                data-status={stop}
+                aria-current={stop === "current" ? "step" : undefined}
               >
                 <span className="journey-route-dot">
-                  {status === "done" ? (
+                  {stop === "done" ? (
                     <CheckIcon weight="bold" role="img" aria-label="Done" />
                   ) : (
                     <span aria-hidden="true">{index + 1}</span>
                   )}
                 </span>
                 <span className="journey-route-name">{milestone.name}</span>
-                {status === "current" && (
+                {stop === "current" && (
                   <span className="journey-route-outcome">
                     {milestone.outcome}
                   </span>
@@ -443,7 +463,7 @@ function ProductJourney() {
           })}
         </ol>
         <section>
-          {isFinished ? (
+          {status === "completed" && (
             <>
               <h3>{path.name} complete</h3>
               <p>
@@ -453,17 +473,23 @@ function ProductJourney() {
               {worksheetSection}
               <div className="button-group button-group--end">
                 {returnButton}
-                <Button
-                  disabled={moving !== null}
-                  state={moving === "restart" ? "pending" : "ready"}
-                  onClick={() => void restartJourney()}
-                >
-                  <Button.State name="ready">Restart Journey</Button.State>
-                  <Button.State name="pending">Restarting…</Button.State>
-                </Button>
+                {restartButton}
               </div>
             </>
-          ) : (
+          )}
+          {status === "abandoned" && (
+            <>
+              <h3>{path.name} abandoned</h3>
+              <p>
+                You stepped away from this Journey on {currentMilestone.name}.
+              </p>
+              {worksheetSection}
+              <div className="button-group button-group--end">
+                {restartButton}
+              </div>
+            </>
+          )}
+          {status === "in-progress" && (
             <>
               <h3>{currentMilestone.name}</h3>
               <p>{currentMilestone.description}</p>
@@ -491,11 +517,45 @@ function ProductJourney() {
           {error && <p role="alert">{error}</p>}
         </section>
       </div>
-      <div className="button-group button-group--end">
-        <Button variant="secondary" onClick={() => setIsDeleting(true)}>
-          Delete Journey
-        </Button>
-      </div>
+      {status === "in-progress" ? (
+        // Not destructive, so the usual reveal in place: the answers and
+        // checked Tasks stay; only the Journey stops being in progress.
+        <div className="button-group button-group--end">
+          {isConfirmingAbandon ? (
+            <>
+              <Button
+                variant="secondary"
+                disabled={moving !== null}
+                onClick={() => setIsConfirmingAbandon(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={moving !== null}
+                state={moving === "abandon" ? "pending" : "ready"}
+                onClick={() => void moveJourney("abandon")}
+              >
+                <Button.State name="ready">Abandon Journey</Button.State>
+                <Button.State name="pending">Abandoning…</Button.State>
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="secondary"
+              disabled={moving !== null}
+              onClick={() => setIsConfirmingAbandon(true)}
+            >
+              Abandon Journey
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="button-group button-group--end">
+          <Button variant="secondary" onClick={() => setIsDeleting(true)}>
+            Delete Journey
+          </Button>
+        </div>
+      )}
 
       <DeleteJourneyDialog
         open={isDeleting}

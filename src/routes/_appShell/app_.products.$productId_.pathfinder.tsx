@@ -11,8 +11,8 @@ interface FollowablePath {
   name: string;
   /** The Product's Journey in progress on it, if there is one. */
   journeyId: string | null;
-  /** Whether the Product has completed a Journey on it. */
-  completed: boolean;
+  /** How the Product's latest other Journey on it ended, if it has one. */
+  lastEnded: "completed" | "abandoned" | null;
 }
 
 // Filename note: `$productId_` makes this a sibling of the Product home
@@ -53,8 +53,9 @@ export const Route = createFileRoute(
  * first, then the User's own Paths that have a saved version. Each is an
  * `ActionCard` link to its Trailhead, or, when the Product has a Journey
  * in progress on it, to that Journey, marked "Following", so the list never
- * invites a second start. One the Product has only completed is marked
- * "Completed" and goes to its Trailhead, to start again (#172). Below,
+ * invites a second start. One the Product has followed before, but isn't
+ * now, says how its latest Journey on it ended, "Completed" or
+ * "Abandoned", and goes to its Trailhead, to start again (#172). Below,
  * "Make Your Own Path" links to Trailblazer.
  */
 function Pathfinder() {
@@ -77,8 +78,12 @@ function Pathfinder() {
                 path.journeyId ? (
                   <ActionCard.Status>Following</ActionCard.Status>
                 ) : (
-                  path.completed && (
-                    <ActionCard.Status>Completed</ActionCard.Status>
+                  path.lastEnded && (
+                    <ActionCard.Status>
+                      {path.lastEnded === "completed"
+                        ? "Completed"
+                        : "Abandoned"}
+                    </ActionCard.Status>
                   )
                 )
               }
