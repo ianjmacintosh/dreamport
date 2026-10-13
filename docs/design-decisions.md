@@ -391,9 +391,13 @@ Add an entry only once a sign-off conversation resolves something repeatable
     Dialog. A `Dropdown` put an older version one click from Start
     Journey, too easy to reach. An earlier version's page says a newer one
     is available.
-  - The Product page's Journey section keeps one line per Journey, and its
-    button reads "View Journeys", or "Choose a Path" (to Pathfinder) when
-    there are none.
+  - The Product page's section is "Journey List" (#172): a singular
+    "Journey" was wrong with several, and "Journey(s)" or plural logic is
+    worse. It shows only the active Journeys, as the Journeys page's
+    `ActionCard`s (path icon, white card, "In Progress"), or "Looking for
+    some structure? Follow a marked path to success." when there are none.
+    Its button reads "View Journeys", or "Choose a Path" (to Pathfinder)
+    when the Product has no Journeys at all.
   - A Path's editor is `/app/paths/:pathId/edit`, its crumb "Edit", so the
     Path's own URL is free for a page about the Path later.
 
@@ -448,8 +452,8 @@ Add an entry only once a sign-off conversation resolves something repeatable
     deletes on one click, then goes to the Journeys list.
   - The Journeys page goes straight to "Active Journeys" (in progress)
     and "Inactive Journeys" (completed or abandoned), with no "Journeys"
-    heading above them (see the Journeys page above); the Product home says "{Path}: {Milestone}", "{Path}
-    complete" or "{Path} abandoned"; Pathfinder marks a Path it isn't
+    heading above them (see the Journeys page above); the Product page's
+    Journey List shows only the active ones (above); Pathfinder marks a Path it isn't
     following but has followed with how its latest Journey ended (decided
     in #172, in words, without a prototype; Pause was dropped for
     Abandon).

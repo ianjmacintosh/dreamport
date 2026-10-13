@@ -1,5 +1,8 @@
 import { Fragment, useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { PathIcon } from "@phosphor-icons/react";
+
+import ActionCard from "../../components/ActionCard";
 
 import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
@@ -76,13 +79,12 @@ interface Idea {
 
 /**
  * The parts of a Journey in `/api/products/:productId/journeys` (#170) the
- * Product home's Journey lines need (see `JourneySummary` in
+ * Product home's Journey List needs (see `JourneySummary` in
  * `src/worker/journeys.ts`).
  */
 interface JourneySummary {
   id: string;
   pathName: string;
-  currentMilestoneName: string;
   status: "in-progress" | "completed" | "abandoned";
 }
 
@@ -188,10 +190,11 @@ const CONNECTION_FAILED =
  * in-place edit shape an Idea row's rename uses. Single-line on purpose:
  * no multi-line text component exists yet (see #112).
  *
- * Journey (#137, #170) is a short `<h2>` section between the description
- * and the Ideas: a line per Journey saying where it's at, or an invitation
- * before there are any, and a link styled as a button: "View Journeys" to
- * the Product's Journeys page, or "Choose a Path" to Pathfinder.
+ * Journey List (#137, #170, #172) is a short `<h2>` section between the
+ * description and the Ideas: the Product's active Journeys as the Journeys
+ * page's `ActionCard`s, or an invitation when it has none, and a link
+ * styled as a button: "View Journeys" to the Product's Journeys page, or
+ * "Choose a Path" to Pathfinder before it has any Journeys at all.
  */
 function ProductHome() {
   const {
@@ -200,6 +203,7 @@ function ProductHome() {
     tagCatalog,
     journeys,
   } = Route.useRouteContext();
+  const active = journeys.filter((j) => j.status === "in-progress");
   const [product, setProduct] = useState<Product>(initialProduct);
   const [error, setError] = useState("");
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -292,15 +296,21 @@ function ProductHome() {
           </p>
         </>
       )}
-      <h2>Journey</h2>
-      {journeys.length > 0 ? (
-        journeys.map((journey) => (
-          <p key={journey.id}>
-            {journey.status === "in-progress"
-              ? `${journey.pathName}: ${journey.currentMilestoneName}`
-              : `${journey.pathName} ${journey.status === "completed" ? "complete" : "abandoned"}`}
-          </p>
-        ))
+      <h2 id="journey-list">Journey List</h2>
+      {active.length > 0 ? (
+        <ul className="action-card-list" aria-labelledby="journey-list">
+          {active.map((journey) => (
+            <li key={journey.id}>
+              <ActionCard
+                href={`/app/products/${product.id}/journeys/${journey.id}`}
+                leading={<PathIcon weight="bold" aria-hidden="true" />}
+                trailing={<ActionCard.Status>In Progress</ActionCard.Status>}
+              >
+                {journey.pathName}
+              </ActionCard>
+            </li>
+          ))}
+        </ul>
       ) : (
         <p>Looking for some structure? Follow a marked path to success.</p>
       )}

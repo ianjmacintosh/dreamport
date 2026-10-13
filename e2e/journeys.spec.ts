@@ -121,9 +121,13 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
     page.getByRole("link", { name: "Dream Sequence In Progress" }),
   ).toBeVisible();
 
-  // Back on the Product home, the Journey section now names where it's at.
+  // Back on the Product home, its Journey List shows it.
   await breadcrumbs.getByRole("link", { name: productName }).click();
-  await expect(page.getByText("Dream Sequence: Real Talk")).toBeVisible();
+  await expect(
+    page
+      .getByRole("list", { name: "Journey List" })
+      .getByRole("link", { name: "Dream Sequence In Progress" }),
+  ).toBeVisible();
   await expect(page.getByRole("link", { name: "View Journeys" })).toBeVisible();
 
   // Pathfinder now marks Dream Sequence as followed and links to its
@@ -289,7 +293,11 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
     .getByRole("navigation", { name: "Breadcrumb" })
     .getByRole("link", { name: productName })
     .click();
-  await expect(page.getByText("Dream Sequence: Growth")).toBeVisible();
+  await expect(
+    page
+      .getByRole("list", { name: "Journey List" })
+      .getByRole("link", { name: "Dream Sequence In Progress" }),
+  ).toBeVisible();
 });
 
 test("tick a Task and fill out the Product Summary from Milestone 1, land back on the Journey with the Task still ticked, then see the Summary kept on Milestone 2", async ({
@@ -352,11 +360,12 @@ test("tick a Task and fill out the Product Summary from Milestone 1, land back o
   await expect(page.getByLabel("2. Customer")).toHaveValue("Home bakers");
 });
 
-test("finish a Journey with a Task ticked, Restart it into a blank Journey, delete the finished one, then abandon, resume, abandon and delete the new one", async ({
+test("finish a Journey with a Task ticked, Restart it into a blank Journey, see only the new one in the Product's Journey List, delete the finished one, then abandon, resume, abandon and delete the new one", async ({
   page,
 }) => {
   await signIn(page, TEST_EMAILS.e2eRestartJourney);
-  await openNewProduct(page, `A restarted app ${Date.now()}`);
+  const productName = `A restarted app ${Date.now()}`;
+  await openNewProduct(page, productName);
   await startDreamSequence(page);
   const finishedUrl = page.url();
 
@@ -389,10 +398,15 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, dele
   expect(page.url()).not.toBe(finishedUrl);
   await expect(task).not.toBeChecked();
 
+  // The Product home lists active Journeys only.
   await page
     .getByRole("navigation", { name: "Breadcrumb" })
-    .getByRole("link", { name: "Journeys" })
+    .getByRole("link", { name: productName })
     .click();
+  await expect(
+    page.getByRole("list", { name: "Journey List" }).getByRole("link"),
+  ).toHaveText([/Dream Sequence\s*In Progress/]);
+  await page.getByRole("link", { name: "View Journeys" }).click();
   const journeys = page.getByRole("link", { name: /^Dream Sequence/ });
   const active = page.getByRole("list", {
     name: "Active Journeys",
