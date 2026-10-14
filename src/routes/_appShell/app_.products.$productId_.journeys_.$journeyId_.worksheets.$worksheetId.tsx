@@ -1,10 +1,13 @@
 import { useState, type ReactNode } from "react";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
-import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Link from "../../components/Link";
 import TextArea from "../../components/TextArea";
+import {
+  journeyWorksheetBreadcrumbs,
+  type JourneyStatus,
+} from "./-journey-breadcrumbs";
 
 /**
  * Plain `fetch` never times out on its own — if the server accepts the TCP
@@ -99,29 +102,25 @@ export const Route = createFileRoute(
     if (!res || !res.ok) {
       throw redirect({ to: "/app" });
     }
-    const { product, path, ...worksheetState } = (await res.json()) as {
-      product: { id: string; name: string };
-      path: { id: string; name: string };
-    } & WorksheetState;
+    const { product, path, journey, ...worksheetState } =
+      (await res.json()) as {
+        product: { id: string; name: string };
+        path: { id: string; name: string };
+        journey: { status: JourneyStatus };
+      } & WorksheetState;
     return {
       product,
       journeyId: params.journeyId,
       worksheetState,
-      breadcrumbs: {
-        trail: [
-          { label: "Products", href: "/app" },
-          { label: product.name, href: `/app/products/${product.id}` },
-          {
-            label: "Journeys",
-            href: `/app/products/${product.id}/journeys`,
-          },
-          {
-            label: path.name,
-            href: `/app/products/${product.id}/journeys/${params.journeyId}`,
-          },
-        ],
-        current: worksheetState.worksheet.name,
-      } satisfies BreadcrumbsProps,
+      breadcrumbs: journeyWorksheetBreadcrumbs(
+        {
+          product,
+          path,
+          journeyId: params.journeyId,
+          status: journey.status,
+        },
+        worksheetState.worksheet.name,
+      ),
     };
   },
   component: ProductWorksheet,
@@ -133,8 +132,8 @@ export const Route = createFileRoute(
  * finished.
  *
  * The Product's name is the h1 (its `breadcrumbs`, Products › Product ›
- * Journeys › the Path › this Worksheet, go in the band under `AppNav`,
- * #109), then the
+ * Paths › the Path › the Journey › this Worksheet, go in the band under
+ * `AppNav`, #109, #198), then the
  * Worksheet drawn as a sheet of paper (`.sheet`, picked from a prototype on
  * branch `prototype/worksheet-design`): its name as the sheet's h2, one
  * numbered `TextArea` per field with its prompt as helper text, one Save

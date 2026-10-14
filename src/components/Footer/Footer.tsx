@@ -21,7 +21,7 @@ export function Footer({ variant = "app" }: FooterProps = {}) {
             <p>
               Dreamport is a platform to help you track, manage, and grow your
               ideas, with as much or as little structure as you want.{" "}
-              <Link href="/login">Log in</Link> and start your journey today.
+              <Link href="/login">Log in</Link> and start on a path today.
             </p>
           </div>
           <div className="footer-learn-more">

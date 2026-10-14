@@ -25,14 +25,14 @@ function crumbClass(shrinks: boolean) {
 
 /**
  * Where the page sits under its section, on one line that never wraps
- * (#109): `Products › Tarot › Journey`. Ancestors shorten with "…" before
+ * (#109): `Products › Tarot › Paths`. Ancestors shorten with "…" before
  * the current page does (see `fitBreadcrumbs`); separators never shorten.
  * No `title` tooltips: a shortened name is still whole in the accessible
  * text, and one tap away on its own page.
  *
  * Below 640px the whole trail gives way to one link up to the parent
- * page (`‹ Back to Journey`): a phone has no room for the trail without
- * shortening every name in it.
+ * page (`‹ Back to Current Journey`): a phone has no room for the trail
+ * without shortening every name in it.
  *
  * Ancestors pass `current={false}`: every one is a prefix of this page's
  * URL, so the router would otherwise mark each as the current page.

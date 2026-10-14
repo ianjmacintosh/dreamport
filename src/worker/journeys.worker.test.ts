@@ -230,6 +230,7 @@ describe("starting a Journey", () => {
     const state = await journeyState(env.DB, journey);
     expect(state.path).toEqual({
       id: own.id,
+      pathId: own.pathId,
       name: "Weekend Launch",
       milestones: own.milestones,
     });

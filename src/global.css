@@ -1725,13 +1725,19 @@ a.action-card:hover {
    `prototype/journey-ux`): the Milestones as a route down the left —
    numbered dots joined by a line — beside the content for where you are
    (before starting, what starting does; after, the current Milestone's
-   work). Below 640px the content stacks above the route, so Start Journey
+   work). Below 640px the content stacks above the route, so Start on Path
    or the current work isn't under all seven stops. */
 .journey-split {
   display: grid;
   grid-template-columns: 16rem minmax(0, 1fr);
   column-gap: var(--space-8);
   align-items: start;
+}
+
+/* When the route has a heading over it ("Milestones" on a Path's page and
+   a Journey page, #198), the heading on the right sits on its baseline. */
+.journey-split:has(> div > h2) {
+  align-items: first baseline;
 }
 
 .journey-route {
