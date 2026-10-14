@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  redirect,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import {
   CalendarBlankIcon,
   CheckIcon,
@@ -7,11 +12,11 @@ import {
 } from "@phosphor-icons/react";
 
 import ActionCard from "../../components/ActionCard";
-import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
 import Dialog from "../../components/Dialog";
 import Link from "../../components/Link";
+import { journeyBreadcrumbs, journeyStatus } from "./-journey-breadcrumbs";
 
 /**
  * Plain `fetch` never times out on its own — if the server accepts the TCP
@@ -65,13 +70,14 @@ interface Milestone {
 
 /**
  * `/api/products/:productId/journeys/:journeyId`'s Path version and
- * Journey (#137, #170): the version with its Milestones in order, and the
- * Journey's progress on it. The GET, Advance, Return and Task check-off
+ * Journey (#137, #170): the version with its Milestones in order, its
+ * Path's id, and the Journey's progress on it. The GET, Advance, Return and Task check-off
  * all answer with this; the GET also bundles the Product.
  */
 interface JourneyState {
   path: {
     id: string;
+    pathId: string;
     name: string;
     milestones: Milestone[];
   };
@@ -133,15 +139,14 @@ function taskDisplay(title: string): { title: string; isEvent: boolean } {
 type JourneyMove = "advance" | "return" | "abandon" | "resume";
 
 const MOVE_JOURNEY_FAILED: Record<JourneyMove, string> = {
-  advance: "We couldn't advance the journey. Try again in a moment.",
-  return: "We couldn't return the journey. Try again in a moment.",
-  abandon: "We couldn't abandon the journey. Try again in a moment.",
-  resume: "We couldn't resume the journey. Try again in a moment.",
+  advance: "We couldn't advance on this Path. Try again in a moment.",
+  return: "We couldn't go back on this Path. Try again in a moment.",
+  abandon: "We couldn't abandon this Path. Try again in a moment.",
+  resume: "We couldn't resume this Path. Try again in a moment.",
 };
 const SET_TASK_FAILED = "We couldn't save that task. Try again in a moment.";
-const RESTART_FAILED =
-  "We couldn't restart the journey. Try again in a moment.";
-const DELETE_FAILED = "We couldn't delete the journey. Try again in a moment.";
+const RESTART_FAILED = "We couldn't restart this Path. Try again in a moment.";
+const DELETE_FAILED = "We couldn't delete this Journey. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -169,17 +174,12 @@ export const Route = createFileRoute(
     return {
       product,
       journeyState,
-      breadcrumbs: {
-        trail: [
-          { label: "Products", href: "/app" },
-          { label: product.name, href: `/app/products/${product.id}` },
-          {
-            label: "Journeys",
-            href: `/app/products/${product.id}/journeys`,
-          },
-        ],
-        current: journeyState.path.name,
-      } satisfies BreadcrumbsProps,
+      breadcrumbs: journeyBreadcrumbs({
+        product,
+        path: { id: journeyState.path.pathId, name: journeyState.path.name },
+        journeyId: journeyState.journey.id,
+        status: journeyStatus(journeyState.journey),
+      }),
     };
   },
   // Restart goes from one Journey's page to another's: a fresh component,
@@ -190,11 +190,12 @@ export const Route = createFileRoute(
 
 /**
  * One of a Product's Journeys (#137, #170), reached from the Product's
- * Journeys page, or from a Trailhead's "Start Journey".
+ * Paths page, or from a Trailhead's "Start on Path".
  *
- * The Product's name is the h1 and "Journey" the h2, so the page reads as
- * part of the Product; its `breadcrumbs` (Products › the Product ›
- * Journeys › the Path) go in the band under `AppNav` (#109). Below them,
+ * The Product's name is the h1 and the Path's the h2, so the page reads as
+ * part of the Product; its `breadcrumbs` (Products › the Product › Paths ›
+ * the Path › Current, Completed or Abandoned Journey, #198) go in the band
+ * under `AppNav` (#109). Below them,
  * `.journey-split` (see global.css): the Milestones as a route on the
  * left, the content for where you are on the right: the current
  * Milestone's name and description, then h4 sections: "Worksheets" (every
@@ -225,6 +226,7 @@ function ProductJourney() {
   /** The Journey in progress on this Path that a refused Resume names. */
   const [activeJourneyId, setActiveJourneyId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const router = useRouter();
   /** The Task mid-save, if one is — shown as already toggled until it lands. */
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -233,11 +235,7 @@ function ProductJourney() {
   const currentIndex = path.milestones.findIndex(
     (milestone) => milestone.id === journey.currentMilestoneId,
   );
-  const status = journey.finishedAt
-    ? "completed"
-    : journey.abandonedAt
-      ? "abandoned"
-      : "in-progress";
+  const status = journeyStatus(journey);
   const isFinished = status === "completed";
   const currentMilestone = path.milestones[currentIndex];
   const isLastMilestone = currentIndex === path.milestones.length - 1;
@@ -278,6 +276,11 @@ function ProductJourney() {
       }
       setJourneyState(moved.state);
       setIsConfirmingAbandon(false);
+      // The breadcrumbs name the status from this route's beforeLoad, which
+      // only reruns on a load.
+      if (journeyStatus(moved.state.journey) !== status) {
+        void router.invalidate();
+      }
     } catch {
       setError(CONNECTION_FAILED);
     } finally {
@@ -424,7 +427,7 @@ function ProductJourney() {
       state={moving === "restart" ? "pending" : "ready"}
       onClick={() => void restartJourney()}
     >
-      <Button.State name="ready">Restart Journey</Button.State>
+      <Button.State name="ready">Restart Path</Button.State>
       <Button.State name="pending">Restarting…</Button.State>
     </Button>
   );
@@ -444,7 +447,7 @@ function ProductJourney() {
   return (
     <>
       <h1>{product.name}</h1>
-      <h2>Journey</h2>
+      <h2>{path.name}</h2>
       <div className="journey-split">
         <ol aria-label="Milestones" className="journey-route">
           {path.milestones.map((milestone, index) => {
@@ -507,7 +510,7 @@ function ProductJourney() {
                   state={moving === "resume" ? "pending" : "ready"}
                   onClick={() => void moveJourney("resume")}
                 >
-                  <Button.State name="ready">Resume Journey</Button.State>
+                  <Button.State name="ready">Resume Path</Button.State>
                   <Button.State name="pending">Resuming…</Button.State>
                 </Button>
               </div>
@@ -530,7 +533,7 @@ function ProductJourney() {
                 >
                   <Button.State name="ready">
                     {isLastMilestone
-                      ? "Finish Journey"
+                      ? "Mark Journey Complete"
                       : "Advance to Next Milestone"}
                   </Button.State>
                   <Button.State name="pending">Advancing…</Button.State>
@@ -577,7 +580,7 @@ function ProductJourney() {
                 state={moving === "abandon" ? "pending" : "ready"}
                 onClick={() => void moveJourney("abandon")}
               >
-                <Button.State name="ready">Abandon Journey</Button.State>
+                <Button.State name="ready">Abandon Path</Button.State>
                 <Button.State name="pending">Abandoning…</Button.State>
               </Button>
             </>
@@ -587,14 +590,14 @@ function ProductJourney() {
               disabled={moving !== null}
               onClick={() => setIsConfirmingAbandon(true)}
             >
-              Abandon Journey
+              Abandon Path
             </Button>
           )}
         </div>
       ) : (
         <div className="button-group button-group--end">
           <Button variant="secondary" onClick={() => setIsDeleting(true)}>
-            Delete Journey
+            Delete This Journey
           </Button>
         </div>
       )}
@@ -620,7 +623,7 @@ function ProductJourney() {
 /**
  * Deleting a Journey takes its Worksheet answers and checked Tasks, which
  * this page doesn't show, so the warning gets a Dialog of its own, and the
- * Dialog's Delete Journey deletes on one click (decided for Paths in #171).
+ * Dialog's Delete This Journey deletes on one click (decided for Paths in #171).
  */
 function DeleteJourneyDialog({
   open,
@@ -687,7 +690,7 @@ function DeleteJourneyDialog({
           state={isPending ? "deleting" : "ready"}
           onClick={() => void remove()}
         >
-          <Button.State name="ready">Delete Journey</Button.State>
+          <Button.State name="ready">Delete This Journey</Button.State>
           <Button.State name="deleting">Deleting…</Button.State>
         </Button>
       </div>
