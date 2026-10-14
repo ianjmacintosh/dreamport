@@ -141,12 +141,15 @@ test("make a Path, manage its Milestones in Edit Path, edit one, give it a Task,
   await expect(page.getByLabel("Task title")).toHaveValue("");
   await expect(stops).toHaveText([/^1Second/, /^2First, edited\s*1 Task$/]);
 
+  // The URL names the picked Milestone, so a reload opens it again.
   await page.reload();
   await expect(stops).toHaveText([
     /^1Second\s*No Tasks$/,
     /^2First, edited\s*1 Task$/,
   ]);
-  await route.getByRole("button", { name: "First, edited" }).click();
+  await expect(
+    route.getByRole("button", { name: "First, edited" }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(tasks).toHaveText([/^Talk to 5 potential customers/]);
 
   // Deleting the picked Milestone picks the first one left.

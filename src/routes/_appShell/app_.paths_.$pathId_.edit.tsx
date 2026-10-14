@@ -177,7 +177,14 @@ function announcementsFor<T extends { id: string }>(
 // `/app/paths/$pathId` (neither renders an `<Outlet />`), not their child:
 // the same escape the Journey page uses.
 export const Route = createFileRoute("/_appShell/app_/paths_/$pathId_/edit")({
-  beforeLoad: async ({ params }) => {
+  // The picked Milestone, by id so a rename keeps the link working (#184).
+  validateSearch: (search: Record<string, unknown>): { milestone?: string } =>
+    typeof search.milestone === "string" ? { milestone: search.milestone } : {},
+  // A loader, not `beforeLoad`, and no search in its deps: `beforeLoad`
+  // reruns on every search change, which would refetch the Path on each
+  // pick. `router.invalidate()` still reruns this.
+  loaderDeps: () => ({}),
+  loader: async ({ params }) => {
     // Not signed in, not this User's Path, offline: back to the list,
     // as an unknown Product goes back to `/app`.
     const res = await fetch(`/api/paths/${params.pathId}`).catch(() => null);
@@ -229,24 +236,32 @@ function taskCount(n: number): string {
  * the Edit Milestone Dialog; its Tasks right there in the panel.
  */
 function PathDraft() {
-  const { draft } = Route.useRouteContext();
+  const { draft } = Route.useLoaderData();
   const router = useRouter();
+  const { milestone: pickedId } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [path, setPath] = useState<PathHead>(draft);
   const [milestones, setMilestones] = useState<Milestone[]>(draft.milestones);
   const [updatedAt, setUpdatedAt] = useState(draft.updatedAt);
   const [latestVersion, setLatestVersion] = useState(draft.latestVersion);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [pickedId, setPickedId] = useState<string | null>(null);
   const [pathDialog, setPathDialog] = useState<PathDialogOpening | null>(null);
   const [isEditingMilestone, setIsEditingMilestone] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDiscarding, setIsDiscarding] = useState(false);
 
   const base = `/api/paths/${path.id}`;
-  // The first Milestone until one is picked, and again if the picked one
-  // is deleted.
+  // The first Milestone until one is picked, and when the URL names one
+  // this Draft doesn't have.
   const picked = milestones.find((m) => m.id === pickedId) ?? milestones[0];
+
+  function pick(milestoneId: string | undefined) {
+    void navigate({
+      search: milestoneId ? { milestone: milestoneId } : {},
+      replace: true,
+    });
+  }
 
   /** After a Draft write lands: the server's `updatedAt` moved to about now. */
   function touch() {
@@ -258,7 +273,7 @@ function PathDraft() {
     setMilestones(updated.milestones);
     setUpdatedAt(updated.updatedAt);
     setPathDialog(null);
-    // The breadcrumbs come from `beforeLoad`; rerun it for the new name.
+    // The breadcrumbs come from the loader; rerun it for the new name.
     void router.invalidate();
   }
 
@@ -310,7 +325,7 @@ function PathDraft() {
                   milestone={m}
                   number={index + 1}
                   isPicked={m.id === picked.id}
-                  onPick={() => setPickedId(m.id)}
+                  onPick={() => pick(m.id)}
                 />
               ))}
             </ol>
@@ -422,7 +437,7 @@ function PathDraft() {
           onClose={() => setIsDiscarding(false)}
           onDiscarded={(restored) => {
             showUpdatedDraft(restored);
-            setPickedId(null);
+            pick(undefined);
             setIsDiscarding(false);
           }}
         />
@@ -441,6 +456,7 @@ function PathDraft() {
         }}
         onDeleted={(id) => {
           setMilestones((prev) => prev.filter((m) => m.id !== id));
+          pick(undefined);
           touch();
           setIsEditingMilestone(false);
         }}
