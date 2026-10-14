@@ -28,7 +28,7 @@ async function openNewProduct(page: Page, productName: string) {
 async function startDreamSequence(page: Page) {
   await page.getByRole("link", { name: "Choose a Path" }).click();
   await page.getByRole("link", { name: "Dream Sequence" }).click();
-  await page.getByRole("button", { name: "Start Journey" }).click();
+  await page.getByRole("button", { name: "Start on Path" }).click();
   await expect(page).toHaveURL(/\/app\/products\/[^/]+\/journeys\/[^/]+$/);
 }
 
@@ -74,7 +74,7 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
     page.getByRole("link", { name: "Looking for an older version?" }),
   ).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Start Journey" }).click();
+  await page.getByRole("button", { name: "Start on Path" }).click();
 
   await expect(page).toHaveURL(/\/app\/products\/[^/]+\/journeys\/[^/]+$/);
   await expect(milestones.locator('[aria-current="step"]')).toContainText(
@@ -121,14 +121,14 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
     page.getByRole("link", { name: "Dream Sequence In Progress" }),
   ).toBeVisible();
 
-  // Back on the Product home, its Journey List shows it.
+  // Back on the Product home, its Active Paths shows it.
   await breadcrumbs.getByRole("link", { name: productName }).click();
   await expect(
     page
-      .getByRole("list", { name: "Journey List" })
+      .getByRole("list", { name: "Active Paths" })
       .getByRole("link", { name: "Dream Sequence In Progress" }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "View Journeys" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View Paths" })).toBeVisible();
 
   // Pathfinder now marks Dream Sequence as followed and links to its
   // Journey, not back to its Trailhead.
@@ -142,10 +142,10 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   await expect(
     page.getByText(`${productName} is already following Dream Sequence.`),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start Journey" })).toHaveCount(
+  await expect(page.getByRole("button", { name: "Start on Path" })).toHaveCount(
     0,
   );
-  await page.getByRole("link", { name: "View Journey" }).click();
+  await page.getByRole("link", { name: "View Current Path Journey" }).click();
   await expect(page).toHaveURL(/\/journeys\/[^/]+$/);
 
   // The one-Journey page's old address lands on the Journeys page.
@@ -224,7 +224,7 @@ test("make a Path in Trailblazer with a Milestone and a Task, save a version, an
   await expect(page).toHaveURL(/\/trailhead$/);
   await expect(earlier).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Start Journey" }).click();
+  await page.getByRole("button", { name: "Start on Path" }).click();
 
   await expect(page).toHaveURL(/\/app\/products\/[^/]+\/journeys\/[^/]+$/);
   await expect(
@@ -295,7 +295,7 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
     .click();
   await expect(
     page
-      .getByRole("list", { name: "Journey List" })
+      .getByRole("list", { name: "Active Paths" })
       .getByRole("link", { name: "Dream Sequence In Progress" }),
   ).toBeVisible();
 });
@@ -360,7 +360,7 @@ test("tick a Task and fill out the Product Summary from Milestone 1, land back o
   await expect(page.getByLabel("2. Customer")).toHaveValue("Home bakers");
 });
 
-test("finish a Journey with a Task ticked, Restart it into a blank Journey, see only the new one in the Product's Journey List, delete the finished one, then abandon, resume, abandon and delete the new one", async ({
+test("finish a Journey with a Task ticked, Restart it into a blank Journey, see only the new one in the Product's Active Paths, delete the finished one, then abandon, resume, abandon and delete the new one", async ({
   page,
 }) => {
   await signIn(page, TEST_EMAILS.e2eRestartJourney);
@@ -404,16 +404,16 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, see 
     .getByRole("link", { name: productName })
     .click();
   await expect(
-    page.getByRole("list", { name: "Journey List" }).getByRole("link"),
+    page.getByRole("list", { name: "Active Paths" }).getByRole("link"),
   ).toHaveText([/Dream Sequence\s*In Progress/]);
-  await page.getByRole("link", { name: "View Journeys" }).click();
+  await page.getByRole("link", { name: "View Paths" }).click();
   const journeys = page.getByRole("link", { name: /^Dream Sequence/ });
   const active = page.getByRole("list", {
-    name: "Active Journeys",
+    name: "Active Paths",
     exact: true,
   });
   const inactive = page.getByRole("list", {
-    name: "Inactive Journeys",
+    name: "Inactive Paths",
     exact: true,
   });
   await expect(journeys).toHaveCount(2);

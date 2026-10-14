@@ -79,7 +79,7 @@ interface Idea {
 
 /**
  * The parts of a Journey in `/api/products/:productId/journeys` (#170) the
- * Product home's Journey List needs (see `JourneySummary` in
+ * Product home's Active Paths needs (see `JourneySummary` in
  * `src/worker/journeys.ts`).
  */
 interface JourneySummary {
@@ -190,10 +190,10 @@ const CONNECTION_FAILED =
  * in-place edit shape an Idea row's rename uses. Single-line on purpose:
  * no multi-line text component exists yet (see #112).
  *
- * Journey List (#137, #170, #172) is a short `<h2>` section between the
- * description and the Ideas: the Product's active Journeys as the Journeys
+ * Active Paths (#137, #170, #172, #198) is a short `<h2>` section between
+ * the description and the Ideas: the Product's active Journeys as the Paths
  * page's `ActionCard`s, or an invitation when it has none, and a link
- * styled as a button: "View Journeys" to the Product's Journeys page, or
+ * styled as a button: "View Paths" to the Product's Paths page, or
  * "Choose a Path" to Pathfinder before it has any Journeys at all.
  */
 function ProductHome() {
@@ -296,9 +296,9 @@ function ProductHome() {
           </p>
         </>
       )}
-      <h2 id="journey-list">Journey List</h2>
+      <h2 id="active-paths">Active Paths</h2>
       {active.length > 0 ? (
-        <ul className="action-card-list" aria-labelledby="journey-list">
+        <ul className="action-card-list" aria-labelledby="active-paths">
           {active.map((journey) => (
             <li key={journey.id}>
               <ActionCard
@@ -320,7 +320,7 @@ function ProductHome() {
             href={`/app/products/${product.id}/journeys`}
             className="button button--secondary"
           >
-            View Journeys
+            View Paths
           </Link>
         ) : (
           <Link

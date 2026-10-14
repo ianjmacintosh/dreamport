@@ -45,7 +45,7 @@ export const Route = createFileRoute(
           { label: "Products", href: "/app" },
           { label: product.name, href: `/app/products/${product.id}` },
         ],
-        current: "Journeys",
+        current: "Paths",
       } satisfies BreadcrumbsProps,
     };
   },
@@ -53,11 +53,12 @@ export const Route = createFileRoute(
 });
 
 /**
- * A Product's Journeys (#170), split into Active Journeys (in progress)
- * and Inactive Journeys (completed or abandoned), each oldest first and
+ * A Product's Paths page (#170, #198; the URL still says journeys): its
+ * Journeys, split into Active Paths (in progress) and Inactive Paths
+ * (completed or abandoned), each oldest first and
  * left out when empty (#172). Each is an `ActionCard` link to its Journey
  * page, saying whether it's in progress, completed or abandoned. Below
- * them, "Follow Another Path" points to Pathfinder, which lists the Paths
+ * them, "Find More Paths" points to Pathfinder, which lists the Paths
  * to start on. With no Journeys yet, the page says so rather than sending
  * the User straight to Pathfinder.
  */
@@ -94,17 +95,17 @@ function ProductJourneys() {
       )}
       {active.length > 0 && (
         <>
-          <h2 id="active-journeys">Active Journeys</h2>
-          {cards(active, "active-journeys")}
+          <h2 id="active-paths">Active Paths</h2>
+          {cards(active, "active-paths")}
         </>
       )}
       {inactive.length > 0 && (
         <>
-          <h2 id="inactive-journeys">Inactive Journeys</h2>
-          {cards(inactive, "inactive-journeys")}
+          <h2 id="inactive-paths">Inactive Paths</h2>
+          {cards(inactive, "inactive-paths")}
         </>
       )}
-      <h2>Follow Another Path</h2>
+      <h2>Find More Paths</h2>
       <p>Pathfinder lists every Path this Product can follow.</p>
       <p>
         <Link

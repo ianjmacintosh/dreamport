@@ -63,7 +63,7 @@ interface Trailhead {
 const LONG_DATE = new Intl.DateTimeFormat(undefined, { dateStyle: "long" });
 
 const START_JOURNEY_FAILED =
-  "We couldn't start the journey. Try again in a moment.";
+  "We couldn't start on this Path. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -117,14 +117,14 @@ export const Route = createFileRoute(
  * is the h1, then `.journey-split`, as on a Journey page: the version's
  * Milestones as a route on the left, every stop still ahead with its
  * outcome showing, and on the right the pitch (Dream Sequence's own words,
- * or a User's Path's description), then "Start Journey", which starts the
+ * or a User's Path's description), then "Start on Path", which starts the
  * Product on Milestone 1 and goes to the new Journey's page.
  *
  * It opens on the latest version. A Path with more than one has "Looking
  * for an older version?" under the button, which opens a Dialog listing
  * every version, and an earlier version says so, linking back to the
  * latest. When the Product already follows the Path, on any version,
- * "View Journey" replaces "Start Journey": a Product has one Journey per
+ * "View Current Path Journey" replaces "Start on Path": a Product has one Journey per
  * Path, and the line above it names the version when it isn't this one.
  */
 function TrailheadPage() {
@@ -243,7 +243,7 @@ function TrailheadPage() {
                   href={`/app/products/${product.id}/journeys/${journey.id}`}
                   className="button button--primary"
                 >
-                  View Journey
+                  View Current Path Journey
                 </Link>
               </div>
             </>
@@ -254,7 +254,7 @@ function TrailheadPage() {
                 state={isStarting ? "pending" : "ready"}
                 onClick={() => void startJourney()}
               >
-                <Button.State name="ready">Start Journey</Button.State>
+                <Button.State name="ready">Start on Path</Button.State>
                 <Button.State name="pending">Starting…</Button.State>
               </Button>
             </div>
