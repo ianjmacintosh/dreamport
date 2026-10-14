@@ -17,6 +17,7 @@ import {
   deleteMilestone,
   deletePath,
   deleteTask,
+  discardChanges,
   type FollowableVersion,
   getDraft,
   getPath,
@@ -1015,6 +1016,191 @@ describe("saving a Path's Draft as a version", () => {
     expect(await contentOf(othersVersion.id)).toEqual(othersBefore);
     expect(await dreamSequence()).toEqual(dreamBefore);
     expect(await dreamSequenceTasks()).toEqual(dreamTasksBefore);
+  });
+});
+
+const DISCARDER_ID = "paths-module-discarder";
+
+/** The Draft in the same shape `contentOf` gives a saved version. */
+async function draftContent(path: OwnedPath) {
+  const { name, description, milestones } = await currentDraft(path);
+  return {
+    name,
+    description,
+    milestones: milestones.map(
+      ({ name, description, doneWhen, outcome, tasks }) => ({
+        name,
+        description,
+        doneWhen,
+        outcome,
+        tasks: tasks.map((t) => t.title),
+      }),
+    ),
+  };
+}
+
+/** A version of the discarder's in `draftContent`'s shape: `contentOf` without its number. */
+async function savedContent(versionId: string) {
+  const { name, description, milestones } = await contentOf(
+    versionId,
+    DISCARDER_ID,
+  );
+  return { name, description, milestones };
+}
+
+async function discarded(path: OwnedPath) {
+  const result = await discardChanges(env.DB, path);
+  if (!result.ok) throw new Error(`not discarded: ${result.reason}`);
+  return result.draft;
+}
+
+/** A new Path of the discarder's, apart from the maker's, who nears the Path cap. */
+async function discardersPath() {
+  await seedUser(DISCARDER_ID, TEST_EMAILS.pathsModuleDiscarder);
+  const created = await createPath(env.DB, DISCARDER_ID, {
+    name: "Bakery Path",
+    description: "For bakers",
+  });
+  if (!created.ok) throw new Error("the discarder is at the Path cap");
+  return created.path;
+}
+
+/** A Path saved once with two Milestones and Tasks, then edited all over. */
+async function editedSinceSaving() {
+  const path = await discardersPath();
+  const bake = await milestoneOn(path, BAKE);
+  const sell = await milestoneOn(path, SELL);
+  const flour = await taskOn(path, bake.id, "Buy flour");
+  const knead = await taskOn(path, bake.id, "Knead");
+  await taskOn(path, sell.id, "Set a price");
+  const version = await saved(path, DISCARDER_ID);
+
+  await rename(path, "Renamed", "New");
+  await updateMilestone(env.DB, path, bake.id, { ...BAKE, name: "Bake It" });
+  const ship = await milestoneOn(path, SHIP);
+  await deleteMilestone(env.DB, path, sell.id);
+  await reorder(path, [ship.id, bake.id]);
+  await taskOn(path, bake.id, "Proof");
+  await updateTask(env.DB, path, bake.id, knead.id, { title: "Knead it" });
+  await reorderTasks(env.DB, path, bake.id, [knead.id, flour.id]);
+  await deleteTask(env.DB, path, bake.id, flour.id);
+  await taskOn(path, ship.id, "Find a van");
+  return { path, version };
+}
+
+describe("discarding a Draft's changes (#179)", () => {
+  it("puts the Draft back exactly as the latest version saved it", async () => {
+    const { path, version } = await editedSinceSaving();
+    const asSaved = await savedContent(version.id);
+    expect(asSaved).toEqual({
+      name: "Bakery Path",
+      description: "For bakers",
+      milestones: [
+        { ...BAKE, tasks: ["Buy flour", "Knead"] },
+        { ...SELL, tasks: ["Set a price"] },
+      ],
+    });
+    expect(await draftContent(path)).not.toEqual(asSaved);
+
+    const draft = await discarded(path);
+
+    expect(await draftContent(path)).toEqual(asSaved);
+    expect(draft).toEqual(await currentDraft(path));
+    expect(draft.latestVersion).toEqual({
+      id: version.id,
+      number: 1,
+      savedAt: version.savedAt,
+    });
+    const orphans = await env.DB.prepare(
+      `SELECT count(*) AS n FROM "draft_tasks"
+       WHERE "milestoneId" NOT IN (SELECT "id" FROM "draft_milestones")`,
+    ).first<{ n: number }>();
+    expect(orphans?.n).toBe(0);
+  });
+
+  it("leaves a Draft that saves again as an identical version and edits as before", async () => {
+    const { path, version } = await editedSinceSaving();
+    await discarded(path);
+
+    const again = await saved(path, DISCARDER_ID);
+
+    const firstContent = await savedContent(version.id);
+    expect(again.number).toBe(2);
+    expect(await savedContent(again.id)).toEqual(firstContent);
+
+    const [bake] = (await currentDraft(path)).milestones;
+    await taskOn(path, bake.id, "Proof");
+    await updateMilestone(env.DB, path, bake.id, SHIP);
+    expect(await taskTitles(path)).toEqual({
+      Ship: ["Buy flour", "Knead", "Proof"],
+      Sell: ["Set a price"],
+    });
+  });
+
+  it("leaves saved versions and the Journeys on them alone", async () => {
+    const path = await discardersPath();
+    const bake = await milestoneOn(path, BAKE);
+    await taskOn(path, bake.id, "Knead");
+    const first = await saved(path, DISCARDER_ID);
+    await milestoneOn(path, SELL);
+    const second = await saved(path, DISCARDER_ID);
+    const journey = await journeyOn(first, DISCARDER_ID);
+    const { tasks } = await journeyState(env.DB, journey);
+    await setTaskDone(env.DB, journey, tasks[0].id, true);
+    await rename(path, "Renamed", "New");
+    await deleteMilestone(env.DB, path, bake.id);
+    const firstBefore = await contentOf(first.id, DISCARDER_ID);
+    const secondBefore = await contentOf(second.id, DISCARDER_ID);
+    const journeyBefore = await journeyState(env.DB, journey);
+    const rowsBefore = await versionRowCounts();
+
+    await discarded(path);
+
+    expect(await versionRowCounts()).toEqual(rowsBefore);
+    expect(await journeyState(env.DB, journey)).toEqual(journeyBefore);
+    expect(await contentOf(first.id, DISCARDER_ID)).toEqual(firstBefore);
+    expect(await contentOf(second.id, DISCARDER_ID)).toEqual(secondBefore);
+  });
+
+  it("is refused, changing nothing, on a Path with no saved version", async () => {
+    const path = await discardersPath();
+    const bake = await milestoneOn(path, BAKE);
+    await taskOn(path, bake.id, "Knead");
+    await rename(path, "Renamed", "New");
+    const before = await currentDraft(path);
+    await tick();
+
+    expect(await discardChanges(env.DB, path)).toEqual({
+      ok: false,
+      reason: "no-version",
+    });
+    expect(await currentDraft(path)).toEqual(before);
+  });
+
+  it("goes back to the latest of several versions", async () => {
+    const path = await discardersPath();
+    const bake = await milestoneOn(path, BAKE);
+    await taskOn(path, bake.id, "Knead");
+    await saved(path, DISCARDER_ID);
+    await rename(path, "Second", "Saved twice");
+    await milestoneOn(path, SELL);
+    await taskOn(path, bake.id, "Proof");
+    const second = await saved(path, DISCARDER_ID);
+    await rename(path, "Third", "Never saved");
+    await deleteMilestone(env.DB, path, bake.id);
+
+    await discarded(path);
+
+    const secondContent = await savedContent(second.id);
+    expect(secondContent).toEqual({
+      name: "Second",
+      description: "Saved twice",
+      milestones: [
+        { ...BAKE, tasks: ["Knead", "Proof"] },
+        { ...SELL, tasks: [] },
+      ],
+    });
+    expect(await draftContent(path)).toEqual(secondContent);
   });
 });
 

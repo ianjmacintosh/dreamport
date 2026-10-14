@@ -205,3 +205,76 @@ test("Update Path past 150 Milestones and Tasks shows the cap and changes nothin
     page.getByRole("list", { name: "Milestones" }).getByRole("listitem"),
   ).toHaveCount(150);
 });
+
+test("Discard Changes puts the Draft back as its latest version saved it", async ({
+  page,
+}) => {
+  const pathName = `Discard Draft ${Date.now()}`;
+  await signIn(page, TEST_EMAILS.e2eTrailblazer);
+  await addPath(page, pathName);
+  const openDiscard = page.getByRole("button", { name: "Discard Changes" });
+  const editPath = page.getByRole("dialog", { name: "Edit Path" });
+  await page.getByRole("button", { name: "Manage Milestones" }).click();
+  await stageMilestone(page, "First");
+  await editPath.getByRole("button", { name: "Update Path" }).click();
+  await expect(editPath).toBeHidden();
+  await expect(openDiscard).toHaveCount(0);
+
+  const taskTitle = page.getByLabel("Task title");
+  const addTask = page.getByRole("button", { name: "Add Task" });
+  await taskTitle.fill("Kept Task");
+  await addTask.click();
+  await expect(taskTitle).toHaveValue("");
+  await page.getByRole("button", { name: "Save as New Version" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: /Latest version/ }),
+  ).toHaveText(/^Latest version: 1, saved /);
+  await expect(openDiscard).toBeVisible();
+
+  await page.getByRole("button", { name: "Edit Path" }).click();
+  await editPath.getByLabel("Path name").fill(`${pathName}, renamed`);
+  await stageMilestone(page, "Second");
+  await editPath.getByRole("button", { name: "Update Path" }).click();
+  await expect(editPath).toBeHidden();
+  await taskTitle.fill("Discarded Task");
+  await addTask.click();
+
+  const heading = page.getByRole("heading", { level: 1 });
+  const stops = page
+    .getByRole("list", { name: "Milestones" })
+    .getByRole("listitem");
+  const tasks = page.getByRole("list", { name: "Tasks" }).getByRole("listitem");
+  const edited = async () => {
+    await expect(heading).toHaveText(`${pathName}, renamed`);
+    await expect(stops).toHaveText([/^1First/, /^2Second/]);
+    await expect(tasks).toHaveText([/^Kept Task/, /^Discarded Task/]);
+  };
+  const restored = async () => {
+    await expect(heading).toHaveText(pathName);
+    await expect(stops).toHaveText([/^1First\s*1 Task$/]);
+    await expect(tasks).toHaveText([/^Kept Task/]);
+  };
+  await edited();
+
+  const sent: string[] = [];
+  page.on("request", (req) => {
+    if (req.url().endsWith("/discard-changes")) sent.push(req.url());
+  });
+  const discard = page.getByRole("dialog", {
+    name: "Discard your changes since Version 1?",
+  });
+  await openDiscard.click();
+  await discard.getByRole("button", { name: "Cancel" }).click();
+  await expect(discard).toBeHidden();
+  await edited();
+  expect(sent).toEqual([]);
+
+  await openDiscard.click();
+  await discard.getByRole("button", { name: "Discard Changes" }).click();
+  await expect(discard).toBeHidden();
+  await restored();
+  expect(sent).toHaveLength(1);
+
+  await page.reload();
+  await restored();
+});

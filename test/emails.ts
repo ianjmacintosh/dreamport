@@ -190,6 +190,8 @@ export const TEST_EMAILS = {
   pathsModuleDeleted: "delivered+paths-module-deleted@resend.dev",
   /** Saves a version and follows it, then is deleted, taking both with them (#169). */
   pathsModuleSaverDeleted: "delivered+paths-module-saver-deleted@resend.dev",
+  /** Makes Paths to discard their Drafts' changes (#179). Never signs in. */
+  pathsModuleDiscarder: "delivered+paths-module-discarder@resend.dev",
   /** Makes the only Paths Pathfinder lists for them (#170). */
   pathsModulePathfinder: "delivered+paths-module-pathfinder@resend.dev",
   /** Makes Paths and opens their Trailheads (#170). */

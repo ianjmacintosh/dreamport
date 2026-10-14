@@ -7,6 +7,7 @@ import {
   deleteMilestone,
   deletePath,
   deleteTask,
+  discardChanges,
   getDraft,
   getPath,
   MILESTONES_AND_TASKS_PER_PATH,
@@ -127,6 +128,20 @@ pathRoutes.post("/versions", async (c) => {
   }
 
   return c.json({ version: saved.version }, 201);
+});
+
+/**
+ * Put the Draft back the way its latest saved version has it (Discard
+ * Changes). 409 if the Path has no saved version. Answers the Draft as it
+ * now stands.
+ */
+pathRoutes.post("/discard-changes", async (c) => {
+  const discarded = await discardChanges(c.env.DB, c.var.path);
+  if (!discarded.ok) {
+    return c.json({ error: "There's no saved version to go back to." }, 409);
+  }
+
+  return c.json({ draft: discarded.draft }, 200);
 });
 
 /** Replace one Milestone's fields. 404 for one not on this Path. */

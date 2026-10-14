@@ -2586,6 +2586,54 @@ describe("Trailblazer routes", () => {
     expect(draft.latestVersion).toEqual(version);
   });
 
+  it("POST /api/paths/:pathId/discard-changes puts the Draft back as its latest version saved it, or 409s with none", async () => {
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
+    const path = await addPath(cookie);
+    await addMilestoneOn(cookie, path.id);
+    const discard = () =>
+      callApi("POST", `/api/paths/${path.id}/discard-changes`, cookie);
+    const draft = async () =>
+      (
+        (await (
+          await callApi("GET", `/api/paths/${path.id}`, cookie)
+        ).json()) as {
+          draft: unknown;
+        }
+      ).draft;
+
+    const unsaved = await draft();
+    const refused = await discard();
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({
+      error: "There's no saved version to go back to.",
+    });
+    expect(await draft()).toEqual(unsaved);
+
+    const saved = await callApi(
+      "POST",
+      `/api/paths/${path.id}/versions`,
+      cookie,
+    );
+    expect(saved.status).toBe(201);
+    const { name, description, milestones } = (await draft()) as {
+      name: string;
+      description: string;
+      milestones: unknown[];
+    };
+    await addMilestoneOn(cookie, path.id);
+    await callApi("PATCH", `/api/paths/${path.id}`, cookie, {
+      name: "Renamed",
+      description: "Changed",
+      milestones: [],
+    });
+
+    const discarded = await discard();
+    expect(discarded.status).toBe(200);
+    const answered = ((await discarded.json()) as { draft: unknown }).draft;
+    expect(answered).toMatchObject({ name, description, milestones });
+    expect(await draft()).toEqual(answered);
+  });
+
   it("PATCH and DELETE /api/paths/:pathId/milestones/:milestoneId edit and remove a Milestone", async () => {
     const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
     const path = await addPath(cookie);
