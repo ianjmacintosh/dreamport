@@ -218,6 +218,8 @@ export const TEST_EMAILS = {
   journeysReturn: "delivered+journeys-return@resend.dev",
   /** Reads the Product Summary on an unknown Journey (404), then on one. */
   worksheetsRead: "delivered+worksheets-read@resend.dev",
+  /** Reads the Product Summary while its Journey is in progress, abandoned, then completed. */
+  worksheetsJourneyStatus: "delivered+worksheets-journey-status@resend.dev",
   /** Saves the Product Summary on an unknown Journey (404), a bad body (400), then a good one. */
   worksheetsSave: "delivered+worksheets-save@resend.dev",
   /** Checks off a Task on an unknown Journey (404), a bad body (400), then a good one. */

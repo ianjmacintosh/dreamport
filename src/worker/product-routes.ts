@@ -14,6 +14,7 @@ import {
   advanceJourney,
   deleteJourney,
   journeyState,
+  journeyStatus,
   listJourneys,
   loadJourney,
   restartJourney,
@@ -431,7 +432,7 @@ productRoutes.delete("/journeys/:journeyId", async (c) => {
   return c.json({}, 200);
 });
 
-/** The Path a Journey follows, for a Worksheet page's breadcrumb. */
+/** The Path a Journey follows, for a Worksheet page's breadcrumbs. */
 function pathOf({ version }: StartedJourney) {
   return { id: version.pathId, name: version.name };
 }
@@ -439,7 +440,8 @@ function pathOf({ version }: StartedJourney) {
 /**
  * Worksheets (issue #139): the Product's instance of one Worksheet on the
  * Journey, the Worksheet and its answers. 404s for no such Journey or no
- * such Worksheet. Bundles the Product for the Worksheet page's heading.
+ * such Worksheet. Bundles the Product for the Worksheet page's heading, and
+ * the Path and the Journey's status for its breadcrumbs.
  */
 productRoutes.get("/journeys/:journeyId/worksheets/:worksheetId", async (c) => {
   const journey = await journeyIn(c);
@@ -447,16 +449,20 @@ productRoutes.get("/journeys/:journeyId/worksheets/:worksheetId", async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  const state = await worksheetState(
-    c.env.DB,
-    journey,
-    c.req.param("worksheetId"),
-  );
+  const [state, status] = await Promise.all([
+    worksheetState(c.env.DB, journey, c.req.param("worksheetId")),
+    journeyStatus(c.env.DB, journey),
+  ]);
   if (!state) {
     return c.json({ error: "Not found" }, 404);
   }
 
-  return c.json({ product: c.var.product, path: pathOf(journey), ...state });
+  return c.json({
+    product: c.var.product,
+    path: pathOf(journey),
+    journey: { status },
+    ...state,
+  });
 });
 
 /**

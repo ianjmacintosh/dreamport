@@ -1781,6 +1781,7 @@ type WorksheetResponse = NonNullable<
   Awaited<ReturnType<typeof worksheetState>>
 > & {
   product: { id: string; name: string };
+  journey: { status: string };
 };
 
 const PRODUCT_SUMMARY = "product-summary";
@@ -2004,6 +2005,7 @@ describe("Journey routes", () => {
       product,
       path: {
         id: DREAM_SEQUENCE_VERSION,
+        pathId: "dream-sequence",
         name: "Dream Sequence",
         milestones: expect.any(Array),
       },
@@ -2106,6 +2108,7 @@ describe("Journey routes", () => {
     expect(body).toEqual({
       product,
       path: { id: "dream-sequence", name: "Dream Sequence" },
+      journey: { status: "in-progress" },
       worksheet: {
         id: PRODUCT_SUMMARY,
         name: "Product Summary",
@@ -2125,6 +2128,29 @@ describe("Journey routes", () => {
       (await getWorksheet(product.id, journeyId, "not-a-worksheet", cookie))
         .status,
     ).toBe(404);
+  });
+
+  it("GET /journeys/:journeyId/worksheets/:worksheetId names the Journey's status as it changes", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
+      TEST_EMAILS.worksheetsJourneyStatus,
+    );
+    const status = async () =>
+      (
+        (await (
+          await getWorksheet(product.id, journeyId, PRODUCT_SUMMARY, cookie)
+        ).json()) as WorksheetResponse
+      ).journey.status;
+
+    expect(await status()).toBe("in-progress");
+    await callApi(
+      "POST",
+      journeyUrl(product.id, journeyId, "/abandon"),
+      cookie,
+    );
+    expect(await status()).toBe("abandoned");
+    await callApi("POST", journeyUrl(product.id, journeyId, "/resume"), cookie);
+    await finishJourney(product.id, journeyId, cookie);
+    expect(await status()).toBe("completed");
   });
 
   it("PUT /journeys/:journeyId/worksheets/:worksheetId 404s an unknown Journey or Worksheet, 400s a bad body, else answers the trimmed answers", async () => {
