@@ -46,6 +46,18 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   // No Journeys yet: the Product home points at Pathfinder.
   await page.getByRole("link", { name: "Choose a Path" }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+\/pathfinder$/);
+  // It sits under the Product's Paths (#198).
+  const trail = page.getByRole("navigation", { name: "Breadcrumb" });
+  await expect(trail.getByRole("listitem")).toHaveText([
+    "Products",
+    productName,
+    "Paths",
+    "Browse Available Paths",
+  ]);
+  await expect(trail.getByRole("link", { name: "Paths" })).toHaveAttribute(
+    "href",
+    /\/app\/products\/[^/]+\/journeys$/,
+  );
   await expect(
     page.getByRole("link", { name: "Make your own Path" }),
   ).toHaveAttribute("href", "/app/paths");
@@ -53,6 +65,13 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   await expect(page).toHaveURL(
     /\/app\/products\/.+\/paths\/dream-sequence\/trailhead$/,
   );
+  await expect(trail.getByRole("listitem")).toHaveText([
+    "Products",
+    productName,
+    "Paths",
+    "Browse Available Paths",
+    "Dream Sequence",
+  ]);
   await expect(
     page.getByRole("heading", { level: 1, name: "Dream Sequence" }),
   ).toBeVisible();

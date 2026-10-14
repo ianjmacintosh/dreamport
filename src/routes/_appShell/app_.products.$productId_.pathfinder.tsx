@@ -40,8 +40,9 @@ export const Route = createFileRoute(
         trail: [
           { label: "Products", href: "/app" },
           { label: product.name, href: `/app/products/${product.id}` },
+          { label: "Paths", href: `/app/products/${product.id}/journeys` },
         ],
-        current: "Pathfinder",
+        current: "Browse Available Paths",
       } satisfies BreadcrumbsProps,
     };
   },
@@ -49,7 +50,8 @@ export const Route = createFileRoute(
 });
 
 /**
- * Pathfinder (#170): every Path this Product can follow, Dream Sequence
+ * Pathfinder (#170), titled "Browse Available Paths" under the Product's
+ * Paths (#198): every Path this Product can follow, Dream Sequence
  * first, then the User's own Paths that have a saved version. Each is an
  * `ActionCard` link to its Trailhead, or, when the Product has a Journey
  * in progress on it, to that Journey, marked "Following", so the list never
@@ -63,7 +65,7 @@ function Pathfinder() {
   return (
     <>
       <h1>{product.name}</h1>
-      <h2>Pathfinder</h2>
+      <h2>Browse Available Paths</h2>
       <ul className="action-card-list">
         {paths.map((path) => (
           <li key={path.id}>

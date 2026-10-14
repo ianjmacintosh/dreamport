@@ -99,8 +99,9 @@ export const Route = createFileRoute(
         trail: [
           { label: "Products", href: "/app" },
           { label: product.name, href: `/app/products/${product.id}` },
+          { label: "Paths", href: `/app/products/${product.id}/journeys` },
           {
-            label: "Pathfinder",
+            label: "Browse Available Paths",
             href: `/app/products/${product.id}/pathfinder`,
           },
         ],

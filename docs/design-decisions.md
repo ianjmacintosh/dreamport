@@ -492,5 +492,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
   page's trail is Products › {Product} › Paths › {Path} › Current,
   Completed or Abandoned Journey, by its state, with Paths linking to the
   Product's Paths page and {Path} to its Trailhead; a Worksheet page in a
-  Journey adds itself after that. URLs, code and `CONTEXT.md`'s terms are
+  Journey adds itself after that. Pathfinder sits under the Product's
+  Paths too: its crumb and heading are "Browse Available Paths"
+  (Products › {Product} › Paths › Browse Available Paths), and a
+  Trailhead's trail runs through it. The Pathfinder name is kept for the
+  directory it grows into. URLs, code and `CONTEXT.md`'s terms are
   unchanged. The labels in earlier entries above predate this.
