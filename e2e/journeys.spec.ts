@@ -69,7 +69,6 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
     "Products",
     productName,
     "Paths",
-    "Browse Available Paths",
     "Dream Sequence",
   ]);
   await expect(

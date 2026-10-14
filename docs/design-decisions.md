@@ -495,6 +495,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
   Journey adds itself after that. Pathfinder sits under the Product's
   Paths too: its crumb and heading are "Browse Available Paths"
   (Products › {Product} › Paths › Browse Available Paths), and a
-  Trailhead's trail runs through it. The Pathfinder name is kept for the
+  Trailhead sits beside it under Paths (Products › {Product} › Paths ›
+  {Path}), so a Journey is a page under its Path's Trailhead. The Pathfinder name is kept for the
   directory it grows into. URLs, code and `CONTEXT.md`'s terms are
   unchanged. The labels in earlier entries above predate this.

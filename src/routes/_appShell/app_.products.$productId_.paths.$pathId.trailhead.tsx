@@ -100,10 +100,6 @@ export const Route = createFileRoute(
           { label: "Products", href: "/app" },
           { label: product.name, href: `/app/products/${product.id}` },
           { label: "Paths", href: `/app/products/${product.id}/journeys` },
-          {
-            label: "Browse Available Paths",
-            href: `/app/products/${product.id}/pathfinder`,
-          },
         ],
         current: trailhead.path.name,
       } satisfies BreadcrumbsProps,
