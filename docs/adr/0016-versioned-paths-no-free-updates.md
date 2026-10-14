@@ -25,3 +25,7 @@ now. Saving a version is separate from publishing it to other Users.
 A Path's content is stored per version, not once. Existing buyers can be
 left on an old version indefinitely. A buyer receives their own copy of the
 version they bought, so deleting the Guide's original never reaches them.
+_(Extended in the PW10 sharing plan, #161: a free Add gets a copy the same
+way. The copy is read-only and remembers which version it came from. The
+one thing that reaches copies is Dreamport destroying a Path for spam, legal
+trouble or harm.)_
