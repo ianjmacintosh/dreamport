@@ -59,7 +59,8 @@ out of print. Only Dreamport can destroy a published Path (spam, legal
 trouble, harm), and that removes it everywhere, every copy and every
 Journey on them included. Dream Sequence, based on Running Lean, is the free Path
 Dreamport itself publishes.
-_Avoid_: methodology, plan, program
+_Avoid_: methodology, plan, program; "path screen" or "path page" (name
+the page: the Journey page, Trailhead, Pathfinder or Trailblazer)
 
 **Draft**:
 The editable working state of a Path in Trailblazer, kept up to date as
