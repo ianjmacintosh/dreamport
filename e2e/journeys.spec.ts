@@ -80,16 +80,18 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   await expect(milestones.locator('[aria-current="step"]')).toContainText(
     "Rough One-Pager",
   );
-  // Beside the route, the current Milestone's heading starts level with its
-  // first stop (#198).
-  const firstStop = await milestones
-    .getByRole("listitem")
-    .first()
-    .boundingBox();
-  const milestoneHeading = await page
-    .getByRole("heading", { level: 3, name: "Rough One-Pager" })
-    .boundingBox();
-  expect(milestoneHeading?.y).toBe(firstStop?.y);
+  // The current Milestone's heading sits on the baseline of "Milestones"
+  // over the route, as on a Path's own page (#198).
+  const baseline = (name: string) =>
+    page.getByRole("heading", { name, exact: true }).evaluate((heading) => {
+      const probe = document.createElement("span");
+      probe.style.display = "inline-block";
+      heading.append(probe);
+      const y = probe.getBoundingClientRect().bottom;
+      probe.remove();
+      return y;
+    });
+  expect(await baseline("Rough One-Pager")).toBe(await baseline("Milestones"));
 
   // The started Journey is stored, not just shown: a reload still has it.
   await page.reload();
@@ -131,7 +133,7 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
     "Current Journey",
   );
   await expect(
-    page.getByRole("heading", { level: 2, name: "Dream Sequence" }),
+    page.getByRole("heading", { level: 1, name: "Dream Sequence" }),
   ).toBeVisible();
   await breadcrumbs.getByRole("link", { name: "Paths" }).click();
   await expect(page).toHaveURL(/\/app\/products\/[^/]+\/journeys$/);

@@ -483,7 +483,10 @@ Add an entry only once a sign-off conversation resolves something repeatable
   Buttons, headings and breadcrumbs name the Path: "Start on Path", "View
   Current Path Journey", "Resume Path", "Restart Path", "Abandon Path",
   "Active Paths", "Inactive Paths", "Find More Paths", "View Paths", and
-  the Journey page's h2 is the Path's name. "Journey" stays only where
+  the Journey page is laid out like a Path's own page: the Path's name as
+  the h1 (the Product's name is left to the breadcrumbs), and a
+  "Milestones" h2 over the route, level with the current Milestone's h3.
+  "Journey" stays only where
   something is about one particular Journey: "Mark Journey Complete",
   "Delete This Journey", the Delete dialog, and the last crumb. A Journey
   page's trail is Products › {Product} › Paths › {Path} › Current,

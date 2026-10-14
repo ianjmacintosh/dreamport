@@ -1734,6 +1734,12 @@ a.action-card:hover {
   align-items: start;
 }
 
+/* When the route has a heading over it ("Milestones" on a Path's page and
+   a Journey page, #198), the heading on the right sits on its baseline. */
+.journey-split:has(> div > h2) {
+  align-items: first baseline;
+}
+
 .journey-route {
   display: grid;
   list-style: none;

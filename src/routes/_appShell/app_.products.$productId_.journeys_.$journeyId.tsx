@@ -192,20 +192,19 @@ export const Route = createFileRoute(
  * One of a Product's Journeys (#137, #170), reached from the Product's
  * Paths page, or from a Trailhead's "Start on Path".
  *
- * The Product's name is the h1 and the Path's the h2, so the page reads as
- * part of the Product; its `breadcrumbs` (Products › the Product › Paths ›
- * the Path › Current, Completed or Abandoned Journey, #198) go in the band
- * under `AppNav` (#109). Below them,
- * `.journey-split` (see global.css): the Milestones as a route on the
- * left, the content for where you are on the right: the current
- * Milestone's name and description, then h4 sections: "Worksheets" (every
- * Worksheet on the Path, #139, as an `ActionCard` link saying Complete or
- * Incomplete), "Tasks" (the Milestone's own, as `ActionCard`s with a
- * `Checkbox`, #140), and "Done When", with Return / Advance at the
- * column's end. A section with nothing in it is left out. The finished
- * state keeps the Worksheets, but no Tasks. The route was picked from the
- * prototype on `prototype/journey-ux` (#137), the Milestone's sections
- * from `prototype/journey-column` (#140).
+ * The Path's name is the h1, as on a Path's own page (#198); the Product
+ * is named in the `breadcrumbs` (Products › the Product › Paths › the Path
+ * › Current, Completed or Abandoned Journey) in the band under `AppNav`
+ * (#109). Below them, `.journey-split` (see global.css): a "Milestones" h2
+ * over the route on the left, the content for where you are on the right,
+ * level with that h2: the current Milestone's name and description, then
+ * h4 sections: "Worksheets" (every Worksheet on the Path, #139, as an
+ * `ActionCard` link saying Complete or Incomplete), "Tasks" (the
+ * Milestone's own, as `ActionCard`s with a `Checkbox`, #140), and "Done
+ * When", with Return / Advance at the column's end. A section with nothing
+ * in it is left out. The finished state keeps the Worksheets, but no
+ * Tasks. The route was picked from the prototype on `prototype/journey-ux`
+ * (#137), the Milestone's sections from `prototype/journey-column` (#140).
  *
  * Only the current stop shows its outcome line under its name, so the
  * route stays short beside the work.
@@ -446,40 +445,42 @@ function ProductJourney() {
 
   return (
     <>
-      <h1>{product.name}</h1>
-      <h2>{path.name}</h2>
+      <h1>{path.name}</h1>
       <div className="journey-split">
-        <ol aria-label="Milestones" className="journey-route">
-          {path.milestones.map((milestone, index) => {
-            // Finished: nothing is current any more, every stop (including
-            // the last) reads as done.
-            const stop = isFinished
-              ? "done"
-              : milestoneStatus(index, currentIndex);
-            return (
-              <li
-                key={milestone.id}
-                className="journey-route-stop"
-                data-status={stop}
-                aria-current={stop === "current" ? "step" : undefined}
-              >
-                <span className="journey-route-dot">
-                  {stop === "done" ? (
-                    <CheckIcon weight="bold" role="img" aria-label="Done" />
-                  ) : (
-                    <span aria-hidden="true">{index + 1}</span>
-                  )}
-                </span>
-                <span className="journey-route-name">{milestone.name}</span>
-                {stop === "current" && (
-                  <span className="journey-route-outcome">
-                    {milestone.outcome}
+        <div>
+          <h2 id="milestones-heading">Milestones</h2>
+          <ol aria-labelledby="milestones-heading" className="journey-route">
+            {path.milestones.map((milestone, index) => {
+              // Finished: nothing is current any more, every stop (including
+              // the last) reads as done.
+              const stop = isFinished
+                ? "done"
+                : milestoneStatus(index, currentIndex);
+              return (
+                <li
+                  key={milestone.id}
+                  className="journey-route-stop"
+                  data-status={stop}
+                  aria-current={stop === "current" ? "step" : undefined}
+                >
+                  <span className="journey-route-dot">
+                    {stop === "done" ? (
+                      <CheckIcon weight="bold" role="img" aria-label="Done" />
+                    ) : (
+                      <span aria-hidden="true">{index + 1}</span>
+                    )}
                   </span>
-                )}
-              </li>
-            );
-          })}
-        </ol>
+                  <span className="journey-route-name">{milestone.name}</span>
+                  {stop === "current" && (
+                    <span className="journey-route-outcome">
+                      {milestone.outcome}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
         <section>
           {status === "completed" && (
             <>
