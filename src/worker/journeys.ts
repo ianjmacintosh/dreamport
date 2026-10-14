@@ -90,6 +90,10 @@ export interface TaskSummary {
 /** Where a Journey stands: under way, Advanced past its end, or Abandoned (#172). */
 export type JourneyStatus = "in-progress" | "completed" | "abandoned";
 
+const STATUS_SQL = `CASE WHEN "journeys"."finishedAt" IS NOT NULL THEN 'completed'
+  WHEN "journeys"."abandonedAt" IS NOT NULL THEN 'abandoned'
+  ELSE 'in-progress' END`;
+
 /** A Journey as the Product's list of Journeys shows it. */
 export interface JourneySummary {
   id: string;
@@ -140,9 +144,7 @@ export async function listJourneys(
     .prepare(
       `SELECT "journeys"."id", "path_versions"."pathId", "path_versions"."name" AS "pathName",
          "path_versions"."number" AS "versionNumber", "milestones"."name" AS "currentMilestoneName", "journeys"."startedAt",
-         CASE WHEN "journeys"."finishedAt" IS NOT NULL THEN 'completed'
-           WHEN "journeys"."abandonedAt" IS NOT NULL THEN 'abandoned'
-           ELSE 'in-progress' END AS "status"
+         ${STATUS_SQL} AS "status"
        FROM "journeys"
        JOIN "path_versions" ON "path_versions"."id" = "journeys"."versionId"
        JOIN "milestones" ON "milestones"."id" = "journeys"."currentMilestoneId"
@@ -536,10 +538,25 @@ export async function setTaskDone(
   return true;
 }
 
+/** Where the Journey stands now. */
+export async function journeyStatus(
+  db: D1Database,
+  started: StartedJourney,
+): Promise<JourneyStatus> {
+  const row = await db
+    .prepare(`SELECT ${STATUS_SQL} AS "status" FROM "journeys" WHERE "id" = ?`)
+    .bind(started.id)
+    .first<{ status: JourneyStatus }>();
+  if (!row) {
+    throw new Error(`Journey ${started.id} is gone`);
+  }
+  return row.status;
+}
+
 /**
  * What `/api/products/:productId/journeys/:journeyId` answers with: the
- * Path version with its Milestones (still under `path`, which the page
- * reads), the Journey's progress on it, the Worksheets on its Milestones
+ * Path version with its Milestones and its Path's id (still under `path`,
+ * which the page reads), the Journey's progress on it, the Worksheets on its Milestones
  * with how much of each is filled in (#139), and the Tasks on them with
  * whether each is checked off (#140).
  */
@@ -547,7 +564,12 @@ export async function journeyState(
   db: D1Database,
   started: StartedJourney,
 ): Promise<{
-  path: { id: string; name: string; milestones: readonly Milestone[] };
+  path: {
+    id: string;
+    pathId: string;
+    name: string;
+    milestones: readonly Milestone[];
+  };
   journey: Journey;
   worksheets: WorksheetSummary[];
   tasks: TaskSummary[];
@@ -566,8 +588,8 @@ export async function journeyState(
   if (!journey) {
     throw new Error(`Journey ${started.id} is gone`);
   }
-  const { id, name, milestones } = version;
-  return { path: { id, name, milestones }, journey, worksheets, tasks };
+  const { id, pathId, name, milestones } = version;
+  return { path: { id, pathId, name, milestones }, journey, worksheets, tasks };
 }
 
 /**

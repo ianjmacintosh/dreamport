@@ -548,6 +548,71 @@ export async function saveVersion(
   return { ok: false, reason: "incomplete", missing };
 }
 
+export type DiscardChangesResult =
+  | { readonly ok: true; readonly draft: Draft }
+  | { readonly ok: false; readonly reason: "no-version" };
+
+/**
+ * Put the Draft back the way the Path's latest saved version has it: its
+ * name, description, Milestones and Tasks. Refused, changing nothing, if
+ * the Path has no saved version. Saved versions and Journeys are untouched.
+ *
+ * One batch is one transaction, and every statement finds the latest
+ * version itself, so with none they all do nothing. A saved row's id is
+ * the version's id, a colon and the Draft row's id it was saved from (see
+ * `saveVersion`), so stripping the prefix gives back the Draft's ids. The
+ * old Draft rows are deleted first, so those ids are free again, and the
+ * restored Tasks find their Milestones without reading anything back.
+ */
+export async function discardChanges(
+  db: D1Database,
+  path: OwnedPath,
+): Promise<DiscardChangesResult> {
+  const latest = `(SELECT "id" FROM "path_versions" WHERE "pathId" = ?1 ORDER BY "number" DESC LIMIT 1)`;
+  const [restored] = await db.batch<OwnedPath>([
+    db
+      .prepare(
+        `UPDATE "paths" SET
+           "name" = (SELECT "name" FROM "path_versions" WHERE "id" = ${latest}),
+           "description" = (SELECT "description" FROM "path_versions" WHERE "id" = ${latest})
+         WHERE "id" = ?1 AND ${latest} IS NOT NULL
+         RETURNING "id", "name", "description", "createdAt"`,
+      )
+      .bind(path.id),
+    db
+      .prepare(
+        `DELETE FROM "draft_milestones" WHERE "pathId" = ?1 AND ${latest} IS NOT NULL`,
+      )
+      .bind(path.id),
+    db
+      .prepare(
+        `INSERT INTO "draft_milestones" ("id", "pathId", "position", "name", "description", "doneWhen", "outcome")
+         SELECT substr("id", length("versionId") + 2), ?1, "position",
+           "name", "description", "doneWhen", "outcome"
+         FROM "milestones"
+         WHERE "versionId" = ${latest}`,
+      )
+      .bind(path.id),
+    db
+      .prepare(
+        `INSERT INTO "draft_tasks" ("id", "milestoneId", "position", "title")
+         SELECT substr("tasks"."id", length("milestones"."versionId") + 2),
+           substr("milestones"."id", length("milestones"."versionId") + 2),
+           "milestone_tasks"."position", "tasks"."title"
+         FROM "milestone_tasks"
+         JOIN "milestones" ON "milestones"."id" = "milestone_tasks"."milestoneId"
+         JOIN "tasks" ON "tasks"."id" = "milestone_tasks"."taskId"
+         WHERE "milestones"."versionId" = ${latest}`,
+      )
+      .bind(path.id),
+  ]);
+  const [head] = restored.results;
+  if (!head) {
+    return { ok: false, reason: "no-version" };
+  }
+  return { ok: true, draft: await getDraft(db, head) };
+}
+
 /**
  * One of the Draft's Milestones in an Update Path list: an existing one by
  * its id, or a new one by its fields.

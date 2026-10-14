@@ -69,6 +69,14 @@ called "saved". Nothing can be followed from a Draft: a Journey starts
 only on a Path version.
 _Avoid_: working copy, unsaved version
 
+**Discard Changes**:
+Put a Path's Draft back the way its latest Path version saved it: its
+name, description, Milestones and Tasks. Saved versions and the Journeys
+on them don't change. A Path with no saved version has nothing to go back
+to, so it can't. Not the same as **Return**, which moves a Journey back a
+Milestone, or as deleting the Path.
+_Avoid_: revert, reset, undo
+
 **Path version**:
 A snapshot of a Path made from its Draft when the User who made it uses
 **Save as New Version**: the name, description, Milestones and Tasks exactly as they
@@ -81,7 +89,7 @@ _Avoid_: revision, edition, update; final, frozen, locked, released
 **Trailhead**:
 The page a Product sees for a Path before starting a Journey on it: the
 Path's name, its pitch, and its Milestones with their outcomes, then
-**Start Journey**. It shows the Path's latest version unless the User picks
+**Start on Path**. It shows the Path's latest version unless the User picks
 an earlier one. Always reached from a Product, never on its own. Dream
 Sequence's pitch is written by Dreamport; a User's own Path shows its
 description in its place.

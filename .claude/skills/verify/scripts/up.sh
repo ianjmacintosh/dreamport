@@ -27,9 +27,11 @@ trap '"$(dirname "${BASH_SOURCE[0]}")/down.sh" >/dev/null' ERR
 fail() { echo "$*"; "$(dirname "${BASH_SOURCE[0]}")/down.sh" >/dev/null; exit 1; }
 
 # setsid: the server becomes its own process group, so down.sh can stop it
-# and every child (workerd) by group id without matching names.
+# and every child (workerd) by group id without matching names. --host:
+# Vite's default "localhost" binds only [::1], which VS Code's IPv4 port
+# forward can't reach, so a human couldn't open the instance to review it.
 CLOUDFLARE_PERSIST_DIR="$STATE_DIR" CLOUDFLARE_ENV=local \
-  setsid npx vite --port "$PORT" --strictPort \
+  setsid npx vite --host 127.0.0.1 --port "$PORT" --strictPort \
   >"$RUN_DIR/server.log" 2>&1 </dev/null &
 echo $! >"$RUN_DIR/pid"
 

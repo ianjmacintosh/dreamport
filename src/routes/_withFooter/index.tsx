@@ -21,10 +21,8 @@ function Home() {
         your concept to the next level.
       </p>
       <p className="text-2xl">
-        For more structure, buy paid toolsets and programs built around specific
-        proven methodologies like <strong>Build-Measure-Learn</strong> or{" "}
-        <strong>Lean Analytics</strong> with guard rails to keep you on track
-        and on schedule.
+        For more structure follow our free path with milestones and worksheets
+        to keep you on track.
       </p>
       <p className="text-2xl">
         The best time to start is now. <Link href="/login">Start now</Link>.

@@ -28,7 +28,7 @@ async function openNewProduct(page: Page, productName: string) {
 async function startDreamSequence(page: Page) {
   await page.getByRole("link", { name: "Choose a Path" }).click();
   await page.getByRole("link", { name: "Dream Sequence" }).click();
-  await page.getByRole("button", { name: "Start Journey" }).click();
+  await page.getByRole("button", { name: "Start on Path" }).click();
   await expect(page).toHaveURL(/\/app\/products\/[^/]+\/journeys\/[^/]+$/);
 }
 
@@ -46,6 +46,18 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   // No Journeys yet: the Product home points at Pathfinder.
   await page.getByRole("link", { name: "Choose a Path" }).click();
   await expect(page).toHaveURL(/\/app\/products\/.+\/pathfinder$/);
+  // It sits under the Product's Paths (#198).
+  const trail = page.getByRole("navigation", { name: "Breadcrumb" });
+  await expect(trail.getByRole("listitem")).toHaveText([
+    "Products",
+    productName,
+    "Paths",
+    "Browse Available Paths",
+  ]);
+  await expect(trail.getByRole("link", { name: "Paths" })).toHaveAttribute(
+    "href",
+    /\/app\/products\/[^/]+\/journeys$/,
+  );
   await expect(
     page.getByRole("link", { name: "Make your own Path" }),
   ).toHaveAttribute("href", "/app/paths");
@@ -53,6 +65,12 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   await expect(page).toHaveURL(
     /\/app\/products\/.+\/paths\/dream-sequence\/trailhead$/,
   );
+  await expect(trail.getByRole("listitem")).toHaveText([
+    "Products",
+    productName,
+    "Paths",
+    "Dream Sequence",
+  ]);
   await expect(
     page.getByRole("heading", { level: 1, name: "Dream Sequence" }),
   ).toBeVisible();
@@ -74,12 +92,24 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
     page.getByRole("link", { name: "Looking for an older version?" }),
   ).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Start Journey" }).click();
+  await page.getByRole("button", { name: "Start on Path" }).click();
 
   await expect(page).toHaveURL(/\/app\/products\/[^/]+\/journeys\/[^/]+$/);
   await expect(milestones.locator('[aria-current="step"]')).toContainText(
     "Rough One-Pager",
   );
+  // The current Milestone's heading sits on the baseline of "Milestones"
+  // over the route, as on a Path's own page (#198).
+  const baseline = (name: string) =>
+    page.getByRole("heading", { name, exact: true }).evaluate((heading) => {
+      const probe = document.createElement("span");
+      probe.style.display = "inline-block";
+      heading.append(probe);
+      const y = probe.getBoundingClientRect().bottom;
+      probe.remove();
+      return y;
+    });
+  expect(await baseline("Rough One-Pager")).toBe(await baseline("Milestones"));
 
   // The started Journey is stored, not just shown: a reload still has it.
   await page.reload();
@@ -114,21 +144,29 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
     "Real Talk",
   );
 
-  // The Journeys page lists it as in progress.
+  // The breadcrumbs name the Path and the Journey's state; the Product's
+  // Paths page lists it as in progress.
   const breadcrumbs = page.getByRole("navigation", { name: "Breadcrumb" });
-  await breadcrumbs.getByRole("link", { name: "Journeys" }).click();
+  await expect(breadcrumbs.locator('[aria-current="page"]')).toHaveText(
+    "Current Journey",
+  );
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Dream Sequence" }),
+  ).toBeVisible();
+  await breadcrumbs.getByRole("link", { name: "Paths" }).click();
+  await expect(page).toHaveURL(/\/app\/products\/[^/]+\/journeys$/);
   await expect(
     page.getByRole("link", { name: "Dream Sequence In Progress" }),
   ).toBeVisible();
 
-  // Back on the Product home, its Journey List shows it.
+  // Back on the Product home, its Active Paths shows it.
   await breadcrumbs.getByRole("link", { name: productName }).click();
   await expect(
     page
-      .getByRole("list", { name: "Journey List" })
+      .getByRole("list", { name: "Active Paths" })
       .getByRole("link", { name: "Dream Sequence In Progress" }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "View Journeys" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View Paths" })).toBeVisible();
 
   // Pathfinder now marks Dream Sequence as followed and links to its
   // Journey, not back to its Trailhead.
@@ -142,11 +180,15 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   await expect(
     page.getByText(`${productName} is already following Dream Sequence.`),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start Journey" })).toHaveCount(
+  await expect(page.getByRole("button", { name: "Start on Path" })).toHaveCount(
     0,
   );
-  await page.getByRole("link", { name: "View Journey" }).click();
+  await page.getByRole("link", { name: "View Current Path Journey" }).click();
   await expect(page).toHaveURL(/\/journeys\/[^/]+$/);
+
+  // The Path's crumb goes back to its Trailhead for this Product.
+  await breadcrumbs.getByRole("link", { name: "Dream Sequence" }).click();
+  await expect(page).toHaveURL(`${productUrl}/paths/dream-sequence/trailhead`);
 
   // The one-Journey page's old address lands on the Journeys page.
   await page.goto(`${productUrl}/journey`);
@@ -224,7 +266,7 @@ test("make a Path in Trailblazer with a Milestone and a Task, save a version, an
   await expect(page).toHaveURL(/\/trailhead$/);
   await expect(earlier).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Start Journey" }).click();
+  await page.getByRole("button", { name: "Start on Path" }).click();
 
   await expect(page).toHaveURL(/\/app\/products\/[^/]+\/journeys\/[^/]+$/);
   await expect(
@@ -270,10 +312,15 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
   await expect(
     page.getByRole("link", { name: "Product Summary Incomplete" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Finish Journey" }).click();
+  await page.getByRole("button", { name: "Mark Journey Complete" }).click();
   await expect(
     page.getByRole("heading", { name: "Dream Sequence complete" }),
   ).toBeVisible();
+  // The last crumb follows the Journey's state without a reload.
+  const currentCrumb = page
+    .getByRole("navigation", { name: "Breadcrumb" })
+    .locator('[aria-current="page"]');
+  await expect(currentCrumb).toHaveText("Completed Journey");
   // …and once finished.
   await expect(
     page.getByRole("link", { name: "Product Summary Incomplete" }),
@@ -286,8 +333,9 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
     .click();
   await expect(current).toContainText("Growth");
   await expect(
-    page.getByRole("button", { name: "Finish Journey" }),
+    page.getByRole("button", { name: "Mark Journey Complete" }),
   ).toBeVisible();
+  await expect(currentCrumb).toHaveText("Current Journey");
 
   await page
     .getByRole("navigation", { name: "Breadcrumb" })
@@ -295,7 +343,7 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
     .click();
   await expect(
     page
-      .getByRole("list", { name: "Journey List" })
+      .getByRole("list", { name: "Active Paths" })
       .getByRole("link", { name: "Dream Sequence In Progress" }),
   ).toBeVisible();
 });
@@ -330,6 +378,19 @@ test("tick a Task and fill out the Product Summary from Milestone 1, land back o
   await expect(
     page.getByRole("heading", { name: "Product Summary" }),
   ).toBeVisible();
+  // Its trail is the Journey's, then the Worksheet.
+  const breadcrumbs = page.getByRole("navigation", { name: "Breadcrumb" });
+  await expect(breadcrumbs.getByRole("listitem")).toHaveText([
+    "Products",
+    productName,
+    "Paths",
+    "Dream Sequence",
+    "Current Journey",
+    "Product Summary",
+  ]);
+  await expect(
+    breadcrumbs.getByRole("link", { name: "Current Journey" }),
+  ).toHaveAttribute("href", /\/journeys\/[^/]+$/);
   // Credited to Lean Canvas, linking the license.
   await expect(
     page.getByText("Credit: Adapted from Lean Canvas by Ash Maurya"),
@@ -360,7 +421,7 @@ test("tick a Task and fill out the Product Summary from Milestone 1, land back o
   await expect(page.getByLabel("2. Customer")).toHaveValue("Home bakers");
 });
 
-test("finish a Journey with a Task ticked, Restart it into a blank Journey, see only the new one in the Product's Journey List, delete the finished one, then abandon, resume, abandon and delete the new one", async ({
+test("finish a Journey with a Task ticked, Restart it into a blank Journey, see only the new one in the Product's Active Paths, delete the finished one, then abandon, resume, abandon and delete the new one", async ({
   page,
 }) => {
   await signIn(page, TEST_EMAILS.e2eRestartJourney);
@@ -391,9 +452,9 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, see 
     await advanceButton.click();
     await expect(current).toContainText(name);
   }
-  await page.getByRole("button", { name: "Finish Journey" }).click();
+  await page.getByRole("button", { name: "Mark Journey Complete" }).click();
 
-  await page.getByRole("button", { name: "Restart Journey" }).click();
+  await page.getByRole("button", { name: "Restart Path" }).click();
   await expect(current).toContainText("Rough One-Pager");
   expect(page.url()).not.toBe(finishedUrl);
   await expect(task).not.toBeChecked();
@@ -404,16 +465,16 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, see 
     .getByRole("link", { name: productName })
     .click();
   await expect(
-    page.getByRole("list", { name: "Journey List" }).getByRole("link"),
+    page.getByRole("list", { name: "Active Paths" }).getByRole("link"),
   ).toHaveText([/Dream Sequence\s*In Progress/]);
-  await page.getByRole("link", { name: "View Journeys" }).click();
+  await page.getByRole("link", { name: "View Paths" }).click();
   const journeys = page.getByRole("link", { name: /^Dream Sequence/ });
   const active = page.getByRole("list", {
-    name: "Active Journeys",
+    name: "Active Paths",
     exact: true,
   });
   const inactive = page.getByRole("list", {
-    name: "Inactive Journeys",
+    name: "Inactive Paths",
     exact: true,
   });
   await expect(journeys).toHaveCount(2);
@@ -421,12 +482,12 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, see 
   await expect(inactive.getByRole("link")).toHaveText(/Completed/);
 
   await inactive.getByRole("link").click();
-  await page.getByRole("button", { name: "Delete Journey" }).click();
+  await page.getByRole("button", { name: "Delete This Journey" }).click();
   const dialog = page.getByRole("dialog", {
     name: "Delete Journey Permanently?",
   });
   await expect(dialog).toContainText("Worksheet answers and checked Tasks");
-  await dialog.getByRole("button", { name: "Delete Journey" }).click();
+  await dialog.getByRole("button", { name: "Delete This Journey" }).click();
 
   await expect(page).toHaveURL(/\/journeys$/);
   await expect(journeys).toHaveCount(1);
@@ -436,28 +497,33 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, see 
   // A Journey in progress can't be deleted until it's abandoned.
   await journeys.click();
   await expect(
-    page.getByRole("button", { name: "Delete Journey" }),
+    page.getByRole("button", { name: "Delete This Journey" }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Abandon Journey" }).click();
-  await page.getByRole("button", { name: "Abandon Journey" }).click();
+  await page.getByRole("button", { name: "Abandon Path" }).click();
+  await page.getByRole("button", { name: "Abandon Path" }).click();
   await expect(
     page.getByRole("heading", { name: "Dream Sequence abandoned" }),
   ).toBeVisible();
   await expect(advanceButton).toHaveCount(0);
+  const currentCrumb = page
+    .getByRole("navigation", { name: "Breadcrumb" })
+    .locator('[aria-current="page"]');
+  await expect(currentCrumb).toHaveText("Abandoned Journey");
 
   // Resuming puts it back where it was, with no Abandon half-confirmed.
-  await page.getByRole("button", { name: "Resume Journey" }).click();
+  await page.getByRole("button", { name: "Resume Path" }).click();
   await expect(current).toContainText("Rough One-Pager");
+  await expect(currentCrumb).toHaveText("Current Journey");
   await expect(advanceButton).toBeVisible();
   await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Abandon Journey" }).click();
-  await page.getByRole("button", { name: "Abandon Journey" }).click();
+  await page.getByRole("button", { name: "Abandon Path" }).click();
+  await page.getByRole("button", { name: "Abandon Path" }).click();
   await expect(
     page.getByRole("heading", { name: "Dream Sequence abandoned" }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Delete Journey" }).click();
-  await dialog.getByRole("button", { name: "Delete Journey" }).click();
+  await page.getByRole("button", { name: "Delete This Journey" }).click();
+  await dialog.getByRole("button", { name: "Delete This Journey" }).click();
   await expect(page).toHaveURL(/\/journeys$/);
   await expect(journeys).toHaveCount(0);
   await expect(

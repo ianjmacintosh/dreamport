@@ -177,7 +177,14 @@ function announcementsFor<T extends { id: string }>(
 // `/app/paths/$pathId` (neither renders an `<Outlet />`), not their child:
 // the same escape the Journey page uses.
 export const Route = createFileRoute("/_appShell/app_/paths_/$pathId_/edit")({
-  beforeLoad: async ({ params }) => {
+  // The picked Milestone, by id so a rename keeps the link working (#184).
+  validateSearch: (search: Record<string, unknown>): { milestone?: string } =>
+    typeof search.milestone === "string" ? { milestone: search.milestone } : {},
+  // A loader, not `beforeLoad`, and no search in its deps: `beforeLoad`
+  // reruns on every search change, which would refetch the Path on each
+  // pick. `router.invalidate()` still reruns this.
+  loaderDeps: () => ({}),
+  loader: async ({ params }) => {
     // Not signed in, not this User's Path, offline: back to the list,
     // as an unknown Product goes back to `/app`.
     const res = await fetch(`/api/paths/${params.pathId}`).catch(() => null);
@@ -207,6 +214,8 @@ const DELETE_FAILED = "We couldn't delete that. Try again in a moment.";
 const REORDER_FAILED =
   "We couldn't move that, so it's back where it was. Try again in a moment.";
 const SAVE_FAILED = "We couldn't save a version. Try again in a moment.";
+const DISCARD_FAILED =
+  "We couldn't discard your changes. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -227,23 +236,32 @@ function taskCount(n: number): string {
  * the Edit Milestone Dialog; its Tasks right there in the panel.
  */
 function PathDraft() {
-  const { draft } = Route.useRouteContext();
+  const { draft } = Route.useLoaderData();
   const router = useRouter();
+  const { milestone: pickedId } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [path, setPath] = useState<PathHead>(draft);
   const [milestones, setMilestones] = useState<Milestone[]>(draft.milestones);
   const [updatedAt, setUpdatedAt] = useState(draft.updatedAt);
   const [latestVersion, setLatestVersion] = useState(draft.latestVersion);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [pickedId, setPickedId] = useState<string | null>(null);
   const [pathDialog, setPathDialog] = useState<PathDialogOpening | null>(null);
   const [isEditingMilestone, setIsEditingMilestone] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
 
   const base = `/api/paths/${path.id}`;
-  // The first Milestone until one is picked, and again if the picked one
-  // is deleted.
+  // The first Milestone until one is picked, and when the URL names one
+  // this Draft doesn't have.
   const picked = milestones.find((m) => m.id === pickedId) ?? milestones[0];
+
+  function pick(milestoneId: string | undefined) {
+    void navigate({
+      search: milestoneId ? { milestone: milestoneId } : {},
+      replace: true,
+    });
+  }
 
   /** After a Draft write lands: the server's `updatedAt` moved to about now. */
   function touch() {
@@ -255,7 +273,7 @@ function PathDraft() {
     setMilestones(updated.milestones);
     setUpdatedAt(updated.updatedAt);
     setPathDialog(null);
-    // The breadcrumbs come from `beforeLoad`; rerun it for the new name.
+    // The breadcrumbs come from the loader; rerun it for the new name.
     void router.invalidate();
   }
 
@@ -307,7 +325,7 @@ function PathDraft() {
                   milestone={m}
                   number={index + 1}
                   isPicked={m.id === picked.id}
-                  onPick={() => setPickedId(m.id)}
+                  onPick={() => pick(m.id)}
                 />
               ))}
             </ol>
@@ -367,6 +385,11 @@ function PathDraft() {
         <Button variant="secondary" onClick={() => setIsDeleting(true)}>
           Delete Path
         </Button>
+        {latestVersion && (
+          <Button variant="secondary" onClick={() => setIsDiscarding(true)}>
+            Discard Changes
+          </Button>
+        )}
         <Button
           disabled={isSaving}
           state={isSaving ? "pending" : "ready"}
@@ -405,6 +428,21 @@ function PathDraft() {
         }
       />
 
+      {latestVersion && (
+        <DiscardChangesDialog
+          open={isDiscarding}
+          path={path}
+          version={latestVersion}
+          pathUrl={base}
+          onClose={() => setIsDiscarding(false)}
+          onDiscarded={(restored) => {
+            showUpdatedDraft(restored);
+            pick(undefined);
+            setIsDiscarding(false);
+          }}
+        />
+      )}
+
       <EditMilestoneDialog
         milestone={isEditingMilestone ? picked : undefined}
         milestonesUrl={`${base}/milestones`}
@@ -418,6 +456,7 @@ function PathDraft() {
         }}
         onDeleted={(id) => {
           setMilestones((prev) => prev.filter((m) => m.id !== id));
+          pick(undefined);
           touch();
           setIsEditingMilestone(false);
         }}
@@ -869,6 +908,105 @@ function DeletePathForm({
         >
           <Button.State name="ready">Delete Path</Button.State>
           <Button.State name="deleting">Deleting…</Button.State>
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function DiscardChangesDialog({
+  open,
+  path,
+  version,
+  pathUrl,
+  onClose,
+  onDiscarded,
+}: {
+  open: boolean;
+  path: PathHead;
+  version: VersionSummary;
+  pathUrl: string;
+  onClose: () => void;
+  onDiscarded: (draft: Draft) => void;
+}) {
+  const [isPending, setIsPending] = useState(false);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !isPending) onClose();
+      }}
+      title={`Discard your changes since Version ${version.number}?`}
+    >
+      <DiscardChangesForm
+        path={path}
+        version={version}
+        pathUrl={pathUrl}
+        isPending={isPending}
+        setIsPending={setIsPending}
+        onCancel={onClose}
+        onDiscarded={onDiscarded}
+      />
+    </Dialog>
+  );
+}
+
+function DiscardChangesForm({
+  path,
+  version,
+  pathUrl,
+  isPending,
+  setIsPending,
+  onCancel,
+  onDiscarded,
+}: {
+  path: PathHead;
+  version: VersionSummary;
+  pathUrl: string;
+  isPending: boolean;
+  setIsPending: (isPending: boolean) => void;
+  onCancel: () => void;
+  onDiscarded: (draft: Draft) => void;
+}) {
+  const [error, setError] = useState("");
+
+  async function discard() {
+    setError("");
+    setIsPending(true);
+    try {
+      const discarded = await withMinimumDuration(() =>
+        send<{ draft: Draft }>(`${pathUrl}/discard-changes`, "POST"),
+      );
+      if (discarded.ok) {
+        setIsPending(false);
+        onDiscarded(discarded.body.draft);
+        return;
+      }
+      setError(discarded.conflict ?? DISCARD_FAILED);
+    } catch {
+      setError(CONNECTION_FAILED);
+    }
+    setIsPending(false);
+  }
+
+  return (
+    <>
+      <p>
+        This will put "{path.name}" back the way Version {version.number} saved
+        it: its name, description, Milestones and Tasks. This cannot be undone!
+      </p>
+      {error && <p role="alert">{error}</p>}
+      <div className="button-group button-group--end">
+        <Button variant="secondary" disabled={isPending} onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          disabled={isPending}
+          state={isPending ? "discarding" : "ready"}
+          onClick={() => void discard()}
+        >
+          <Button.State name="ready">Discard Changes</Button.State>
+          <Button.State name="discarding">Discarding…</Button.State>
         </Button>
       </div>
     </>

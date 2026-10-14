@@ -190,6 +190,8 @@ export const TEST_EMAILS = {
   pathsModuleDeleted: "delivered+paths-module-deleted@resend.dev",
   /** Saves a version and follows it, then is deleted, taking both with them (#169). */
   pathsModuleSaverDeleted: "delivered+paths-module-saver-deleted@resend.dev",
+  /** Makes Paths to discard their Drafts' changes (#179). Never signs in. */
+  pathsModuleDiscarder: "delivered+paths-module-discarder@resend.dev",
   /** Makes the only Paths Pathfinder lists for them (#170). */
   pathsModulePathfinder: "delivered+paths-module-pathfinder@resend.dev",
   /** Makes Paths and opens their Trailheads (#170). */
@@ -216,6 +218,8 @@ export const TEST_EMAILS = {
   journeysReturn: "delivered+journeys-return@resend.dev",
   /** Reads the Product Summary on an unknown Journey (404), then on one. */
   worksheetsRead: "delivered+worksheets-read@resend.dev",
+  /** Reads the Product Summary while its Journey is in progress, abandoned, then completed. */
+  worksheetsJourneyStatus: "delivered+worksheets-journey-status@resend.dev",
   /** Saves the Product Summary on an unknown Journey (404), a bad body (400), then a good one. */
   worksheetsSave: "delivered+worksheets-save@resend.dev",
   /** Checks off a Task on an unknown Journey (404), a bad body (400), then a good one. */

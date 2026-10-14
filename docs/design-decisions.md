@@ -422,6 +422,18 @@ Add an entry only once a sign-off conversation resolves something repeatable
     step. A reveal inside it only changed the button's color and said
     nothing new, so it read as broken rather than careful.
 
+- Discarding a Draft's changes is "Discard Changes", a secondary button
+  between Delete Path and Save as New Version, shown only once the Path has
+  a saved version. It opens a `Dialog` titled "Discard your changes since
+  Version {n}?" that says what comes back ("This will put "{Path name}"
+  back the way Version {n} saved it: its name, description, Milestones and
+  Tasks. This cannot be undone!"), then Cancel and "Discard Changes", a
+  primary button. Afterwards the page shows the restored Draft with its
+  first Milestone picked (decided in #179, in words, without a prototype).
+  - Why a Dialog: the same reason as Delete Path's. What it throws away
+    isn't all on screen (Milestones added since, edits to the Tasks of
+    Milestones not picked), and it can't be undone.
+
 - A Journey is In Progress, Completed or Abandoned (#172), and its page
   follows suit, in the right column and at the page's end, bottom right
   under the two columns:
@@ -466,3 +478,24 @@ Add an entry only once a sign-off conversation resolves something repeatable
   `--space-4` above it from `global.css`, so it reads as its own message
   rather than part of the button row. Covers every such message, not just
   the one it was noticed on (decided in #172).
+
+- The UI says Path, not Journey (decided with Ian on 2026-10-14, #198).
+  Buttons, headings and breadcrumbs name the Path: "Start on Path", "View
+  Current Path Journey", "Resume Path", "Restart Path", "Abandon Path",
+  "Active Paths", "Inactive Paths", "Find More Paths", "View Paths", and
+  the Journey page is laid out like a Path's own page: the Path's name as
+  the h1 (the Product's name is left to the breadcrumbs), and a
+  "Milestones" h2 over the route, level with the current Milestone's h3.
+  "Journey" stays only where
+  something is about one particular Journey: "Mark Journey Complete",
+  "Delete This Journey", the Delete dialog, and the last crumb. A Journey
+  page's trail is Products › {Product} › Paths › {Path} › Current,
+  Completed or Abandoned Journey, by its state, with Paths linking to the
+  Product's Paths page and {Path} to its Trailhead; a Worksheet page in a
+  Journey adds itself after that. Pathfinder sits under the Product's
+  Paths too: its crumb and heading are "Browse Available Paths"
+  (Products › {Product} › Paths › Browse Available Paths), and a
+  Trailhead sits beside it under Paths (Products › {Product} › Paths ›
+  {Path}), so a Journey is a page under its Path's Trailhead. The Pathfinder name is kept for the
+  directory it grows into. URLs, code and `CONTEXT.md`'s terms are
+  unchanged. The labels in earlier entries above predate this.

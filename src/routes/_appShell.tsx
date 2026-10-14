@@ -64,13 +64,17 @@ function AppShellLayout() {
   // Sign-out used to be its own button on `/app/settings` (#26); it moved
   // to `AppNav` so every signed-in page carries the same way out.
   const { signOut, error } = useSignOut();
-  // A nested page names its own trail in its route context (`breadcrumbs`);
-  // drawn here so the band sits under `AppNav`, outside <main> (#109).
+  // A nested page names its own trail (`breadcrumbs`) in its route context,
+  // or in its loader data when a loader fetches what the trail names; drawn
+  // here so the band sits under `AppNav`, outside <main> (#109).
   const breadcrumbs = useMatches({
     select: (matches) => {
-      const context = matches[matches.length - 1]?.context;
-      return context && "breadcrumbs" in context
-        ? context.breadcrumbs
+      const match = matches[matches.length - 1];
+      if (match?.loaderData && "breadcrumbs" in match.loaderData) {
+        return match.loaderData.breadcrumbs;
+      }
+      return match?.context && "breadcrumbs" in match.context
+        ? match.context.breadcrumbs
         : undefined;
     },
   });

@@ -1781,6 +1781,7 @@ type WorksheetResponse = NonNullable<
   Awaited<ReturnType<typeof worksheetState>>
 > & {
   product: { id: string; name: string };
+  journey: { status: string };
 };
 
 const PRODUCT_SUMMARY = "product-summary";
@@ -2004,6 +2005,7 @@ describe("Journey routes", () => {
       product,
       path: {
         id: DREAM_SEQUENCE_VERSION,
+        pathId: "dream-sequence",
         name: "Dream Sequence",
         milestones: expect.any(Array),
       },
@@ -2106,6 +2108,7 @@ describe("Journey routes", () => {
     expect(body).toEqual({
       product,
       path: { id: "dream-sequence", name: "Dream Sequence" },
+      journey: { status: "in-progress" },
       worksheet: {
         id: PRODUCT_SUMMARY,
         name: "Product Summary",
@@ -2125,6 +2128,29 @@ describe("Journey routes", () => {
       (await getWorksheet(product.id, journeyId, "not-a-worksheet", cookie))
         .status,
     ).toBe(404);
+  });
+
+  it("GET /journeys/:journeyId/worksheets/:worksheetId names the Journey's status as it changes", async () => {
+    const { cookie, product, journeyId } = await startedProduct(
+      TEST_EMAILS.worksheetsJourneyStatus,
+    );
+    const status = async () =>
+      (
+        (await (
+          await getWorksheet(product.id, journeyId, PRODUCT_SUMMARY, cookie)
+        ).json()) as WorksheetResponse
+      ).journey.status;
+
+    expect(await status()).toBe("in-progress");
+    await callApi(
+      "POST",
+      journeyUrl(product.id, journeyId, "/abandon"),
+      cookie,
+    );
+    expect(await status()).toBe("abandoned");
+    await callApi("POST", journeyUrl(product.id, journeyId, "/resume"), cookie);
+    await finishJourney(product.id, journeyId, cookie);
+    expect(await status()).toBe("completed");
   });
 
   it("PUT /journeys/:journeyId/worksheets/:worksheetId 404s an unknown Journey or Worksheet, 400s a bad body, else answers the trimmed answers", async () => {
@@ -2584,6 +2610,54 @@ describe("Trailblazer routes", () => {
       draft: { latestVersion: unknown };
     };
     expect(draft.latestVersion).toEqual(version);
+  });
+
+  it("POST /api/paths/:pathId/discard-changes puts the Draft back as its latest version saved it, or 409s with none", async () => {
+    const cookie = await signIn(TEST_EMAILS.pathsRoutesDraft);
+    const path = await addPath(cookie);
+    await addMilestoneOn(cookie, path.id);
+    const discard = () =>
+      callApi("POST", `/api/paths/${path.id}/discard-changes`, cookie);
+    const draft = async () =>
+      (
+        (await (
+          await callApi("GET", `/api/paths/${path.id}`, cookie)
+        ).json()) as {
+          draft: unknown;
+        }
+      ).draft;
+
+    const unsaved = await draft();
+    const refused = await discard();
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({
+      error: "There's no saved version to go back to.",
+    });
+    expect(await draft()).toEqual(unsaved);
+
+    const saved = await callApi(
+      "POST",
+      `/api/paths/${path.id}/versions`,
+      cookie,
+    );
+    expect(saved.status).toBe(201);
+    const { name, description, milestones } = (await draft()) as {
+      name: string;
+      description: string;
+      milestones: unknown[];
+    };
+    await addMilestoneOn(cookie, path.id);
+    await callApi("PATCH", `/api/paths/${path.id}`, cookie, {
+      name: "Renamed",
+      description: "Changed",
+      milestones: [],
+    });
+
+    const discarded = await discard();
+    expect(discarded.status).toBe(200);
+    const answered = ((await discarded.json()) as { draft: unknown }).draft;
+    expect(answered).toMatchObject({ name, description, milestones });
+    expect(await draft()).toEqual(answered);
   });
 
   it("PATCH and DELETE /api/paths/:pathId/milestones/:milestoneId edit and remove a Milestone", async () => {
