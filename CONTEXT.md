@@ -84,7 +84,7 @@ _Avoid_: revision, edition, update; final, frozen, locked, released
 **Trailhead**:
 The page a Product sees for a Path before starting a Journey on it: the
 Path's name, its pitch, and its Milestones with their outcomes, then
-**Start Journey**. It shows the Path's latest version unless the User picks
+**Start on Path**. It shows the Path's latest version unless the User picks
 an earlier one. Always reached from a Product, never on its own. Dream
 Sequence's pitch is written by Dreamport; a User's own Path shows its
 description in its place.

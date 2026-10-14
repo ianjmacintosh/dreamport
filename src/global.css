@@ -1725,7 +1725,7 @@ a.action-card:hover {
    `prototype/journey-ux`): the Milestones as a route down the left —
    numbered dots joined by a line — beside the content for where you are
    (before starting, what starting does; after, the current Milestone's
-   work). Below 640px the content stacks above the route, so Start Journey
+   work). Below 640px the content stacks above the route, so Start on Path
    or the current work isn't under all seven stops. */
 .journey-split {
   display: grid;

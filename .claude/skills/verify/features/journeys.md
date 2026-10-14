@@ -10,11 +10,11 @@ shows "Current Milestone: <name> (n of 7)".
 
 - `journey-preview` lists 7 Milestones before the start, none current, with
   "Start by describing your solution.".
-- `journey-start` uses Start Journey to make "Rough One-Pager" current
+- `journey-start` uses Start on Path to make "Rough One-Pager" current
   (`aria-current="step"`). It survives a reload.
 - `journey-advance` / `journey-return` use "Advance to Next Milestone" and
   "Return to Previous Milestone". Return is absent on Milestone 1.
-- `journey-finish` is "Finish Journey" on Growth, which shows the heading
+- `journey-finish` is "Mark Journey Complete" on Growth, which shows the heading
   "Dream Sequence complete". Return then un-finishes, and Growth stays
   current.
 - `journey-tasks` ticks a Milestone Task checkbox, and it stays ticked after
@@ -39,7 +39,7 @@ Preconditions: signed in, with a Product opened.
 - **Open.** `$S/act.sh click link 'Learn More'`. Then
   `eval "location.pathname"` ends in `/journey`. The snapshot has
   `list "Milestones"` with 7 `listitem`s.
-- **Start.** `$S/act.sh click button 'Start Journey'`. Current is
+- **Start.** `$S/act.sh click button 'Start on Path'`. Current is
   `eval "document.querySelector('[aria-current=step]').textContent"`, which
   contains "Rough One-Pager".
 - **Advance and return.** `$S/act.sh click button 'Advance to Next Milestone'`

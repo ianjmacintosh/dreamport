@@ -478,3 +478,16 @@ Add an entry only once a sign-off conversation resolves something repeatable
   `--space-4` above it from `global.css`, so it reads as its own message
   rather than part of the button row. Covers every such message, not just
   the one it was noticed on (decided in #172).
+
+- The UI says Path, not Journey (decided with Ian on 2026-10-14, #198).
+  Buttons, headings and breadcrumbs name the Path: "Start on Path", "View
+  Current Path Journey", "Resume Path", "Restart Path", "Abandon Path",
+  "Active Paths", "Inactive Paths", "Find More Paths", "View Paths", and
+  the Journey page's h2 is the Path's name. "Journey" stays only where
+  something is about one particular Journey: "Mark Journey Complete",
+  "Delete This Journey", the Delete dialog, and the last crumb. A Journey
+  page's trail is Products › {Product} › Paths › {Path} › Current,
+  Completed or Abandoned Journey, by its state, with Paths linking to the
+  Product's Paths page and {Path} to its Trailhead; a Worksheet page in a
+  Journey adds itself after that. URLs, code and `CONTEXT.md`'s terms are
+  unchanged. The labels in earlier entries above predate this.

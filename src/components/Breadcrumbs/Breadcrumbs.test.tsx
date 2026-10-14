@@ -33,7 +33,7 @@ const worksheetTrail = {
   trail: [
     { label: "Products", href: "/app" },
     { label: "Tarot", href: "/app/products/p1" },
-    { label: "Journey", href: "/app/products/p1/journey" },
+    { label: "Current Journey", href: "/app/products/p1/journeys/j1" },
   ],
   current: "Product Summary",
 } satisfies Parameters<typeof Breadcrumbs>[0];
@@ -51,11 +51,11 @@ describe("Breadcrumbs", () => {
     expect(links.map(([, , text]) => text)).toEqual([
       "Products",
       "Tarot",
-      "Journey",
+      "Current Journey",
     ]);
     expect(
       links.map(([, attrs]) => attrs.match(/href="([^"]*)"/)?.[1]),
-    ).toEqual(["/app", "/app/products/p1", "/app/products/p1/journey"]);
+    ).toEqual(["/app", "/app/products/p1", "/app/products/p1/journeys/j1"]);
     for (const [, attrs] of links) {
       expect(attrs).not.toContain("aria-current");
       expect(attrs).not.toContain("data-router-decides");
@@ -84,11 +84,11 @@ describe("Breadcrumbs", () => {
     const up = render(worksheetTrail).match(
       /<a ([^>]*class="breadcrumbs-up"[^>]*)>(.*?)<\/a>/,
     );
-    expect(up?.[1]).toContain('href="/app/products/p1/journey"');
+    expect(up?.[1]).toContain('href="/app/products/p1/journeys/j1"');
     expect(up?.[1]).not.toContain("aria-current");
     expect(up?.[1]).not.toContain("data-router-decides");
     expect(up?.[2]).toMatch(
-      /<svg[^>]*aria-hidden="true".*>Back to Journey<\/span>$/,
+      /<svg[^>]*aria-hidden="true".*>Back to Current Journey<\/span>$/,
     );
   });
 });
