@@ -19,8 +19,9 @@ interface ActionCardProps {
  * One thing to do, as a full-width row on the sheet's white (#140) — the
  * whole card is the click target. Two shapes: with `href`, a link (e.g. a
  * Worksheet to fill in); without, a `<label>` wrapping its `leading`
- * `Checkbox` (e.g. a Task to tick). Hovering a label card outlines its
- * check box. Below 640px `trailing` drops under the title. List several
+ * `Checkbox` (e.g. a Task to tick). Hovering or focusing a link card
+ * outlines it and underlines its title (#199); hovering a label card
+ * outlines its check box. Below 640px `trailing` drops under the title. List several
  * in a `<ul className="action-card-list">`.
  */
 export function ActionCard({

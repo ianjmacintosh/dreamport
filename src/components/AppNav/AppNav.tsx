@@ -1,7 +1,7 @@
 import {
+  CompassIcon,
   ListIcon,
   PackageIcon,
-  PathIcon,
   UserCircleIcon,
 } from "@phosphor-icons/react";
 
@@ -37,7 +37,7 @@ const SECTIONS = [
   {
     label: "Paths",
     href: "/app/paths",
-    icon: <PathIcon />,
+    icon: <CompassIcon />,
     matches: (pathname: string) =>
       pathname === "/app/paths" || pathname.startsWith("/app/paths/"),
   },

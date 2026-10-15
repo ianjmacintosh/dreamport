@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { PathIcon } from "@phosphor-icons/react";
+import { CompassIcon } from "@phosphor-icons/react";
 
 import ActionCard from "../../components/ActionCard";
 import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
@@ -73,7 +73,7 @@ function ProductJourneys() {
         <li key={journey.id}>
           <ActionCard
             href={`/app/products/${product.id}/journeys/${journey.id}`}
-            leading={<PathIcon weight="bold" aria-hidden="true" />}
+            leading={<CompassIcon weight="bold" aria-hidden="true" />}
             trailing={
               <ActionCard.Status>
                 {STATUS_LABEL[journey.status]}

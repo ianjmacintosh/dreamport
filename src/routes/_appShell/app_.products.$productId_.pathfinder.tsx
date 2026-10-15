@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { PathIcon } from "@phosphor-icons/react";
+import { CompassIcon } from "@phosphor-icons/react";
 
 import ActionCard from "../../components/ActionCard";
 import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
@@ -75,7 +75,7 @@ function Pathfinder() {
                   ? `/app/products/${product.id}/journeys/${path.journeyId}`
                   : `/app/products/${product.id}/paths/${path.id}/trailhead`
               }
-              leading={<PathIcon weight="bold" aria-hidden="true" />}
+              leading={<CompassIcon weight="bold" aria-hidden="true" />}
               trailing={
                 path.journeyId ? (
                   <ActionCard.Status>Following</ActionCard.Status>

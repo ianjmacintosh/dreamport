@@ -693,11 +693,13 @@ function StyleGuide() {
           optional <code>trailing</code> item at the end: a Tag, or{" "}
           <code>&lt;ActionCard.Status&gt;</code> for italic status text like
           &ldquo;Incomplete&rdquo;. With <code>href</code> it&apos;s a link
-          (e.g. a Worksheet to fill in) and ends with a caret; without,
-          it&apos;s a <code>&lt;label&gt;</code> around its{" "}
-          <code>Checkbox</code> (e.g. a Task to tick), and hovering anywhere on
-          it outlines the box. <code>done</code> mutes the title. Below 640px
-          the trailing item drops under the title. List them in{" "}
+          (e.g. a Worksheet to fill in) and ends with a caret; hovering or
+          focusing it outlines the whole card like a button&apos;s hover and
+          underlines its title (#199). Without, it&apos;s a{" "}
+          <code>&lt;label&gt;</code> around its <code>Checkbox</code> (e.g. a
+          Task to tick), and hovering anywhere on it outlines the box.{" "}
+          <code>done</code> mutes the title. Below 640px the trailing item drops
+          under the title. List them in{" "}
           <code>&lt;ul className=&quot;action-card-list&quot;&gt;</code> (#140).
         </p>
       </Section>

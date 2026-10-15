@@ -274,7 +274,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
   one accepted exception to "no inline styles": it follows the pointer, so
   no class can hold it.
 
-- `AppNav` has a second section, Paths (Phosphor `PathIcon`, the
+- `AppNav` has a second section, Paths (Phosphor `CompassIcon`, the
   `/app/paths` pages), after Products, 12px apart. The section, its h1
   and its breadcrumb say "Paths", never "Trailblazer": that name is for
   adding and editing a Path inside the section, and would mean nothing to
@@ -499,3 +499,14 @@ Add an entry only once a sign-off conversation resolves something repeatable
   {Path}), so a Journey is a page under its Path's Trailhead. The Pathfinder name is kept for the
   directory it grows into. URLs, code and `CONTEXT.md`'s terms are
   unchanged. The labels in earlier entries above predate this.
+
+- A linked `ActionCard` (a Worksheet, a Path) shows it's clickable the
+  way a button does: hover outlines the whole card with `.button:hover`'s
+  outline, and its title underlines. Keyboard focus gets exactly the same,
+  so hover and focus read as one state. A Task's card, a `<label>`, keeps
+  outlining only its check box. Paths are a compass (Phosphor
+  `CompassIcon`), on their cards and in `AppNav` (decided in #199, from a
+  prototype on local branch `199-prototype-linked-card-hover` that
+  compared outlining the icon, the caret or the card, underlining the
+  title, nudging the caret and filling the icon, then combinations of the
+  last three; filling the icon was built, then dropped as too much).
