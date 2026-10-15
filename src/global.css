@@ -1597,8 +1597,9 @@ button.tag-more[data-popup-open] {
    own white — no border or radius of its own. Leading slot (check box or
    icon), title, then an optional trailing Tag or status, and a caret when
    it's a link. Hovering a link card outlines it like `.button:hover`, the
-   same outline its keyboard focus gets from `:focus-visible` (#199). Below
-   640px the trailing item drops under the title. */
+   same outline its keyboard focus gets from `:focus-visible`, and both
+   swap its bold icon for the filled one (#199). Below 640px the trailing
+   item drops under the title. */
 .action-card-list {
   display: grid;
   row-gap: var(--space-3);
@@ -1631,6 +1632,15 @@ a.action-card:hover {
 a.action-card:hover {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
+}
+
+.action-card-icon-fill,
+a.action-card:is(:hover, :focus-visible) .action-card-icon-bold {
+  display: none;
+}
+
+a.action-card:is(:hover, :focus-visible) .action-card-icon-fill {
+  display: block;
 }
 
 .action-card-leading {

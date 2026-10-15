@@ -73,7 +73,7 @@ function ProductJourneys() {
         <li key={journey.id}>
           <ActionCard
             href={`/app/products/${product.id}/journeys/${journey.id}`}
-            leading={<PathIcon weight="bold" aria-hidden="true" />}
+            icon={PathIcon}
             trailing={
               <ActionCard.Status>
                 {STATUS_LABEL[journey.status]}

@@ -303,7 +303,7 @@ function ProductHome() {
             <li key={journey.id}>
               <ActionCard
                 href={`/app/products/${product.id}/journeys/${journey.id}`}
-                leading={<PathIcon weight="bold" aria-hidden="true" />}
+                icon={PathIcon}
                 trailing={<ActionCard.Status>In Progress</ActionCard.Status>}
               >
                 {journey.pathName}

@@ -52,7 +52,7 @@ function ActionCardDemo() {
       <li>
         <ActionCard
           href="#action-card"
-          leading={<FileTextIcon weight="bold" aria-hidden="true" />}
+          icon={FileTextIcon}
           trailing={<ActionCard.Status>Incomplete</ActionCard.Status>}
         >
           Product Summary
@@ -683,18 +683,20 @@ function StyleGuide() {
       <Section id="action-card" label="Action card">
         <ActionCardDemo />
         <Snippet
-          code={`<ul className="action-card-list">\n  <li>\n    <ActionCard\n      href={worksheetUrl}\n      leading={<FileTextIcon weight="bold" aria-hidden="true" />}\n      trailing={<ActionCard.Status>Incomplete</ActionCard.Status>}\n    >\n      Product Summary\n    </ActionCard>\n  </li>\n  <li>\n    <ActionCard\n      leading={<Checkbox checked={done} onChange={toggle} />}\n      trailing={<span className="tag"><CalendarBlankIcon … /> Event</span>}\n      done={done}\n    >\n      Schedule time to write the Product Summary (optional)\n    </ActionCard>\n  </li>\n</ul>`}
+          code={`<ul className="action-card-list">\n  <li>\n    <ActionCard\n      href={worksheetUrl}\n      icon={FileTextIcon}\n      trailing={<ActionCard.Status>Incomplete</ActionCard.Status>}\n    >\n      Product Summary\n    </ActionCard>\n  </li>\n  <li>\n    <ActionCard\n      leading={<Checkbox checked={done} onChange={toggle} />}\n      trailing={<span className="tag"><CalendarBlankIcon … /> Event</span>}\n      done={done}\n    >\n      Schedule time to write the Product Summary (optional)\n    </ActionCard>\n  </li>\n</ul>`}
         />
         <p className="sg-note">
           <code>&lt;ActionCard&gt;</code> is one thing to do, as a full-width
           row on the sheet&apos;s own white — no border or radius of its own —
-          and the whole card is the click target. A 1.5rem <code>leading</code>{" "}
-          slot (an icon, or a <code>Checkbox</code>), the title, then an
-          optional <code>trailing</code> item at the end: a Tag, or{" "}
+          and the whole card is the click target. A 1.5rem leading slot (an
+          icon, or a <code>Checkbox</code>), the title, then an optional{" "}
+          <code>trailing</code> item at the end: a Tag, or{" "}
           <code>&lt;ActionCard.Status&gt;</code> for italic status text like
           &ldquo;Incomplete&rdquo;. With <code>href</code> it&apos;s a link
-          (e.g. a Worksheet to fill in) and ends with a caret; without,
-          it&apos;s a <code>&lt;label&gt;</code> around its{" "}
+          (e.g. a Worksheet to fill in) led by its Phosphor <code>icon</code>{" "}
+          and ending with a caret; hovering or focusing it outlines the whole
+          card like a button&apos;s hover and fills its icon (#199). Without,
+          it&apos;s a <code>&lt;label&gt;</code> around its <code>leading</code>{" "}
           <code>Checkbox</code> (e.g. a Task to tick), and hovering anywhere on
           it outlines the box. <code>done</code> mutes the title. Below 640px
           the trailing item drops under the title. List them in{" "}
