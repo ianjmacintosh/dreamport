@@ -1596,7 +1596,9 @@ button.tag-more[data-popup-open] {
 /* `ActionCard` (#140): one thing to do as a full-width row on the sheet's
    own white — no border or radius of its own. Leading slot (check box or
    icon), title, then an optional trailing Tag or status, and a caret when
-   it's a link. Below 640px the trailing item drops under the title. */
+   it's a link. Hovering a link card outlines it like `.button:hover`, the
+   same outline its keyboard focus gets from `:focus-visible` (#199). Below
+   640px the trailing item drops under the title. */
 .action-card-list {
   display: grid;
   row-gap: var(--space-3);
@@ -1624,6 +1626,11 @@ a.action-card,
 a.action-card:hover {
   color: var(--color-text-primary);
   text-decoration: none;
+}
+
+a.action-card:hover {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 
 .action-card-leading {
