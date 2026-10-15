@@ -502,10 +502,11 @@ Add an entry only once a sign-off conversation resolves something repeatable
 
 - A linked `ActionCard` (a Worksheet, a Path) shows it's clickable the
   way a button does: hover outlines the whole card with `.button:hover`'s
-  outline, and its leading icon swaps from Phosphor's bold weight to its
-  filled one. Keyboard focus gets exactly the same, so hover and focus
-  read as one state. A Task's card, a `<label>`, keeps outlining only its
-  check box (decided in #199, from a prototype on local branch
-  `199-prototype-linked-card-hover` that compared outlining the icon, the
-  caret or the card, underlining the title, nudging the caret and filling
-  the icon, then combinations of the last three).
+  outline, and its title underlines. Keyboard focus gets exactly the same,
+  so hover and focus read as one state. A Task's card, a `<label>`, keeps
+  outlining only its check box. Paths are a compass (Phosphor
+  `CompassIcon`), on their cards and in `AppNav` (decided in #199, from a
+  prototype on local branch `199-prototype-linked-card-hover` that
+  compared outlining the icon, the caret or the card, underlining the
+  title, nudging the caret and filling the icon, then combinations of the
+  last three; filling the icon was built, then dropped as too much).

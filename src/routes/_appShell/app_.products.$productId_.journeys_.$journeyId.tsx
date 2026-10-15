@@ -402,7 +402,7 @@ function ProductJourney() {
           <li key={worksheet.id}>
             <ActionCard
               href={`/app/products/${product.id}/journeys/${journey.id}/worksheets/${worksheet.id}`}
-              icon={FileTextIcon}
+              leading={<FileTextIcon weight="bold" aria-hidden="true" />}
               trailing={
                 <ActionCard.Status>
                   {worksheet.filled === worksheet.total

@@ -75,7 +75,7 @@ function Pathfinder() {
                   ? `/app/products/${product.id}/journeys/${path.journeyId}`
                   : `/app/products/${product.id}/paths/${path.id}/trailhead`
               }
-              icon={CompassIcon}
+              leading={<CompassIcon weight="bold" aria-hidden="true" />}
               trailing={
                 path.journeyId ? (
                   <ActionCard.Status>Following</ActionCard.Status>

@@ -1598,8 +1598,8 @@ button.tag-more[data-popup-open] {
    icon), title, then an optional trailing Tag or status, and a caret when
    it's a link. Hovering a link card outlines it like `.button:hover`, the
    same outline its keyboard focus gets from `:focus-visible`, and both
-   swap its bold icon for the filled one (#199). Below 640px the trailing
-   item drops under the title. */
+   underline its title (#199). Below 640px the trailing item drops under
+   the title. */
 .action-card-list {
   display: grid;
   row-gap: var(--space-3);
@@ -1634,13 +1634,8 @@ a.action-card:hover {
   outline-offset: 2px;
 }
 
-.action-card-icon-fill,
-a.action-card:is(:hover, :focus-visible) .action-card-icon-bold {
-  display: none;
-}
-
-a.action-card:is(:hover, :focus-visible) .action-card-icon-fill {
-  display: block;
+a.action-card:is(:hover, :focus-visible) .action-card-title {
+  text-decoration: underline;
 }
 
 .action-card-leading {
