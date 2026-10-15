@@ -1,6 +1,6 @@
 import { Fragment, useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { PathIcon } from "@phosphor-icons/react";
+import { CompassIcon } from "@phosphor-icons/react";
 
 import ActionCard from "../../components/ActionCard";
 
@@ -303,7 +303,7 @@ function ProductHome() {
             <li key={journey.id}>
               <ActionCard
                 href={`/app/products/${product.id}/journeys/${journey.id}`}
-                icon={PathIcon}
+                icon={CompassIcon}
                 trailing={<ActionCard.Status>In Progress</ActionCard.Status>}
               >
                 {journey.pathName}
