@@ -499,3 +499,13 @@ Add an entry only once a sign-off conversation resolves something repeatable
   {Path}), so a Journey is a page under its Path's Trailhead. The Pathfinder name is kept for the
   directory it grows into. URLs, code and `CONTEXT.md`'s terms are
   unchanged. The labels in earlier entries above predate this.
+
+- A linked `ActionCard` (a Worksheet, a Path) shows it's clickable the
+  way a button does: hover outlines the whole card with `.button:hover`'s
+  outline, and its leading icon swaps from Phosphor's bold weight to its
+  filled one. Keyboard focus gets exactly the same, so hover and focus
+  read as one state. A Task's card, a `<label>`, keeps outlining only its
+  check box (decided in #199, from a prototype on local branch
+  `199-prototype-linked-card-hover` that compared outlining the icon, the
+  caret or the card, underlining the title, nudging the caret and filling
+  the icon, then combinations of the last three).
