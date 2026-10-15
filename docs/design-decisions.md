@@ -274,7 +274,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
   one accepted exception to "no inline styles": it follows the pointer, so
   no class can hold it.
 
-- `AppNav` has a second section, Paths (Phosphor `PathIcon`, the
+- `AppNav` has a second section, Paths (Phosphor `CompassIcon`, the
   `/app/paths` pages), after Products, 12px apart. The section, its h1
   and its breadcrumb say "Paths", never "Trailblazer": that name is for
   adding and editing a Path inside the section, and would mean nothing to
