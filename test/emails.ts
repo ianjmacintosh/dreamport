@@ -242,6 +242,8 @@ export const TEST_EMAILS = {
   pathsRoutesDraft: "delivered+paths-routes-draft@resend.dev",
   /** Saves a version, follows it, then deletes the Path (#171). */
   pathsRoutesDelete: "delivered+paths-routes-delete@resend.dev",
+  /** A plain User, refused at every Publish, Unpublish, Open and Close route (#191). */
+  pathsRoutesPlainUser: "delivered+paths-routes-plain-user@resend.dev",
 
   // --- Seam 1f: the gates every product route crosses (#154) ---
   /** Owns the Product every product-scoped route is driven against. */
