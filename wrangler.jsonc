@@ -82,6 +82,8 @@
         "TURNSTILE_SECRET_KEY": "1x0000000000000000000000000000000AA",
         // See "local" below — same purpose, same reasoning (issue #70).
         "TEST_LOGIN_ENABLED": "true",
+        // See "local" below.
+        "GUIDE_EMAILS": "delivered+guide+e2e-test@resend.dev",
       },
       "d1_databases": [
         {
@@ -96,6 +98,8 @@
       "vars": {
         // See "local" below — same purpose, same reasoning.
         "TEST_LOGIN_ENABLED": "true",
+        // See "local" below.
+        "GUIDE_EMAILS": "delivered+guide+e2e-test@resend.dev",
       },
       "d1_databases": [
         {
@@ -120,6 +124,11 @@
         // URL), but manual testing there needs the fixed test-login code same
         // as dev/local, and it's not reachable without knowing the URL.
         "TEST_LOGIN_ENABLED": "true",
+        // The Guides (#190): only this test address, which signs in with the
+        // fixed code above, so it must never be on production's list.
+        // Production has no GUIDE_EMAILS here: it's a dashboard secret there,
+        // and an env can't have a var and a secret of the same name.
+        "GUIDE_EMAILS": "delivered+guide+e2e-test@resend.dev",
       },
       "d1_databases": [
         {

@@ -44,6 +44,13 @@ export interface WorkerEnv {
    * absent → `MockEmailSender` (see `createEmailSender`). A secret.
    */
   RESEND_API_KEY?: string;
+  /**
+   * Comma-separated email addresses of the Guides (#190), read by `isGuide`.
+   * A `wrangler.jsonc` var outside production; production's is a dashboard
+   * secret, so Ian's address stays out of the repo. Unset means no Guides.
+   * Never sent to the browser.
+   */
+  GUIDE_EMAILS?: string;
   /** The static SPA assets (`wrangler.jsonc` `assets.binding`). */
   ASSETS: Fetcher;
 }
