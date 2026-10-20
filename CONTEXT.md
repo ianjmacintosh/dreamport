@@ -87,17 +87,20 @@ version is seen on the Path's Trailhead.
 _Avoid_: revision, edition, update; final, frozen, locked, released
 
 **Trailhead**:
-A Path's own page: its name, its pitch, and its Milestones with their
-outcomes, then **Start on Path**, which asks which of the User's Products
-the Journey is for and starts on the version shown. It belongs to the Path,
-not to a Product. The Path has one Trailhead, plus one for each published
-version, and it's the link a Guide gives out. What it shows depends on who's
-looking: the Guide sees their latest saved version; another User sees the
-newest published version (or the one they asked for) and Adds it, or their
-own copy once they have; a closed Path or an unpublished version shows
-"no longer available" to anyone without a copy. A copy has no page of its
-own. Dream Sequence's pitch is written by Dreamport; a User's own Path
-shows its description in its place.
+A Path's own page: its name, its version (and price), its pitch, and its
+Milestones with their outcomes, then **Start on Path**, which asks which of
+the User's Products the Journey is for and starts on the version shown. A
+Product already on the Path is pointed to its Journey instead; restarting
+happens from the Journey. It belongs to the Path, not to a Product. The Path
+has one Trailhead, plus one for each published version, and it's the link a
+Guide gives out. Everyone, its Guide included, sees the newest published
+version (or the one they asked for); a Path never published, such as a
+User's own, shows its latest saved version. Another User Adds it there, or
+sees their own copy once they have; a closed Path or an unpublished version
+shows "no longer available" to anyone without a copy. A copy has no page of
+its own. Its Guide's way into Trailblazer is the only difference for them.
+Dream Sequence's pitch is written by Dreamport; a User's own Path shows its
+description in its place.
 _Avoid_: intro, introduction, summary, landing page, version page
 
 **Publish**:
@@ -256,11 +259,9 @@ only one can be; the User abandons that one first.
 _Avoid_: unabandon, continue, reopen
 
 **Restart**:
-Start a new Journey on the same Path for a Product that already has one on
-it, on the version the Trailhead shows — the alternative to Resume, and the
-way a Product switches to another version. If the Product's Journey on the
-Path is still in progress, Restart Abandons it first, after a confirmation
-that says so, since only one can be in progress. The new Journey is blank,
+Start a new Journey on the same Path for a Product whose Journey on it is
+completed or abandoned, on the Path's latest version — the alternative to
+Resume. The new Journey is blank,
 on the Path's first Milestone, in progress. Never destructive: the earlier
 Journey stays as it was, answers and checked Tasks included, until the User
 deletes it.
