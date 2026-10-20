@@ -52,13 +52,13 @@ _Avoid_: response, reply
 **Path**:
 A route a Product can follow from idea to a growing, profitable product,
 made of ordered Milestones. Any User can make one in Trailblazer; it starts
-private to the User who made it. A Guide can Publish it, free or for a
-Purchase. Its Guide can delete it at any time, published or not: Users who
-Added it keep their copies, the way a book's owner keeps it when it goes
-out of print. Only Dreamport can destroy a published Path (spam, legal
-trouble, harm), and that removes it everywhere, every copy and every
-Journey on them included. Dream Sequence, based on Running Lean, is the free Path
-Dreamport itself publishes.
+private to the User who made it. A Guide can Publish its versions and
+Open it, free or for a Purchase. Its Guide can delete it only while nobody
+has Added it; after that they Close it instead, and every copy carries on.
+Only Dreamport can destroy a Path someone has Added (spam, legal trouble,
+harm), and that removes it everywhere, every copy and every Journey on them
+included. Dream Sequence, based on Running Lean, is the free Path Dreamport
+itself publishes, and it's always open.
 _Avoid_: methodology, plan, program; "path screen" or "path page" (name
 the page: the Journey page, Trailhead, Pathfinder or Trailblazer)
 
@@ -82,42 +82,75 @@ A snapshot of a Path made from its Draft when the User who made it uses
 **Save as New Version**: the name, description, Milestones and Tasks exactly as they
 stood. It never changes afterwards, and it needs a name, a description and
 at least one Milestone. A Journey stays on the version it started on; a newer version is
-a new release, never a free update to existing Journeys (for now). A
-Product sees a version on its Trailhead.
+a new release, never a free update to existing Journeys (for now). Every
+version is seen on the Path's Trailhead.
 _Avoid_: revision, edition, update; final, frozen, locked, released
 
 **Trailhead**:
-The page a Product sees for a Path before starting a Journey on it: the
-Path's name, its pitch, and its Milestones with their outcomes, then
-**Start on Path**. It shows the Path's latest version unless the User picks
-an earlier one. Always reached from a Product, never on its own. Dream
-Sequence's pitch is written by Dreamport; a User's own Path shows its
+A Path's own page: its name, its version (and price), its pitch, and its
+Milestones with their outcomes, then **Start on Path**, which asks which of
+the User's Products the Journey is for and starts on the version shown. A
+Product already on the Path is pointed to its Journey instead; restarting
+happens from the Journey. It belongs to the Path, not to a Product. The Path
+has one Trailhead, plus one for each published version, and it's the link a
+Guide gives out. Everyone, its Guide included, sees the newest published
+version (or the one they asked for); a Path never published, such as a
+User's own, shows its latest saved version. Another User Adds it there, or
+sees their own copy once they have; a closed Path or an unpublished version
+shows "no longer available" to anyone without a copy. A copy has no page of
+its own. Its Guide's way into Trailblazer is the only difference for them.
+Dream Sequence's pitch is written by Dreamport; a User's own Path shows its
 description in its place.
 _Avoid_: intro, introduction, summary, landing page, version page
 
 **Publish**:
-Make a saved Path version available to other Users, free or for a
-Purchase. Only a Guide can. Publishing is per version, but a Path has one
-link, which always offers its newest published version: a Guide shares the
-link once and keeps publishing to it. Saving a version is not publishing
-it.
+Make a saved Path version available for other Users to Add, free or for a
+Purchase, once the Path is open. Only a Guide can. Publishing is per
+version: saving a version is not publishing it, so a Guide can save
+unfinished versions while the Path stays open. The Path's Trailhead offers
+its newest published version, and each published version has a Trailhead
+of its own. Publishing never opens a closed Path.
 _Avoid_: release, launch, go live, share (as a noun for this)
 
 **Unpublish**:
-Stop a Path's link offering it to Users who haven't Added it yet. Users who
-already Added it keep their copies, and their Journeys on them carry on.
-The mirror of Publish.
+Stop offering one published Path version to Users who haven't Added it.
+Users who already Added it keep their copies, and their Journeys on them
+carry on. If it was the newest, the Path's Trailhead falls back to the next
+newest published version; if it was the only one, the Path closes. The
+mirror of Publish.
 _Avoid_: retract, withdraw, take down, hide
 
+**Open**:
+Let other Users Add a Path's published versions. Only its Guide can, and
+only once at least one version is published. Every Path starts closed, and
+stays closed until its Guide opens it; Dream Sequence is always open.
+_Avoid_: publish (for this), launch, go live
+
+**Close**:
+Stop a whole Path accepting new Adds ("Close This Path"), like a trail
+closed to new hikers while those already on it finish. Users who Added it
+keep their copies, and their Journeys on them carry on; its Trailhead still
+shows them their copy. Nothing reopens it but its Guide Opening it again.
+The mirror of Open, and how a Guide retires a Path someone has Added.
+_Avoid_: unpublish (for this), archive, retire, delete (for this)
+
 **Add**:
-Take your own copy of a published Path version, from the link its Guide
-gives out, so Pathfinder offers it on every one of your Products. Like a
-bought book: the copy is yours, it doesn't change when the Guide publishes
-a later version (no later versions reach you, for now), and you can't
-change it either. Adding is free for a free Path; a Purchase Adds the
-version it pays for. You can remove an Added Path from your Paths while no
-Journey is on it.
+Take your own copy of a published version of an open Path, from its
+Trailhead, so it's one of your Available Paths. Like a bought book: the copy
+is yours, it doesn't change when the Guide publishes a later version (no
+later versions reach you, for now), and you can't change it either. Any
+published version can be Added, and you can hold copies of several versions
+of the same Path. Nobody starts a Journey on another User's Path without
+Adding it first. Adding is free for a free Path; a Purchase Adds the
+version it pays for.
 _Avoid_: import, save, subscribe, install, clone, fork, follow (for this)
+
+**Available Paths**:
+Every Path a User can start a Journey on: Dream Sequence, their own Paths
+that have a saved version, and the copies they've Added. Dream Sequence and
+their own Paths need no Add. "Available" is the point: not every one of
+them is the User's own work.
+_Avoid_: my Paths, library, followable
 
 **Trailblazer**:
 The one tool in which any User makes and edits a Path. Making a Path for
@@ -145,11 +178,12 @@ Paths: that is Trailblazer's job, open to any User.
 _Avoid_: system administrator, staff, superuser
 
 **Pathfinder**:
-Where a Product finds a Path to follow. For now it's a plain list of Dream
-Sequence, the User's own Paths that have a saved version, and the Paths
-they've Added, marking the ones the Product already follows. It grows into the directory of shared
-Paths, with search, filters and sorting; until then a shared Path is found
-only through a link its Guide gives out.
+The bookstore: where a User finds Paths they don't have yet, with search,
+filters and sorting. It doesn't exist yet; until it does, a shared Path is
+found only through the Trailhead link its Guide gives out. Today's page of
+that name, on each Product, lists the User's Available Paths, marking the
+ones the Product already follows, and is to be renamed when the bookstore
+arrives.
 _Avoid_: marketplace, catalog, store
 
 **Purchase**:

@@ -29,3 +29,10 @@ _(Extended in the PW10 sharing plan, #161: a free Add gets a copy the same
 way. The copy is read-only and remembers which version it came from. The
 one thing that reaches copies is Dreamport destroying a Path for spam, legal
 trouble or harm.)_
+
+_(Extended again in the PW10 refinement, #189: offering a version takes two
+switches. Publishing is per version, so a Guide can save unfinished versions
+without anyone getting them; Opening and Closing is per Path, and stops new
+Adds without touching copies. A Path anyone has Added can't be deleted by
+its Guide, only closed, so a Guide's delete never has to reckon with
+copies.)_
