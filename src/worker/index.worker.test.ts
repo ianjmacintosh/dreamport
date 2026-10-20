@@ -691,13 +691,21 @@ describe("verify a sign-in code", () => {
 });
 
 describe("GET /api/me", () => {
-  it("returns the signed-in email with a valid session cookie", async () => {
+  it("returns the signed-in email with a valid session cookie, and that it isn't a Guide's", async () => {
     const cookie = await signIn(TEST_EMAILS.meOk);
 
     const res = await fetchWorker("/api/me", { headers: { cookie } });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ email: TEST_EMAILS.meOk });
+    expect(await res.json()).toEqual({ email: TEST_EMAILS.meOk, guide: false });
+  });
+
+  it("says when the signed-in User is a Guide (#191)", async () => {
+    const cookie = await signIn(TEST_EMAILS.guide);
+
+    const res = await fetchWorker("/api/me", { headers: { cookie } });
+
+    expect(await res.json()).toEqual({ email: TEST_EMAILS.guide, guide: true });
   });
 
   it("rejects a request with no session cookie", async () => {

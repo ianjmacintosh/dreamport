@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { createAuth, currentSession } from "./auth";
 import { getMockSender } from "./email/sender";
 import type { WorkerEnv } from "./env";
+import { isGuide } from "./guides";
 import {
   peekDailySendCap,
   peekOtpSendBudget,
@@ -274,8 +275,9 @@ export function createApp(deps: AppDeps = {}) {
   /**
    * Session check for the `/app` page. Verifies the caller's session against
    * the database on its own — the client-side route guard is a UX
-   * affordance, never the security boundary — and echoes just the signed-in
-   * email. 401 with no valid session.
+   * affordance, never the security boundary — and echoes the signed-in
+   * email and whether that User is a Guide, so the UI can leave out
+   * controls a plain User can't use (#191). 401 with no valid session.
    */
   app.get("/api/me", async (c) => {
     const session = await currentSession(c.env, c.req.raw);
@@ -284,7 +286,10 @@ export function createApp(deps: AppDeps = {}) {
       return c.json({ error: "Not signed in" }, 401);
     }
 
-    return c.json({ email: session.user.email });
+    return c.json({
+      email: session.user.email,
+      guide: isGuide(c.env, session.user.email),
+    });
   });
 
   /**
