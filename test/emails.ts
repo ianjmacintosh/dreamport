@@ -363,6 +363,12 @@ export const TEST_EMAILS = {
   /** No `+e2e-test@` marker: gets a real random code, not the fixed one. */
   e2eTestNoMarker: "delivered+not-e2e-test@resend.dev",
 
+  // --- Guides (#190) ---
+  /** The only Guide on every non-production `GUIDE_EMAILS` list in `wrangler.jsonc`. */
+  guide: "delivered+guide+e2e-test@resend.dev",
+  /** Never on any `GUIDE_EMAILS` list. */
+  notGuide: "delivered+not-guide@resend.dev",
+
   // --- Seam 1: real ResendEmailSender path, MSW-stubbed (#66) ---
   /** Send with RESEND_API_KEY set and MSW stubbing Resend's response. */
   resendPathMsw: "delivered+resend-path-msw@resend.dev",
