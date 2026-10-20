@@ -510,3 +510,43 @@ Add an entry only once a sign-off conversation resolves something repeatable
   compared outlining the icon, the caret or the card, underlining the
   title, nudging the caret and filling the icon, then combinations of the
   last three; filling the icon was built, then dropped as too much).
+
+- A Guide's Publish, Unpublish, Open and Close controls live in the Path
+  editor (`/app/paths/:pathId/edit`), not on the Trailhead (decided in
+  #191, from a prototype on local branch `191-prototype-editor`: eight
+  rounds, from four placements (a Versions section at the page's end, a
+  status line plus a Dialog, one Publishing menu beside Edit Path, controls
+  beside Save as New Version) down to the one below, then wording):
+  - Under the h1 and above the description, two lines at `.text-sm`. The
+    first is "Path Status: Open" or "Path Status: Closed", plain text, the
+    word linking to the Trailhead. It is the Guide's alone. The second is
+    the version being edited in bold, then a middle dot (hidden from screen
+    readers) and a `.link-quiet` "Manage Versions". Everyone sees the
+    second line, a plain User included.
+  - The version is "Version {n}" while the page matches that saved version,
+    with " (unpublished)" after it when it isn't published. After any edit
+    it is "Draft (unpublished)", whether or not another version has
+    exactly the same fields; saving a new version, or Discard Changes,
+    turns it back into a version. A Path nothing is saved on yet is
+    "Draft (unpublished)". This reverses #169's "No Draft label".
+  - "Manage Versions" opens a `Dialog` with a row for every saved version,
+    newest first (`.list`): "Version {n}", then at `.text-sm` its status and
+    "saved {date}". For a Guide, an unpublished row has Publish, and a
+    published one has Copy Link and Unpublish. Unpublish confirms in place
+    in the row, as every destructive action does: the row says "Users who
+    already Added Version {n} keep it." (and, for the only published
+    version, that unpublishing it closes this Path), with Cancel and
+    Unpublish. Publish and Copy Link act on one click. A plain User gets the
+    same list read-only: dates only, no status and no buttons.
+  - Close This Path is a secondary button in Delete Path's place at the end
+    of the page, so while a Path is open it can't be deleted. Once it is
+    closed Delete Path returns, and Open This Path follows it, between
+    Delete Path and Save as New Version. Open This Path appears only once a
+    version is published. Publishing into a closed Path doesn't open it; the
+    Guide is told it is still closed. Unpublishing the only published
+    version closes the Path and tells the Guide with the Trailhead's notice
+    (above the version line, in the notice style, which is not an error
+    treatment).
+  - There is no root-address copy button on the page. The Path Status link
+    goes to the Trailhead, and Copy Link on a published version's row is
+    the only copy control.
