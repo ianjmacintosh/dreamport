@@ -196,6 +196,8 @@ export const TEST_EMAILS = {
   pathsModulePathfinder: "delivered+paths-module-pathfinder@resend.dev",
   /** Makes Paths and opens their Trailheads (#170). */
   pathsModuleTrailhead: "delivered+paths-module-trailhead@resend.dev",
+  /** Publishes and Unpublishes versions, and Opens and Closes Paths (#191). */
+  pathsModulePublisher: "delivered+paths-module-publisher@resend.dev",
 
   // --- Seam 1: the Journey routes (#137-#140, #170), one test each ---
   /** Lists a Product's Journeys, none and then one. */

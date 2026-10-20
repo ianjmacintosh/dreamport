@@ -2489,6 +2489,8 @@ describe("Trailblazer routes", () => {
         ...path,
         milestones: [],
         updatedAt: path.createdAt,
+        open: false,
+        versions: [],
         latestVersion: null,
       },
     });
@@ -2511,6 +2513,8 @@ describe("Trailblazer routes", () => {
         description: "",
         milestones: [],
         updatedAt: expect.any(String),
+        open: false,
+        versions: [],
         latestVersion: null,
       },
     });
@@ -2603,12 +2607,14 @@ describe("Trailblazer routes", () => {
       id: expect.any(String),
       number: 1,
       savedAt: expect.any(String),
+      published: false,
     });
 
     const read = await callApi("GET", `/api/paths/${path.id}`, cookie);
     const { draft } = (await read.json()) as {
-      draft: { latestVersion: unknown };
+      draft: { versions: unknown; latestVersion: unknown };
     };
+    expect(draft.versions).toEqual([version]);
     expect(draft.latestVersion).toEqual(version);
   });
 

@@ -2,7 +2,8 @@
  * A Path belongs to Dreamport (`paths.userId` null, followable by every
  * User) or to one User (followable only by them). That check lives here and
  * nowhere else: another User's version comes back as `null`, the same as
- * one that doesn't exist.
+ * one that doesn't exist. The exception is `getOfferedVersion`: what a
+ * Path's addresses offer any viewer, only ever a published version.
  *
  * A saved version never changes, so a loaded `PathVersion` never goes
  * stale, unlike a Journey's progress. Callers can hold one and pass it on.
@@ -120,14 +121,14 @@ export async function getTrailheadVersion(
   const { results } = await db
     .prepare(
       `SELECT "path_versions"."id", "path_versions"."number", "path_versions"."savedAt",
-         "paths"."userId" IS NULL AS "dreamports"
+         "path_versions"."published", "paths"."userId" IS NULL AS "dreamports"
        FROM "path_versions"
        JOIN "paths" ON "paths"."id" = "path_versions"."pathId"
        WHERE "path_versions"."pathId" = ? AND ("paths"."userId" IS NULL OR "paths"."userId" = ?)
        ORDER BY "path_versions"."number" DESC`,
     )
     .bind(pathId, userId)
-    .all<VersionSummary & { dreamports: number }>();
+    .all<VersionRow & { dreamports: number }>();
   const picked =
     number === null ? results[0] : results.find((v) => v.number === number);
   const version = picked ? await loadVersion(db, picked.id, userId) : null;
@@ -137,12 +138,68 @@ export async function getTrailheadVersion(
   return {
     owner: picked.dreamports ? "dreamport" : "user",
     version,
-    versions: results.map(({ id, number, savedAt }) => ({
-      id,
-      number,
-      savedAt,
-    })),
+    versions: results.map(versionSummary),
   };
+}
+
+/** A version offered to any viewer, with whether its Path is open. */
+export interface OfferedVersion {
+  readonly version: PathVersion;
+  readonly open: boolean;
+}
+
+/**
+ * Version `number` of a Path if it's published, or for `null` the version
+ * the Path's root address offers, for any viewer. `null` for an unknown
+ * Path or number, an unpublished version, or a Path with none published.
+ * Who owns the Path is never part of the answer.
+ */
+export async function getOfferedVersion(
+  db: D1Database,
+  pathId: string,
+  number: number | null,
+): Promise<OfferedVersion | null> {
+  const { results } = await db
+    .prepare(
+      `SELECT "path_versions"."id", "path_versions"."number", "path_versions"."name",
+         "path_versions"."description", "path_versions"."savedAt",
+         "path_versions"."published", "paths"."open"
+       FROM "path_versions"
+       JOIN "paths" ON "paths"."id" = "path_versions"."pathId"
+       WHERE "path_versions"."pathId" = ?`,
+    )
+    .bind(pathId)
+    .all<
+      Omit<PathVersion, "pathId" | "milestones"> & {
+        published: number;
+        open: number;
+      }
+    >();
+  const wanted = number ?? offeredNumber(results.map(versionSummary));
+  const picked = results.find((v) => v.published === 1 && v.number === wanted);
+  if (!picked) {
+    return null;
+  }
+  const { id, name, description, savedAt } = picked;
+  return {
+    version: withMilestones(
+      { id, pathId, number: picked.number, name, description, savedAt },
+      await loadMilestones(db, id),
+    ),
+    open: picked.open === 1,
+  };
+}
+
+/**
+ * The number of the version a Path's root address offers: its
+ * highest-numbered published one, or `null` with none published. Worked
+ * out from the versions every time, never stored.
+ */
+export function offeredNumber(
+  versions: readonly Pick<VersionSummary, "number" | "published">[],
+): number | null {
+  const published = versions.filter((v) => v.published).map((v) => v.number);
+  return published.length > 0 ? Math.max(...published) : null;
 }
 
 async function loadVersion(
@@ -150,7 +207,7 @@ async function loadVersion(
   versionId: string,
   userId: string,
 ): Promise<FollowableVersion | null> {
-  const [version, { results: milestones }] = await Promise.all([
+  const [version, milestones] = await Promise.all([
     db
       .prepare(
         `SELECT "path_versions"."id", "path_versions"."pathId", "path_versions"."number",
@@ -161,22 +218,36 @@ async function loadVersion(
       )
       .bind(versionId, userId)
       .first<Omit<PathVersion, "milestones">>(),
-    db
-      .prepare(
-        'SELECT "id", "name", "description", "doneWhen", "outcome" FROM "milestones" WHERE "versionId" = ? ORDER BY "position" ASC',
-      )
-      .bind(versionId)
-      .all<Milestone>(),
+    loadMilestones(db, versionId),
   ]);
   if (!version) {
     return null;
   }
+  return withMilestones(version, milestones) as FollowableVersion;
+}
+
+async function loadMilestones(
+  db: D1Database,
+  versionId: string,
+): Promise<Milestone[]> {
+  const { results } = await db
+    .prepare(
+      'SELECT "id", "name", "description", "doneWhen", "outcome" FROM "milestones" WHERE "versionId" = ? ORDER BY "position" ASC',
+    )
+    .bind(versionId)
+    .all<Milestone>();
+  return results;
+}
+
+function withMilestones(
+  version: Omit<PathVersion, "milestones">,
+  milestones: readonly Milestone[],
+): PathVersion {
   const [first, ...rest] = milestones;
   if (!first) {
-    throw new Error(`Path version ${versionId} has no Milestones`);
+    throw new Error(`Path version ${version.id} has no Milestones`);
   }
-  const loaded: PathVersion = { ...version, milestones: [first, ...rest] };
-  return loaded as FollowableVersion;
+  return { ...version, milestones: [first, ...rest] };
 }
 
 /** A User's Path as their list of Paths shows it. */
@@ -217,6 +288,22 @@ export interface VersionSummary {
   readonly id: string;
   readonly number: number;
   readonly savedAt: string;
+  /** Offered to other Users. Saving a version doesn't publish it. */
+  readonly published: boolean;
+}
+
+/** A `VersionSummary` as D1 returns it, with SQLite's 0 or 1 for a boolean. */
+type VersionRow = Omit<VersionSummary, "published"> & {
+  readonly published: number;
+};
+
+function versionSummary({
+  id,
+  number,
+  savedAt,
+  published,
+}: VersionRow): VersionSummary {
+  return { id, number, savedAt, published: published === 1 };
 }
 
 /** A Path's Draft: its name, description and Milestones, as last edited. */
@@ -226,6 +313,10 @@ export interface Draft extends PathSummary {
   readonly milestones: readonly DraftMilestone[];
   /** When the Draft last changed. Saving a version doesn't change it. */
   readonly updatedAt: string;
+  /** Whether the Path accepts new Adds. Only ever true with a version published. */
+  readonly open: boolean;
+  /** Every saved version, newest first. */
+  readonly versions: readonly VersionSummary[];
   readonly latestVersion: VersionSummary | null;
 }
 
@@ -408,35 +499,40 @@ export async function getDraft(
   db: D1Database,
   path: OwnedPath,
 ): Promise<Draft> {
-  const [{ results: milestones }, { results: tasks }, edited, latestVersion] =
-    await Promise.all([
-      db
-        .prepare(
-          'SELECT "id", "name", "description", "doneWhen", "outcome" FROM "draft_milestones" WHERE "pathId" = ? ORDER BY "position" ASC, "rowid" ASC',
-        )
-        .bind(path.id)
-        .all<Omit<DraftMilestone, "tasks">>(),
-      db
-        .prepare(
-          `SELECT "draft_tasks"."id", "draft_tasks"."milestoneId", "draft_tasks"."title"
+  const [
+    { results: milestones },
+    { results: tasks },
+    edited,
+    { results: saved },
+  ] = await Promise.all([
+    db
+      .prepare(
+        'SELECT "id", "name", "description", "doneWhen", "outcome" FROM "draft_milestones" WHERE "pathId" = ? ORDER BY "position" ASC, "rowid" ASC',
+      )
+      .bind(path.id)
+      .all<Omit<DraftMilestone, "tasks">>(),
+    db
+      .prepare(
+        `SELECT "draft_tasks"."id", "draft_tasks"."milestoneId", "draft_tasks"."title"
          FROM "draft_tasks"
          JOIN "draft_milestones" ON "draft_milestones"."id" = "draft_tasks"."milestoneId"
          WHERE "draft_milestones"."pathId" = ?
          ORDER BY "draft_tasks"."position" ASC, "draft_tasks"."rowid" ASC`,
-        )
-        .bind(path.id)
-        .all<DraftTask & { milestoneId: string }>(),
-      db
-        .prepare('SELECT "updatedAt" FROM "paths" WHERE "id" = ?')
-        .bind(path.id)
-        .first<{ updatedAt: string }>(),
-      db
-        .prepare(
-          'SELECT "id", "number", "savedAt" FROM "path_versions" WHERE "pathId" = ? ORDER BY "number" DESC LIMIT 1',
-        )
-        .bind(path.id)
-        .first<VersionSummary>(),
-    ]);
+      )
+      .bind(path.id)
+      .all<DraftTask & { milestoneId: string }>(),
+    db
+      .prepare('SELECT "updatedAt", "open" FROM "paths" WHERE "id" = ?')
+      .bind(path.id)
+      .first<{ updatedAt: string; open: number }>(),
+    db
+      .prepare(
+        'SELECT "id", "number", "savedAt", "published" FROM "path_versions" WHERE "pathId" = ? ORDER BY "number" DESC',
+      )
+      .bind(path.id)
+      .all<VersionRow>(),
+  ]);
+  const versions = saved.map(versionSummary);
   const tasksOf = new Map<string, DraftTask[]>();
   for (const { milestoneId, ...task } of tasks) {
     tasksOf.set(milestoneId, [...(tasksOf.get(milestoneId) ?? []), task]);
@@ -451,7 +547,9 @@ export async function getDraft(
       tasks: tasksOf.get(m.id) ?? [],
     })),
     updatedAt: edited?.updatedAt ?? path.createdAt,
-    latestVersion,
+    open: edited?.open === 1,
+    versions,
+    latestVersion: versions[0] ?? null,
   };
 }
 
@@ -487,7 +585,7 @@ export async function saveVersion(
   const pathsDraftTasks = `FROM "draft_tasks"
     JOIN "draft_milestones" ON "draft_milestones"."id" = "draft_tasks"."milestoneId"
     WHERE "draft_milestones"."pathId" = ?1 AND ${versionSaved}`;
-  const [saved] = await db.batch<VersionSummary>([
+  const [saved] = await db.batch<VersionRow>([
     db
       .prepare(
         `INSERT INTO "path_versions" ("id", "pathId", "number", "name", "description", "savedAt")
@@ -497,7 +595,7 @@ export async function saveVersion(
          FROM "paths"
          WHERE "id" = ?1 AND "name" <> '' AND "description" <> ''
            AND EXISTS (SELECT 1 FROM "draft_milestones" WHERE "pathId" = ?1)
-         RETURNING "id", "number", "savedAt"`,
+         RETURNING "id", "number", "savedAt", "published"`,
       )
       .bind(path.id, versionId, new Date().toISOString()),
     db
@@ -530,7 +628,7 @@ export async function saveVersion(
   ]);
   const [version] = saved.results;
   if (version) {
-    return { ok: true, version };
+    return { ok: true, version: versionSummary(version) };
   }
 
   const draft = await db
@@ -546,6 +644,113 @@ export async function saveVersion(
   if (!draft?.description) missing.push("description");
   if (!draft?.hasMilestone) missing.push("milestone");
   return { ok: false, reason: "incomplete", missing };
+}
+
+export type PublishResult =
+  | { readonly ok: true; readonly version: VersionSummary }
+  | { readonly ok: false; readonly reason: "not-found" };
+
+/**
+ * Offer saved version `number` to other Users. Publishing a published
+ * version changes nothing, and publishing never opens a closed Path.
+ */
+export async function publishVersion(
+  db: D1Database,
+  path: OwnedPath,
+  number: number,
+): Promise<PublishResult> {
+  const version = await db
+    .prepare(
+      `UPDATE "path_versions" SET "published" = 1 WHERE "pathId" = ? AND "number" = ?
+       RETURNING "id", "number", "savedAt", "published"`,
+    )
+    .bind(path.id, number)
+    .first<VersionRow>();
+  return version
+    ? { ok: true, version: versionSummary(version) }
+    : { ok: false, reason: "not-found" };
+}
+
+export type UnpublishResult =
+  | {
+      readonly ok: true;
+      readonly version: VersionSummary;
+      /** Whether this closed the Path: it was open, and nothing's published now. */
+      readonly closed: boolean;
+    }
+  | { readonly ok: false; readonly reason: "not-found" };
+
+/**
+ * Stop offering saved version `number` to Users who haven't Added it.
+ * Unpublishing an unpublished version changes nothing. If no version is
+ * left published, the Path closes in the same transaction, so an open Path
+ * always has a published version.
+ */
+export async function unpublishVersion(
+  db: D1Database,
+  path: OwnedPath,
+  number: number,
+): Promise<UnpublishResult> {
+  const [unpublished, closed] = await db.batch<VersionRow>([
+    db
+      .prepare(
+        `UPDATE "path_versions" SET "published" = 0 WHERE "pathId" = ?1 AND "number" = ?2
+         RETURNING "id", "number", "savedAt", "published"`,
+      )
+      .bind(path.id, number),
+    db
+      .prepare(
+        `UPDATE "paths" SET "open" = 0
+         WHERE "id" = ?1 AND "open" = 1
+           AND NOT EXISTS (SELECT 1 FROM "path_versions" WHERE "pathId" = ?1 AND "published" = 1)
+         RETURNING "id"`,
+      )
+      .bind(path.id),
+  ]);
+  const [version] = unpublished.results;
+  if (!version) {
+    return { ok: false, reason: "not-found" };
+  }
+  return {
+    ok: true,
+    version: versionSummary(version),
+    closed: closed.results.length > 0,
+  };
+}
+
+export type OpenPathResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: "none-published" };
+
+/**
+ * Let other Users Add the Path's published versions. Refused, changing
+ * nothing, while none is published. Opening an open Path changes nothing.
+ */
+export async function openPath(
+  db: D1Database,
+  path: OwnedPath,
+): Promise<OpenPathResult> {
+  const opened = await db
+    .prepare(
+      `UPDATE "paths" SET "open" = 1
+       WHERE "id" = ?1
+         AND EXISTS (SELECT 1 FROM "path_versions" WHERE "pathId" = ?1 AND "published" = 1)
+       RETURNING "id"`,
+    )
+    .bind(path.id)
+    .first();
+  return opened ? { ok: true } : { ok: false, reason: "none-published" };
+}
+
+/** Stop the Path accepting new Adds. Closing a closed Path changes nothing. */
+export async function closePath(
+  db: D1Database,
+  path: OwnedPath,
+): Promise<void> {
+  await db
+    .prepare('UPDATE "paths" SET "open" = 0 WHERE "id" = ?')
+    .bind(path.id)
+    .run();
 }
 
 export type DiscardChangesResult =
