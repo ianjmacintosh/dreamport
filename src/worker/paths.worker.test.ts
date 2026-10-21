@@ -21,7 +21,7 @@ import {
   discardChanges,
   type FollowableVersion,
   getDraft,
-  getOfferedVersion,
+  getTrailhead,
   getPath,
   getTrailheadVersion,
   getVersion,
@@ -30,7 +30,6 @@ import {
   MILESTONE_NAME_MAX_LENGTH,
   type MilestoneFields,
   MILESTONES_AND_TASKS_PER_PATH,
-  offeredNumber,
   openPath,
   type OwnedPath,
   type PathUpdate,
@@ -1527,8 +1526,12 @@ async function publishedNumbers(path: OwnedPath) {
     .map((v) => v.number);
 }
 
+/** The version number the Path's root shows its owner. */
 async function offered(pathId: string) {
-  return (await getOfferedVersion(env.DB, pathId, null))?.version.number;
+  const trailhead = await getTrailhead(env.DB, PUBLISHER_ID, pathId, null);
+  return trailhead?.status === "followable"
+    ? trailhead.version.number
+    : undefined;
 }
 
 describe("publishing a Path's versions (#191)", () => {
@@ -1572,9 +1575,9 @@ describe("publishing a Path's versions (#191)", () => {
     expect(await publishedNumbers(path)).toEqual([]);
   });
 
-  it("offers the highest-numbered published version at the root, falling back when it's unpublished", async () => {
+  it("shows the highest-numbered published version at the root, falling back when it's unpublished, or the newest saved with none published", async () => {
     const { path } = await publishersPath(3);
-    expect(await offered(path.id)).toBeUndefined();
+    expect(await offered(path.id)).toBe(3);
 
     await publishVersion(env.DB, path, 2);
     expect(await offered(path.id)).toBe(2);
@@ -1584,28 +1587,57 @@ describe("publishing a Path's versions (#191)", () => {
     await unpublishVersion(env.DB, path, 2);
     expect(await offered(path.id)).toBe(1);
   });
-
-  it("works out the offered number from the published versions alone", () => {
-    expect(offeredNumber([])).toBeNull();
-    expect(
-      offeredNumber([
-        { number: 3, published: false },
-        { number: 2, published: false },
-      ]),
-    ).toBeNull();
-    expect(
-      offeredNumber([
-        { number: 1, published: true },
-        { number: 3, published: false },
-        { number: 2, published: true },
-      ]),
-    ).toBe(2);
-  });
 });
 
-describe("a Path's offered versions, for any viewer (#191)", () => {
-  it("gives a published version by number, or the root's, with its Milestones and whether the Path is open, and nothing about its owner", async () => {
+describe("a Path's Trailhead, for any viewer (#205)", () => {
+  /** `versions` as a Trailhead lists them, newest first. */
+  const summaries = (
+    versions: readonly FollowableVersion[],
+    published: boolean,
+  ) =>
+    [...versions]
+      .reverse()
+      .map(({ id, number, savedAt }) => ({ id, number, savedAt, published }));
+
+  it("shows its owner every saved version while none is published, the newest at the root", async () => {
     const { path, versions } = await publishersPath(2);
+    const [one, two] = versions;
+    const all = summaries(versions, false);
+
+    expect(await getTrailhead(env.DB, PUBLISHER_ID, path.id, null)).toEqual({
+      status: "followable",
+      owner: "user",
+      version: two,
+      versions: all,
+    });
+    expect(await getTrailhead(env.DB, PUBLISHER_ID, path.id, 1)).toEqual({
+      status: "followable",
+      owner: "user",
+      version: one,
+      versions: all,
+    });
+    expect(await getTrailhead(env.DB, PUBLISHER_ID, path.id, 3)).toBeNull();
+  });
+
+  it("shows its owner only the published versions once one is, even while the Path is closed", async () => {
+    const { path, versions } = await publishersPath(2);
+    await publishVersion(env.DB, path, 1);
+    const [one] = versions;
+    const published = summaries([one], true);
+
+    expect(await isOpen(path)).toBe(false);
+    expect(await getTrailhead(env.DB, PUBLISHER_ID, path.id, null)).toEqual({
+      status: "followable",
+      owner: "user",
+      version: one,
+      versions: published,
+    });
+    expect(await getTrailhead(env.DB, PUBLISHER_ID, path.id, 2)).toBeNull();
+  });
+
+  it("offers another User an open Path's published versions, and nothing about its owner", async () => {
+    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
+    const { path, versions } = await publishersPath(3);
     await publishVersion(env.DB, path, 1);
     await publishVersion(env.DB, path, 2);
     await openPath(env.DB, path);
@@ -1620,12 +1652,18 @@ describe("a Path's offered versions, for any viewer (#191)", () => {
         milestones,
       }),
     );
+    const published = summaries(versions.slice(0, 2), true);
 
-    const root = await getOfferedVersion(env.DB, path.id, null);
-    expect(root).toEqual({ version: two, open: true });
-    expect(await getOfferedVersion(env.DB, path.id, 1)).toEqual({
+    const root = await getTrailhead(env.DB, STRANGER_ID, path.id, null);
+    expect(root).toEqual({
+      status: "offered",
+      version: two,
+      versions: published,
+    });
+    expect(await getTrailhead(env.DB, STRANGER_ID, path.id, 1)).toEqual({
+      status: "offered",
       version: one,
-      open: true,
+      versions: published,
     });
     expect(JSON.stringify(root)).not.toContain(PUBLISHER_ID);
     expect(JSON.stringify(root)).not.toContain(
@@ -1633,27 +1671,66 @@ describe("a Path's offered versions, for any viewer (#191)", () => {
     );
   });
 
-  it("gives nothing for an unpublished version, an unknown number or Path, or a Path with none published", async () => {
-    const { path } = await publishersPath(2);
-    expect(await getOfferedVersion(env.DB, path.id, null)).toBeNull();
-    expect(await getOfferedVersion(env.DB, path.id, 1)).toBeNull();
+  it("tells another User a closed Path, or a version that isn't published, is unavailable, by its newest published name", async () => {
+    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
+    const { path } = await publishersPath(1);
+    const unavailable = { status: "unavailable", name: "Bakery Path" };
 
-    await publishVersion(env.DB, path, 2);
+    expect(await getTrailhead(env.DB, STRANGER_ID, path.id, null)).toEqual(
+      unavailable,
+    );
 
-    expect(await getOfferedVersion(env.DB, path.id, 1)).toBeNull();
-    expect(await getOfferedVersion(env.DB, path.id, 3)).toBeNull();
-    expect(await getOfferedVersion(env.DB, "no-such-path", null)).toBeNull();
+    await publishVersion(env.DB, path, 1);
+    await openPath(env.DB, path);
+    await rename(path, "Renamed Path", "For bakers");
+    await saved(path, PUBLISHER_ID);
+
+    expect(await getTrailhead(env.DB, STRANGER_ID, path.id, 2)).toEqual(
+      unavailable,
+    );
+    expect(await getTrailhead(env.DB, STRANGER_ID, path.id, 3)).toEqual(
+      unavailable,
+    );
+
+    await closePath(env.DB, path);
+    for (const number of [null, 1]) {
+      expect(await getTrailhead(env.DB, STRANGER_ID, path.id, number)).toEqual(
+        unavailable,
+      );
+    }
   });
 
-  it("offers Dream Sequence's version 1, open", async () => {
+  it("offers Dream Sequence's version 1 to any User to follow", async () => {
+    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
     for (const number of [null, 1]) {
       expect(
-        await getOfferedVersion(env.DB, "dream-sequence", number),
+        await getTrailhead(env.DB, STRANGER_ID, "dream-sequence", number),
       ).toMatchObject({
+        status: "followable",
+        owner: "dreamport",
         version: { id: "starter", number: 1, name: "Dream Sequence" },
-        open: true,
+        versions: [{ id: "starter", number: 1, published: true }],
       });
     }
+    expect(
+      await getTrailhead(env.DB, STRANGER_ID, "dream-sequence", 2),
+    ).toBeNull();
+  });
+
+  it("has nothing to show for a Path with only a Draft, its owner told so, and nothing at all for an unknown Path", async () => {
+    await seedUser(PUBLISHER_ID, TEST_EMAILS.pathsModulePublisher);
+    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
+    const draftOnly = await pathOf(PUBLISHER_ID, "Draft Only", [BAKE]);
+
+    expect(
+      await getTrailhead(env.DB, PUBLISHER_ID, draftOnly.id, null),
+    ).toEqual({ status: "unsaved" });
+    expect(
+      await getTrailhead(env.DB, STRANGER_ID, draftOnly.id, null),
+    ).toBeNull();
+    expect(
+      await getTrailhead(env.DB, PUBLISHER_ID, "no-such-path", null),
+    ).toBeNull();
   });
 });
 

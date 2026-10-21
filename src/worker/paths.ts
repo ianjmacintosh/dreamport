@@ -2,8 +2,9 @@
  * A Path belongs to Dreamport (`paths.userId` null, followable by every
  * User) or to one User (followable only by them). That check lives here and
  * nowhere else: another User's version comes back as `null`, the same as
- * one that doesn't exist. The exception is `getOfferedVersion`: what a
- * Path's addresses offer any viewer, only ever a published version.
+ * one that doesn't exist. The exception is `getTrailhead`: what a Path's
+ * addresses show any viewer, which for another User's Path is only ever a
+ * published version, and never anything about its owner.
  *
  * A saved version never changes, so a loaded `PathVersion` never goes
  * stale, unlike a Journey's progress. Callers can hold one and pass it on.
@@ -142,64 +143,99 @@ export async function getTrailheadVersion(
   };
 }
 
-/** A version offered to any viewer, with whether its Path is open. */
-export interface OfferedVersion {
-  readonly version: PathVersion;
-  readonly open: boolean;
-}
+/**
+ * What a Path's Trailhead shows the viewer (#205), at its root or at one
+ * version's address.
+ */
+export type Trailhead =
+  /** The viewer's own Path with only a Draft: nothing to show yet. */
+  | { readonly status: "unsaved" }
+  /** Another User's Path that's closed, or a version that isn't published. */
+  | { readonly status: "unavailable"; readonly name: string }
+  /** Another User's open Path, not followable until Add (#192). */
+  | {
+      readonly status: "offered";
+      readonly version: PathVersion;
+      readonly versions: readonly VersionSummary[];
+    }
+  /** Dream Sequence, or the viewer's own Path. */
+  | {
+      readonly status: "followable";
+      readonly owner: PathOwner;
+      readonly version: FollowableVersion;
+      readonly versions: readonly VersionSummary[];
+    };
 
 /**
- * Version `number` of a Path if it's published, or for `null` the version
- * the Path's root address offers, for any viewer. `null` for an unknown
- * Path or number, an unpublished version, or a Path with none published.
- * Who owns the Path is never part of the answer.
+ * The Trailhead offers a Path's published versions, newest first, in
+ * `versions`, and shows version `number` if it's one of them, or the
+ * newest for `null`. The one exception is the viewer's own Path with none
+ * published, which offers every saved version: a plain User can't
+ * publish. Its owner never sees "unavailable", open or closed: a version
+ * it doesn't offer them is `null`, as is an unknown Path, or another
+ * User's with nothing saved.
  */
-export async function getOfferedVersion(
+export async function getTrailhead(
   db: D1Database,
+  userId: string,
   pathId: string,
   number: number | null,
-): Promise<OfferedVersion | null> {
+): Promise<Trailhead | null> {
   const { results } = await db
     .prepare(
-      `SELECT "path_versions"."id", "path_versions"."number", "path_versions"."name",
-         "path_versions"."description", "path_versions"."savedAt",
-         "path_versions"."published", "paths"."open"
-       FROM "path_versions"
-       JOIN "paths" ON "paths"."id" = "path_versions"."pathId"
-       WHERE "path_versions"."pathId" = ?`,
+      `SELECT "paths"."userId", "paths"."open", "path_versions"."id", "path_versions"."number",
+         "path_versions"."name", "path_versions"."description", "path_versions"."savedAt",
+         "path_versions"."published"
+       FROM "paths"
+       LEFT JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
+       WHERE "paths"."id" = ?
+       ORDER BY "path_versions"."number" DESC`,
     )
     .bind(pathId)
     .all<
-      Omit<PathVersion, "pathId" | "milestones"> & {
+      Omit<PathVersion, "pathId" | "milestones" | "id"> & {
+        id: string | null;
         published: number;
+        userId: string | null;
         open: number;
       }
     >();
-  const wanted = number ?? offeredNumber(results.map(versionSummary));
-  const picked = results.find((v) => v.published === 1 && v.number === wanted);
+  const owner = results[0]?.userId;
+  const own = owner === userId;
+  const followable = own || owner === null;
+  const saved = results.filter(
+    (row): row is (typeof results)[number] & { id: string } => row.id !== null,
+  );
+  const published = saved.filter((v) => v.published === 1);
+  const shown = own && published.length === 0 ? saved : published;
+  const picked =
+    number === null ? shown[0] : shown.find((v) => v.number === number);
+
+  const newest = published[0] ?? saved[0];
+  if (!newest) {
+    return own ? { status: "unsaved" } : null;
+  }
+  if (!followable && (!picked || results[0]?.open !== 1)) {
+    return { status: "unavailable", name: newest.name };
+  }
   if (!picked) {
     return null;
   }
-  const { id, name, description, savedAt } = picked;
-  return {
-    version: withMilestones(
-      { id, pathId, number: picked.number, name, description, savedAt },
-      await loadMilestones(db, id),
-    ),
-    open: picked.open === 1,
-  };
-}
 
-/**
- * The number of the version a Path's root address offers: its
- * highest-numbered published one, or `null` with none published. Worked
- * out from the versions every time, never stored.
- */
-export function offeredNumber(
-  versions: readonly Pick<VersionSummary, "number" | "published">[],
-): number | null {
-  const published = versions.filter((v) => v.published).map((v) => v.number);
-  return published.length > 0 ? Math.max(...published) : null;
+  const { id, name, description, savedAt } = picked;
+  const version = withMilestones(
+    { id, pathId, number: picked.number, name, description, savedAt },
+    await loadMilestones(db, id),
+  );
+  const versions = shown.map(versionSummary);
+  return followable
+    ? {
+        status: "followable",
+        owner: own ? "user" : "dreamport",
+        version: version as FollowableVersion,
+        versions,
+      }
+    : { status: "offered", version, versions };
 }
 
 async function loadVersion(

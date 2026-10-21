@@ -156,6 +156,36 @@ export async function listJourneys(
   return results;
 }
 
+/** One of the User's Products, as a Trailhead's picker lists it (#205). */
+export interface ProductOnPath {
+  readonly id: string;
+  readonly name: string;
+  /** Its Journey in progress on the Path, on any version, if it has one. */
+  readonly journeyId: string | null;
+}
+
+/** Every one of the User's Products, oldest first, with its Journey in progress on the Path. */
+export async function productsOnPath(
+  db: D1Database,
+  userId: string,
+  pathId: string,
+): Promise<ProductOnPath[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT "products"."id", "products"."name",
+         (SELECT "journeys"."id" FROM "journeys"
+          JOIN "path_versions" ON "path_versions"."id" = "journeys"."versionId"
+          WHERE "journeys"."productId" = "products"."id" AND "path_versions"."pathId" = ? AND ${IN_PROGRESS}
+          LIMIT 1) AS "journeyId"
+       FROM "products"
+       WHERE "products"."userId" = ?
+       ORDER BY "products"."createdAt" ASC`,
+    )
+    .bind(pathId, userId)
+    .all<ProductOnPath>();
+  return results;
+}
+
 /**
  * Start a Journey for the Product on `version`, at its first Milestone,
  * with its one instance of each singleton Worksheet on the version (#139).
