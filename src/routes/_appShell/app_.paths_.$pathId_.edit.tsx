@@ -30,6 +30,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Dialog from "../../components/Dialog";
+import Link from "../../components/Link";
 import Notice from "../../components/Notice";
 import TextArea from "../../components/TextArea";
 import TextInput from "../../components/TextInput";
@@ -201,8 +202,8 @@ export const Route = createFileRoute("/_appShell/app_/paths_/$pathId_/edit")({
     return {
       draft,
       breadcrumbs: {
-        // The Path's own address redirects back here until a Path has a
-        // page of its own.
+        // The Path's own address is its Trailhead, or back here while it
+        // has only a Draft.
         trail: [
           { label: "Paths", href: "/app/paths" },
           { label: draft.name, href: `/app/paths/${draft.id}` },
@@ -377,9 +378,8 @@ function PathDraft() {
       </div>
       {guide && (
         <p className="text-sm">
-          {/* Plain text until #205 gives the Path a page at
-              `/app/paths/:pathId`; then the word links there. */}
-          Path Status: {open ? "Open" : "Closed"}
+          Path Status:{" "}
+          <Link href={`/app/paths/${path.id}`}>{open ? "Open" : "Closed"}</Link>
         </p>
       )}
       {notice && <NoticeOf sentences={notice} />}

@@ -30,7 +30,7 @@ describe("journeyBreadcrumbs", () => {
       { label: "Paths", href: "/app/products/p1/journeys" },
       {
         label: "Dream Sequence",
-        href: "/app/products/p1/paths/dream-sequence/trailhead",
+        href: "/app/paths/dream-sequence",
       },
     ]);
   });
