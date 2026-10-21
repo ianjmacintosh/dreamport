@@ -30,10 +30,10 @@ import { PrototypeSwitcher } from "../../components/PrototypeSwitcher";
 // ---------------------------------------------------------------- stubs --
 
 const VARIANTS = [
-  { key: "M", name: "Round 4's M: 1rem between cards and button" },
-  { key: "Q", name: "1.5rem between cards and button (as .list)" },
-  { key: "R", name: "2rem between cards and button (as headings)" },
-  { key: "S", name: "2.5rem between cards and button" },
+  { key: "M", name: "Round 4's M: 2rem above headings" },
+  { key: "T", name: "1rem above headings, the generic gap, no new rule" },
+  { key: "U", name: "1.25rem above headings" },
+  { key: "V", name: "1.5rem above headings" },
 ];
 
 const STATES = [
@@ -490,7 +490,13 @@ const GAP: Record<string, string> = {
   S: "var(--space-9)",
 };
 
+// Round 6: with the click wrapper gone, `main > * + *`'s 1rem gives the
+// cards and the button room enough; M's 2rem above headings is now too
+// much. T–V: no extra room (the generic 1rem), 1.25rem, 1.5rem.
 const ROOM: Record<string, string> = {
+  T: "var(--space-4)",
+  U: "var(--space-5)",
+  V: "var(--space-6)",
   Q: "var(--space-8)",
   R: "var(--space-8)",
   S: "var(--space-8)",
@@ -778,7 +784,7 @@ export function Prototype({
   setSearch: (next: ProtoSearch) => void;
 }) {
   const [lastClick, setLastClick] = useState<string | null>(null);
-  const variant = search.variant ?? "Q";
+  const variant = search.variant ?? "T";
   const state = search.state ?? "typical";
   const blurb = search.blurb ?? "1";
   const stub = stubFor(state);
