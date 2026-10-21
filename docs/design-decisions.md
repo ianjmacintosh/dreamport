@@ -321,7 +321,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
     name and description all at once, so Cancel really cancels.
   - A Path with no Milestones shows "No Milestones yet." and "Manage
     Milestones" under the h2.
-  - The save state and Save as New Version end the page (below).
+  - Save as New Version ends the page (below).
 
 - A heading with an action (Edit Path beside a Path's h1, Edit Milestone
   beside a Milestone's h3) puts the button at the right end of the
@@ -338,18 +338,14 @@ Add an entry only once a sign-off conversation resolves something repeatable
   end (Save as New Version). Forms and Dialogs built before this move
   over when they're next changed (decided in #169).
 
-- A Path's page ends with its save state, then Save as New Version
-  bottom right: "Last edited {date and time}", then "Latest version:
-  {n}, saved {date and time}" ("No saved versions yet." before the first
-  save), the latest-version line a `role="status"` so a save is
-  announced as it changes, and a refused save's reason under the button.
-  No Milestones-and-Tasks count. (#191 added a version label and a list
-  of every version, under the h1.) A date and time shows in the
-  browser's own locale as a long date with the time ("October 10, 2026
-  at 2:32 PM"), in a `<time>`. Picked
-  over status lines at the top, a facts list, and a "changed since the
-  last save" sentence in a prototype on branch
-  `169-prototype-save-version` (decided in #169).
+- A Path's page ends with Save as New Version bottom right, and a
+  refused save's reason under the button. Which version the page is, and
+  every saved version, are under the h1 instead (#191, which dropped
+  #169's "Last edited" and "Latest version" lines as too much in the
+  status area). No Milestones-and-Tasks count. A date and time shows in
+  the browser's own locale as a long date with the time ("October 10,
+  2026 at 2:32 PM"), in a `<time>` (decided in #169, from a prototype on
+  branch `169-prototype-save-version`).
 
 - A Product's Journeys, Pathfinder and a Path's Trailhead are three pages
   under the Product, each with the Product's name as the h1 except the

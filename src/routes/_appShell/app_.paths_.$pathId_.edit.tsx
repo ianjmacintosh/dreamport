@@ -252,7 +252,7 @@ type Sentences = readonly string[];
  * The Path's page (docs/design-decisions.md, #169, #191): its name, a
  * Guide's Path Status, which version the page is with Manage Versions,
  * the description, the route of Milestones beside the picked one and its
- * Tasks, then the save state. Name, description and the Milestones' order
+ * Tasks, then Save as New Version. Name, description and the Milestones' order
  * change together in the Edit Path Dialog; a Milestone's own fields in
  * the Edit Milestone Dialog; its Tasks right there in the panel. A Guide
  * publishes and unpublishes versions in the Manage Versions Dialog, and
@@ -266,7 +266,6 @@ function PathDraft() {
   const navigate = Route.useNavigate();
   const [path, setPath] = useState<PathHead>(draft);
   const [milestones, setMilestones] = useState<Milestone[]>(draft.milestones);
-  const [updatedAt, setUpdatedAt] = useState(draft.updatedAt);
   const [matchesLatest, setMatchesLatest] = useState(draft.matchesLatest);
   const [versions, setVersions] = useState(draft.versions);
   const [open, setOpen] = useState(draft.open);
@@ -296,16 +295,14 @@ function PathDraft() {
     });
   }
 
-  /** After a Draft write lands: the server's `updatedAt` moved to about now. */
+  /** After a Draft write lands: it no longer matches its latest version. */
   function touch() {
-    setUpdatedAt(new Date().toISOString());
     setMatchesLatest(false);
   }
 
   function showUpdatedDraft(updated: Draft) {
     setPath(updated);
     setMilestones(updated.milestones);
-    setUpdatedAt(updated.updatedAt);
     setMatchesLatest(updated.matchesLatest);
     setVersions(updated.versions);
     setOpen(updated.open);
@@ -465,18 +462,6 @@ function PathDraft() {
         </>
       )}
 
-      <p role="status">
-        {latestVersion ? (
-          <>
-            Latest version: {latestVersion.number}, saved{" "}
-            <time dateTime={latestVersion.savedAt}>
-              {DATE_TIME.format(new Date(latestVersion.savedAt))}
-            </time>
-          </>
-        ) : (
-          "No saved versions yet."
-        )}
-      </p>
       <div className="button-group button-group--end">
         {/* An open Path can't be deleted: Close This Path takes Delete
             Path's place until it's closed. */}
@@ -523,14 +508,6 @@ function PathDraft() {
         </Button>
       </div>
       {saveError && <p role="alert">{saveError}</p>}
-      <p className="text-sm">
-        <i>
-          Last edited{" "}
-          <time dateTime={updatedAt}>
-            {DATE_TIME.format(new Date(updatedAt))}
-          </time>
-        </i>
-      </p>
 
       <EditPathDialog
         opening={pathDialog}

@@ -46,14 +46,14 @@ test("make a Path, manage its Milestones in Edit Path, edit one, give it a Task,
   await addPath(page, pathName);
   await expect(page.getByText("No Milestones yet.")).toBeVisible();
   const save = page.getByRole("button", { name: "Save as New Version" });
-  const latestVersion = page
-    .getByRole("status")
-    .filter({ hasText: /saved version|Latest version/ });
+  const versionLabel = page.getByText(
+    /^(Version \d+|Draft)( \(unpublished\))?$/,
+  );
   await save.click();
   await expect(page.getByRole("alert")).toHaveText(
     "Add a Milestone before saving a version.",
   );
-  await expect(latestVersion).toHaveText("No saved versions yet.");
+  await expect(versionLabel).toHaveText("Draft (unpublished)");
 
   // Adds and moves wait for Update Path, so Cancel sends nothing.
   const sent: string[] = [];
@@ -164,9 +164,9 @@ test("make a Path, manage its Milestones in Edit Path, edit one, give it a Task,
   ).toBeVisible();
 
   await save.click();
-  await expect(latestVersion).toHaveText(/^Latest version: 1, saved /);
+  await expect(versionLabel).toHaveText("Version 1 (unpublished)");
   await page.reload();
-  await expect(latestVersion).toHaveText(/^Latest version: 1, saved /);
+  await expect(versionLabel).toHaveText("Version 1 (unpublished)");
 });
 
 test("Update Path past 150 Milestones and Tasks shows the cap and changes nothing", async ({
@@ -229,9 +229,7 @@ test("Discard Changes puts the Draft back as its latest version saved it", async
   await addTask.click();
   await expect(taskTitle).toHaveValue("");
   await page.getByRole("button", { name: "Save as New Version" }).click();
-  await expect(
-    page.getByRole("status").filter({ hasText: /Latest version/ }),
-  ).toHaveText(/^Latest version: 1, saved /);
+  await expect(page.getByText("Version 1 (unpublished)")).toBeVisible();
   await expect(openDiscard).toBeVisible();
 
   await page.getByRole("button", { name: "Edit Path" }).click();
