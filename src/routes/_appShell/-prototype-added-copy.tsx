@@ -327,8 +327,6 @@ const icon = {
 
 const LOOK_PLAIN: Look = { icon: () => icon.compass };
 
-const ADDED_LINE =
-  "Copies of other Users' Paths. Your Products can follow them, but they can't be changed.";
 
 function PathfinderRound3({ stub }: { stub: Stub }) {
   const all = entries(stub, true);
