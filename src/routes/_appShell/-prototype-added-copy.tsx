@@ -1,6 +1,9 @@
 // PROTOTYPE — throwaway (#192). Lives on 192-prototype-added-copy only;
 // never merge, never push.
 //
+// Round 2 (below "round 2"): E–H, after Ian picked D. Round 1's A–C are
+// in this branch's history (d658e06).
+//
 // Round 1: how an Added copy looks among a User's Available Paths, on the
 // Paths page (`/app/paths`) and Pathfinder
 // (`/app/products/:productId/pathfinder`). Four structurally different
@@ -9,7 +12,13 @@
 // to the state line instead of navigating.
 import { useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
-import { CompassIcon } from "@phosphor-icons/react";
+import {
+  BookOpenIcon,
+  CompassIcon,
+  LockSimpleIcon,
+  PencilSimpleIcon,
+  UserIcon,
+} from "@phosphor-icons/react";
 
 import ActionCard from "../../components/ActionCard";
 import Button from "../../components/Button";
@@ -19,10 +28,11 @@ import { PrototypeSwitcher } from "../../components/PrototypeSwitcher";
 // ---------------------------------------------------------------- stubs --
 
 const VARIANTS = [
-  { key: "A", name: "One list, version beside a copy's name" },
-  { key: "B", name: "Two sections: made by you, Added" },
-  { key: "C", name: "One row per Path, its versions inside" },
-  { key: "D", name: "Rows say what you can do: Edit Path / View Path" },
+  { key: "D", name: "Round 1's D, for reference" },
+  { key: "E", name: "One list, pencil (yours) or padlock (read-only)" },
+  { key: "F", name: "Two sections, pencil or padlock" },
+  { key: "G", name: "One list, person or open book, versions at the end" },
+  { key: "H", name: "Compass on every card, words say made or Added" },
 ];
 
 const STATES = [
@@ -223,318 +233,6 @@ function compass() {
   return <CompassIcon weight="bold" aria-hidden="true" />;
 }
 
-// ------------------------------------------------------------- variant A --
-// One list, as today. A copy's row links to its Trailhead and carries
-// "Version 2 · Added" at the row's end, small and italic; an own Path's row
-// is unchanged and still opens the editor.
-
-function PathsA({ stub }: { stub: Stub }) {
-  const rows = [...stub.paths].sort(byName);
-  return (
-    <>
-      <h1 id="paths-heading">Paths</h1>
-      <PathsIntro />
-      <p>
-        <Button>Make New Path</Button>
-      </p>
-      <ul className="list" aria-labelledby="paths-heading">
-        {rows.map((p) => (
-          <li className="list-row" key={p.id}>
-            <Link
-              className="list-row-name"
-              href={p.kind === "copy" ? trailhead(p) : editor(p)}
-            >
-              {p.name}
-            </Link>
-            {p.kind === "copy" && (
-              <span className="list-row-action text-sm" style={italic}>
-                Version {p.version}
-                <Dot />
-                Added
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-}
-
-function PathfinderA({ stub }: { stub: Stub }) {
-  const entries: ({ id: string; name: string } & Partial<UserPath>)[] = [
-    DREAM_SEQUENCE,
-    ...followableOwn(stub),
-    ...copies(stub),
-  ];
-  return (
-    <>
-      <h1>{PRODUCT.name}</h1>
-      <h2>Browse Available Paths</h2>
-      <ul className="action-card-list">
-        {entries.map((p) => {
-          const { href, status } = pathfinderTarget(stub, p);
-          const version = p.kind === "copy" ? `Version ${p.version}` : null;
-          const trailing = [version, status].filter(Boolean).join(" · ");
-          return (
-            <li key={p.id}>
-              <ActionCard
-                href={href}
-                leading={compass()}
-                trailing={
-                  trailing && <ActionCard.Status>{trailing}</ActionCard.Status>
-                }
-              >
-                {p.name}
-              </ActionCard>
-            </li>
-          );
-        })}
-      </ul>
-      <MakeYourOwn />
-    </>
-  );
-}
-
-// ------------------------------------------------------------- variant B --
-// Two sections. The Paths page splits "Paths You Made" (with Make New Path)
-// from "Paths You've Added" (one line on what Added means, then a row per
-// copy, its version at the row's end). Pathfinder groups the same way under
-// h3s, Dream Sequence on its own first.
-
-function PathsB({ stub }: { stub: Stub }) {
-  const mine = own(stub).sort(byName);
-  const added = copies(stub).sort(byName);
-  return (
-    <>
-      <h1>Paths</h1>
-      <PathsIntro />
-      <h2 id="made-heading">Paths You Made</h2>
-      <p>
-        <Button>Make New Path</Button>
-      </p>
-      {mine.length === 0 ? (
-        <p>No Paths yet.</p>
-      ) : (
-        <ul className="list" aria-labelledby="made-heading">
-          {mine.map((p) => (
-            <li className="list-row" key={p.id}>
-              <Link className="list-row-name" href={editor(p)}>
-                {p.name}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-      {added.length > 0 && (
-        <>
-          <h2 id="added-heading">Paths You&apos;ve Added</h2>
-          <p>
-            These are copies of other Users&apos; Paths. Your Products can
-            follow them, but they can&apos;t be changed.
-          </p>
-          <ul className="list" aria-labelledby="added-heading">
-            {added.map((p) => (
-              <li className="list-row" key={p.id}>
-                <Link className="list-row-name" href={trailhead(p)}>
-                  {p.name}
-                </Link>
-                <span className="list-row-action text-sm">
-                  Version {p.version}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </>
-  );
-}
-
-function CardList({
-  stub,
-  entries,
-}: {
-  stub: Stub;
-  entries: ({ id: string; name: string } & Partial<UserPath>)[];
-}) {
-  return (
-    <ul className="action-card-list">
-      {entries.map((p) => {
-        const { href, status } = pathfinderTarget(stub, p);
-        return (
-          <li key={p.id}>
-            <ActionCard
-              href={href}
-              leading={compass()}
-              trailing={
-                status && <ActionCard.Status>{status}</ActionCard.Status>
-              }
-            >
-              {p.name}
-              {p.kind === "copy" && (
-                <>
-                  <Dot />
-                  <span className="text-sm">Version {p.version}</span>
-                </>
-              )}
-            </ActionCard>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function PathfinderB({ stub }: { stub: Stub }) {
-  const mine = followableOwn(stub).sort(byName);
-  const added = copies(stub).sort(byName);
-  return (
-    <>
-      <h1>{PRODUCT.name}</h1>
-      <h2>Browse Available Paths</h2>
-      <h3>From Dreamport</h3>
-      <CardList stub={stub} entries={[DREAM_SEQUENCE]} />
-      {mine.length > 0 && (
-        <>
-          <h3>Made by You</h3>
-          <CardList stub={stub} entries={mine} />
-        </>
-      )}
-      {added.length > 0 && (
-        <>
-          <h3>Added</h3>
-          <CardList stub={stub} entries={added} />
-        </>
-      )}
-      <MakeYourOwn />
-    </>
-  );
-}
-
-// ------------------------------------------------------------- variant C --
-// One row per Path, not per copy. Copies of two versions of one Path share
-// a row: its name links to the newest copy's Trailhead, and the row's end
-// lists every version held, each a link to that copy's Trailhead. On
-// Pathfinder that's one card per Path, the versions in its status; a Path
-// is followed once across its versions, so the card says which.
-
-function VersionLinks({ group }: { group: CopyPath[] }) {
-  return (
-    <span className="list-row-action text-sm">
-      {group.length === 1 ? (
-        <>Version {group[0].version}</>
-      ) : (
-        <>
-          {"Versions "}
-          {group.map((c, i) => (
-            <span key={c.id}>
-              {i > 0 && (i === group.length - 1 ? " and " : ", ")}
-              <Link href={trailhead(c)}>{c.version}</Link>
-            </span>
-          ))}
-        </>
-      )}
-    </span>
-  );
-}
-
-function PathsC({ stub }: { stub: Stub }) {
-  type Row = { name: string; own?: OwnPath; group?: CopyPath[] };
-  const rows: Row[] = [
-    ...own(stub).map((p): Row => ({ name: p.name, own: p })),
-    ...groupCopies(stub).map((g): Row => ({ name: g[0].name, group: g })),
-  ].sort((a, b) => a.name.localeCompare(b.name) || (a.own ? -1 : 1));
-  return (
-    <>
-      <h1 id="paths-heading">Paths</h1>
-      <PathsIntro />
-      <p>
-        <Button>Make New Path</Button>
-      </p>
-      <ul className="list" aria-labelledby="paths-heading">
-        {rows.map((r) =>
-          r.own ? (
-            <li className="list-row" key={r.own.id}>
-              <Link className="list-row-name" href={editor(r.own)}>
-                {r.name}
-              </Link>
-            </li>
-          ) : (
-            <li className="list-row" key={r.group![0].sourceId}>
-              <Link
-                className="list-row-name"
-                href={trailhead(r.group![r.group!.length - 1])}
-              >
-                {r.name}
-              </Link>
-              <VersionLinks group={r.group!} />
-            </li>
-          ),
-        )}
-      </ul>
-    </>
-  );
-}
-
-function PathfinderC({ stub }: { stub: Stub }) {
-  const groups = groupCopies(stub);
-  return (
-    <>
-      <h1>{PRODUCT.name}</h1>
-      <h2>Browse Available Paths</h2>
-      <ul className="action-card-list">
-        {[DREAM_SEQUENCE, ...followableOwn(stub)].map((p) => {
-          const { href, status } = pathfinderTarget(stub, p);
-          return (
-            <li key={p.id}>
-              <ActionCard
-                href={href}
-                leading={compass()}
-                trailing={
-                  status && <ActionCard.Status>{status}</ActionCard.Status>
-                }
-              >
-                {p.name}
-              </ActionCard>
-            </li>
-          );
-        })}
-        {groups.map((g) => {
-          const newest = g[g.length - 1];
-          const journey = stub.journeys[newest.sourceId];
-          const following = journey?.status === "following";
-          const followed = g.find((c) => c.id === journey?.pathId);
-          const versions =
-            g.length === 1
-              ? `Version ${newest.version}`
-              : `Versions ${g.map((c) => c.version).join(" and ")}`;
-          const status = following
-            ? `Following Version ${followed?.version}`
-            : journey
-              ? journey.status === "completed"
-                ? "Completed"
-                : "Abandoned"
-              : versions;
-          return (
-            <li key={newest.sourceId}>
-              <ActionCard
-                href={
-                  following ? journeyHref(journey.pathId) : trailhead(newest)
-                }
-                leading={compass()}
-                trailing={<ActionCard.Status>{status}</ActionCard.Status>}
-              >
-                {newest.name}
-              </ActionCard>
-            </li>
-          );
-        })}
-      </ul>
-      <MakeYourOwn />
-    </>
-  );
-}
-
 // ------------------------------------------------------------- variant D --
 // Rows say what you can do. The Paths page's rows become white cards
 // (`.list--cards`), each the Path's name over a small line about it, and a
@@ -635,20 +333,318 @@ function PathfinderD({ stub }: { stub: Stub }) {
   );
 }
 
+// ---------------------------------------------------------- round 2 --
+// Ian on round 1: D's cards, but one card per Path however many versions
+// are held; the whole card clickable, always to the Trailhead (an own
+// Path's Trailhead has Edit Path); the name bold; an icon saying yours or
+// read-only. What's still open is which icons, sections or one list, and
+// where the version goes. E–H answer those differently; D stays for
+// reference.
+
+/** One entry per Path: each own Path, and each Path the User holds copies of. */
+type Entry =
+  | { kind: "own"; id: string; name: string; path: OwnPath }
+  | { kind: "added"; id: string; name: string; copies: CopyPath[] }
+  | { kind: "dreamport"; id: string; name: string };
+
+function entries(s: Stub, forPathfinder: boolean): Entry[] {
+  const mine = (forPathfinder ? followableOwn(s) : own(s)).map(
+    (p): Entry => ({ kind: "own", id: p.id, name: p.name, path: p }),
+  );
+  const added = groupCopies(s).map(
+    (g): Entry => ({
+      kind: "added",
+      id: g[0].sourceId,
+      name: g[0].name,
+      copies: g,
+    }),
+  );
+  const byEntryName = (a: Entry, b: Entry) => a.name.localeCompare(b.name);
+  return [
+    ...(forPathfinder
+      ? [{ kind: "dreamport", ...DREAM_SEQUENCE } as Entry]
+      : []),
+    ...[...mine, ...added].sort(
+      (a, b) => byEntryName(a, b) || (a.kind === "own" ? -1 : 1),
+    ),
+  ];
+}
+
+function versionsText(e: Entry): string {
+  if (e.kind === "dreamport") return "";
+  if (e.kind === "own") {
+    return e.path.version === null
+      ? "Draft, no version saved"
+      : `Version ${e.path.version}`;
+  }
+  const v = e.copies.map((c) => c.version);
+  return v.length === 1
+    ? `Version ${v[0]}`
+    : `Versions ${v.slice(0, -1).join(", ")} and ${v[v.length - 1]}`;
+}
+
+/** Pathfinder's status for an entry: Following, Completed, Abandoned. */
+function journeyStatus(s: Stub, e: Entry) {
+  const journey = s.journeys[e.id];
+  if (!journey) return { href: trailhead(e), status: null };
+  if (journey.status === "following") {
+    const on = s.paths.find((p) => p.id === journey.pathId);
+    return {
+      href: journeyHref(journey.pathId),
+      status:
+        e.kind === "added" && e.copies.length > 1 && on?.kind === "copy"
+          ? `Following Version ${on.version}`
+          : "Following",
+    };
+  }
+  return {
+    href: trailhead(e),
+    status: journey.status === "completed" ? "Completed" : "Abandoned",
+  };
+}
+
+interface Look {
+  icon: (e: Entry) => ReactNode;
+  /** The small line under the name, if this look has one. */
+  line?: (e: Entry) => ReactNode;
+  /** Text at the card's end on the Paths page, if any. */
+  end?: (e: Entry) => string | null;
+}
+
+function Card({
+  e,
+  look,
+  stub,
+  page,
+}: {
+  e: Entry;
+  look: Look;
+  stub: Stub;
+  page: "Paths" | "Pathfinder";
+}) {
+  const { href, status } =
+    page === "Pathfinder"
+      ? journeyStatus(stub, e)
+      : { href: trailhead(e), status: null };
+  const end = [look.end?.(e), status].filter(Boolean).join(" · ");
+  const line = look.line?.(e);
+  return (
+    <ActionCard
+      href={href}
+      leading={look.icon(e)}
+      trailing={end && <ActionCard.Status>{end}</ActionCard.Status>}
+    >
+      <strong>{e.name}</strong>
+      {line && (
+        <>
+          <br />
+          <span className="text-sm">{line}</span>
+        </>
+      )}
+    </ActionCard>
+  );
+}
+
+function Cards({
+  list,
+  look,
+  stub,
+  page,
+}: {
+  list: Entry[];
+  look: Look;
+  stub: Stub;
+  page: "Paths" | "Pathfinder";
+}) {
+  return (
+    <ul className="action-card-list">
+      {list.map((e) => (
+        <li key={e.id}>
+          <Card e={e} look={look} stub={stub} page={page} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const icon = {
+  pencil: <PencilSimpleIcon weight="bold" aria-hidden="true" />,
+  lock: <LockSimpleIcon weight="bold" aria-hidden="true" />,
+  user: <UserIcon weight="bold" aria-hidden="true" />,
+  book: <BookOpenIcon weight="bold" aria-hidden="true" />,
+  compass: <CompassIcon weight="bold" aria-hidden="true" />,
+};
+
+// E: one list. A pencil for a Path you made (you can change it), a padlock
+// for anything you can't (an Added copy, Dream Sequence). The small line
+// says Added and the versions.
+const LOOK_E: Look = {
+  icon: (e) => (e.kind === "own" ? icon.pencil : icon.lock),
+  line: (e) =>
+    e.kind === "own" ? (
+      versionsText(e)
+    ) : e.kind === "added" ? (
+      <>
+        Added
+        <Dot />
+        Read-only
+        <Dot />
+        {versionsText(e)}
+      </>
+    ) : (
+      "From Dreamport"
+    ),
+};
+
+// F: B's two sections, with E's pencil and padlock. The headings say
+// made-or-Added, so the small line is only the versions.
+const LOOK_F: Look = {
+  icon: LOOK_E.icon,
+  line: (e) => (e.kind === "dreamport" ? null : versionsText(e)),
+};
+
+// G: one list, no second line. A person for a Path you made, an open book
+// for an Added one (the "bought book" of CONTEXT.md); the versions sit at
+// the card's end like a status.
+const LOOK_G: Look = {
+  icon: (e) =>
+    e.kind === "own"
+      ? icon.user
+      : e.kind === "added"
+        ? icon.book
+        : icon.compass,
+  end: (e) => versionsText(e) || null,
+};
+
+// H: the compass stays on every card (#199's "Paths are a compass"), and
+// the words carry it: "Made by you" or "Added, read-only" on the small
+// line, made ones first, then Added.
+const LOOK_H: Look = {
+  icon: () => icon.compass,
+  line: (e) =>
+    e.kind === "own" ? (
+      <>
+        Made by you
+        <Dot />
+        {versionsText(e)}
+      </>
+    ) : e.kind === "added" ? (
+      <>
+        Added, read-only
+        <Dot />
+        {versionsText(e)}
+      </>
+    ) : (
+      "From Dreamport"
+    ),
+};
+
+const LOOKS: Record<string, Look> = {
+  E: LOOK_E,
+  F: LOOK_F,
+  G: LOOK_G,
+  H: LOOK_H,
+};
+
+function PathsRound2({ variant, stub }: { variant: string; stub: Stub }) {
+  const look = LOOKS[variant];
+  const all = entries(stub, false);
+  const mine = all.filter((e) => e.kind === "own");
+  const added = all.filter((e) => e.kind === "added");
+  return (
+    <>
+      <h1>Paths</h1>
+      <PathsIntro />
+      {variant === "F" ? (
+        <>
+          <h2>Paths You Made</h2>
+          <p>
+            <Button>Make New Path</Button>
+          </p>
+          {mine.length === 0 ? (
+            <p>No Paths yet.</p>
+          ) : (
+            <Cards list={mine} look={look} stub={stub} page="Paths" />
+          )}
+          {added.length > 0 && (
+            <>
+              <h2>Paths You&apos;ve Added</h2>
+              <p>
+                These are copies of other Users&apos; Paths. Your Products can
+                follow them, but they can&apos;t be changed.
+              </p>
+              <Cards list={added} look={look} stub={stub} page="Paths" />
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <p>
+            <Button>Make New Path</Button>
+          </p>
+          <Cards
+            list={variant === "H" ? [...mine, ...added] : all}
+            look={look}
+            stub={stub}
+            page="Paths"
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+function PathfinderRound2({ variant, stub }: { variant: string; stub: Stub }) {
+  const look = LOOKS[variant];
+  const all = entries(stub, true);
+  const ofKind = (k: Entry["kind"]) => all.filter((e) => e.kind === k);
+  return (
+    <>
+      <h1>{PRODUCT.name}</h1>
+      <h2>Browse Available Paths</h2>
+      {variant === "F" ? (
+        (
+          [
+            ["From Dreamport", ofKind("dreamport")],
+            ["Made by You", ofKind("own")],
+            ["Added", ofKind("added")],
+          ] as const
+        ).map(
+          ([heading, list]) =>
+            list.length > 0 && (
+              <div key={heading}>
+                <h3>{heading}</h3>
+                <Cards list={list} look={look} stub={stub} page="Pathfinder" />
+              </div>
+            ),
+        )
+      ) : (
+        <Cards
+          list={
+            variant === "H"
+              ? [...ofKind("dreamport"), ...ofKind("own"), ...ofKind("added")]
+              : all
+          }
+          look={look}
+          stub={stub}
+          page="Pathfinder"
+        />
+      )}
+      <MakeYourOwn />
+    </>
+  );
+}
+
 // ------------------------------------------------------------- harness --
 
 function PathsPage({ variant, stub }: { variant: string; stub: Stub }) {
-  if (variant === "B") return <PathsB stub={stub} />;
-  if (variant === "C") return <PathsC stub={stub} />;
   if (variant === "D") return <PathsD stub={stub} />;
-  return <PathsA stub={stub} />;
+  return <PathsRound2 variant={variant} stub={stub} />;
 }
 
 function PathfinderPage({ variant, stub }: { variant: string; stub: Stub }) {
-  if (variant === "B") return <PathfinderB stub={stub} />;
-  if (variant === "C") return <PathfinderC stub={stub} />;
   if (variant === "D") return <PathfinderD stub={stub} />;
-  return <PathfinderA stub={stub} />;
+  return <PathfinderRound2 variant={variant} stub={stub} />;
 }
 
 /** Catches link clicks inside the page, so a stubbed row never navigates. */
@@ -665,6 +661,12 @@ function catchClicks(onClick: (href: string) => void): (e: MouseEvent) => void {
 }
 
 function describeHref(href: string, stub: Stub): string {
+  const held = stub.paths.filter(
+    (p) => p.kind === "copy" && href.endsWith(`/paths/${p.sourceId}`),
+  ) as CopyPath[];
+  if (held.length > 0) {
+    return `the Trailhead for ${held[0].name}, showing your copy of Version ${held[held.length - 1].version}`;
+  }
   const path = stub.paths.find((p) => href.includes(`/${p.id}`));
   const label = path
     ? `${path.name}${path.kind === "copy" ? ` (copy of Version ${path.version})` : ""}`
@@ -798,7 +800,7 @@ export function Prototype({
   setSearch: (next: ProtoSearch) => void;
 }) {
   const [lastClick, setLastClick] = useState<string | null>(null);
-  const variant = search.variant ?? "A";
+  const variant = search.variant ?? "E";
   const state = search.state ?? "typical";
   const stub = stubFor(state);
   const set = (next: ProtoSearch) => {
