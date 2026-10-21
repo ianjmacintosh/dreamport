@@ -520,7 +520,8 @@ Add an entry only once a sign-off conversation resolves something repeatable
   beside Save as New Version) down to the one below, then wording):
   - Under the h1 and above the description, two lines at `.text-sm`. The
     first is "Path Status: Open" or "Path Status: Closed", plain text, the
-    word linking to the Trailhead. It is the Guide's alone. The second is
+    word linking to the Trailhead (plain text until #205 gives the Path
+    its page at `/app/paths/:pathId`). It is the Guide's alone. The second is
     the version being edited in bold, then a middle dot (hidden from screen
     readers) and a `.link-quiet` "Manage Versions". Everyone sees the
     second line, a plain User included.

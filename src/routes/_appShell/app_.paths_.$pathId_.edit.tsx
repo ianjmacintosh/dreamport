@@ -30,7 +30,6 @@ import { CSS } from "@dnd-kit/utilities";
 import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Dialog from "../../components/Dialog";
-import Link from "../../components/Link";
 import Notice from "../../components/Notice";
 import TextArea from "../../components/TextArea";
 import TextInput from "../../components/TextInput";
@@ -379,10 +378,9 @@ function PathDraft() {
       </div>
       {guide && (
         <p className="text-sm">
-          Path Status:{" "}
-          <Link href={`/app/paths/${path.id}`} current={false}>
-            {open ? "Open" : "Closed"}
-          </Link>
+          {/* Plain text until #205 gives the Path a page at
+              `/app/paths/:pathId`; then the word links there. */}
+          Path Status: {open ? "Open" : "Closed"}
         </p>
       )}
       {notice && <NoticeOf sentences={notice} />}
