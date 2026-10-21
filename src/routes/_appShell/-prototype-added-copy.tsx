@@ -368,7 +368,7 @@ function PathfinderRound3({ stub }: { stub: Stub }) {
 const BLURBS = [
   {
     key: "ian",
-    text: "The paths listed below were made by other users. You can follow these paths, but you cannot make changes to them.",
+    text: "The paths listed below were made by other people. You can follow these paths, but you cannot make changes to them.",
   },
   {
     key: "1",
