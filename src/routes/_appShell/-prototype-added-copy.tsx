@@ -463,6 +463,10 @@ function PathfinderRound3({ stub }: { stub: Stub }) {
 
 const BLURBS = [
   {
+    key: "ian",
+    text: "The Paths listed below were made by other Users. You can follow these Paths, but you cannot make changes to them.",
+  },
+  {
     key: "1",
     text: "These were made by other Users. Your Products can follow them, but you can't edit them.",
   },
@@ -786,7 +790,7 @@ export function Prototype({
   const [lastClick, setLastClick] = useState<string | null>(null);
   const variant = search.variant ?? "T";
   const state = search.state ?? "typical";
-  const blurb = search.blurb ?? "1";
+  const blurb = search.blurb ?? "ian";
   const stub = stubFor(state);
   useEffect(() => {
     const onClick = catchClicks((href) =>
