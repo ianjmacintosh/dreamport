@@ -321,7 +321,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
     name and description all at once, so Cancel really cancels.
   - A Path with no Milestones shows "No Milestones yet." and "Manage
     Milestones" under the h2.
-  - The save state and Save as New Version end the page (below).
+  - Save as New Version ends the page (below).
 
 - A heading with an action (Edit Path beside a Path's h1, Edit Milestone
   beside a Milestone's h3) puts the button at the right end of the
@@ -338,17 +338,14 @@ Add an entry only once a sign-off conversation resolves something repeatable
   end (Save as New Version). Forms and Dialogs built before this move
   over when they're next changed (decided in #169).
 
-- A Path's page ends with its save state, then Save as New Version
-  bottom right: "Last edited {date and time}", then "Latest version:
-  {n}, saved {date and time}" ("No saved versions yet." before the first
-  save), the latest-version line a `role="status"` so a save is
-  announced as it changes, and a refused save's reason under the button.
-  No Draft label, no list of every version, and no Milestones-and-Tasks
-  count. A date and time shows in the browser's own locale as a long date
-  with the time ("October 10, 2026 at 2:32 PM"), in a `<time>`. Picked
-  over status lines at the top, a facts list, and a "changed since the
-  last save" sentence in a prototype on branch
-  `169-prototype-save-version` (decided in #169).
+- A Path's page ends with Save as New Version bottom right, and a
+  refused save's reason under the button. Which version the page is, and
+  every saved version, are under the h1 instead (#191, which dropped
+  #169's "Last edited" and "Latest version" lines as too much in the
+  status area). No Milestones-and-Tasks count. A date and time shows in
+  the browser's own locale as a long date with the time ("October 10,
+  2026 at 2:32 PM"), in a `<time>` (decided in #169, from a prototype on
+  branch `169-prototype-save-version`).
 
 - A Product's Journeys, Pathfinder and a Path's Trailhead are three pages
   under the Product, each with the Product's name as the h1 except the
@@ -510,3 +507,57 @@ Add an entry only once a sign-off conversation resolves something repeatable
   compared outlining the icon, the caret or the card, underlining the
   title, nudging the caret and filling the icon, then combinations of the
   last three; filling the icon was built, then dropped as too much).
+
+- A Guide's Publish, Unpublish, Open and Close controls live in the Path
+  editor (`/app/paths/:pathId/edit`), not on the Trailhead (decided in
+  #191, from a prototype on local branch `191-prototype-editor`: eight
+  rounds, from four placements (a Versions section at the page's end, a
+  status line plus a Dialog, one Publishing menu beside Edit Path, controls
+  beside Save as New Version) down to the one below, then wording):
+  - Under the h1 and above the description, two lines at `.text-sm`. The
+    first is "Path Status: Open" or "Path Status: Closed", plain text, the
+    word linking to the Trailhead (plain text until #205 gives the Path
+    its page at `/app/paths/:pathId`). It is the Guide's alone. The second is
+    the version being edited in bold, then, for a Guide only, a middle dot
+    (hidden from screen readers) and a `.link-quiet` "Manage Versions". A
+    plain User sees just the version: they can't publish, and can't go
+    back to an earlier version, so nothing about publishing is shown to
+    them.
+  - The version is "Version {n}" while the page matches that saved version,
+    and "Draft" after any edit, whether or not another version has exactly
+    the same fields; saving a new version, or Discard Changes, turns it
+    back into a version. A Path nothing is saved on yet is "Draft". For a
+    Guide, " (unpublished)" follows a version that isn't published, and
+    always follows "Draft". This reverses #169's "No Draft label".
+  - "Manage Versions" opens a `Dialog` with a row for every saved version,
+    newest first (`.list`): just "Version {n}", then its buttons at the
+    row's end: Publish on an unpublished row, Copy Link and Unpublish on a
+    published one. Done closes it. Unpublish confirms in place
+    in the row, as every destructive action does: the row says "Users who
+    already Added Version {n} keep it." (and, for the only published
+    version, that unpublishing it closes this Path), with Cancel and
+    Unpublish. Publish and Copy Link act on one click. Copy Link's own
+    label turns to "Copied Link" for a moment, then back, as a `Button`
+    state, so it keeps its width; there is no separate confirmation line.
+  - Close This Path is a secondary button in Delete Path's place at the end
+    of the page, so while a Path is open it can't be deleted. Once it is
+    closed Delete Path returns, and Open This Path follows it, between
+    Delete Path and Save as New Version. Open This Path appears only once a
+    version is published. Publishing into a closed Path doesn't open it; the
+    Guide is told it is still closed. Unpublishing the only published
+    version closes the Path and tells the Guide with the Trailhead's notice
+    (above the version line, in the notice style, which is not an error
+    treatment).
+  - There is no root-address copy button on the page. The Path Status link
+    goes to the Trailhead, and Copy Link on a published version's row is
+    the only copy control.
+  - Copy Link copies the version's own address, the Trailhead's root
+    with the version in the query: `/app/paths/:pathId?version={n}`.
+  - The notice is #205's notice component, built here first since #191
+    lands before #205: a small Phosphor `WarningCircleIcon`, a left accent
+    bar, no box, the text in italics, each sentence its own paragraph with
+    no space below the last. #205's Trailhead reuses it.
+  - The description has a heading, "About This Path": an `h2` (it sits
+    between the h1 and the "Milestones" h2) at `.text-h4`, a new type
+    utility that gives a heading the `h4`'s look, its body face included.
+    A plain `h2` is too big over a sentence or two.

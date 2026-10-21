@@ -196,6 +196,8 @@ export const TEST_EMAILS = {
   pathsModulePathfinder: "delivered+paths-module-pathfinder@resend.dev",
   /** Makes Paths and opens their Trailheads (#170). */
   pathsModuleTrailhead: "delivered+paths-module-trailhead@resend.dev",
+  /** Publishes and Unpublishes versions, and Opens and Closes Paths (#191). */
+  pathsModulePublisher: "delivered+paths-module-publisher@resend.dev",
 
   // --- Seam 1: the Journey routes (#137-#140, #170), one test each ---
   /** Lists a Product's Journeys, none and then one. */
@@ -240,6 +242,8 @@ export const TEST_EMAILS = {
   pathsRoutesDraft: "delivered+paths-routes-draft@resend.dev",
   /** Saves a version, follows it, then deletes the Path (#171). */
   pathsRoutesDelete: "delivered+paths-routes-delete@resend.dev",
+  /** A plain User, refused at every Publish, Unpublish, Open and Close route (#191). */
+  pathsRoutesPlainUser: "delivered+paths-routes-plain-user@resend.dev",
 
   // --- Seam 1f: the gates every product route crosses (#154) ---
   /** Owns the Product every product-scoped route is driven against. */
@@ -338,6 +342,8 @@ export const TEST_EMAILS = {
     "delivered+e2e-product-rows-independent+e2e-test@resend.dev",
   /** #167: add a Path, add, reorder, edit and delete its Milestones, then reload. */
   e2eTrailblazer: "delivered+e2e-trailblazer+e2e-test@resend.dev",
+  /** #191: a plain User (not a Guide) sees no Publish, Open or Close controls in the Path editor. */
+  e2ePlainPathMaker: "delivered+e2e-plain-path-maker+e2e-test@resend.dev",
   /** #119: the account Dropdown opens from its trigger and closes on Escape, returning focus. */
   e2eAccountDropdown: "delivered+e2e-account-dropdown+e2e-test@resend.dev",
   /**

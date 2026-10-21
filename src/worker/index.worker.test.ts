@@ -691,13 +691,21 @@ describe("verify a sign-in code", () => {
 });
 
 describe("GET /api/me", () => {
-  it("returns the signed-in email with a valid session cookie", async () => {
+  it("returns the signed-in email with a valid session cookie, and that it isn't a Guide's", async () => {
     const cookie = await signIn(TEST_EMAILS.meOk);
 
     const res = await fetchWorker("/api/me", { headers: { cookie } });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ email: TEST_EMAILS.meOk });
+    expect(await res.json()).toEqual({ email: TEST_EMAILS.meOk, guide: false });
+  });
+
+  it("says when the signed-in User is a Guide (#191)", async () => {
+    const cookie = await signIn(TEST_EMAILS.guide);
+
+    const res = await fetchWorker("/api/me", { headers: { cookie } });
+
+    expect(await res.json()).toEqual({ email: TEST_EMAILS.guide, guide: true });
   });
 
   it("rejects a request with no session cookie", async () => {
@@ -2489,6 +2497,9 @@ describe("Trailblazer routes", () => {
         ...path,
         milestones: [],
         updatedAt: path.createdAt,
+        matchesLatest: false,
+        open: false,
+        versions: [],
         latestVersion: null,
       },
     });
@@ -2511,6 +2522,9 @@ describe("Trailblazer routes", () => {
         description: "",
         milestones: [],
         updatedAt: expect.any(String),
+        matchesLatest: false,
+        open: false,
+        versions: [],
         latestVersion: null,
       },
     });
@@ -2603,12 +2617,14 @@ describe("Trailblazer routes", () => {
       id: expect.any(String),
       number: 1,
       savedAt: expect.any(String),
+      published: false,
     });
 
     const read = await callApi("GET", `/api/paths/${path.id}`, cookie);
     const { draft } = (await read.json()) as {
-      draft: { latestVersion: unknown };
+      draft: { versions: unknown; latestVersion: unknown };
     };
+    expect(draft.versions).toEqual([version]);
     expect(draft.latestVersion).toEqual(version);
   });
 
@@ -2847,6 +2863,158 @@ describe("Trailblazer routes", () => {
   });
 });
 
+describe("Publish, Unpublish, Open and Close routes (#191)", () => {
+  /** The Draft's open flag and published version numbers, as the API reads them. */
+  async function sharing(cookie: string, pathId: string) {
+    const res = await callApi("GET", `/api/paths/${pathId}`, cookie);
+    const { draft } = (await res.json()) as {
+      draft: {
+        open: boolean;
+        versions: { number: number; published: boolean }[];
+      };
+    };
+    return {
+      open: draft.open,
+      published: draft.versions.filter((v) => v.published).map((v) => v.number),
+    };
+  }
+
+  it("refuses a plain User at every one with 403, changing nothing", async () => {
+    const { cookie, path } = await savedPath(TEST_EMAILS.pathsRoutesPlainUser);
+    const refused = async (method: string, url: string) => {
+      const res = await callApi(method, url, cookie);
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: "Only a Guide can do that." });
+    };
+
+    await refused("PUT", `/api/paths/${path.id}/versions/1/published`);
+    await refused("PUT", `/api/paths/${path.id}/open`);
+    expect(await sharing(cookie, path.id)).toEqual({
+      open: false,
+      published: [],
+    });
+
+    await env.DB.batch([
+      env.DB.prepare(
+        'UPDATE "path_versions" SET "published" = 1 WHERE "pathId" = ?',
+      ).bind(path.id),
+      env.DB.prepare('UPDATE "paths" SET "open" = 1 WHERE "id" = ?').bind(
+        path.id,
+      ),
+    ]);
+    await refused("DELETE", `/api/paths/${path.id}/versions/1/published`);
+    await refused("DELETE", `/api/paths/${path.id}/open`);
+    expect(await sharing(cookie, path.id)).toEqual({
+      open: true,
+      published: [1],
+    });
+  });
+
+  it("lets a Guide publish, open, unpublish and close, saying when unpublishing closed the Path", async () => {
+    const { cookie, path, version } = await savedPath(TEST_EMAILS.guide);
+    expect(
+      (await callApi("POST", `/api/paths/${path.id}/versions`, cookie)).status,
+    ).toBe(201);
+    const versionUrl = (number: number) =>
+      `/api/paths/${path.id}/versions/${number}/published`;
+    const openUrl = `/api/paths/${path.id}/open`;
+
+    const refused = await callApi("PUT", openUrl, cookie);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({
+      error: "Publish a version before opening this Path.",
+    });
+
+    for (let i = 0; i < 2; i++) {
+      const published = await callApi("PUT", versionUrl(1), cookie);
+      expect(published.status).toBe(200);
+      expect(await published.json()).toEqual({
+        version: { ...version, published: true },
+      });
+    }
+    expect(await sharing(cookie, path.id)).toEqual({
+      open: false,
+      published: [1],
+    });
+
+    expect((await callApi("PUT", openUrl, cookie)).status).toBe(200);
+    expect((await callApi("PUT", versionUrl(2), cookie)).status).toBe(200);
+    expect(await sharing(cookie, path.id)).toEqual({
+      open: true,
+      published: [2, 1],
+    });
+
+    const notLast = await callApi("DELETE", versionUrl(2), cookie);
+    expect(notLast.status).toBe(200);
+    expect(await notLast.json()).toMatchObject({
+      version: { number: 2, published: false },
+      closed: false,
+    });
+    const last = await callApi("DELETE", versionUrl(1), cookie);
+    expect(await last.json()).toMatchObject({
+      version: { number: 1, published: false },
+      closed: true,
+    });
+    expect(await sharing(cookie, path.id)).toEqual({
+      open: false,
+      published: [],
+    });
+
+    await callApi("PUT", versionUrl(1), cookie);
+    await callApi("PUT", openUrl, cookie);
+    for (let i = 0; i < 2; i++) {
+      expect((await callApi("DELETE", openUrl, cookie)).status).toBe(200);
+    }
+    expect(await sharing(cookie, path.id)).toEqual({
+      open: false,
+      published: [1],
+    });
+  });
+
+  it("409s deleting an open Path, deleting nothing, and deletes it once closed", async () => {
+    const { cookie, path } = await savedPath(TEST_EMAILS.guide);
+    await callApi("PUT", `/api/paths/${path.id}/versions/1/published`, cookie);
+    await callApi("PUT", `/api/paths/${path.id}/open`, cookie);
+
+    const refused = await callApi("DELETE", `/api/paths/${path.id}`, cookie);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({
+      error: "Close this Path before deleting it.",
+    });
+    expect(await sharing(cookie, path.id)).toEqual({
+      open: true,
+      published: [1],
+    });
+
+    await callApi("DELETE", `/api/paths/${path.id}/open`, cookie);
+    expect(
+      (await callApi("DELETE", `/api/paths/${path.id}`, cookie)).status,
+    ).toBe(200);
+    expect((await callApi("GET", `/api/paths/${path.id}`, cookie)).status).toBe(
+      404,
+    );
+  });
+
+  it("404s a version number that isn't a positive whole number, or one the Path hasn't saved", async () => {
+    const { cookie, path } = await savedPath(TEST_EMAILS.guide);
+
+    for (const number of ["0", "-1", "01", "1.0", "1e0", "one", "3"]) {
+      for (const method of ["PUT", "DELETE"]) {
+        const res = await callApi(
+          method,
+          `/api/paths/${path.id}/versions/${number}/published`,
+          cookie,
+        );
+        expect(res.status).toBe(404);
+      }
+    }
+    expect(await sharing(cookie, path.id)).toEqual({
+      open: false,
+      published: [],
+    });
+  });
+});
+
 /** Add `MILESTONE` at the end of the Draft through Update Path; its new id. */
 async function addMilestoneOn(cookie: string, pathId: string) {
   const read = await callApi("GET", `/api/paths/${pathId}`, cookie);
@@ -3024,7 +3192,10 @@ describe("request gates, across every route (#154)", () => {
         `/api/paths/${path.id}/milestones/${milestoneId}/tasks`,
         "Ask",
       );
-      return { cookie, params: { pathId: path.id, milestoneId, taskId } };
+      return {
+        cookie,
+        params: { pathId: path.id, milestoneId, taskId, number: "1" },
+      };
     }
 
     it("finds the path-scoped routes", () => {

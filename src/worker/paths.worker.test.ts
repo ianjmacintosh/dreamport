@@ -13,6 +13,7 @@ import {
 } from "./journeys";
 import {
   addTask,
+  closePath,
   createPath,
   deleteMilestone,
   deletePath,
@@ -20,6 +21,7 @@ import {
   discardChanges,
   type FollowableVersion,
   getDraft,
+  getOfferedVersion,
   getPath,
   getTrailheadVersion,
   getVersion,
@@ -28,15 +30,19 @@ import {
   MILESTONE_NAME_MAX_LENGTH,
   type MilestoneFields,
   MILESTONES_AND_TASKS_PER_PATH,
+  offeredNumber,
+  openPath,
   type OwnedPath,
   type PathUpdate,
   parseMilestoneFields,
   parsePathFields,
   parseTaskFields,
   PATHS_PER_USER,
+  publishVersion,
   reorderTasks,
   saveVersion,
   TASK_TITLE_MAX_LENGTH,
+  unpublishVersion,
   updateMilestone,
   updatePath,
   updateTask,
@@ -370,7 +376,7 @@ describe("a User's Paths", () => {
     const [oldest] = await listPaths(env.DB, userId);
     const path = await getPath(env.DB, userId, oldest.id);
     if (!path) throw new Error("the listed Path isn't there");
-    expect(await deletePath(env.DB, path)).toBe(true);
+    expect(await deletePath(env.DB, path)).toEqual({ ok: true });
     expect(
       (await createPath(env.DB, userId, { name: "Room", description: "" })).ok,
     ).toBe(true);
@@ -427,7 +433,7 @@ describe("a User's Paths", () => {
 });
 
 describe("a Path's Draft", () => {
-  it("starts with its name and description and no Milestones", async () => {
+  it("starts closed, with its name and description and no Milestones or versions", async () => {
     const path = await makersPath();
 
     expect(await getDraft(env.DB, path)).toEqual({
@@ -437,6 +443,9 @@ describe("a Path's Draft", () => {
       createdAt: path.createdAt,
       milestones: [],
       updatedAt: path.createdAt,
+      matchesLatest: false,
+      open: false,
+      versions: [],
       latestVersion: null,
     });
   });
@@ -862,6 +871,7 @@ describe("saving a Path's Draft as a version", () => {
         id: expect.any(String),
         number: 1,
         savedAt: expect.any(String),
+        published: false,
       },
     });
     if (!result.ok) return;
@@ -937,11 +947,12 @@ describe("saving a Path's Draft as a version", () => {
         { ...SELL, tasks: [] },
       ],
     });
-    expect((await getDraft(env.DB, path)).latestVersion).toEqual({
-      id: second.id,
-      number: 2,
-      savedAt: second.savedAt,
-    });
+    const draft = await getDraft(env.DB, path);
+    expect(draft.versions).toEqual([
+      { id: second.id, number: 2, savedAt: second.savedAt, published: false },
+      { id: first.id, number: 1, savedAt: first.savedAt, published: false },
+    ]);
+    expect(draft.latestVersion).toEqual(draft.versions[0]);
   });
 
   it("leaves when the Draft was last edited alone, while every Draft edit moves it forward", async () => {
@@ -1110,6 +1121,7 @@ describe("discarding a Draft's changes (#179)", () => {
       id: version.id,
       number: 1,
       savedAt: version.savedAt,
+      published: false,
     });
     const orphans = await env.DB.prepare(
       `SELECT count(*) AS n FROM "draft_tasks"
@@ -1204,6 +1216,56 @@ describe("discarding a Draft's changes (#179)", () => {
   });
 });
 
+describe("whether a Draft matches its latest version (#191)", () => {
+  const matches = async (path: OwnedPath) =>
+    (await currentDraft(path)).matchesLatest;
+
+  it("doesn't for a Path with nothing saved", async () => {
+    const path = await discardersPath();
+    await milestoneOn(path, BAKE);
+
+    expect(await matches(path)).toBe(false);
+  });
+
+  it("does once saved, until any edit to the name, a Milestone or a Task, and again after Discard Changes", async () => {
+    const path = await discardersPath();
+    const bake = await milestoneOn(path, BAKE);
+    const knead = await taskOn(path, bake.id, "Knead");
+    const edits = [
+      () => rename(path, "Renamed", "New"),
+      () => updateMilestone(env.DB, path, bake.id, SHIP),
+      () => updateTask(env.DB, path, bake.id, knead.id, { title: "Knead it" }),
+      () => taskOn(path, bake.id, "Proof"),
+    ];
+
+    await tick();
+    await saved(path, DISCARDER_ID);
+    expect(await matches(path)).toBe(true);
+
+    for (const edit of edits) {
+      await tick();
+      await edit();
+      expect(await matches(path)).toBe(false);
+      await tick();
+      await discarded(path);
+      expect(await matches(path)).toBe(true);
+    }
+  });
+
+  it("does after saving an edited Draft as a new version", async () => {
+    const path = await discardersPath();
+    await milestoneOn(path, BAKE);
+    await saved(path, DISCARDER_ID);
+    await tick();
+    await rename(path, "Renamed", "New");
+    await tick();
+
+    await saved(path, DISCARDER_ID);
+
+    expect(await matches(path)).toBe(true);
+  });
+});
+
 describe("deleting a Path (#171)", () => {
   it("takes its Draft, every version and every Journey on them, leaving other Paths and Journeys alone", async () => {
     const othersPath = await makersPath();
@@ -1246,7 +1308,7 @@ describe("deleting a Path (#171)", () => {
     await setTaskDone(env.DB, journey, tasks[0].id, true);
     await journeyOn(second, MAKER_ID);
 
-    expect(await deletePath(env.DB, doomed)).toBe(true);
+    expect(await deletePath(env.DB, doomed)).toEqual({ ok: true });
 
     expect(await getPath(env.DB, MAKER_ID, doomed.id)).toBeNull();
     expect(await getVersion(env.DB, MAKER_ID, first.id)).toBeNull();
@@ -1394,6 +1456,7 @@ describe("a Trailhead (#170)", () => {
       id,
       number,
       savedAt,
+      published: false,
     }));
 
     expect(
@@ -1415,7 +1478,7 @@ describe("a Trailhead (#170)", () => {
     ).toMatchObject({
       owner: "dreamport",
       version: { id: "starter", number: 1, name: "Dream Sequence" },
-      versions: [{ id: "starter", number: 1 }],
+      versions: [{ id: "starter", number: 1, published: true }],
     });
   });
 
@@ -1438,5 +1501,256 @@ describe("a Trailhead (#170)", () => {
     expect(
       await getTrailheadVersion(env.DB, TRAILHEAD_ID, draftOnly.id, null),
     ).toBeNull();
+  });
+});
+
+const PUBLISHER_ID = "paths-module-publisher";
+
+/** A Path of the publisher's own with `count` saved versions, none published. */
+async function publishersPath(count: number) {
+  await seedUser(PUBLISHER_ID, TEST_EMAILS.pathsModulePublisher);
+  const path = await pathOf(PUBLISHER_ID, "Bakery Path", [BAKE]);
+  const versions: FollowableVersion[] = [];
+  for (let i = 0; i < count; i++) {
+    versions.push(await saved(path, PUBLISHER_ID));
+  }
+  return { path, versions };
+}
+
+async function isOpen(path: OwnedPath) {
+  return (await getDraft(env.DB, path)).open;
+}
+
+async function publishedNumbers(path: OwnedPath) {
+  return (await getDraft(env.DB, path)).versions
+    .filter((v) => v.published)
+    .map((v) => v.number);
+}
+
+async function offered(pathId: string) {
+  return (await getOfferedVersion(env.DB, pathId, null))?.version.number;
+}
+
+describe("publishing a Path's versions (#191)", () => {
+  it("publishes and unpublishes a saved version, each twice changing nothing more", async () => {
+    const { path, versions } = await publishersPath(2);
+
+    for (let i = 0; i < 2; i++) {
+      expect(await publishVersion(env.DB, path, 1)).toEqual({
+        ok: true,
+        version: {
+          id: versions[0].id,
+          number: 1,
+          savedAt: versions[0].savedAt,
+          published: true,
+        },
+      });
+      expect(await publishedNumbers(path)).toEqual([1]);
+    }
+
+    for (let i = 0; i < 2; i++) {
+      expect(await unpublishVersion(env.DB, path, 1)).toMatchObject({
+        ok: true,
+        version: { number: 1, published: false },
+        closed: false,
+      });
+      expect(await publishedNumbers(path)).toEqual([]);
+    }
+  });
+
+  it("refuses a number the Path has no version for, changing nothing", async () => {
+    const { path } = await publishersPath(1);
+
+    expect(await publishVersion(env.DB, path, 2)).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
+    expect(await unpublishVersion(env.DB, path, 2)).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
+    expect(await publishedNumbers(path)).toEqual([]);
+  });
+
+  it("offers the highest-numbered published version at the root, falling back when it's unpublished", async () => {
+    const { path } = await publishersPath(3);
+    expect(await offered(path.id)).toBeUndefined();
+
+    await publishVersion(env.DB, path, 2);
+    expect(await offered(path.id)).toBe(2);
+    await publishVersion(env.DB, path, 1);
+    expect(await offered(path.id)).toBe(2);
+
+    await unpublishVersion(env.DB, path, 2);
+    expect(await offered(path.id)).toBe(1);
+  });
+
+  it("works out the offered number from the published versions alone", () => {
+    expect(offeredNumber([])).toBeNull();
+    expect(
+      offeredNumber([
+        { number: 3, published: false },
+        { number: 2, published: false },
+      ]),
+    ).toBeNull();
+    expect(
+      offeredNumber([
+        { number: 1, published: true },
+        { number: 3, published: false },
+        { number: 2, published: true },
+      ]),
+    ).toBe(2);
+  });
+});
+
+describe("a Path's offered versions, for any viewer (#191)", () => {
+  it("gives a published version by number, or the root's, with its Milestones and whether the Path is open, and nothing about its owner", async () => {
+    const { path, versions } = await publishersPath(2);
+    await publishVersion(env.DB, path, 1);
+    await publishVersion(env.DB, path, 2);
+    await openPath(env.DB, path);
+    const [one, two] = versions.map(
+      ({ id, pathId, number, name, description, savedAt, milestones }) => ({
+        id,
+        pathId,
+        number,
+        name,
+        description,
+        savedAt,
+        milestones,
+      }),
+    );
+
+    const root = await getOfferedVersion(env.DB, path.id, null);
+    expect(root).toEqual({ version: two, open: true });
+    expect(await getOfferedVersion(env.DB, path.id, 1)).toEqual({
+      version: one,
+      open: true,
+    });
+    expect(JSON.stringify(root)).not.toContain(PUBLISHER_ID);
+    expect(JSON.stringify(root)).not.toContain(
+      TEST_EMAILS.pathsModulePublisher,
+    );
+  });
+
+  it("gives nothing for an unpublished version, an unknown number or Path, or a Path with none published", async () => {
+    const { path } = await publishersPath(2);
+    expect(await getOfferedVersion(env.DB, path.id, null)).toBeNull();
+    expect(await getOfferedVersion(env.DB, path.id, 1)).toBeNull();
+
+    await publishVersion(env.DB, path, 2);
+
+    expect(await getOfferedVersion(env.DB, path.id, 1)).toBeNull();
+    expect(await getOfferedVersion(env.DB, path.id, 3)).toBeNull();
+    expect(await getOfferedVersion(env.DB, "no-such-path", null)).toBeNull();
+  });
+
+  it("offers Dream Sequence's version 1, open", async () => {
+    for (const number of [null, 1]) {
+      expect(
+        await getOfferedVersion(env.DB, "dream-sequence", number),
+      ).toMatchObject({
+        version: { id: "starter", number: 1, name: "Dream Sequence" },
+        open: true,
+      });
+    }
+  });
+});
+
+describe("opening and closing a Path (#191)", () => {
+  it("refuses to open a Path with no published version, leaving it closed", async () => {
+    const { path } = await publishersPath(1);
+
+    expect(await openPath(env.DB, path)).toEqual({
+      ok: false,
+      reason: "none-published",
+    });
+    expect(await isOpen(path)).toBe(false);
+  });
+
+  it("opens once a version is published, and closes, each twice changing nothing more", async () => {
+    const { path } = await publishersPath(1);
+    await publishVersion(env.DB, path, 1);
+    expect(await isOpen(path)).toBe(false);
+
+    for (let i = 0; i < 2; i++) {
+      expect(await openPath(env.DB, path)).toEqual({ ok: true });
+      expect(await isOpen(path)).toBe(true);
+    }
+    for (let i = 0; i < 2; i++) {
+      await closePath(env.DB, path);
+      expect(await isOpen(path)).toBe(false);
+    }
+    expect(await publishedNumbers(path)).toEqual([1]);
+  });
+
+  it("stays closed when a version is published", async () => {
+    const { path } = await publishersPath(2);
+    await publishVersion(env.DB, path, 1);
+    await openPath(env.DB, path);
+    await closePath(env.DB, path);
+
+    await publishVersion(env.DB, path, 2);
+
+    expect(await isOpen(path)).toBe(false);
+  });
+
+  it("closes when its only published version left is unpublished, and says so", async () => {
+    const { path } = await publishersPath(2);
+    await publishVersion(env.DB, path, 1);
+    await publishVersion(env.DB, path, 2);
+    await openPath(env.DB, path);
+
+    expect(await unpublishVersion(env.DB, path, 2)).toMatchObject({
+      ok: true,
+      closed: false,
+    });
+    expect(await isOpen(path)).toBe(true);
+
+    expect(await unpublishVersion(env.DB, path, 1)).toMatchObject({
+      ok: true,
+      closed: true,
+    });
+    expect(await isOpen(path)).toBe(false);
+    expect(await unpublishVersion(env.DB, path, 1)).toMatchObject({
+      ok: true,
+      closed: false,
+    });
+  });
+
+  it("leaves when the Draft was last edited alone", async () => {
+    const { path } = await publishersPath(1);
+    const before = (await getDraft(env.DB, path)).updatedAt;
+    await tick();
+
+    await publishVersion(env.DB, path, 1);
+    await openPath(env.DB, path);
+    await closePath(env.DB, path);
+
+    expect((await getDraft(env.DB, path)).updatedAt).toBe(before);
+  });
+});
+
+describe("deleting an open Path (#191)", () => {
+  it("is refused, deleting nothing, until the Path is closed", async () => {
+    const { path, versions } = await publishersPath(1);
+    await publishVersion(env.DB, path, 1);
+    await openPath(env.DB, path);
+
+    expect(await deletePath(env.DB, path)).toEqual({
+      ok: false,
+      reason: "open",
+    });
+    expect(await getPath(env.DB, PUBLISHER_ID, path.id)).not.toBeNull();
+    expect(await getVersion(env.DB, PUBLISHER_ID, versions[0].id)).toEqual(
+      versions[0],
+    );
+
+    await closePath(env.DB, path);
+    expect(await deletePath(env.DB, path)).toEqual({ ok: true });
+    expect(await deletePath(env.DB, path)).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
   });
 });

@@ -18,6 +18,7 @@ import Dropdown from "../../../components/Dropdown";
 import Footer from "../../../components/Footer";
 import Header from "../../../components/Header";
 import Link from "../../../components/Link";
+import Notice from "../../../components/Notice";
 import TagList from "../../../components/TagList";
 import TagPicker from "../../../components/TagPicker";
 import TextArea from "../../../components/TextArea";
@@ -340,6 +341,7 @@ function StyleGuide() {
         <a href="#action-card">Action card</a>
         <a href="#dropdown">Dropdown</a>
         <a href="#dialog">Dialog</a>
+        <a href="#notice">Notice</a>
         <a href="#breadcrumbs">Breadcrumbs</a>
         <a href="#header-bars">Header bars</a>
         <a href="#footers">Footers</a>
@@ -452,12 +454,18 @@ function StyleGuide() {
           diverge from the semantic level (say, an <code>&lt;h2&gt;</code> that
           should look like an <code>&lt;h3&gt;</code>), override just the size
           with a <code>.text-h1</code>/<code>.text-h2</code>/
-          <code>.text-h3</code> class — never change the tag just to change how
-          it looks.
+          <code>.text-h3</code>/<code>.text-h4</code> class — never change the
+          tag just to change how it looks. <code>.text-h4</code> takes the
+          h4&apos;s body face too, e.g. a Path&apos;s &ldquo;About This
+          Path&rdquo; label, an h2 that would be too big at its own size (#191).
         </p>
         <div className="sg-heading-stack">
           <h2 className="text-h3">
             An &lt;h2&gt; sized like an &lt;h3&gt;, via <code>.text-h3</code>
+          </h2>
+          <h2 className="text-h4">
+            An &lt;h2&gt; that looks like an &lt;h4&gt;, via{" "}
+            <code>.text-h4</code>
           </h2>
         </div>
         <Snippet code={`<h2 className="text-h3">Looks like an h3</h2>`} />
@@ -790,6 +798,28 @@ function StyleGuide() {
           While a request is in flight, ignore <code>onOpenChange</code> so the
           Dialog stays up until it settles. A panel taller than the screen
           scrolls, with the page behind it held still.
+        </p>
+      </Section>
+
+      <Section id="notice" label="Notice">
+        <Notice>
+          <p>Version 2 is published.</p>
+          <p>
+            This Path is still closed: Open This Path when you&apos;re ready.
+          </p>
+        </Notice>
+        <Snippet
+          code={`<Notice>\n  <p>Version 2 is published.</p>\n  <p>This Path is still closed: Open This Path when you're ready.</p>\n</Notice>`}
+        />
+        <p className="sg-note">
+          <code>&lt;Notice&gt;</code> tells the User something they should know
+          that isn&apos;t an error: a Path still closed after publishing a
+          version, or closed by unpublishing its last published one (#191). Each
+          sentence is its own <code>&lt;p&gt;</code>. It is a{" "}
+          <code>role=&quot;status&quot;</code>, so it&apos;s announced as it
+          appears; render it only once there&apos;s something to say. Not for a
+          refused action: that stays a plain <code>role=&quot;alert&quot;</code>{" "}
+          line under its buttons. A Path&apos;s Trailhead reuses it (#205).
         </p>
       </Section>
 

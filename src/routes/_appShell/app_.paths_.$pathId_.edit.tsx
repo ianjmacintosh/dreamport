@@ -30,6 +30,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
 import Dialog from "../../components/Dialog";
+import Notice from "../../components/Notice";
 import TextArea from "../../components/TextArea";
 import TextInput from "../../components/TextInput";
 
@@ -45,6 +46,7 @@ interface VersionSummary {
   id: string;
   number: number;
   savedAt: string;
+  published: boolean;
 }
 
 interface MilestoneFields {
@@ -67,7 +69,11 @@ interface Milestone extends MilestoneFields {
 interface Draft extends PathHead {
   milestones: Milestone[];
   updatedAt: string;
-  latestVersion: VersionSummary | null;
+  /** Exactly what the latest version saved: nothing edited since. */
+  matchesLatest: boolean;
+  open: boolean;
+  /** Newest first. */
+  versions: VersionSummary[];
 }
 
 /** Mirror `src/worker/paths.ts`; the server enforces the real limits. */
@@ -216,34 +222,60 @@ const REORDER_FAILED =
 const SAVE_FAILED = "We couldn't save a version. Try again in a moment.";
 const DISCARD_FAILED =
   "We couldn't discard your changes. Try again in a moment.";
+const PUBLISH_FAILED = "We couldn't change that. Try again in a moment.";
+const COPY_FAILED = "We couldn't copy that link. Try again in a moment.";
+/** How long Copy Link reads "Copied Link" before turning back. */
+const COPIED_HOLD_MS = 1500;
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
-
-const DATE_TIME = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "long",
-  timeStyle: "short",
-});
 
 function taskCount(n: number): string {
   return n === 0 ? "No Tasks" : n === 1 ? "1 Task" : `${n} Tasks`;
 }
 
 /**
- * The Path's page (docs/design-decisions.md, #169): its name and
- * description, the route of Milestones beside the picked one and its
- * Tasks, then the save state. Name, description and the Milestones' order
+ * Which version the page is: the latest while it matches it, else a Draft.
+ * Only a Guide publishes, so only a Guide is told what isn't published.
+ */
+function versionLabel(
+  latest: VersionSummary | undefined,
+  matchesLatest: boolean,
+  guide: boolean,
+): string {
+  const unpublished = guide ? " (unpublished)" : "";
+  if (!latest || !matchesLatest) return `Draft${unpublished}`;
+  return `Version ${latest.number}${latest.published ? "" : unpublished}`;
+}
+
+/** A Notice's text, one paragraph per sentence. */
+type Sentences = readonly string[];
+
+/**
+ * The Path's page (docs/design-decisions.md, #169, #191): its name, a
+ * Guide's Path Status, which version the page is with Manage Versions,
+ * the description, the route of Milestones beside the picked one and its
+ * Tasks, then Save as New Version. Name, description and the Milestones' order
  * change together in the Edit Path Dialog; a Milestone's own fields in
- * the Edit Milestone Dialog; its Tasks right there in the panel.
+ * the Edit Milestone Dialog; its Tasks right there in the panel. A Guide
+ * publishes and unpublishes versions in the Manage Versions Dialog, and
+ * opens and closes the Path at the page's end.
  */
 function PathDraft() {
   const { draft } = Route.useLoaderData();
+  const { guide } = Route.useRouteContext();
   const router = useRouter();
   const { milestone: pickedId } = Route.useSearch();
   const navigate = Route.useNavigate();
   const [path, setPath] = useState<PathHead>(draft);
   const [milestones, setMilestones] = useState<Milestone[]>(draft.milestones);
-  const [updatedAt, setUpdatedAt] = useState(draft.updatedAt);
-  const [latestVersion, setLatestVersion] = useState(draft.latestVersion);
+  const [matchesLatest, setMatchesLatest] = useState(draft.matchesLatest);
+  const [versions, setVersions] = useState(draft.versions);
+  const [open, setOpen] = useState(draft.open);
+  const [notice, setNotice] = useState<Sentences | null>(null);
+  const [isManagingVersions, setIsManagingVersions] = useState(false);
+  const [openPending, setOpenPending] = useState<
+    "none" | "opening" | "closing"
+  >("none");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [pathDialog, setPathDialog] = useState<PathDialogOpening | null>(null);
@@ -252,6 +284,8 @@ function PathDraft() {
   const [isDiscarding, setIsDiscarding] = useState(false);
 
   const base = `/api/paths/${path.id}`;
+  const latestVersion = versions.at(0);
+  const anyPublished = versions.some((v) => v.published);
   // The first Milestone until one is picked, and when the URL names one
   // this Draft doesn't have.
   const picked = milestones.find((m) => m.id === pickedId) ?? milestones[0];
@@ -263,15 +297,17 @@ function PathDraft() {
     });
   }
 
-  /** After a Draft write lands: the server's `updatedAt` moved to about now. */
+  /** After a Draft write lands: it no longer matches its latest version. */
   function touch() {
-    setUpdatedAt(new Date().toISOString());
+    setMatchesLatest(false);
   }
 
   function showUpdatedDraft(updated: Draft) {
     setPath(updated);
     setMilestones(updated.milestones);
-    setUpdatedAt(updated.updatedAt);
+    setMatchesLatest(updated.matchesLatest);
+    setVersions(updated.versions);
+    setOpen(updated.open);
     setPathDialog(null);
     // The breadcrumbs come from the loader; rerun it for the new name.
     void router.invalidate();
@@ -288,12 +324,39 @@ function PathDraft() {
         setSaveError(saved.conflict ?? SAVE_FAILED);
         return;
       }
-      setLatestVersion(saved.body.version);
+      setVersions((prev) => [saved.body.version, ...prev]);
+      setMatchesLatest(true);
     } catch {
       setSaveError(CONNECTION_FAILED);
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function setPathOpen(next: boolean) {
+    setSaveError("");
+    setNotice(null);
+    setOpenPending(next ? "opening" : "closing");
+    try {
+      const sent = await withMinimumDuration(() =>
+        send<object>(`${base}/open`, next ? "PUT" : "DELETE"),
+      );
+      if (!sent.ok) {
+        setSaveError(sent.conflict ?? PUBLISH_FAILED);
+        return;
+      }
+      setOpen(next);
+    } catch {
+      setSaveError(CONNECTION_FAILED);
+    } finally {
+      setOpenPending("none");
+    }
+  }
+
+  function showVersion(version: VersionSummary) {
+    setVersions((prev) =>
+      prev.map((v) => (v.number === version.number ? version : v)),
+    );
   }
 
   const manageMilestones = (
@@ -312,7 +375,48 @@ function PathDraft() {
           Edit Path
         </Button>
       </div>
-      {path.description && <p>{path.description}</p>}
+      {guide && (
+        <p className="text-sm">
+          {/* Plain text until #205 gives the Path a page at
+              `/app/paths/:pathId`; then the word links there. */}
+          Path Status: {open ? "Open" : "Closed"}
+        </p>
+      )}
+      {notice && <NoticeOf sentences={notice} />}
+      <p className="text-sm">
+        <b>{versionLabel(latestVersion, matchesLatest, guide)}</b>
+        {guide && (
+          <>
+            <span aria-hidden="true"> · </span>
+            {/* A quiet link to look at, but it opens a Dialog rather than
+                going anywhere, so it's a button to assistive tech. */}
+            <a
+              href="#"
+              role="button"
+              aria-haspopup="dialog"
+              className="link-quiet"
+              onClick={(e) => {
+                e.preventDefault();
+                setIsManagingVersions(true);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === " ") {
+                  e.preventDefault();
+                  setIsManagingVersions(true);
+                }
+              }}
+            >
+              Manage Versions
+            </a>
+          </>
+        )}
+      </p>
+      {path.description && (
+        <>
+          <h2 className="text-h4">About This Path</h2>
+          <p>{path.description}</p>
+        </>
+      )}
 
       {picked ? (
         <div className="journey-split journey-split--route-first">
@@ -369,22 +473,37 @@ function PathDraft() {
         </>
       )}
 
-      <p role="status">
-        {latestVersion ? (
-          <>
-            Latest version: {latestVersion.number}, saved{" "}
-            <time dateTime={latestVersion.savedAt}>
-              {DATE_TIME.format(new Date(latestVersion.savedAt))}
-            </time>
-          </>
-        ) : (
-          "No saved versions yet."
-        )}
-      </p>
       <div className="button-group button-group--end">
-        <Button variant="secondary" onClick={() => setIsDeleting(true)}>
-          Delete Path
-        </Button>
+        {/* An open Path can't be deleted: Close This Path takes Delete
+            Path's place until it's closed. */}
+        {open ? (
+          guide && (
+            <Button
+              variant="secondary"
+              disabled={openPending !== "none"}
+              state={openPending === "closing" ? "pending" : "ready"}
+              onClick={() => void setPathOpen(false)}
+            >
+              <Button.State name="ready">Close This Path</Button.State>
+              <Button.State name="pending">Closing…</Button.State>
+            </Button>
+          )
+        ) : (
+          <Button variant="secondary" onClick={() => setIsDeleting(true)}>
+            Delete Path
+          </Button>
+        )}
+        {guide && !open && anyPublished && (
+          <Button
+            variant="secondary"
+            disabled={openPending !== "none"}
+            state={openPending === "opening" ? "pending" : "ready"}
+            onClick={() => void setPathOpen(true)}
+          >
+            <Button.State name="ready">Open This Path</Button.State>
+            <Button.State name="pending">Opening…</Button.State>
+          </Button>
+        )}
         {latestVersion && (
           <Button variant="secondary" onClick={() => setIsDiscarding(true)}>
             Discard Changes
@@ -400,14 +519,6 @@ function PathDraft() {
         </Button>
       </div>
       {saveError && <p role="alert">{saveError}</p>}
-      <p className="text-sm">
-        <i>
-          Last edited{" "}
-          <time dateTime={updatedAt}>
-            {DATE_TIME.format(new Date(updatedAt))}
-          </time>
-        </i>
-      </p>
 
       <EditPathDialog
         opening={pathDialog}
@@ -416,6 +527,40 @@ function PathDraft() {
         pathUrl={base}
         onClose={() => setPathDialog(null)}
         onUpdated={showUpdatedDraft}
+      />
+
+      <ManageVersionsDialog
+        open={guide && isManagingVersions}
+        versions={versions}
+        pathIsOpen={open}
+        pathUrl={base}
+        versionUrl={(n) =>
+          `${window.location.origin}/app/paths/${path.id}?version=${n}`
+        }
+        notice={notice}
+        onClose={() => setIsManagingVersions(false)}
+        onPublished={(version) => {
+          showVersion(version);
+          setNotice(
+            open
+              ? null
+              : [
+                  `Version ${version.number} is published.`,
+                  "This Path is still closed: Open This Path when you're ready.",
+                ],
+          );
+        }}
+        onUnpublished={(version, closed) => {
+          showVersion(version);
+          if (closed) setOpen(false);
+          setNotice(
+            closed
+              ? [
+                  `Version ${version.number} was the only published version, so this Path is now closed.`,
+                ]
+              : null,
+          );
+        }}
       />
 
       <DeletePathDialog
@@ -911,6 +1056,220 @@ function DeletePathForm({
         </Button>
       </div>
     </>
+  );
+}
+
+function NoticeOf({ sentences }: { sentences: Sentences }) {
+  return (
+    <Notice>
+      {sentences.map((sentence) => (
+        <p key={sentence}>{sentence}</p>
+      ))}
+    </Notice>
+  );
+}
+
+/** What a Manage Versions row has in flight. */
+type RowPending = {
+  number: number;
+  action: "publishing" | "unpublishing";
+} | null;
+
+/**
+ * A Guide's saved versions, newest first, each with Publish, or Copy Link
+ * and Unpublish, Unpublish confirming in place. A plain User can't
+ * publish, so they never get this Dialog.
+ */
+function ManageVersionsDialog({
+  open,
+  versions,
+  pathIsOpen,
+  pathUrl,
+  versionUrl,
+  notice,
+  onClose,
+  onPublished,
+  onUnpublished,
+}: {
+  open: boolean;
+  versions: VersionSummary[];
+  pathIsOpen: boolean;
+  pathUrl: string;
+  /** A version's own address, absolute, for Copy Link. */
+  versionUrl: (number: number) => string;
+  notice: Sentences | null;
+  onClose: () => void;
+  onPublished: (version: VersionSummary) => void;
+  onUnpublished: (version: VersionSummary, closed: boolean) => void;
+}) {
+  const [pending, setPending] = useState<RowPending>(null);
+  const [confirming, setConfirming] = useState<number | null>(null);
+  const [copied, setCopied] = useState<number | null>(null);
+  const [error, setError] = useState("");
+  const published = versions.filter((v) => v.published);
+
+  function reset() {
+    setConfirming(null);
+    setCopied(null);
+    setError("");
+  }
+
+  async function setPublished(number: number, next: boolean) {
+    reset();
+    setPending({ number, action: next ? "publishing" : "unpublishing" });
+    try {
+      const sent = await withMinimumDuration(() =>
+        send<{ version: VersionSummary; closed?: boolean }>(
+          `${pathUrl}/versions/${number}/published`,
+          next ? "PUT" : "DELETE",
+        ),
+      );
+      if (!sent.ok) {
+        setError(PUBLISH_FAILED);
+        return;
+      }
+      if (next) {
+        onPublished(sent.body.version);
+      } else {
+        onUnpublished(sent.body.version, sent.body.closed === true);
+      }
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function copy(number: number) {
+    reset();
+    try {
+      await navigator.clipboard.writeText(versionUrl(number));
+    } catch {
+      setError(COPY_FAILED);
+      return;
+    }
+    setCopied(number);
+    await new Promise((resolve) => setTimeout(resolve, COPIED_HOLD_MS));
+    setCopied((current) => (current === number ? null : current));
+  }
+
+  function unpublishWarning(number: number): string {
+    const closes =
+      pathIsOpen && published.length === 1 && published[0].number === number;
+    return `Users who already Added Version ${number} keep it.${
+      closes
+        ? " It's the only published version, so unpublishing it closes this Path."
+        : ""
+    }`;
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && pending === null) {
+          reset();
+          onClose();
+        }
+      }}
+      title="Manage Versions"
+    >
+      {versions.length === 0 ? (
+        <p>No saved versions yet.</p>
+      ) : (
+        <ul className="list">
+          {versions.map((version) => {
+            const { number } = version;
+            const isConfirming = confirming === number;
+            const isBusy = pending !== null;
+            return (
+              <li key={version.id} className="list-row">
+                <span className="list-row-name">
+                  Version {number}
+                  {isConfirming && (
+                    <>
+                      <br />
+                      <span className="text-sm">
+                        <i>{unpublishWarning(number)}</i>
+                      </span>
+                    </>
+                  )}
+                </span>
+                <div className="list-row-action button-group">
+                  {version.published ? (
+                    <>
+                      {/* Cancel takes Copy Link's place and Unpublish
+                            stays put, so focus stays on Unpublish as it
+                            turns into the confirming one. */}
+                      {isConfirming ? (
+                        <Button
+                          variant="secondary"
+                          disabled={isBusy}
+                          onClick={() => setConfirming(null)}
+                        >
+                          Cancel
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          disabled={isBusy}
+                          state={copied === number ? "copied" : "ready"}
+                          onClick={() => void copy(number)}
+                        >
+                          <Button.State name="ready">Copy Link</Button.State>
+                          <Button.State name="copied">Copied Link</Button.State>
+                        </Button>
+                      )}
+                      <Button
+                        variant={isConfirming ? "primary" : "secondary"}
+                        disabled={isBusy}
+                        state={pending?.number === number ? "pending" : "ready"}
+                        onClick={() => {
+                          if (isConfirming) {
+                            void setPublished(number, false);
+                          } else {
+                            reset();
+                            setConfirming(number);
+                          }
+                        }}
+                      >
+                        <Button.State name="ready">Unpublish</Button.State>
+                        <Button.State name="pending">
+                          Unpublishing…
+                        </Button.State>
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      disabled={isBusy}
+                      state={pending?.number === number ? "pending" : "ready"}
+                      onClick={() => void setPublished(number, true)}
+                    >
+                      <Button.State name="ready">Publish</Button.State>
+                      <Button.State name="pending">Publishing…</Button.State>
+                    </Button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {notice && <NoticeOf sentences={notice} />}
+      {error && <p role="alert">{error}</p>}
+      <div className="button-group button-group--end">
+        <Button
+          disabled={pending !== null}
+          onClick={() => {
+            reset();
+            onClose();
+          }}
+        >
+          Done
+        </Button>
+      </div>
+    </Dialog>
   );
 }
 

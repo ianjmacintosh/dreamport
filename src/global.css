@@ -1682,6 +1682,33 @@ a.action-card:is(:hover, :focus-visible) .action-card-title {
   }
 }
 
+/* ── Components: notice ────────────────────────────────────── */
+/* `Notice` (#191, #205): something to know that isn't an error. A small
+   icon, a bar down its left edge, no box, the text in italics, as
+   picked in #205's prototype. Each sentence is its own paragraph, with
+   no room left under the last. */
+.notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: start;
+  border-left: 4px solid currentColor;
+  padding: var(--space-1) 0 var(--space-1) var(--space-3);
+  margin-bottom: var(--space-4);
+  font-style: italic;
+}
+
+/* Nudged down onto the first line's text rather than its line box. */
+.notice-icon {
+  width: 1.25em;
+  height: 1.25em;
+  margin-top: 0.15em;
+}
+
+.notice p:last-child {
+  margin-bottom: 0;
+}
+
 /* ── Components: sheet ─────────────────────────────────────── */
 /* A Worksheet drawn as a sheet of paper (#139, picked from a prototype on
    branch `prototype/worksheet-design`): white (`--color-sheet`) on the

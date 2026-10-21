@@ -1,9 +1,12 @@
 import { Hono } from "hono";
+import { createMiddleware } from "hono/factory";
 
 import { currentSession } from "./auth";
 import type { WorkerEnv } from "./env";
+import { isGuide } from "./guides";
 import {
   addTask,
+  closePath,
   deleteMilestone,
   deletePath,
   deleteTask,
@@ -11,13 +14,16 @@ import {
   getDraft,
   getPath,
   MILESTONES_AND_TASKS_PER_PATH,
+  openPath,
   type OwnedPath,
   parseMilestoneFields,
   parsePathUpdate,
   parseTaskFields,
+  publishVersion,
   reorderTasks,
   saveVersion,
   type DraftGap,
+  unpublishVersion,
   updateMilestone,
   updatePath,
   updateTask,
@@ -25,7 +31,7 @@ import {
 
 type PathEnv = {
   Bindings: WorkerEnv;
-  Variables: { path: OwnedPath };
+  Variables: { path: OwnedPath; guide: boolean };
 };
 
 /**
@@ -33,7 +39,8 @@ type PathEnv = {
  * at `/api/paths/:pathId`. The middleware is the only place a route here
  * learns which Path it's about, the same as `productRoutes`: 401 with no
  * session, and 404 for a Path that doesn't exist, is another User's, or is
- * Dreamport's, all three alike. Past it, a handler gets `c.var.path`.
+ * Dreamport's, all three alike. Past it, a handler gets `c.var.path`, and
+ * `c.var.guide`: whether the User is a Guide.
  *
  * The origin check on requests that change data is `index.ts`'s, in front
  * of every `/api/*` route.
@@ -56,12 +63,31 @@ pathRoutes.use(async (c, next) => {
   }
 
   c.set("path", path);
+  c.set("guide", isGuide(c.env, session.user.email));
   await next();
 });
 
+/** Publish, Unpublish, Open and Close are a Guide's alone (#191): 403 for anyone else. */
+const guidesOnly = createMiddleware<PathEnv>(async (c, next) => {
+  if (!c.var.guide) {
+    return c.json({ error: "Only a Guide can do that." }, 403);
+  }
+  await next();
+});
+pathRoutes.use("/versions/:number/published", guidesOnly);
+pathRoutes.use("/open", guidesOnly);
+
+/** A version number from the address: a positive whole number, or null. */
+function versionNumber(raw: string): number | null {
+  const number = Number(raw);
+  return /^[1-9][0-9]*$/.test(raw) && Number.isSafeInteger(number)
+    ? number
+    : null;
+}
+
 /**
  * The Path's Draft: its name, description and Milestones in order, when it
- * was last edited, and its latest saved version.
+ * was last edited, whether the Path is open, and its saved versions.
  */
 pathRoutes.get("/", async (c) => {
   return c.json({ draft: await getDraft(c.env.DB, c.var.path) });
@@ -69,11 +95,14 @@ pathRoutes.get("/", async (c) => {
 
 /**
  * Delete the Path, its Draft, every saved version and every Journey on any
- * of them, for good.
+ * of them, for good. 409 while the Path is open.
  */
 pathRoutes.delete("/", async (c) => {
-  if (!(await deletePath(c.env.DB, c.var.path))) {
-    return c.json({ error: "Not found" }, 404);
+  const deleted = await deletePath(c.env.DB, c.var.path);
+  if (!deleted.ok) {
+    return deleted.reason === "open"
+      ? c.json({ error: "Close this Path before deleting it." }, 409)
+      : c.json({ error: "Not found" }, 404);
   }
 
   return c.json({}, 200);
@@ -128,6 +157,56 @@ pathRoutes.post("/versions", async (c) => {
   }
 
   return c.json({ version: saved.version }, 201);
+});
+
+/** Publish saved version `:number`. 404 for a number the Path hasn't saved. */
+pathRoutes.put("/versions/:number/published", async (c) => {
+  const number = versionNumber(c.req.param("number"));
+  const published =
+    number === null ? null : await publishVersion(c.env.DB, c.var.path, number);
+  if (!published?.ok) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  return c.json({ version: published.version }, 200);
+});
+
+/**
+ * Unpublish saved version `:number`. `closed` says whether that closed the
+ * Path, which happens when no published version is left.
+ */
+pathRoutes.delete("/versions/:number/published", async (c) => {
+  const number = versionNumber(c.req.param("number"));
+  const unpublished =
+    number === null
+      ? null
+      : await unpublishVersion(c.env.DB, c.var.path, number);
+  if (!unpublished?.ok) {
+    return c.json({ error: "Not found" }, 404);
+  }
+
+  return c.json(
+    { version: unpublished.version, closed: unpublished.closed },
+    200,
+  );
+});
+
+/** Open the Path to new Adds. 409 while no version is published. */
+pathRoutes.put("/open", async (c) => {
+  const opened = await openPath(c.env.DB, c.var.path);
+  if (!opened.ok) {
+    return c.json(
+      { error: "Publish a version before opening this Path." },
+      409,
+    );
+  }
+
+  return c.json({}, 200);
+});
+
+pathRoutes.delete("/open", async (c) => {
+  await closePath(c.env.DB, c.var.path);
+  return c.json({}, 200);
 });
 
 /**
