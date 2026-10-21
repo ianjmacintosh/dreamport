@@ -7,16 +7,22 @@ import Button from "../../components/Button";
 import Link from "../../components/Link";
 import TextInput from "../../components/TextInput";
 import { authClient } from "../../utils/auth-client";
+import { parseReturnTo } from "../../utils/return-to";
 
 import "./login.css";
 
 export const Route = createFileRoute("/_withFooter/login")({
+  // Always sets the key: the router spreads this over the raw search, so
+  // leaving a refused `redirect` out would keep it.
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
+    redirect: parseReturnTo(search.redirect),
+  }),
   // Already signed in (the `_withFooter` layout's own `/api/me` check found
   // a session): there's nothing to sign into, so go straight to the app
-  // (#121).
-  beforeLoad: ({ context }) => {
+  // (#121), or the page the User was sent here from.
+  beforeLoad: ({ context, search }) => {
     if (context.email) {
-      throw redirect({ to: "/app" });
+      throw redirect({ href: search.redirect ?? "/app" });
     }
   },
   component: Login,
@@ -110,6 +116,7 @@ const ERROR_ID = "login-error";
  */
 function Login() {
   const navigate = useNavigate();
+  const { redirect: returnTo } = Route.useSearch();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -207,7 +214,7 @@ function Login() {
         // Stay submitting: `navigate()` doesn't unmount this form
         // synchronously, so clearing the state here would re-enable the
         // button for the frames before `/app` takes over (#128).
-        navigate({ to: "/app" });
+        navigate({ href: returnTo ?? "/app" });
         return;
       }
       // A wrong code is spent: clear the boxes so the retry starts from the
