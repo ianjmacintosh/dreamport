@@ -464,7 +464,7 @@ function PathfinderRound3({ stub }: { stub: Stub }) {
 const BLURBS = [
   {
     key: "ian",
-    text: "The Paths listed below were made by other Users. You can follow these Paths, but you cannot make changes to them.",
+    text: "The paths listed below were made by other users. You can follow these paths, but you cannot make changes to them.",
   },
   {
     key: "1",
@@ -545,7 +545,7 @@ function PathsRound4({
       )}
       {added.length > 0 && (
         <>
-          <h2 style={room}>Your added Paths</h2>
+          <h2 style={room}>Your Added Paths</h2>
           <p>{BLURBS.find((b) => b.key === blurb)?.text}</p>
           {cards(added)}
         </>
@@ -559,7 +559,7 @@ function PathfinderRound4({ variant, stub }: { variant: string; stub: Stub }) {
   const sections = [
     ["From Dreamport", all.filter((e) => e.kind === "dreamport")],
     ["Your Original Paths", all.filter((e) => e.kind === "own")],
-    ["Your added Paths", all.filter((e) => e.kind === "added")],
+    ["Your Added Paths", all.filter((e) => e.kind === "added")],
   ] as const;
   return (
     <>
