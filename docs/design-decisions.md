@@ -591,3 +591,42 @@ Add an entry only once a sign-off conversation resolves something repeatable
   picker in a Dialog, a numbered checklist) down to round 1's first, then
   older versions as a Dialog or a popover, and the version line as small
   italics, body-size italics or small dotted text).
+
+- Pathfinder is the page at `/app/paths`, no longer under a Product: one
+  page listing every Available Path, reached from `AppNav` and from a
+  Product's links to find a Path (decided in #192, from a prototype on
+  local branch `192-prototype-added-copy`: eight rounds, from four
+  layouts (one list with the version beside a copy's name, two sections,
+  one row per Path with its versions inside, rows with Edit Path / View
+  Path buttons) to the last one's cards, then icons, sections, spacing,
+  where Dream Sequence goes and where the name shows). It replaces #170's
+  per-Product Pathfinder and #198's "Browse Available Paths" crumb; a
+  Product's own Journeys stay on its Journeys page.
+  - `AppNav`'s section, the page's h1 and the crumbs above it say
+    "Pathfinder", replacing #167's "Paths". The URL stays `/app/paths`,
+    so a Path's Trailhead (`/app/paths/:pathId`) still sits under it.
+  - Two sections, each an h2: "Your Original Paths" (the Paths the User
+    made) and "Your Added Paths" (Dream Sequence first, then their Added
+    copies). Dream Sequence needs no Add, but on this page it is grouped
+    with the Paths someone else made.
+  - Each card is a linked `ActionCard`: the compass, the Path's name in
+    bold, and nothing else: no version, no Draft or saved state, nothing
+    about who made it. The whole card links to the Path's Trailhead, an
+    Original Path's too (its Trailhead has Edit Path). There are no
+    buttons on the cards.
+  - A User holding copies of several versions of one Path sees one card
+    for it, not one per version. The Trailhead shows their copies.
+  - Make New Path sits under the "Your Original Paths" cards, bottom left,
+    not bottom right: it doesn't act on the cards above it. With no
+    Original Paths, "No Paths yet." takes the cards' place.
+  - Under "Your Added Paths", before the cards: "The paths listed below
+    were made by other people. You can follow these paths, but you cannot
+    make changes to them." Its "paths" stays lowercase: it's plain prose,
+    and capitalized there it reads oddly. The heading and that line are
+    the only signs a Path is read-only; the card looks the same as an
+    Original Path's.
+  - The page keeps the design system's spacing, `main > * + *`'s 1rem,
+    with no extra room above the headings or after the cards. Rounds with
+    2rem above them read as too much.
+  - Picked over a pencil (yours) or padlock (read-only) icon, and a person
+    or open book: the compass stays every Path's icon (#199).
