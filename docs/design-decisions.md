@@ -518,24 +518,27 @@ Add an entry only once a sign-off conversation resolves something repeatable
     first is "Path Status: Open" or "Path Status: Closed", plain text, the
     word linking to the Trailhead (plain text until #205 gives the Path
     its page at `/app/paths/:pathId`). It is the Guide's alone. The second is
-    the version being edited in bold, then a middle dot (hidden from screen
-    readers) and a `.link-quiet` "Manage Versions". Everyone sees the
-    second line, a plain User included.
+    the version being edited in bold, then, for a Guide only, a middle dot
+    (hidden from screen readers) and a `.link-quiet` "Manage Versions". A
+    plain User sees just the version: they can't publish, and can't go
+    back to an earlier version, so nothing about publishing is shown to
+    them.
   - The version is "Version {n}" while the page matches that saved version,
-    with " (unpublished)" after it when it isn't published. After any edit
-    it is "Draft (unpublished)", whether or not another version has
-    exactly the same fields; saving a new version, or Discard Changes,
-    turns it back into a version. A Path nothing is saved on yet is
-    "Draft (unpublished)". This reverses #169's "No Draft label".
+    and "Draft" after any edit, whether or not another version has exactly
+    the same fields; saving a new version, or Discard Changes, turns it
+    back into a version. A Path nothing is saved on yet is "Draft". For a
+    Guide, " (unpublished)" follows a version that isn't published, and
+    always follows "Draft". This reverses #169's "No Draft label".
   - "Manage Versions" opens a `Dialog` with a row for every saved version,
-    newest first (`.list`): "Version {n}", then at `.text-sm` its status and
-    "saved {date}". For a Guide, an unpublished row has Publish, and a
-    published one has Copy Link and Unpublish. Unpublish confirms in place
+    newest first (`.list`): just "Version {n}", then its buttons at the
+    row's end: Publish on an unpublished row, Copy Link and Unpublish on a
+    published one. Done closes it. Unpublish confirms in place
     in the row, as every destructive action does: the row says "Users who
     already Added Version {n} keep it." (and, for the only published
     version, that unpublishing it closes this Path), with Cancel and
-    Unpublish. Publish and Copy Link act on one click. A plain User gets the
-    same list read-only: dates only, no status and no buttons.
+    Unpublish. Publish and Copy Link act on one click. Copy Link's own
+    label turns to "Copied Link" for a moment, then back, as a `Button`
+    state, so it keeps its width; there is no separate confirmation line.
   - Close This Path is a secondary button in Delete Path's place at the end
     of the page, so while a Path is open it can't be deleted. Once it is
     closed Delete Path returns, and Open This Path follows it, between
@@ -554,3 +557,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
     lands before #205: a small Phosphor `WarningCircleIcon`, a left accent
     bar, no box, the text in italics, each sentence its own paragraph with
     no space below the last. #205's Trailhead reuses it.
+  - The description has a heading, "About This Path": an `h2` (it sits
+    between the h1 and the "Milestones" h2) at `.text-h4`, a new type
+    utility that gives a heading the `h4`'s look, its body face included.
+    A plain `h2` is too big over a sentence or two.

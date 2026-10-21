@@ -454,12 +454,18 @@ function StyleGuide() {
           diverge from the semantic level (say, an <code>&lt;h2&gt;</code> that
           should look like an <code>&lt;h3&gt;</code>), override just the size
           with a <code>.text-h1</code>/<code>.text-h2</code>/
-          <code>.text-h3</code> class — never change the tag just to change how
-          it looks.
+          <code>.text-h3</code>/<code>.text-h4</code> class — never change the
+          tag just to change how it looks. <code>.text-h4</code> takes the
+          h4&apos;s body face too, e.g. a Path&apos;s &ldquo;About This
+          Path&rdquo; label, an h2 that would be too big at its own size (#191).
         </p>
         <div className="sg-heading-stack">
           <h2 className="text-h3">
             An &lt;h2&gt; sized like an &lt;h3&gt;, via <code>.text-h3</code>
+          </h2>
+          <h2 className="text-h4">
+            An &lt;h2&gt; that looks like an &lt;h4&gt;, via{" "}
+            <code>.text-h4</code>
           </h2>
         </div>
         <Snippet code={`<h2 className="text-h3">Looks like an h3</h2>`} />

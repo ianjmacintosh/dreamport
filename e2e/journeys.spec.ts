@@ -228,13 +228,11 @@ test("make a Path in Trailblazer with a Milestone and a Task, save a version, an
     page.getByRole("list", { name: "Tasks" }).getByRole("listitem"),
   ).toHaveText([/^Write it down/]);
   const save = page.getByRole("button", { name: "Save as New Version" });
-  const versionLabel = page.getByText(
-    /^(Version \d+|Draft)( \(unpublished\))?$/,
-  );
+  const versionLabel = page.getByText(/^(Version \d+|Draft)$/);
   await save.click();
-  await expect(versionLabel).toHaveText("Version 1 (unpublished)");
+  await expect(versionLabel).toHaveText("Version 1");
   await save.click();
-  await expect(versionLabel).toHaveText("Version 2 (unpublished)");
+  await expect(versionLabel).toHaveText("Version 2");
 
   await page.getByRole("link", { name: "Products", exact: true }).click();
   await openNewProduct(page, productName);

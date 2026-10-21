@@ -224,25 +224,27 @@ const DISCARD_FAILED =
   "We couldn't discard your changes. Try again in a moment.";
 const PUBLISH_FAILED = "We couldn't change that. Try again in a moment.";
 const COPY_FAILED = "We couldn't copy that link. Try again in a moment.";
+/** How long Copy Link reads "Copied Link" before turning back. */
+const COPIED_HOLD_MS = 1500;
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
-
-const DATE_TIME = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "long",
-  timeStyle: "short",
-});
 
 function taskCount(n: number): string {
   return n === 0 ? "No Tasks" : n === 1 ? "1 Task" : `${n} Tasks`;
 }
 
-/** Which version the page is: the latest while it matches it, else a Draft. */
+/**
+ * Which version the page is: the latest while it matches it, else a Draft.
+ * Only a Guide publishes, so only a Guide is told what isn't published.
+ */
 function versionLabel(
   latest: VersionSummary | undefined,
   matchesLatest: boolean,
+  guide: boolean,
 ): string {
-  if (!latest || !matchesLatest) return "Draft (unpublished)";
-  return `Version ${latest.number}${latest.published ? "" : " (unpublished)"}`;
+  const unpublished = guide ? " (unpublished)" : "";
+  if (!latest || !matchesLatest) return `Draft${unpublished}`;
+  return `Version ${latest.number}${latest.published ? "" : unpublished}`;
 }
 
 /** A Notice's text, one paragraph per sentence. */
@@ -382,30 +384,39 @@ function PathDraft() {
       )}
       {notice && <NoticeOf sentences={notice} />}
       <p className="text-sm">
-        <b>{versionLabel(latestVersion, matchesLatest)}</b>
-        <span aria-hidden="true"> · </span>
-        {/* A quiet link to look at, but it opens a Dialog rather than
-            going anywhere, so it's a button to assistive tech. */}
-        <a
-          href="#"
-          role="button"
-          aria-haspopup="dialog"
-          className="link-quiet"
-          onClick={(e) => {
-            e.preventDefault();
-            setIsManagingVersions(true);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === " ") {
-              e.preventDefault();
-              setIsManagingVersions(true);
-            }
-          }}
-        >
-          Manage Versions
-        </a>
+        <b>{versionLabel(latestVersion, matchesLatest, guide)}</b>
+        {guide && (
+          <>
+            <span aria-hidden="true"> · </span>
+            {/* A quiet link to look at, but it opens a Dialog rather than
+                going anywhere, so it's a button to assistive tech. */}
+            <a
+              href="#"
+              role="button"
+              aria-haspopup="dialog"
+              className="link-quiet"
+              onClick={(e) => {
+                e.preventDefault();
+                setIsManagingVersions(true);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === " ") {
+                  e.preventDefault();
+                  setIsManagingVersions(true);
+                }
+              }}
+            >
+              Manage Versions
+            </a>
+          </>
+        )}
       </p>
-      {path.description && <p>{path.description}</p>}
+      {path.description && (
+        <>
+          <h2 className="text-h4">About This Path</h2>
+          <p>{path.description}</p>
+        </>
+      )}
 
       {picked ? (
         <div className="journey-split journey-split--route-first">
@@ -519,8 +530,7 @@ function PathDraft() {
       />
 
       <ManageVersionsDialog
-        open={isManagingVersions}
-        guide={guide}
+        open={guide && isManagingVersions}
         versions={versions}
         pathIsOpen={open}
         pathUrl={base}
@@ -1066,13 +1076,12 @@ type RowPending = {
 } | null;
 
 /**
- * Every saved version, newest first. A Guide's rows Publish, Copy Link
- * and Unpublish, Unpublish confirming in place; a plain User's are
- * read-only, with dates only.
+ * A Guide's saved versions, newest first, each with Publish, or Copy Link
+ * and Unpublish, Unpublish confirming in place. A plain User can't
+ * publish, so they never get this Dialog.
  */
 function ManageVersionsDialog({
   open,
-  guide,
   versions,
   pathIsOpen,
   pathUrl,
@@ -1083,7 +1092,6 @@ function ManageVersionsDialog({
   onUnpublished,
 }: {
   open: boolean;
-  guide: boolean;
   versions: VersionSummary[];
   pathIsOpen: boolean;
   pathUrl: string;
@@ -1099,7 +1107,6 @@ function ManageVersionsDialog({
   const [copied, setCopied] = useState<number | null>(null);
   const [error, setError] = useState("");
   const published = versions.filter((v) => v.published);
-  const offered = published.at(0)?.number;
 
   function reset() {
     setConfirming(null);
@@ -1137,17 +1144,13 @@ function ManageVersionsDialog({
     reset();
     try {
       await navigator.clipboard.writeText(versionUrl(number));
-      setCopied(number);
     } catch {
       setError(COPY_FAILED);
+      return;
     }
-  }
-
-  function statusOf(version: VersionSummary): string {
-    if (!version.published) return "Not published";
-    return version.number === offered
-      ? "Published, offered at the Path's link"
-      : "Published";
+    setCopied(number);
+    await new Promise((resolve) => setTimeout(resolve, COPIED_HOLD_MS));
+    setCopied((current) => (current === number ? null : current));
   }
 
   function unpublishWarning(number: number): string {
@@ -1182,14 +1185,7 @@ function ManageVersionsDialog({
             return (
               <li key={version.id} className="list-row">
                 <span className="list-row-name">
-                  <b>Version {number}</b>
-                  <br />
-                  <span className="text-sm">
-                    {guide && `${statusOf(version)} · `}saved{" "}
-                    <time dateTime={version.savedAt}>
-                      {DATE_TIME.format(new Date(version.savedAt))}
-                    </time>
-                  </span>
+                  Version {number}
                   {isConfirming && (
                     <>
                       <br />
@@ -1199,75 +1195,68 @@ function ManageVersionsDialog({
                     </>
                   )}
                 </span>
-                {guide && (
-                  <div className="list-row-action button-group">
-                    {version.published ? (
-                      <>
-                        {/* Cancel takes Copy Link's place and Unpublish
+                <div className="list-row-action button-group">
+                  {version.published ? (
+                    <>
+                      {/* Cancel takes Copy Link's place and Unpublish
                             stays put, so focus stays on Unpublish as it
                             turns into the confirming one. */}
-                        {isConfirming ? (
-                          <Button
-                            variant="secondary"
-                            disabled={isBusy}
-                            onClick={() => setConfirming(null)}
-                          >
-                            Cancel
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="secondary"
-                            disabled={isBusy}
-                            onClick={() => void copy(number)}
-                          >
-                            Copy Link
-                          </Button>
-                        )}
+                      {isConfirming ? (
                         <Button
-                          variant={isConfirming ? "primary" : "secondary"}
+                          variant="secondary"
                           disabled={isBusy}
-                          state={
-                            pending?.number === number ? "pending" : "ready"
-                          }
-                          onClick={() => {
-                            if (isConfirming) {
-                              void setPublished(number, false);
-                            } else {
-                              reset();
-                              setConfirming(number);
-                            }
-                          }}
+                          onClick={() => setConfirming(null)}
                         >
-                          <Button.State name="ready">Unpublish</Button.State>
-                          <Button.State name="pending">
-                            Unpublishing…
-                          </Button.State>
+                          Cancel
                         </Button>
-                      </>
-                    ) : (
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          disabled={isBusy}
+                          state={copied === number ? "copied" : "ready"}
+                          onClick={() => void copy(number)}
+                        >
+                          <Button.State name="ready">Copy Link</Button.State>
+                          <Button.State name="copied">Copied Link</Button.State>
+                        </Button>
+                      )}
                       <Button
-                        variant="secondary"
+                        variant={isConfirming ? "primary" : "secondary"}
                         disabled={isBusy}
                         state={pending?.number === number ? "pending" : "ready"}
-                        onClick={() => void setPublished(number, true)}
+                        onClick={() => {
+                          if (isConfirming) {
+                            void setPublished(number, false);
+                          } else {
+                            reset();
+                            setConfirming(number);
+                          }
+                        }}
                       >
-                        <Button.State name="ready">Publish</Button.State>
-                        <Button.State name="pending">Publishing…</Button.State>
+                        <Button.State name="ready">Unpublish</Button.State>
+                        <Button.State name="pending">
+                          Unpublishing…
+                        </Button.State>
                       </Button>
-                    )}
-                  </div>
-                )}
+                    </>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      disabled={isBusy}
+                      state={pending?.number === number ? "pending" : "ready"}
+                      onClick={() => void setPublished(number, true)}
+                    >
+                      <Button.State name="ready">Publish</Button.State>
+                      <Button.State name="pending">Publishing…</Button.State>
+                    </Button>
+                  )}
+                </div>
               </li>
             );
           })}
         </ul>
       )}
       {notice && <NoticeOf sentences={notice} />}
-      {copied !== null && (
-        <p role="status" className="text-sm">
-          <i>Copied Version {copied}&apos;s link.</i>
-        </p>
-      )}
       {error && <p role="alert">{error}</p>}
       <div className="button-group button-group--end">
         <Button

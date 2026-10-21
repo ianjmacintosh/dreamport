@@ -55,6 +55,12 @@ test("a Guide publishes Version 1, opens the Path, and unpublishing it closes th
       .filter({ hasText: "This Path is still closed" }),
   ).toBeVisible();
   await versions.getByRole("button", { name: "Copy Link" }).click();
+  await expect(
+    versions.getByRole("button", { name: "Copied Link" }),
+  ).toBeVisible();
+  await expect(
+    versions.getByRole("button", { name: "Copy Link" }),
+  ).toBeVisible();
   const pathId = new URL(page.url()).pathname.split("/")[3];
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
     new URL(`/app/paths/${pathId}?version=1`, page.url()).href,
@@ -89,17 +95,15 @@ test("a Guide publishes Version 1, opens the Path, and unpublishing it closes th
   await expect(versionLine(page)).toHaveText("Version 1 (unpublished)");
 });
 
-test("a plain User's editor shows the version but no Path Status, and its versions read-only", async ({
+test("a plain User's editor shows the version, and nothing about publishing", async ({
   page,
 }) => {
   await signIn(page, TEST_EMAILS.e2ePlainPathMaker);
   await savedPath(page, `Plain Launch ${Date.now()}`);
   const main = page.getByRole("main");
-  await expect(versionLine(page)).toHaveText("Version 1 (unpublished)");
-  await expect(main.getByText(/Path Status/)).toHaveCount(0);
-
-  await main.getByRole("button", { name: "Manage Versions" }).click();
-  const versions = page.getByRole("dialog", { name: "Manage Versions" });
-  await expect(versions.getByRole("listitem")).toHaveText([/^Version 1saved /]);
-  await expect(versions.getByRole("button")).toHaveText(["Done"]);
+  await expect(versionLine(page)).toHaveText("Version 1");
+  await expect(main.getByText(/Path Status|publish/i)).toHaveCount(0);
+  await expect(
+    main.getByRole("button", { name: "Manage Versions" }),
+  ).toHaveCount(0);
 });
