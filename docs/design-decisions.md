@@ -550,3 +550,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
   - There is no root-address copy button on the page. The Path Status link
     goes to the Trailhead, and Copy Link on a published version's row is
     the only copy control.
+  - Copy Link copies the version's own address, the Trailhead's root
+    with the version in the query: `/app/paths/:pathId?version={n}`.
+  - The notice is #205's notice component, built here first since #191
+    lands before #205: a small Phosphor `WarningCircleIcon`, a left accent
+    bar, no box, the text in italics, each sentence its own paragraph with
+    no space below the last. #205's Trailhead reuses it.
