@@ -1685,7 +1685,7 @@ a.action-card:is(:hover, :focus-visible) .action-card-title {
 /* ── Components: notice ────────────────────────────────────── */
 /* `Notice` (#191, #205): something to know that isn't an error. A small
    icon, a bar down its left edge, no box, the text in italics, as
-   picked in #191's prototype. Each sentence is its own paragraph, with
+   picked in #205's prototype. Each sentence is its own paragraph, with
    no room left under the last. */
 .notice {
   display: grid;
