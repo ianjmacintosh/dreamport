@@ -1,7 +1,8 @@
 // PROTOTYPE — throwaway (#192). Lives on 192-prototype-added-copy only;
 // never merge, never push.
 //
-// Round 3 (below "round 3"): I–L, after Ian picked G. Round 2 (below
+// Round 4 (below "round 4"): M–P, after Ian picked J. Round 3 (below
+// "round 3"): I–L, after Ian picked G. Round 2 (below
 // "round 2"): E–H, after Ian picked D. Round 1's A–C are
 // in this branch's history (d658e06).
 //
@@ -29,11 +30,11 @@ import { PrototypeSwitcher } from "../../components/PrototypeSwitcher";
 // ---------------------------------------------------------------- stubs --
 
 const VARIANTS = [
-  { key: "G", name: "Round 2's G, for reference" },
-  { key: "I", name: "Make New Path under Original; Added only when held" },
-  { key: "J", name: "As I, plus a line saying Added can't be changed" },
-  { key: "K", name: "Make New Path beside the Original heading" },
-  { key: "L", name: "Make New Path on top; both sections always shown" },
+  { key: "J", name: "Round 3's J, for reference" },
+  { key: "M", name: "2rem above headings, Make New Path under, left" },
+  { key: "N", name: "3rem above headings, Make New Path under, left" },
+  { key: "O", name: "2rem above headings, Make New Path bottom right" },
+  { key: "P", name: "3rem above headings, Make New Path bottom right" },
 ];
 
 const STATES = [
@@ -164,10 +165,6 @@ function groupCopies(s: Stub) {
   );
 }
 
-function Dot() {
-  return <span aria-hidden="true"> · </span>;
-}
-
 function PathsIntro() {
   return (
     <p>
@@ -230,19 +227,6 @@ function entries(s: Stub, forPathfinder: boolean): Entry[] {
       (a, b) => byEntryName(a, b) || (a.kind === "own" ? -1 : 1),
     ),
   ];
-}
-
-function versionsText(e: Entry): string {
-  if (e.kind === "dreamport") return "";
-  if (e.kind === "own") {
-    return e.path.version === null
-      ? "Draft, no version saved"
-      : `Version ${e.path.version}`;
-  }
-  const v = e.copies.map((c) => c.version);
-  return v.length === 1
-    ? `Version ${v[0]}`
-    : `Versions ${v.slice(0, -1).join(", ")} and ${v[v.length - 1]}`;
 }
 
 /** Pathfinder's status for an entry: Following, Completed, Abandoned. */
@@ -331,165 +315,7 @@ const icon = {
   compass: <CompassIcon weight="bold" aria-hidden="true" />,
 };
 
-// E: one list. A pencil for a Path you made (you can change it), a padlock
-// for anything you can't (an Added copy, Dream Sequence). The small line
-// says Added and the versions.
-const LOOK_E: Look = {
-  icon: (e) => (e.kind === "own" ? icon.pencil : icon.lock),
-  line: (e) =>
-    e.kind === "own" ? (
-      versionsText(e)
-    ) : e.kind === "added" ? (
-      <>
-        Added
-        <Dot />
-        Read-only
-        <Dot />
-        {versionsText(e)}
-      </>
-    ) : (
-      "From Dreamport"
-    ),
-};
-
-// F: B's two sections, with E's pencil and padlock. The headings say
-// made-or-Added, so the small line is only the versions.
-const LOOK_F: Look = {
-  icon: LOOK_E.icon,
-  line: (e) => (e.kind === "dreamport" ? null : versionsText(e)),
-};
-
-// G: one list, no second line. A person for a Path you made, an open book
-// for an Added one (the "bought book" of CONTEXT.md); the versions sit at
-// the card's end like a status.
-const LOOK_G: Look = {
-  icon: (e) =>
-    e.kind === "own"
-      ? icon.user
-      : e.kind === "added"
-        ? icon.book
-        : icon.compass,
-  end: (e) => versionsText(e) || null,
-};
-
-// H: the compass stays on every card (#199's "Paths are a compass"), and
-// the words carry it: "Made by you" or "Added, read-only" on the small
-// line, made ones first, then Added.
-const LOOK_H: Look = {
-  icon: () => icon.compass,
-  line: (e) =>
-    e.kind === "own" ? (
-      <>
-        Made by you
-        <Dot />
-        {versionsText(e)}
-      </>
-    ) : e.kind === "added" ? (
-      <>
-        Added, read-only
-        <Dot />
-        {versionsText(e)}
-      </>
-    ) : (
-      "From Dreamport"
-    ),
-};
-
-const LOOKS: Record<string, Look> = {
-  E: LOOK_E,
-  F: LOOK_F,
-  G: LOOK_G,
-  H: LOOK_H,
-};
-
-function PathsRound2({ variant, stub }: { variant: string; stub: Stub }) {
-  const look = LOOKS[variant];
-  const all = entries(stub, false);
-  const mine = all.filter((e) => e.kind === "own");
-  const added = all.filter((e) => e.kind === "added");
-  return (
-    <>
-      <h1>Paths</h1>
-      <PathsIntro />
-      {variant === "F" ? (
-        <>
-          <h2>Paths You Made</h2>
-          <p>
-            <Button>Make New Path</Button>
-          </p>
-          {mine.length === 0 ? (
-            <p>No Paths yet.</p>
-          ) : (
-            <Cards list={mine} look={look} stub={stub} page="Paths" />
-          )}
-          {added.length > 0 && (
-            <>
-              <h2>Paths You&apos;ve Added</h2>
-              <p>
-                These are copies of other Users&apos; Paths. Your Products can
-                follow them, but they can&apos;t be changed.
-              </p>
-              <Cards list={added} look={look} stub={stub} page="Paths" />
-            </>
-          )}
-        </>
-      ) : (
-        <>
-          <p>
-            <Button>Make New Path</Button>
-          </p>
-          <Cards
-            list={variant === "H" ? [...mine, ...added] : all}
-            look={look}
-            stub={stub}
-            page="Paths"
-          />
-        </>
-      )}
-    </>
-  );
-}
-
-function PathfinderRound2({ variant, stub }: { variant: string; stub: Stub }) {
-  const look = LOOKS[variant];
-  const all = entries(stub, true);
-  const ofKind = (k: Entry["kind"]) => all.filter((e) => e.kind === k);
-  return (
-    <>
-      <h1>{PRODUCT.name}</h1>
-      <h2>Browse Available Paths</h2>
-      {variant === "F" ? (
-        (
-          [
-            ["From Dreamport", ofKind("dreamport")],
-            ["Made by You", ofKind("own")],
-            ["Added", ofKind("added")],
-          ] as const
-        ).map(
-          ([heading, list]) =>
-            list.length > 0 && (
-              <div key={heading}>
-                <h3>{heading}</h3>
-                <Cards list={list} look={look} stub={stub} page="Pathfinder" />
-              </div>
-            ),
-        )
-      ) : (
-        <Cards
-          list={
-            variant === "H"
-              ? [...ofKind("dreamport"), ...ofKind("own"), ...ofKind("added")]
-              : all
-          }
-          look={look}
-          stub={stub}
-          page="Pathfinder"
-        />
-      )}
-      <MakeYourOwn />
-    </>
-  );
-}
+// Round 2's looks E–H and pages are in history (b1ae763).
 
 // ---------------------------------------------------------- round 3 --
 // Ian on round 2: G's one-line cards, but the compass on every card, no
@@ -629,17 +455,135 @@ function PathfinderRound3({ stub }: { stub: Stub }) {
   );
 }
 
+// ---------------------------------------------------------- round 4 --
+// Ian on round 3: J, with the blurb reworded, Make New Path under the
+// cards, and more room above the headings. Still open: how much room
+// (2rem, the h4's `* + h4`, or 3rem) and where Make New Path sits under the
+// list (left, or bottom right as a page's main action at its end). M–P
+// are those four; the blurb's wording is its own select, top right.
+
+const BLURBS = [
+  {
+    key: "1",
+    text: "These were made by other Users. Your Products can follow them, but you can't edit them.",
+  },
+  {
+    key: "2",
+    text: "Paths you've Added are copies of Paths other Users made. You can put your Products on them, but you can't edit them.",
+  },
+  {
+    key: "3",
+    text: "Like a book you've bought, an Added Path is yours to follow, not to rewrite. To change one, make a Path of your own.",
+  },
+  {
+    key: "4",
+    text: "Only the User who made a Path can edit it. Your copy stays as it was when you Added it.",
+  },
+];
+
+const ROOM: Record<string, string> = {
+  M: "var(--space-8)",
+  N: "var(--space-10)",
+  O: "var(--space-8)",
+  P: "var(--space-10)",
+};
+
+function PathsRound4({
+  variant,
+  stub,
+  blurb,
+}: {
+  variant: string;
+  stub: Stub;
+  blurb: string;
+}) {
+  const all = entries(stub, false);
+  const mine = all.filter((e) => e.kind === "own");
+  const added = all.filter((e) => e.kind === "added");
+  // Prototype-only inline style: built, it's a `* + h2` rule like `* + h4`.
+  const room = { marginTop: ROOM[variant] };
+  const atEnd = variant === "O" || variant === "P";
+  const cards = (list: Entry[]) => (
+    <Cards list={list} look={LOOK_PLAIN} stub={stub} page="Paths" />
+  );
+  return (
+    <>
+      <h1>Paths</h1>
+      <PathsIntro />
+      <h2 style={room}>Your Original Paths</h2>
+      {mine.length === 0 ? <p>No Paths yet.</p> : cards(mine)}
+      {atEnd ? (
+        <div className="button-group button-group--end">
+          <Button>Make New Path</Button>
+        </div>
+      ) : (
+        <p>
+          <Button>Make New Path</Button>
+        </p>
+      )}
+      {added.length > 0 && (
+        <>
+          <h2 style={room}>Your Added Paths</h2>
+          <p>{BLURBS.find((b) => b.key === blurb)?.text}</p>
+          {cards(added)}
+        </>
+      )}
+    </>
+  );
+}
+
+function PathfinderRound4({ variant, stub }: { variant: string; stub: Stub }) {
+  const all = entries(stub, true);
+  const sections = [
+    ["From Dreamport", all.filter((e) => e.kind === "dreamport")],
+    ["Your Original Paths", all.filter((e) => e.kind === "own")],
+    ["Your Added Paths", all.filter((e) => e.kind === "added")],
+  ] as const;
+  return (
+    <>
+      <h1>{PRODUCT.name}</h1>
+      <h2>Browse Available Paths</h2>
+      {sections.map(
+        ([heading, list]) =>
+          list.length > 0 && (
+            <div key={heading}>
+              <h3 style={{ marginTop: ROOM[variant] }}>{heading}</h3>
+              <Cards
+                list={list}
+                look={LOOK_PLAIN}
+                stub={stub}
+                page="Pathfinder"
+              />
+            </div>
+          ),
+      )}
+      <h3 style={{ marginTop: ROOM[variant] }}>Make Your Own Path</h3>
+      <p>
+        Not finding a Path that does quite what you need?{" "}
+        <Link href="/app/paths">Make your own Path</Link>
+      </p>
+    </>
+  );
+}
+
 // ------------------------------------------------------------- harness --
 
-function PathsPage({ variant, stub }: { variant: string; stub: Stub }) {
-  if (variant === "G") return <PathsRound2 variant={variant} stub={stub} />;
-  return <PathsRound3 variant={variant} stub={stub} />;
+function PathsPage({
+  variant,
+  stub,
+  blurb,
+}: {
+  variant: string;
+  stub: Stub;
+  blurb: string;
+}) {
+  if (variant === "J") return <PathsRound3 variant={variant} stub={stub} />;
+  return <PathsRound4 variant={variant} stub={stub} blurb={blurb} />;
 }
 
 function PathfinderPage({ variant, stub }: { variant: string; stub: Stub }) {
-  if (variant === "G")
-    return <PathfinderRound2 variant={variant} stub={stub} />;
-  return <PathfinderRound3 stub={stub} />;
+  if (variant === "J") return <PathfinderRound3 stub={stub} />;
+  return <PathfinderRound4 variant={variant} stub={stub} />;
 }
 
 /** Catches link clicks inside the page, so a stubbed row never navigates. */
@@ -680,18 +624,24 @@ function describeHref(href: string, stub: Stub): string {
 function StateBar({
   state,
   onChange,
+  blurb,
+  onBlurb,
 }: {
   state: StateKey;
   onChange: (s: StateKey) => void;
+  blurb: string;
+  onBlurb: (b: string) => void;
 }) {
   if (!import.meta.env.DEV) return null;
   return (
-    <label
+    <div
       style={{
         position: "fixed",
         top: "0.5rem",
         right: "0.5rem",
         zIndex: 1000,
+        display: "grid",
+        rowGap: "0.25rem",
         padding: "0.25rem 0.5rem",
         borderRadius: "0.5rem",
         background: "#111",
@@ -700,19 +650,35 @@ function StateBar({
         fontSize: "0.8rem",
       }}
     >
-      State{" "}
-      <select
-        value={state}
-        onChange={(e) => onChange(e.target.value as StateKey)}
-        style={{ fontSize: "0.8rem" }}
-      >
-        {STATES.map((s) => (
-          <option key={s.key} value={s.key}>
-            {s.name}
-          </option>
-        ))}
-      </select>
-    </label>
+      <label>
+        State{" "}
+        <select
+          value={state}
+          onChange={(e) => onChange(e.target.value as StateKey)}
+          style={{ fontSize: "0.8rem" }}
+        >
+          {STATES.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Blurb{" "}
+        <select
+          value={blurb}
+          onChange={(e) => onBlurb(e.target.value)}
+          style={{ fontSize: "0.8rem", maxWidth: "22rem" }}
+        >
+          {BLURBS.map((b) => (
+            <option key={b.key} value={b.key}>
+              {b.key}: {b.text}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
   );
 }
 
@@ -773,6 +739,7 @@ function StateLine({
 
 export interface ProtoSearch {
   variant?: string;
+  blurb?: string;
   state?: StateKey;
 }
 
@@ -781,6 +748,7 @@ export const validateProtoSearch = (
   search: Record<string, unknown>,
 ): ProtoSearch => ({
   ...(typeof search.variant === "string" && { variant: search.variant }),
+  ...(typeof search.blurb === "string" && { blurb: search.blurb }),
   ...(typeof search.state === "string" && { state: search.state as StateKey }),
 });
 
@@ -795,23 +763,29 @@ export function Prototype({
   setSearch: (next: ProtoSearch) => void;
 }) {
   const [lastClick, setLastClick] = useState<string | null>(null);
-  const variant = search.variant ?? "I";
+  const variant = search.variant ?? "M";
   const state = search.state ?? "typical";
+  const blurb = search.blurb ?? "1";
   const stub = stubFor(state);
   const set = (next: ProtoSearch) => {
     setLastClick(null);
-    setSearch({ variant, state, ...next });
+    setSearch({ variant, state, blurb, ...next });
   };
   return (
     <>
-      <StateBar state={state} onChange={(s) => set({ state: s })} />
+      <StateBar
+        state={state}
+        onChange={(s) => set({ state: s })}
+        blurb={blurb}
+        onBlurb={(b) => set({ blurb: b })}
+      />
       <div
         onClickCapture={catchClicks((href) =>
           setLastClick(`${href} → ${describeHref(href, stub)}`),
         )}
       >
         {page === "Paths" ? (
-          <PathsPage variant={variant} stub={stub} />
+          <PathsPage variant={variant} stub={stub} blurb={blurb} />
         ) : (
           <PathfinderPage variant={variant} stub={stub} />
         )}
