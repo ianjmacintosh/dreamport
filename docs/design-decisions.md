@@ -343,9 +343,10 @@ Add an entry only once a sign-off conversation resolves something repeatable
   {n}, saved {date and time}" ("No saved versions yet." before the first
   save), the latest-version line a `role="status"` so a save is
   announced as it changes, and a refused save's reason under the button.
-  No Draft label, no list of every version, and no Milestones-and-Tasks
-  count. A date and time shows in the browser's own locale as a long date
-  with the time ("October 10, 2026 at 2:32 PM"), in a `<time>`. Picked
+  No Milestones-and-Tasks count. (#191 added a version label and a list
+  of every version, under the h1.) A date and time shows in the
+  browser's own locale as a long date with the time ("October 10, 2026
+  at 2:32 PM"), in a `<time>`. Picked
   over status lines at the top, a facts list, and a "changed since the
   last save" sentence in a prototype on branch
   `169-prototype-save-version` (decided in #169).

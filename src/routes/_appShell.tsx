@@ -52,8 +52,12 @@ export const Route = createFileRoute("/_appShell")({
     if (!res || !res.ok) {
       throw redirect({ to: "/login" });
     }
-    const { email } = (await res.json()) as { email: string };
-    return { email, productsPromise };
+    const { email, guide } = (await res.json()) as {
+      email: string;
+      /** Whether the User is a Guide (#190): Publish, Open and Close are theirs. */
+      guide: boolean;
+    };
+    return { email, guide, productsPromise };
   },
   component: AppShellLayout,
 });

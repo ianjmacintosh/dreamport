@@ -342,6 +342,8 @@ export const TEST_EMAILS = {
     "delivered+e2e-product-rows-independent+e2e-test@resend.dev",
   /** #167: add a Path, add, reorder, edit and delete its Milestones, then reload. */
   e2eTrailblazer: "delivered+e2e-trailblazer+e2e-test@resend.dev",
+  /** #191: a plain User (not a Guide) sees no Publish, Open or Close controls in the Path editor. */
+  e2ePlainPathMaker: "delivered+e2e-plain-path-maker+e2e-test@resend.dev",
   /** #119: the account Dropdown opens from its trigger and closes on Escape, returning focus. */
   e2eAccountDropdown: "delivered+e2e-account-dropdown+e2e-test@resend.dev",
   /**
