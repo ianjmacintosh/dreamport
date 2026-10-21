@@ -12,8 +12,8 @@
 // variants via `?variant=`, the same key on both pages; the case via
 // `?state=`. All stubbed in memory: clicks on rows are caught and written
 // to the state line instead of navigating.
-import { useState } from "react";
-import type { MouseEvent, ReactNode } from "react";
+import { Fragment, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import {
   BookOpenIcon,
   CompassIcon,
@@ -30,11 +30,10 @@ import { PrototypeSwitcher } from "../../components/PrototypeSwitcher";
 // ---------------------------------------------------------------- stubs --
 
 const VARIANTS = [
-  { key: "J", name: "Round 3's J, for reference" },
-  { key: "M", name: "2rem above headings, Make New Path under, left" },
-  { key: "N", name: "3rem above headings, Make New Path under, left" },
-  { key: "O", name: "2rem above headings, Make New Path bottom right" },
-  { key: "P", name: "3rem above headings, Make New Path bottom right" },
+  { key: "M", name: "Round 4's M: 1rem between cards and button" },
+  { key: "Q", name: "1.5rem between cards and button (as .list)" },
+  { key: "R", name: "2rem between cards and button (as headings)" },
+  { key: "S", name: "2.5rem between cards and button" },
 ];
 
 const STATES = [
@@ -439,7 +438,7 @@ function PathfinderRound3({ stub }: { stub: Stub }) {
       {sections.map(
         ([heading, list]) =>
           list.length > 0 && (
-            <div key={heading}>
+            <Fragment key={heading}>
               <h3>{heading}</h3>
               <Cards
                 list={list}
@@ -447,7 +446,7 @@ function PathfinderRound3({ stub }: { stub: Stub }) {
                 stub={stub}
                 page="Pathfinder"
               />
-            </div>
+            </Fragment>
           ),
       )}
       <MakeYourOwn />
@@ -481,7 +480,20 @@ const BLURBS = [
   },
 ];
 
+// Round 5: Ian picked M's 2rem (as a design-system rule) and Make New
+// Path bottom left; what's open is the room between the last card and the
+// button. Q–S: 1.5rem (what `.list` leaves after itself, #169), 2rem (the
+// headings' own room), 2.5rem.
+const GAP: Record<string, string> = {
+  Q: "var(--space-6)",
+  R: "var(--space-8)",
+  S: "var(--space-9)",
+};
+
 const ROOM: Record<string, string> = {
+  Q: "var(--space-8)",
+  R: "var(--space-8)",
+  S: "var(--space-8)",
   M: "var(--space-8)",
   N: "var(--space-10)",
   O: "var(--space-8)",
@@ -517,7 +529,7 @@ function PathsRound4({
           <Button>Make New Path</Button>
         </div>
       ) : (
-        <p>
+        <p style={GAP[variant] ? { marginTop: GAP[variant] } : undefined}>
           <Button>Make New Path</Button>
         </p>
       )}
@@ -546,7 +558,7 @@ function PathfinderRound4({ variant, stub }: { variant: string; stub: Stub }) {
       {sections.map(
         ([heading, list]) =>
           list.length > 0 && (
-            <div key={heading}>
+            <Fragment key={heading}>
               <h3 style={{ marginTop: ROOM[variant] }}>{heading}</h3>
               <Cards
                 list={list}
@@ -554,7 +566,7 @@ function PathfinderRound4({ variant, stub }: { variant: string; stub: Stub }) {
                 stub={stub}
                 page="Pathfinder"
               />
-            </div>
+            </Fragment>
           ),
       )}
       <h3 style={{ marginTop: ROOM[variant] }}>Make Your Own Path</h3>
@@ -590,7 +602,9 @@ function PathfinderPage({ variant, stub }: { variant: string; stub: Stub }) {
 function catchClicks(onClick: (href: string) => void): (e: MouseEvent) => void {
   return (e) => {
     const a = (e.target as HTMLElement).closest("a");
-    const href = a?.getAttribute("href");
+    // Only the page's own links: not AppNav, breadcrumbs or the state line.
+    if (!a?.closest("main") || a.closest("[data-proto]")) return;
+    const href = a.getAttribute("href");
     if (!href || !href.startsWith("/app/")) return;
     if (href === "/app/paths" || href.startsWith("/app/paths?")) return;
     e.preventDefault();
@@ -711,6 +725,7 @@ function StateLine({
     .join(", ");
   return (
     <div
+      data-proto
       style={{
         marginTop: "3rem",
         marginBottom: "4rem",
@@ -763,10 +778,17 @@ export function Prototype({
   setSearch: (next: ProtoSearch) => void;
 }) {
   const [lastClick, setLastClick] = useState<string | null>(null);
-  const variant = search.variant ?? "M";
+  const variant = search.variant ?? "Q";
   const state = search.state ?? "typical";
   const blurb = search.blurb ?? "1";
   const stub = stubFor(state);
+  useEffect(() => {
+    const onClick = catchClicks((href) =>
+      setLastClick(`${href} → ${describeHref(href, stubFor(state))}`),
+    );
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [state]);
   const set = (next: ProtoSearch) => {
     setLastClick(null);
     setSearch({ variant, state, blurb, ...next });
@@ -779,17 +801,12 @@ export function Prototype({
         blurb={blurb}
         onBlurb={(b) => set({ blurb: b })}
       />
-      <div
-        onClickCapture={catchClicks((href) =>
-          setLastClick(`${href} → ${describeHref(href, stub)}`),
-        )}
-      >
-        {page === "Paths" ? (
-          <PathsPage variant={variant} stub={stub} blurb={blurb} />
-        ) : (
-          <PathfinderPage variant={variant} stub={stub} />
-        )}
-      </div>
+      {/* No wrapper element: one would keep `main > * + *` off the page. */}
+      {page === "Paths" ? (
+        <PathsPage variant={variant} stub={stub} blurb={blurb} />
+      ) : (
+        <PathfinderPage variant={variant} stub={stub} />
+      )}
       <StateLine
         page={page}
         variant={variant}
