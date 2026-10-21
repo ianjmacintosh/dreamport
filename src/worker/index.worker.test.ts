@@ -2317,7 +2317,7 @@ describe("Pathfinder and Trailhead routes", () => {
     });
   });
 
-  it("GET /paths/:pathId/trailhead answers a version and its Path's versions, or 404s another User's Path, an unknown one, or a version it doesn't have", async () => {
+  it("GET /api/paths/:pathId/trailhead shows the User's own Path with their Products and each one's Journey on it, and 404s a version it doesn't offer", async () => {
     const { cookie, path, version } = await savedPath(
       TEST_EMAILS.trailheadRoute,
     );
@@ -2332,12 +2332,10 @@ describe("Pathfinder and Trailhead routes", () => {
     const { product } = (await (
       await addProduct(cookie, "A phone-scale app")
     ).json()) as { product: { id: string; name: string } };
-    const trailhead = (pathId: string, query = "") =>
-      callApi(
-        "GET",
-        `/api/products/${product.id}/paths/${pathId}/trailhead${query}`,
-        cookie,
-      );
+    const trailhead = (pathId: string, query = "", as = cookie) =>
+      callApi("GET", `/api/paths/${pathId}/trailhead${query}`, as);
+
+    expect((await trailhead(path.id, "", "")).status).toBe(401);
 
     const res = await trailhead(path.id);
     expect(res.status).toBe(200);
@@ -2346,8 +2344,8 @@ describe("Pathfinder and Trailhead routes", () => {
       savedAt,
     }));
     expect(await res.json()).toEqual({
-      product,
-      path: { id: path.id, name: path.name, owner: "user" },
+      status: "followable",
+      path: { id: path.id, name: path.name, dreamport: false, own: true },
       version: {
         id: latest.id,
         number: 2,
@@ -2355,37 +2353,36 @@ describe("Pathfinder and Trailhead routes", () => {
         milestones: [{ id: expect.any(String), ...MILESTONE }],
       },
       versions,
-      latestNumber: 2,
-      journey: null,
-    });
-    expect(await (await trailhead(path.id, "?version=1")).json()).toMatchObject(
-      { version: { id: version.id, number: 1 }, versions, latestNumber: 2 },
-    );
-    expect(await (await trailhead("dream-sequence")).json()).toMatchObject({
-      path: {
-        id: "dream-sequence",
-        name: "Dream Sequence",
-        owner: "dreamport",
-      },
-      version: { id: DREAM_SEQUENCE_VERSION, number: 1 },
-      latestNumber: 1,
+      newestNumber: 2,
+      products: [{ id: product.id, name: product.name, journeyId: null }],
     });
 
-    // Following an earlier version still counts as following the Path,
-    // and a Journey on the later one is refused.
+    // A Journey on an earlier version is still the Product's on this Path.
     const { journeyId } = (await (
       await startJourney(product.id, cookie, version.id)
     ).json()) as { journeyId: string };
-    expect(await (await trailhead(path.id)).json()).toMatchObject({
-      version: { number: 2 },
-      journey: { id: journeyId, versionNumber: 1 },
+    expect(await (await trailhead(path.id, "?version=1")).json()).toMatchObject(
+      {
+        version: { id: version.id, number: 1 },
+        versions,
+        newestNumber: 2,
+        products: [{ id: product.id, journeyId }],
+      },
+    );
+    expect(await (await trailhead("dream-sequence")).json()).toMatchObject({
+      status: "followable",
+      path: {
+        id: "dream-sequence",
+        name: "Dream Sequence",
+        dreamport: true,
+        own: false,
+      },
+      version: { id: DREAM_SEQUENCE_VERSION, number: 1 },
+      newestNumber: 1,
+      products: [{ id: product.id, journeyId: null }],
     });
-    const refused = await startJourney(product.id, cookie, latest.id);
-    expect(refused.status).toBe(409);
 
-    const theirs = await savedPath(TEST_EMAILS.trailheadStranger);
     for (const [pathId, query] of [
-      [theirs.path.id, ""],
       ["no-such-path", ""],
       [path.id, "?version=3"],
       [path.id, "?version=one"],
@@ -2394,6 +2391,82 @@ describe("Pathfinder and Trailhead routes", () => {
       expect(missing.status).toBe(404);
       expect(await missing.json()).toEqual({ error: "Not found" });
     }
+
+    const draftOnly = await addPath(cookie, "Never Saved");
+    expect(await (await trailhead(draftOnly.id)).json()).toEqual({
+      status: "unsaved",
+    });
+  });
+
+  it("GET /api/paths/:pathId/trailhead offers another User a Guide's published versions of an open Path and nothing about the Guide, then says it's unavailable once closed", async () => {
+    const guide = await savedPath(TEST_EMAILS.guide);
+    const { path } = guide;
+    expect(
+      (await callApi("POST", `/api/paths/${path.id}/versions`, guide.cookie))
+        .status,
+    ).toBe(201);
+    await callApi(
+      "PUT",
+      `/api/paths/${path.id}/versions/1/published`,
+      guide.cookie,
+    );
+    await callApi("PUT", `/api/paths/${path.id}/open`, guide.cookie);
+    const { cookie, product } = await unstartedProduct(
+      TEST_EMAILS.trailheadStranger,
+    );
+    const trailhead = (query = "", as = cookie) =>
+      callApi("GET", `/api/paths/${path.id}/trailhead${query}`, as);
+
+    const res = await trailhead();
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(JSON.parse(text)).toEqual({
+      status: "offered",
+      path: { id: path.id, name: path.name, dreamport: false, own: false },
+      version: {
+        id: guide.version.id,
+        number: 1,
+        description: path.description,
+        milestones: [{ id: expect.any(String), ...MILESTONE }],
+      },
+      versions: [{ number: 1, savedAt: guide.version.savedAt }],
+      newestNumber: 1,
+    });
+    const guideRow = await env.DB.prepare(
+      'SELECT "id" FROM "user" WHERE "email" = ?',
+    )
+      .bind(TEST_EMAILS.guide)
+      .first<{ id: string }>();
+    if (!guideRow) throw new Error("The Guide has no user row");
+    for (const secret of [
+      guideRow.id,
+      TEST_EMAILS.guide,
+      '"userId"',
+      '"open"',
+    ]) {
+      expect(text).not.toContain(secret);
+    }
+
+    // The Guide sees the same version, as their own.
+    expect(await (await trailhead("", guide.cookie)).json()).toMatchObject({
+      status: "followable",
+      path: { own: true },
+      version: { number: 1 },
+      versions: [{ number: 1 }],
+      newestNumber: 1,
+    });
+
+    const unavailable = {
+      status: "unavailable",
+      path: { id: path.id, name: path.name },
+    };
+    expect(await (await trailhead("?version=2")).json()).toEqual(unavailable);
+
+    const refused = await startJourney(product.id, cookie, guide.version.id);
+    expect(refused.status).toBe(404);
+
+    await callApi("DELETE", `/api/paths/${path.id}/open`, guide.cookie);
+    expect(await (await trailhead()).json()).toEqual(unavailable);
   });
 });
 
@@ -2852,7 +2925,7 @@ describe("Trailblazer routes", () => {
     expect(res.status).toBe(200);
     for (const url of [
       `/api/paths/${path.id}`,
-      `/api/products/${product.id}/paths/${path.id}/trailhead`,
+      `/api/paths/${path.id}/trailhead`,
       journeyUrl(product.id, journeyId),
     ]) {
       expect((await callApi("GET", url, cookie)).status).toBe(404);
@@ -3179,8 +3252,12 @@ describe("request gates, across every route (#154)", () => {
   });
 
   describe("Path ownership", () => {
-    const pathScoped = routes.filter((route) =>
-      route.path.startsWith("/api/paths/:"),
+    // The Trailhead answers every signed-in User, by design (#205); what it
+    // tells a stranger is tested with the Trailhead routes.
+    const pathScoped = routes.filter(
+      (route) =>
+        route.path.startsWith("/api/paths/:") &&
+        route.path !== "/api/paths/:pathId/trailhead",
     );
 
     async function ownedPath() {

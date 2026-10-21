@@ -73,7 +73,7 @@ function Pathfinder() {
               href={
                 path.journeyId
                   ? `/app/products/${product.id}/journeys/${path.journeyId}`
-                  : `/app/products/${product.id}/paths/${path.id}/trailhead`
+                  : `/app/paths/${path.id}`
               }
               leading={<CompassIcon weight="bold" aria-hidden="true" />}
               trailing={

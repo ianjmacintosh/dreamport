@@ -25,8 +25,10 @@ import {
 } from "./products";
 import { productRoutes } from "./product-routes";
 import { pathRoutes } from "./path-routes";
+import { productsOnPath } from "./journeys";
 import {
   createPath,
+  getTrailhead,
   listPaths,
   parsePathFields,
   PATHS_PER_USER,
@@ -370,6 +372,64 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     return c.json({ path: created.path }, 201);
+  });
+
+  /**
+   * A Path's Trailhead (#205), at its root or `?version=n`, for any
+   * signed-in User: what `getTrailhead` says they see, and for a Path they
+   * can follow, their Products with each one's Journey in progress on it.
+   * Nothing here names the Path's owner, its other versions or whether
+   * it's open. 404 for an unknown Path or a version it doesn't offer.
+   * Ahead of `pathRoutes`, whose middleware 404s anyone but the owner.
+   */
+  app.get("/api/paths/:pathId/trailhead", async (c) => {
+    const session = await currentSession(c.env, c.req.raw);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const pathId = c.req.param("pathId");
+    const raw = c.req.query("version");
+    const number = raw === undefined ? null : Number(raw);
+    const trailhead =
+      number === null || Number.isInteger(number)
+        ? await getTrailhead(c.env.DB, session.user.id, pathId, number)
+        : null;
+    if (!trailhead) {
+      return c.json({ error: "Not found" }, 404);
+    }
+    if (trailhead.status === "unsaved") {
+      return c.json({ status: trailhead.status });
+    }
+    if (trailhead.status === "unavailable") {
+      return c.json({
+        status: trailhead.status,
+        path: { id: pathId, name: trailhead.name },
+      });
+    }
+
+    const { version, versions } = trailhead;
+    return c.json({
+      status: trailhead.status,
+      path: {
+        id: pathId,
+        name: version.name,
+        dreamport:
+          trailhead.status === "followable" && trailhead.owner === "dreamport",
+        own: trailhead.status === "followable" && trailhead.owner === "user",
+      },
+      version: {
+        id: version.id,
+        number: version.number,
+        description: version.description,
+        milestones: version.milestones,
+      },
+      versions: versions.map(({ number, savedAt }) => ({ number, savedAt })),
+      newestNumber: versions[0].number,
+      ...(trailhead.status === "followable" && {
+        products: await productsOnPath(c.env.DB, session.user.id, pathId),
+      }),
+    });
   });
 
   // Every route about one Path: session and ownership checked once, in

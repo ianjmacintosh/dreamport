@@ -561,3 +561,33 @@ Add an entry only once a sign-off conversation resolves something repeatable
     between the h1 and the "Milestones" h2) at `.text-h4`, a new type
     utility that gives a heading the `h4`'s look, its body face included.
     A plain `h2` is too big over a sentence or two.
+- A Path's Trailhead (`/app/paths/:pathId`, and the same page for one
+  published version) looks the same to everyone, its Guide included: the
+  Path's name as the h1, a version line under it, then `.journey-split`
+  with the Milestones on the left and everything else in the right column
+  under the description. The Guide alone gets an **Edit Path** button at
+  the h1's end (`.heading-row`); Publish, Open and Close live in the Path
+  editor, not here. The version line is written by the page, not the
+  Path: "Version 2 · Free" at `.text-sm` in the text's own colour, its
+  parts split by middle dots hidden from screen readers, as the in-app
+  `Footer` does; an older version adds "A newer version is available.",
+  linking to the newest. **Add This Path**, for a User who hasn't Added
+  another User's Path, arrives with #192. Once it can be followed, a native
+  select of the User's Products sits beside **Start on Path** as a
+  `.field-row`. "Looking for an older version?" under that opens a
+  `Dialog` of the published versions, as before. Its trail is Paths ›
+  {Path}, replacing the Product-scoped Trailhead trail above. Nothing
+  warns ahead of a click: pressing Start on Path with no Product, or for
+  a Product already on the Path, shows why after the button ("You don't
+  have a Product yet, and a Journey needs one. [Add a Product] first."; or
+  "{Product} is already on the {Path} Path." then "Would you like to [view
+  your current Journey]? If you'd like to restart, you'll have to do it
+  from within your current Journey."). There's no Restart on the
+  Trailhead. A closed Path or an unpublished version shows "This Path
+  ({Path}) is no longer available." These messages are #191's `Notice`
+  (decided in #205, from a prototype on local branch
+  `205-prototype-trailhead`: six rounds across six viewers, from three
+  layouts (the right column as today, one action beside the h1 with the
+  picker in a Dialog, a numbered checklist) down to round 1's first, then
+  older versions as a Dialog or a popover, and the version line as small
+  italics, body-size italics or small dotted text).

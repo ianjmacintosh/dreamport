@@ -39,7 +39,7 @@ export function journeyBreadcrumbs({
       { label: "Paths", href: `/app/products/${product.id}/journeys` },
       {
         label: path.name,
-        href: `/app/products/${product.id}/paths/${path.id}/trailhead`,
+        href: `/app/paths/${path.id}`,
       },
     ],
     current: JOURNEY_CRUMB[status],

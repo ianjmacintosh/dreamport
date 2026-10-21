@@ -50,7 +50,11 @@ export const Route = createFileRoute("/_appShell")({
 
     const res = await fetch("/api/me").catch(() => null);
     if (!res || !res.ok) {
-      throw redirect({ to: "/login" });
+      // Back here once signed in (#205); `/app` is where sign-in goes anyway.
+      throw redirect({
+        to: "/login",
+        search: location.href === "/app" ? {} : { redirect: location.href },
+      });
     }
     const { email, guide } = (await res.json()) as {
       email: string;

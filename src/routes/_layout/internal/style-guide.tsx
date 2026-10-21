@@ -817,9 +817,11 @@ function StyleGuide() {
           version, or closed by unpublishing its last published one (#191). Each
           sentence is its own <code>&lt;p&gt;</code>. It is a{" "}
           <code>role=&quot;status&quot;</code>, so it&apos;s announced as it
-          appears; render it only once there&apos;s something to say. Not for a
-          refused action: that stays a plain <code>role=&quot;alert&quot;</code>{" "}
-          line under its buttons. A Path&apos;s Trailhead reuses it (#205).
+          appears; render it only once there&apos;s something to say. A
+          Path&apos;s Trailhead uses it for a Path that&apos;s no longer
+          available, and for why Start on Path didn&apos;t start (#205). Not for
+          a request that failed: that stays a plain{" "}
+          <code>role=&quot;alert&quot;</code> line under its buttons.
         </p>
       </Section>
 
