@@ -1,5 +1,8 @@
 import { useState } from "react";
+// PROTOTYPE (#192): this page renders -prototype-added-copy.tsx. Never merge.
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+
+import { Prototype, validateProtoSearch } from "./-prototype-added-copy";
 
 import Button from "../../components/Button";
 import Dialog from "../../components/Dialog";
@@ -59,6 +62,7 @@ async function withMinimumDuration<T>(
 // `app_.paths`, not `app.paths`: `app.tsx` renders no `<Outlet />`, so this
 // page is a sibling of `/app`, the same as `app_.settings.tsx`.
 export const Route = createFileRoute("/_appShell/app_/paths")({
+  validateSearch: validateProtoSearch,
   beforeLoad: async () => {
     // The session is already proven by `_appShell`. A failed fetch starts
     // the page empty, as `/app` does with its Products.
@@ -69,8 +73,23 @@ export const Route = createFileRoute("/_appShell/app_/paths")({
         : [];
     return { paths };
   },
-  component: Paths,
+  component: PrototypePaths,
 });
+
+function PrototypePaths() {
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  return (
+    <Prototype
+      page="Paths"
+      search={search}
+      setSearch={(next) => void navigate({ search: next, replace: true })}
+    />
+  );
+}
+
+// The real page, kept for reference while prototyping.
+export { Paths };
 
 const ADD_PATH_FAILED = "We couldn't add that. Try again in a moment.";
 const CONNECTION_FAILED =
