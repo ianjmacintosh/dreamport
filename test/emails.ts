@@ -319,6 +319,13 @@ export const TEST_EMAILS = {
   e2eIdeaTagOverflow: "delivered+e2e-idea-tag-overflow+e2e-test@resend.dev",
   /** #170: make a Path in Trailblazer, save a version, and start a Journey on it from a Product. */
   e2eFollowOwnPath: "delivered+e2e-follow-own-path+e2e-test@resend.dev",
+  /** #205: open a Trailhead signed out, sign in, and land back on it. */
+  e2eTrailheadReturn: "delivered+e2e-trailhead-return+e2e-test@resend.dev",
+  /** #205: press Start on Path with no Products, and be told to add one. */
+  e2eTrailheadNoProducts:
+    "delivered+e2e-trailhead-no-products+e2e-test@resend.dev",
+  /** #205: open a Guide's published Path, then find it unavailable once closed. */
+  e2eTrailheadVisitor: "delivered+e2e-trailhead-visitor+e2e-test@resend.dev",
   /** #137: open a Product, start its Journey, see Milestone 1 current — then advance and return. */
   e2eStartJourney: "delivered+e2e-start-journey+e2e-test@resend.dev",
   /** Finish a Journey, then Return from finished: un-finished, Growth still current. */

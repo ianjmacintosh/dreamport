@@ -24,11 +24,17 @@ async function openNewProduct(page: Page, productName: string) {
   ).toBeVisible();
 }
 
+/** On a Trailhead, pick `productName` and press Start on Path. */
+async function startOnPath(page: Page, productName: string) {
+  await page.getByLabel("Product").selectOption({ label: productName });
+  await page.getByRole("button", { name: "Start on Path" }).click();
+}
+
 /** From a Product with no Journeys, start one on Dream Sequence. */
-async function startDreamSequence(page: Page) {
+async function startDreamSequence(page: Page, productName: string) {
   await page.getByRole("link", { name: "Choose a Path" }).click();
   await page.getByRole("link", { name: "Dream Sequence" }).click();
-  await page.getByRole("button", { name: "Start on Path" }).click();
+  await startOnPath(page, productName);
   await expect(page).toHaveURL(/\/app\/products\/[^/]+\/journeys\/[^/]+$/);
 }
 
@@ -62,15 +68,12 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
     page.getByRole("link", { name: "Make your own Path" }),
   ).toHaveAttribute("href", "/app/paths");
   await page.getByRole("link", { name: "Dream Sequence" }).click();
-  await expect(page).toHaveURL(
-    /\/app\/products\/.+\/paths\/dream-sequence\/trailhead$/,
-  );
+  await expect(page).toHaveURL(/\/app\/paths\/dream-sequence$/);
   await expect(trail.getByRole("listitem")).toHaveText([
-    "Products",
-    productName,
     "Paths",
     "Dream Sequence",
   ]);
+  await expect(page.getByText("Version 1 · Free")).toBeVisible();
   await expect(
     page.getByRole("heading", { level: 1, name: "Dream Sequence" }),
   ).toBeVisible();
@@ -92,7 +95,7 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
     page.getByRole("link", { name: "Looking for an older version?" }),
   ).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Start on Path" }).click();
+  await startOnPath(page, productName);
 
   await expect(page).toHaveURL(/\/app\/products\/[^/]+\/journeys\/[^/]+$/);
   await expect(milestones.locator('[aria-current="step"]')).toContainText(
@@ -175,20 +178,27 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   await page.getByRole("link", { name: "Dream Sequence Following" }).click();
   await expect(page).toHaveURL(/\/journeys\/[^/]+$/);
 
-  // Its Trailhead, reached directly, offers the Journey, not a second start.
-  await page.goto(`${productUrl}/paths/dream-sequence/trailhead`);
+  // Its Trailhead, reached directly, starts nothing for a Product already
+  // on it, and points at the Journey instead.
+  await page.goto("/app/paths/dream-sequence");
+  await startOnPath(page, productName);
   await expect(
-    page.getByText(`${productName} is already following Dream Sequence.`),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start on Path" })).toHaveCount(
-    0,
+    page.getByRole("status").filter({
+      hasText: `${productName} is already on the Dream Sequence Path.`,
+    }),
+  ).toContainText(
+    "If you'd like to restart, you'll have to do it from within your current Journey.",
   );
-  await page.getByRole("link", { name: "View Current Path Journey" }).click();
+  await page.getByRole("link", { name: "view your current Journey" }).click();
   await expect(page).toHaveURL(/\/journeys\/[^/]+$/);
 
-  // The Path's crumb goes back to its Trailhead for this Product.
+  // The Path's crumb goes back to its Trailhead.
   await breadcrumbs.getByRole("link", { name: "Dream Sequence" }).click();
-  await expect(page).toHaveURL(`${productUrl}/paths/dream-sequence/trailhead`);
+  await expect(page).toHaveURL(/\/app\/paths\/dream-sequence$/);
+
+  // The Product-scoped Trailhead's old address lands on the Path's.
+  await page.goto(`${productUrl}/paths/dream-sequence/trailhead?version=1`);
+  await expect(page).toHaveURL(/\/app\/paths\/dream-sequence\?version=1$/);
 
   // The one-Journey page's old address lands on the Journeys page.
   await page.goto(`${productUrl}/journey`);
@@ -246,7 +256,10 @@ test("make a Path in Trailblazer with a Milestone and a Task, save a version, an
 
   // An earlier version is in a Dialog behind a quiet link, and says how to
   // get back.
-  const earlier = page.getByText("This is version 1.");
+  const earlier = page.getByRole("link", {
+    name: "A newer version is available.",
+  });
+  await expect(page.getByText("Version 2 · Free")).toBeVisible();
   await expect(earlier).toHaveCount(0);
   await page
     .getByRole("link", { name: "Looking for an older version?" })
@@ -255,16 +268,20 @@ test("make a Path in Trailblazer with a Milestone and a Task, save a version, an
     name: `Versions of ${pathName}`,
   });
   await versions.getByRole("link", { name: /^Version 1, saved / }).click();
-  await expect(page).toHaveURL(/\/trailhead\?version=1$/);
+  await expect(page).toHaveURL(/\/app\/paths\/[^/?]+\?version=1$/);
   await expect(versions).toHaveCount(0);
-  await expect(earlier).toBeVisible();
-  await page
-    .getByRole("link", { name: "A newer version is available." })
-    .click();
-  await expect(page).toHaveURL(/\/trailhead$/);
+  await expect(page.getByText("Version 1 · Free")).toBeVisible();
+  await earlier.click();
+  await expect(page).toHaveURL(/\/app\/paths\/[^/?]+$/);
   await expect(earlier).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Start on Path" }).click();
+  // The User's own Path can be edited from its Trailhead.
+  await expect(page.getByRole("link", { name: "Edit Path" })).toHaveAttribute(
+    "href",
+    /\/app\/paths\/[^/]+\/edit$/,
+  );
+
+  await startOnPath(page, productName);
 
   await expect(page).toHaveURL(/\/app\/products\/[^/]+\/journeys\/[^/]+$/);
   await expect(
@@ -287,7 +304,7 @@ test("finish a Journey, then Return: un-finished with Growth still current, and 
 
   await signIn(page, TEST_EMAILS.e2eReturnFromFinished);
   await openNewProduct(page, productName);
-  await startDreamSequence(page);
+  await startDreamSequence(page, productName);
 
   const milestones = page.getByRole("list", { name: "Milestones" });
   const current = milestones.locator('[aria-current="step"]');
@@ -353,7 +370,7 @@ test("tick a Task and fill out the Product Summary from Milestone 1, land back o
 
   await signIn(page, TEST_EMAILS.e2eFillOnePager);
   await openNewProduct(page, productName);
-  await startDreamSequence(page);
+  await startDreamSequence(page, productName);
 
   // Milestone 1's Tasks (#140): the Event one shows an Event Tag instead of
   // its "EVENT:" prefix. Ticking one is saved.
@@ -425,7 +442,7 @@ test("finish a Journey with a Task ticked, Restart it into a blank Journey, see 
   await signIn(page, TEST_EMAILS.e2eRestartJourney);
   const productName = `A restarted app ${Date.now()}`;
   await openNewProduct(page, productName);
-  await startDreamSequence(page);
+  await startDreamSequence(page, productName);
   const finishedUrl = page.url();
 
   const task = page.getByRole("checkbox", {
