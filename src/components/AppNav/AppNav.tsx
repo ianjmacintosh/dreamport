@@ -35,7 +35,13 @@ const SECTIONS = [
       pathname === "/app" || pathname.startsWith("/app/products/"),
   },
   {
-    label: "Paths",
+    // PROTOTYPE (#192): "Pathfinder" under ?variant=AB. Never merge.
+    get label() {
+      return typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("variant") === "AB"
+        ? "Pathfinder"
+        : "Paths";
+    },
     href: "/app/paths",
     icon: <CompassIcon />,
     matches: (pathname: string) =>

@@ -30,11 +30,12 @@ import { PrototypeSwitcher } from "../../components/PrototypeSwitcher";
 // ---------------------------------------------------------------- stubs --
 
 const VARIANTS = [
-  { key: "T", name: "Round 6's T: no Dream Sequence" },
-  { key: "W", name: 'Dream Sequence first, under "From Dreamport"' },
-  { key: "X", name: "Dream Sequence's card first, no heading" },
-  { key: "Y", name: 'Dream Sequence last, under "From Dreamport"' },
-  { key: "Z", name: "No card: the intro links Dream Sequence" },
+  { key: "AA", name: "h1 Pathfinder, nav still Paths" },
+  { key: "AB", name: "h1 and nav both Pathfinder" },
+  {
+    key: "AC",
+    name: "h1 and nav Paths; Pathfinder only on the Product's link",
+  },
 ];
 
 const STATES = [
@@ -327,7 +328,6 @@ const icon = {
 
 const LOOK_PLAIN: Look = { icon: () => icon.compass };
 
-
 function PathfinderRound3({ stub }: { stub: Stub }) {
   const all = entries(stub, true);
   const sections = [
@@ -392,11 +392,6 @@ const BLURBS = [
 // Path bottom left; what's open is the room between the last card and the
 // button. Q–S: 1.5rem (what `.list` leaves after itself, #169), 2rem (the
 // headings' own room), 2.5rem.
-const GAP: Record<string, string> = {
-  Q: "var(--space-6)",
-  R: "var(--space-8)",
-  S: "var(--space-9)",
-};
 
 // Round 6: with the click wrapper gone, `main > * + *`'s 1rem gives the
 // cards and the button room enough; M's 2rem above headings is now too
@@ -413,50 +408,6 @@ const ROOM: Record<string, string> = {
   O: "var(--space-8)",
   P: "var(--space-10)",
 };
-
-function PathsRound4({
-  variant,
-  stub,
-  blurb,
-}: {
-  variant: string;
-  stub: Stub;
-  blurb: string;
-}) {
-  const all = entries(stub, false);
-  const mine = all.filter((e) => e.kind === "own");
-  const added = all.filter((e) => e.kind === "added");
-  // Prototype-only inline style: built, it's a `* + h2` rule like `* + h4`.
-  const room = { marginTop: ROOM[variant] };
-  const atEnd = variant === "O" || variant === "P";
-  const cards = (list: Entry[]) => (
-    <Cards list={list} look={LOOK_PLAIN} stub={stub} page="Paths" />
-  );
-  return (
-    <>
-      <h1>Paths</h1>
-      <PathsIntro />
-      <h2 style={room}>Your Original Paths</h2>
-      {mine.length === 0 ? <p>No Paths yet.</p> : cards(mine)}
-      {atEnd ? (
-        <div className="button-group button-group--end">
-          <Button>Make New Path</Button>
-        </div>
-      ) : (
-        <p style={GAP[variant] ? { marginTop: GAP[variant] } : undefined}>
-          <Button>Make New Path</Button>
-        </p>
-      )}
-      {added.length > 0 && (
-        <>
-          <h2 style={room}>Your Added Paths</h2>
-          <p>{BLURBS.find((b) => b.key === blurb)?.text}</p>
-          {cards(added)}
-        </>
-      )}
-    </>
-  );
-}
 
 function PathfinderRound4({ variant, stub }: { variant: string; stub: Stub }) {
   const all = entries(stub, true);
@@ -501,10 +452,12 @@ function PathsRound7({
   variant,
   stub,
   blurb,
+  title = "Paths",
 }: {
   variant: string;
   stub: Stub;
   blurb: string;
+  title?: string;
 }) {
   const all = entries(stub, false);
   const mine = all.filter((e) => e.kind === "own");
@@ -540,7 +493,7 @@ function PathsRound7({
   if (variant === "Z") {
     return (
       <>
-        <h1>Paths</h1>
+        <h1>{title}</h1>
         <p>
           If you&apos;d like your Product to follow a structured program with
           milestones and tasks along the way to a certain goal, that&apos;s
@@ -560,7 +513,7 @@ function PathsRound7({
 
   return (
     <>
-      <h1>Paths</h1>
+      <h1>{title}</h1>
       <PathsIntro />
       {/* W: its own section, first. */}
       {variant === "W" && fromDreamport}
@@ -574,9 +527,14 @@ function PathsRound7({
   );
 }
 
-// ------------------------------------------------------------- harness --
+// ---------------------------------------------------------- round 8 --
+// Ian: keep the name Pathfinder, but not under a Product: the Paths page
+// is Pathfinder, and the Product's "explore other Paths" link goes here.
+// Open: where the name shows. AA–AC; Dream Sequence's place is the "DS"
+// select (round 7's W–Z, still unpicked).
 
-function PathsPage({
+/** Ian, mid-round: Dream Sequence is one of "Your Added Paths", first. */
+function PathsRound8Added({
   variant,
   stub,
   blurb,
@@ -585,9 +543,70 @@ function PathsPage({
   stub: Stub;
   blurb: string;
 }) {
-  if (variant === "T")
-    return <PathsRound4 variant={variant} stub={stub} blurb={blurb} />;
-  return <PathsRound7 variant={variant} stub={stub} blurb={blurb} />;
+  const all = entries(stub, false);
+  const mine = all.filter((e) => e.kind === "own");
+  const added: Entry[] = [
+    { kind: "dreamport", ...DREAM_SEQUENCE },
+    ...all.filter((e) => e.kind === "added"),
+  ];
+  const cards = (list: Entry[]) => (
+    <Cards list={list} look={LOOK_PLAIN} stub={stub} page="Paths" />
+  );
+  return (
+    <>
+      <h1>{variant === "AC" ? "Paths" : "Pathfinder"}</h1>
+      <PathsIntro />
+      <h2>Your Original Paths</h2>
+      {mine.length === 0 ? <p>No Paths yet.</p> : cards(mine)}
+      <p>
+        <Button>Make New Path</Button>
+      </p>
+      <h2>Your Added Paths</h2>
+      <p>{BLURBS.find((b) => b.key === blurb)?.text}</p>
+      {cards(added)}
+    </>
+  );
+}
+
+function PathsRound8({
+  variant,
+  stub,
+  blurb,
+  ds,
+}: {
+  variant: string;
+  stub: Stub;
+  blurb: string;
+  ds: string;
+}) {
+  return (
+    <PathsRound7
+      variant={ds}
+      stub={stub}
+      blurb={blurb}
+      title={variant === "AC" ? "Paths" : "Pathfinder"}
+    />
+  );
+}
+
+// ------------------------------------------------------------- harness --
+
+function PathsPage({
+  variant,
+  stub,
+  blurb,
+  ds,
+}: {
+  variant: string;
+  stub: Stub;
+  blurb: string;
+  ds: string;
+}) {
+  return ds === "added" ? (
+    <PathsRound8Added variant={variant} stub={stub} blurb={blurb} />
+  ) : (
+    <PathsRound8 variant={variant} stub={stub} blurb={blurb} ds={ds} />
+  );
 }
 
 function PathfinderPage({ variant, stub }: { variant: string; stub: Stub }) {
@@ -637,11 +656,15 @@ function StateBar({
   onChange,
   blurb,
   onBlurb,
+  ds,
+  onDs,
 }: {
   state: StateKey;
   onChange: (s: StateKey) => void;
   blurb: string;
   onBlurb: (b: string) => void;
+  ds: string;
+  onDs: (d: string) => void;
 }) {
   if (!import.meta.env.DEV) return null;
   return (
@@ -673,6 +696,20 @@ function StateBar({
               {s.name}
             </option>
           ))}
+        </select>
+      </label>
+      <label>
+        DS{" "}
+        <select
+          value={ds}
+          onChange={(e) => onDs(e.target.value)}
+          style={{ fontSize: "0.8rem" }}
+        >
+          <option value="added">Ian: first of Your Added Paths</option>
+          <option value="W">W: Dream Sequence first, From Dreamport</option>
+          <option value="X">X: its card first, no heading</option>
+          <option value="Y">Y: last, From Dreamport</option>
+          <option value="Z">Z: no card, intro links it</option>
         </select>
       </label>
       <label>
@@ -751,6 +788,7 @@ function StateLine({
 
 export interface ProtoSearch {
   variant?: string;
+  ds?: string;
   blurb?: string;
   state?: StateKey;
 }
@@ -761,6 +799,7 @@ export const validateProtoSearch = (
 ): ProtoSearch => ({
   ...(typeof search.variant === "string" && { variant: search.variant }),
   ...(typeof search.blurb === "string" && { blurb: search.blurb }),
+  ...(typeof search.ds === "string" && { ds: search.ds }),
   ...(typeof search.state === "string" && { state: search.state as StateKey }),
 });
 
@@ -775,9 +814,10 @@ export function Prototype({
   setSearch: (next: ProtoSearch) => void;
 }) {
   const [lastClick, setLastClick] = useState<string | null>(null);
-  const variant = search.variant ?? "W";
+  const variant = search.variant ?? "AA";
   const state = search.state ?? "typical";
   const blurb = search.blurb ?? "ian";
+  const ds = search.ds ?? "added";
   const stub = stubFor(state);
   useEffect(() => {
     const onClick = catchClicks((href) =>
@@ -788,7 +828,7 @@ export function Prototype({
   }, [state]);
   const set = (next: ProtoSearch) => {
     setLastClick(null);
-    setSearch({ variant, state, blurb, ...next });
+    setSearch({ variant, state, blurb, ds, ...next });
   };
   return (
     <>
@@ -797,10 +837,12 @@ export function Prototype({
         onChange={(s) => set({ state: s })}
         blurb={blurb}
         onBlurb={(b) => set({ blurb: b })}
+        ds={ds}
+        onDs={(d) => set({ ds: d })}
       />
       {/* No wrapper element: one would keep `main > * + *` off the page. */}
       {page === "Paths" ? (
-        <PathsPage variant={variant} stub={stub} blurb={blurb} />
+        <PathsPage variant={variant} stub={stub} blurb={blurb} ds={ds} />
       ) : (
         <PathfinderPage variant={variant} stub={stub} />
       )}
