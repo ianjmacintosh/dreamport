@@ -30,10 +30,11 @@ import { PrototypeSwitcher } from "../../components/PrototypeSwitcher";
 // ---------------------------------------------------------------- stubs --
 
 const VARIANTS = [
-  { key: "M", name: "Round 4's M: 2rem above headings" },
-  { key: "T", name: "1rem above headings, the generic gap, no new rule" },
-  { key: "U", name: "1.25rem above headings" },
-  { key: "V", name: "1.5rem above headings" },
+  { key: "T", name: "Round 6's T: no Dream Sequence" },
+  { key: "W", name: 'Dream Sequence first, under "From Dreamport"' },
+  { key: "X", name: "Dream Sequence's card first, no heading" },
+  { key: "Y", name: 'Dream Sequence last, under "From Dreamport"' },
+  { key: "Z", name: "No card: the intro links Dream Sequence" },
 ];
 
 const STATES = [
@@ -329,101 +330,6 @@ const LOOK_PLAIN: Look = { icon: () => icon.compass };
 const ADDED_LINE =
   "Copies of other Users' Paths. Your Products can follow them, but they can't be changed.";
 
-function PathsRound3({ variant, stub }: { variant: string; stub: Stub }) {
-  const all = entries(stub, false);
-  const mine = all.filter((e) => e.kind === "own");
-  const added = all.filter((e) => e.kind === "added");
-  const make = <Button>Make New Path</Button>;
-  const cards = (list: Entry[]) => (
-    <Cards list={list} look={LOOK_PLAIN} stub={stub} page="Paths" />
-  );
-
-  // I: Make New Path opens the Original section, under its heading; the
-  // Added section only when there's something in it, no explanation.
-  if (variant === "I") {
-    return (
-      <>
-        <h1>Paths</h1>
-        <PathsIntro />
-        <h2>Your Original Paths</h2>
-        <p>{make}</p>
-        {mine.length === 0 ? <p>No Paths yet.</p> : cards(mine)}
-        {added.length > 0 && (
-          <>
-            <h2>Your Added Paths</h2>
-            {cards(added)}
-          </>
-        )}
-      </>
-    );
-  }
-
-  // J: as I, plus one line under "Your Added Paths" saying they're
-  // copies and can't be changed: the heading alone is the only sign.
-  if (variant === "J") {
-    return (
-      <>
-        <h1>Paths</h1>
-        <PathsIntro />
-        <h2>Your Original Paths</h2>
-        <p>{make}</p>
-        {mine.length === 0 ? <p>No Paths yet.</p> : cards(mine)}
-        {added.length > 0 && (
-          <>
-            <h2>Your Added Paths</h2>
-            <p>{ADDED_LINE}</p>
-            {cards(added)}
-          </>
-        )}
-      </>
-    );
-  }
-
-  // K: Make New Path beside "Your Original Paths" (`.heading-row`, the
-  // Edit Path arrangement), so it reads as that section's action.
-  if (variant === "K") {
-    return (
-      <>
-        <h1>Paths</h1>
-        <PathsIntro />
-        <div className="heading-row">
-          <h2>Your Original Paths</h2>
-          {make}
-        </div>
-        {mine.length === 0 ? <p>No Paths yet.</p> : cards(mine)}
-        {added.length > 0 && (
-          <>
-            <h2>Your Added Paths</h2>
-            {cards(added)}
-          </>
-        )}
-      </>
-    );
-  }
-
-  // L: Make New Path above both sections, where it is today; both
-  // sections always shown, an empty one saying so.
-  return (
-    <>
-      <h1>Paths</h1>
-      <PathsIntro />
-      <p>{make}</p>
-      <h2>Your Original Paths</h2>
-      {mine.length === 0 ? (
-        <p>You haven&apos;t made a Path yet.</p>
-      ) : (
-        cards(mine)
-      )}
-      <h2>Your Added Paths</h2>
-      {added.length === 0 ? (
-        <p>You haven&apos;t Added a Path yet.</p>
-      ) : (
-        cards(added)
-      )}
-    </>
-  );
-}
-
 function PathfinderRound3({ stub }: { stub: Stub }) {
   const all = entries(stub, true);
   const sections = [
@@ -588,6 +494,88 @@ function PathfinderRound4({ variant, stub }: { variant: string; stub: Stub }) {
   );
 }
 
+// ---------------------------------------------------------- round 7 --
+// Ian on round 6: T, and Pathfinder is a misstep: the Paths page is where
+// a User's Available Paths live, Dream Sequence included (Pathfinder is
+// retired in #192). Open: where Dream Sequence goes. W–Z; T for reference.
+
+function PathsRound7({
+  variant,
+  stub,
+  blurb,
+}: {
+  variant: string;
+  stub: Stub;
+  blurb: string;
+}) {
+  const all = entries(stub, false);
+  const mine = all.filter((e) => e.kind === "own");
+  const added = all.filter((e) => e.kind === "added");
+  const ds: Entry = { kind: "dreamport", ...DREAM_SEQUENCE };
+  const cards = (list: Entry[]) => (
+    <Cards list={list} look={LOOK_PLAIN} stub={stub} page="Paths" />
+  );
+  const original = (
+    <>
+      <h2>Your Original Paths</h2>
+      {mine.length === 0 ? <p>No Paths yet.</p> : cards(mine)}
+      <p>
+        <Button>Make New Path</Button>
+      </p>
+    </>
+  );
+  const addedSection = added.length > 0 && (
+    <>
+      <h2>Your Added Paths</h2>
+      <p>{BLURBS.find((b) => b.key === blurb)?.text}</p>
+      {cards(added)}
+    </>
+  );
+  const fromDreamport = (
+    <>
+      <h2>From Dreamport</h2>
+      {cards([ds])}
+    </>
+  );
+
+  // Z: no card. The intro already names Dream Sequence; it links there.
+  if (variant === "Z") {
+    return (
+      <>
+        <h1>Paths</h1>
+        <p>
+          If you&apos;d like your Product to follow a structured program with
+          milestones and tasks along the way to a certain goal, that&apos;s
+          exactly what Paths provide. You can follow our free{" "}
+          <Link href={trailhead(DREAM_SEQUENCE)}>Dream Sequence</Link> Path to
+          bring your product idea all the way from its beginning to being a real
+          shipped product with a growing user base, using customer feedback all
+          along the way. If you have different goals or prefer taking another
+          route, you can make your own Path for your Product to follow instead.
+          You make the milestones and tasks and put your Product on that path.
+        </p>
+        {original}
+        {addedSection}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <h1>Paths</h1>
+      <PathsIntro />
+      {/* W: its own section, first. */}
+      {variant === "W" && fromDreamport}
+      {/* X: its card first, under no heading. */}
+      {variant === "X" && cards([ds])}
+      {original}
+      {addedSection}
+      {/* Y: its own section, last. */}
+      {variant === "Y" && fromDreamport}
+    </>
+  );
+}
+
 // ------------------------------------------------------------- harness --
 
 function PathsPage({
@@ -599,8 +587,9 @@ function PathsPage({
   stub: Stub;
   blurb: string;
 }) {
-  if (variant === "J") return <PathsRound3 variant={variant} stub={stub} />;
-  return <PathsRound4 variant={variant} stub={stub} blurb={blurb} />;
+  if (variant === "T")
+    return <PathsRound4 variant={variant} stub={stub} blurb={blurb} />;
+  return <PathsRound7 variant={variant} stub={stub} blurb={blurb} />;
 }
 
 function PathfinderPage({ variant, stub }: { variant: string; stub: Stub }) {
@@ -788,7 +777,7 @@ export function Prototype({
   setSearch: (next: ProtoSearch) => void;
 }) {
   const [lastClick, setLastClick] = useState<string | null>(null);
-  const variant = search.variant ?? "T";
+  const variant = search.variant ?? "W";
   const state = search.state ?? "typical";
   const blurb = search.blurb ?? "ian";
   const stub = stubFor(state);
