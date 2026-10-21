@@ -313,6 +313,11 @@ export interface Draft extends PathSummary {
   readonly milestones: readonly DraftMilestone[];
   /** When the Draft last changed. Saving a version doesn't change it. */
   readonly updatedAt: string;
+  /**
+   * Whether the Draft is exactly what its latest version saved: nothing
+   * edited since that save or since Discard Changes. False with nothing saved.
+   */
+  readonly matchesLatest: boolean;
   /** Whether the Path accepts new Adds. Only ever true with a version published. */
   readonly open: boolean;
   /** Every saved version, newest first. */
@@ -478,21 +483,33 @@ export async function createPath(
   return { ok: true, path: path as OwnedPath };
 }
 
+export type DeletePathResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: "not-found" | "open" };
+
 /**
  * Delete a Path for good. The rows under it cascade: its Draft's
  * Milestones and Tasks, and its saved versions, each of which takes its
  * Journeys and their records with it (migration `0022`'s trigger). Saved
- * versions belong to one Path, so no other Path loses anything.
+ * versions belong to one Path, so no other Path loses anything. Refused,
+ * deleting nothing, while the Path is open: its Guide closes it first.
  */
 export async function deletePath(
   db: D1Database,
   path: OwnedPath,
-): Promise<boolean> {
+): Promise<DeletePathResult> {
   const { meta } = await db
-    .prepare('DELETE FROM "paths" WHERE "id" = ?')
+    .prepare('DELETE FROM "paths" WHERE "id" = ? AND "open" = 0')
     .bind(path.id)
     .run();
-  return meta.changes > 0;
+  if (meta.changes > 0) {
+    return { ok: true };
+  }
+  const still = await db
+    .prepare('SELECT 1 FROM "paths" WHERE "id" = ?')
+    .bind(path.id)
+    .first();
+  return { ok: false, reason: still ? "open" : "not-found" };
 }
 
 export async function getDraft(
@@ -522,9 +539,11 @@ export async function getDraft(
       .bind(path.id)
       .all<DraftTask & { milestoneId: string }>(),
     db
-      .prepare('SELECT "updatedAt", "open" FROM "paths" WHERE "id" = ?')
+      .prepare(
+        'SELECT "updatedAt", "matchedAt", "open" FROM "paths" WHERE "id" = ?',
+      )
       .bind(path.id)
-      .first<{ updatedAt: string; open: number }>(),
+      .first<{ updatedAt: string; matchedAt: string; open: number }>(),
     db
       .prepare(
         'SELECT "id", "number", "savedAt", "published" FROM "path_versions" WHERE "pathId" = ? ORDER BY "number" DESC',
@@ -547,6 +566,8 @@ export async function getDraft(
       tasks: tasksOf.get(m.id) ?? [],
     })),
     updatedAt: edited?.updatedAt ?? path.createdAt,
+    matchesLatest:
+      versions.length > 0 && !!edited && edited.updatedAt <= edited.matchedAt,
     open: edited?.open === 1,
     versions,
     latestVersion: versions[0] ?? null,
@@ -625,6 +646,7 @@ export async function saveVersion(
          ${pathsDraftTasks}`,
       )
       .bind(path.id, versionId),
+    markMatched(db, path, versionSaved, versionId),
   ]);
   const [version] = saved.results;
   if (version) {
@@ -644,6 +666,25 @@ export async function saveVersion(
   if (!draft?.description) missing.push("description");
   if (!draft?.hasMilestone) missing.push("milestone");
   return { ok: false, reason: "incomplete", missing };
+}
+
+/**
+ * Stamp the Draft as matching its latest version, if `condition` holds.
+ * Last in its batch, after any trigger has stamped `updatedAt`, so the
+ * two compare `updatedAt <= matchedAt` (migration `0026`).
+ */
+function markMatched(
+  db: D1Database,
+  path: OwnedPath,
+  condition: string,
+  ...params: string[]
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE "paths" SET "matchedAt" = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE "id" = ?1 AND ${condition}`,
+    )
+    .bind(path.id, ...params);
 }
 
 export type PublishResult =
@@ -810,6 +851,7 @@ export async function discardChanges(
          WHERE "milestones"."versionId" = ${latest}`,
       )
       .bind(path.id),
+    markMatched(db, path, `${latest} IS NOT NULL`),
   ]);
   const [head] = restored.results;
   if (!head) {

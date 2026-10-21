@@ -95,11 +95,14 @@ pathRoutes.get("/", async (c) => {
 
 /**
  * Delete the Path, its Draft, every saved version and every Journey on any
- * of them, for good.
+ * of them, for good. 409 while the Path is open.
  */
 pathRoutes.delete("/", async (c) => {
-  if (!(await deletePath(c.env.DB, c.var.path))) {
-    return c.json({ error: "Not found" }, 404);
+  const deleted = await deletePath(c.env.DB, c.var.path);
+  if (!deleted.ok) {
+    return deleted.reason === "open"
+      ? c.json({ error: "Close this Path before deleting it." }, 409)
+      : c.json({ error: "Not found" }, 404);
   }
 
   return c.json({}, 200);

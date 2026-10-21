@@ -2497,6 +2497,7 @@ describe("Trailblazer routes", () => {
         ...path,
         milestones: [],
         updatedAt: path.createdAt,
+        matchesLatest: false,
         open: false,
         versions: [],
         latestVersion: null,
@@ -2521,6 +2522,7 @@ describe("Trailblazer routes", () => {
         description: "",
         milestones: [],
         updatedAt: expect.any(String),
+        matchesLatest: false,
         open: false,
         versions: [],
         latestVersion: null,
@@ -2967,6 +2969,30 @@ describe("Publish, Unpublish, Open and Close routes (#191)", () => {
       open: false,
       published: [1],
     });
+  });
+
+  it("409s deleting an open Path, deleting nothing, and deletes it once closed", async () => {
+    const { cookie, path } = await savedPath(TEST_EMAILS.guide);
+    await callApi("PUT", `/api/paths/${path.id}/versions/1/published`, cookie);
+    await callApi("PUT", `/api/paths/${path.id}/open`, cookie);
+
+    const refused = await callApi("DELETE", `/api/paths/${path.id}`, cookie);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({
+      error: "Close this Path before deleting it.",
+    });
+    expect(await sharing(cookie, path.id)).toEqual({
+      open: true,
+      published: [1],
+    });
+
+    await callApi("DELETE", `/api/paths/${path.id}/open`, cookie);
+    expect(
+      (await callApi("DELETE", `/api/paths/${path.id}`, cookie)).status,
+    ).toBe(200);
+    expect((await callApi("GET", `/api/paths/${path.id}`, cookie)).status).toBe(
+      404,
+    );
   });
 
   it("404s a version number that isn't a positive whole number, or one the Path hasn't saved", async () => {

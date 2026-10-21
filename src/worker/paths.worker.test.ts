@@ -376,7 +376,7 @@ describe("a User's Paths", () => {
     const [oldest] = await listPaths(env.DB, userId);
     const path = await getPath(env.DB, userId, oldest.id);
     if (!path) throw new Error("the listed Path isn't there");
-    expect(await deletePath(env.DB, path)).toBe(true);
+    expect(await deletePath(env.DB, path)).toEqual({ ok: true });
     expect(
       (await createPath(env.DB, userId, { name: "Room", description: "" })).ok,
     ).toBe(true);
@@ -443,6 +443,7 @@ describe("a Path's Draft", () => {
       createdAt: path.createdAt,
       milestones: [],
       updatedAt: path.createdAt,
+      matchesLatest: false,
       open: false,
       versions: [],
       latestVersion: null,
@@ -1215,6 +1216,56 @@ describe("discarding a Draft's changes (#179)", () => {
   });
 });
 
+describe("whether a Draft matches its latest version (#191)", () => {
+  const matches = async (path: OwnedPath) =>
+    (await currentDraft(path)).matchesLatest;
+
+  it("doesn't for a Path with nothing saved", async () => {
+    const path = await discardersPath();
+    await milestoneOn(path, BAKE);
+
+    expect(await matches(path)).toBe(false);
+  });
+
+  it("does once saved, until any edit to the name, a Milestone or a Task, and again after Discard Changes", async () => {
+    const path = await discardersPath();
+    const bake = await milestoneOn(path, BAKE);
+    const knead = await taskOn(path, bake.id, "Knead");
+    const edits = [
+      () => rename(path, "Renamed", "New"),
+      () => updateMilestone(env.DB, path, bake.id, SHIP),
+      () => updateTask(env.DB, path, bake.id, knead.id, { title: "Knead it" }),
+      () => taskOn(path, bake.id, "Proof"),
+    ];
+
+    await tick();
+    await saved(path, DISCARDER_ID);
+    expect(await matches(path)).toBe(true);
+
+    for (const edit of edits) {
+      await tick();
+      await edit();
+      expect(await matches(path)).toBe(false);
+      await tick();
+      await discarded(path);
+      expect(await matches(path)).toBe(true);
+    }
+  });
+
+  it("does after saving an edited Draft as a new version", async () => {
+    const path = await discardersPath();
+    await milestoneOn(path, BAKE);
+    await saved(path, DISCARDER_ID);
+    await tick();
+    await rename(path, "Renamed", "New");
+    await tick();
+
+    await saved(path, DISCARDER_ID);
+
+    expect(await matches(path)).toBe(true);
+  });
+});
+
 describe("deleting a Path (#171)", () => {
   it("takes its Draft, every version and every Journey on them, leaving other Paths and Journeys alone", async () => {
     const othersPath = await makersPath();
@@ -1257,7 +1308,7 @@ describe("deleting a Path (#171)", () => {
     await setTaskDone(env.DB, journey, tasks[0].id, true);
     await journeyOn(second, MAKER_ID);
 
-    expect(await deletePath(env.DB, doomed)).toBe(true);
+    expect(await deletePath(env.DB, doomed)).toEqual({ ok: true });
 
     expect(await getPath(env.DB, MAKER_ID, doomed.id)).toBeNull();
     expect(await getVersion(env.DB, MAKER_ID, first.id)).toBeNull();
@@ -1677,5 +1728,29 @@ describe("opening and closing a Path (#191)", () => {
     await closePath(env.DB, path);
 
     expect((await getDraft(env.DB, path)).updatedAt).toBe(before);
+  });
+});
+
+describe("deleting an open Path (#191)", () => {
+  it("is refused, deleting nothing, until the Path is closed", async () => {
+    const { path, versions } = await publishersPath(1);
+    await publishVersion(env.DB, path, 1);
+    await openPath(env.DB, path);
+
+    expect(await deletePath(env.DB, path)).toEqual({
+      ok: false,
+      reason: "open",
+    });
+    expect(await getPath(env.DB, PUBLISHER_ID, path.id)).not.toBeNull();
+    expect(await getVersion(env.DB, PUBLISHER_ID, versions[0].id)).toEqual(
+      versions[0],
+    );
+
+    await closePath(env.DB, path);
+    expect(await deletePath(env.DB, path)).toEqual({ ok: true });
+    expect(await deletePath(env.DB, path)).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
   });
 });
