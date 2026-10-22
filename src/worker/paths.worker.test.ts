@@ -13,6 +13,7 @@ import {
 } from "./journeys";
 import {
   addTask,
+  addVersion,
   closePath,
   createPath,
   deleteMilestone,
@@ -25,7 +26,7 @@ import {
   getPath,
   getTrailheadVersion,
   getVersion,
-  listFollowable,
+  listAddedPaths,
   listPaths,
   MILESTONE_NAME_MAX_LENGTH,
   type MilestoneFields,
@@ -188,6 +189,7 @@ describe("a User's own Path version", () => {
     expect(await getVersion(env.DB, OWNER_ID, OWNERS_VERSION_ID)).toEqual({
       id: OWNERS_VERSION_ID,
       pathId: "owners-path",
+      trailheadPathId: "owners-path",
       number: 1,
       name: "Bakery Path",
       description: "For bakers",
@@ -1403,7 +1405,6 @@ describe("parsing a Path's fields", () => {
   });
 });
 
-const PATHFINDER_ID = "paths-module-pathfinder";
 const TRAILHEAD_ID = "paths-module-trailhead";
 
 /** A new Path of `userId`'s, its Draft holding `milestones`. */
@@ -1422,27 +1423,6 @@ async function pathOf(
   }
   return created.path;
 }
-
-describe("Pathfinder (#170)", () => {
-  it("lists Dream Sequence first, then the User's Paths with a saved version by their latest name, never another User's", async () => {
-    await seedUser(PATHFINDER_ID, TEST_EMAILS.pathsModulePathfinder);
-    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
-    const first = await pathOf(PATHFINDER_ID, "First", [BAKE]);
-    await saved(first, PATHFINDER_ID);
-    await rename(first, "First Again", "For bakers");
-    await saved(first, PATHFINDER_ID);
-    await pathOf(PATHFINDER_ID, "Draft Only", [BAKE]);
-    const second = await pathOf(PATHFINDER_ID, "Second", [BAKE]);
-    await saved(second, PATHFINDER_ID);
-    await saved(await pathOf(STRANGER_ID, "Theirs", [BAKE]), STRANGER_ID);
-
-    expect(await listFollowable(env.DB, PATHFINDER_ID)).toEqual([
-      { id: "dream-sequence", name: "Dream Sequence" },
-      { id: first.id, name: "First Again" },
-      { id: second.id, name: "Second" },
-    ]);
-  });
-});
 
 describe("a Trailhead (#170)", () => {
   it("opens on a Path's latest version, or an earlier one by number, with every version newest first", async () => {
@@ -1504,6 +1484,8 @@ describe("a Trailhead (#170)", () => {
 });
 
 const PUBLISHER_ID = "paths-module-publisher";
+const ADDER_ID = "paths-module-adder";
+const ADDER_CAP_ID = "paths-module-adder-cap";
 
 /** A Path of the publisher's own with `count` saved versions, none published. */
 async function publishersPath(count: number) {
@@ -1642,9 +1624,19 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
     await publishVersion(env.DB, path, 2);
     await openPath(env.DB, path);
     const [one, two] = versions.map(
-      ({ id, pathId, number, name, description, savedAt, milestones }) => ({
+      ({
         id,
         pathId,
+        trailheadPathId,
+        number,
+        name,
+        description,
+        savedAt,
+        milestones,
+      }) => ({
+        id,
+        pathId,
+        trailheadPathId,
         number,
         name,
         description,
@@ -1676,10 +1668,6 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
     const { path } = await publishersPath(1);
     const unavailable = { status: "unavailable", name: "Bakery Path" };
 
-    expect(await getTrailhead(env.DB, STRANGER_ID, path.id, null)).toEqual(
-      unavailable,
-    );
-
     await publishVersion(env.DB, path, 1);
     await openPath(env.DB, path);
     await rename(path, "Renamed Path", "For bakers");
@@ -1697,6 +1685,17 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
       expect(await getTrailhead(env.DB, STRANGER_ID, path.id, number)).toEqual(
         unavailable,
       );
+    }
+  });
+
+  it("has nothing to show another User for a Path with nothing published, saying nothing of its name", async () => {
+    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
+    const { path } = await publishersPath(2);
+
+    for (const number of [null, 1, 2]) {
+      expect(
+        await getTrailhead(env.DB, STRANGER_ID, path.id, number),
+      ).toBeNull();
     }
   });
 
@@ -1829,5 +1828,298 @@ describe("deleting an open Path (#191)", () => {
       ok: false,
       reason: "not-found",
     });
+  });
+});
+
+describe("Adding a published version as a read-only copy (#192)", () => {
+  /** The publisher's open Path with `count` versions, `published` of them published. */
+  async function offeredPath(count: number, published: readonly number[]) {
+    await seedUser(ADDER_ID, TEST_EMAILS.pathsModuleAdder);
+    const { path, versions } = await publishersPath(0);
+    const [bake] = (await getDraft(env.DB, path)).milestones;
+    await taskOn(path, bake.id, "Buy flour");
+    for (let i = 0; i < count; i++) {
+      versions.push(await saved(path, PUBLISHER_ID));
+    }
+    for (const number of published) {
+      await publishVersion(env.DB, path, number);
+    }
+    if (published.length > 0) {
+      await openPath(env.DB, path);
+    }
+    return { path, versions };
+  }
+
+  /**
+   * The adder's Pathfinder entries for `pathId`. Every test here Adds as the
+   * same User, so their list holds other tests' Paths too.
+   */
+  async function addedEntries(pathId: string) {
+    return (await listAddedPaths(env.DB, ADDER_ID)).filter(
+      (entry) => entry.id === pathId,
+    );
+  }
+
+  /** What the adder's Trailhead shows at `number`, when it's their copy. */
+  async function copyAt(pathId: string, number: number | null) {
+    const trailhead = await getTrailhead(env.DB, ADDER_ID, pathId, number);
+    if (trailhead?.status !== "followable") {
+      throw new Error(`no copy at ${number}: ${JSON.stringify(trailhead)}`);
+    }
+    return trailhead;
+  }
+
+  /** A version's content, without the ids that differ between a copy and its source. */
+  async function copiedContent(versionId: string, userId: string) {
+    const version = await getVersion(env.DB, userId, versionId);
+    if (!version) throw new Error(`${userId} can't read ${versionId}`);
+    const { name, description, number, savedAt, milestones } = version;
+    const { results: tasks } = await env.DB.prepare(
+      `SELECT "tasks"."title" FROM "milestone_tasks"
+       JOIN "milestones" ON "milestones"."id" = "milestone_tasks"."milestoneId"
+       JOIN "tasks" ON "tasks"."id" = "milestone_tasks"."taskId"
+       WHERE "milestones"."versionId" = ? ORDER BY "milestone_tasks"."position"`,
+    )
+      .bind(versionId)
+      .all<{ title: string }>();
+    return {
+      name,
+      description,
+      number,
+      savedAt,
+      milestones: milestones.map(
+        ({ name, description, doneWhen, outcome }) => ({
+          name,
+          description,
+          doneWhen,
+          outcome,
+        }),
+      ),
+      tasks: tasks.map((t) => t.title),
+    };
+  }
+
+  it("gives the User their own copy of the version, which their Trailhead shows them to follow", async () => {
+    const { path, versions } = await offeredPath(1, [1]);
+
+    expect(await addVersion(env.DB, ADDER_ID, path.id, 1)).toEqual({
+      ok: true,
+      added: true,
+    });
+
+    const { owner, version } = await copyAt(path.id, null);
+    expect(owner).toBe("added");
+    expect(version.id).not.toBe(versions[0].id);
+    expect(version.pathId).not.toBe(path.id);
+    expect(version.trailheadPathId).toBe(path.id);
+    expect(await copiedContent(version.id, ADDER_ID)).toEqual(
+      await copiedContent(versions[0].id, PUBLISHER_ID),
+    );
+    expect(await copyAt(path.id, 1)).toMatchObject({ version });
+  });
+
+  it("changes nothing when the User Adds a version they already hold", async () => {
+    const { path } = await offeredPath(1, [1]);
+    await addVersion(env.DB, ADDER_ID, path.id, 1);
+    const first = await copyAt(path.id, 1);
+
+    expect(await addVersion(env.DB, ADDER_ID, path.id, 1)).toEqual({
+      ok: true,
+      added: false,
+    });
+    expect(await copyAt(path.id, 1)).toEqual(first);
+  });
+
+  it("lets the User hold copies of two versions, from their own addresses, both on one copy of the Path", async () => {
+    const { path } = await offeredPath(2, [1, 2]);
+
+    await addVersion(env.DB, ADDER_ID, path.id, 1);
+    expect(await getTrailhead(env.DB, ADDER_ID, path.id, null)).toMatchObject({
+      status: "offered",
+      version: { number: 2 },
+      versions: [{ number: 2 }, { number: 1 }],
+    });
+    await addVersion(env.DB, ADDER_ID, path.id, 2);
+
+    const one = await copyAt(path.id, 1);
+    const two = await copyAt(path.id, null);
+    expect(two.version.number).toBe(2);
+    expect(one.version.number).toBe(1);
+    expect(one.version.pathId).toBe(two.version.pathId);
+    expect(two.versions.map((v) => v.number)).toEqual([2, 1]);
+  });
+
+  it("keeps the copy and the Journey on it as they were when the Guide saves, publishes, unpublishes or closes", async () => {
+    const { path, versions } = await offeredPath(1, [1]);
+    await addVersion(env.DB, ADDER_ID, path.id, 1);
+    const { version } = await copyAt(path.id, 1);
+    const before = await copiedContent(version.id, ADDER_ID);
+    const product = await getProduct(
+      env.DB,
+      ADDER_ID,
+      (await createProduct(env.DB, ADDER_ID, "Loaves")).id,
+    );
+    if (!product) throw new Error("no Product");
+    const { journeyId } = await startJourney(env.DB, product, version);
+
+    await rename(path, "Renamed Path", "For bakers");
+    await saved(path, PUBLISHER_ID);
+    await publishVersion(env.DB, path, 2);
+    await unpublishVersion(env.DB, path, 1);
+    await closePath(env.DB, path);
+
+    expect(await copiedContent(version.id, ADDER_ID)).toEqual(before);
+    expect(await copyAt(path.id, null)).toMatchObject({ version });
+    expect(await copyAt(path.id, 1)).toMatchObject({ version });
+    const journey = await loadJourney(env.DB, product, journeyId);
+    if (!journey) throw new Error("the Journey is gone");
+    expect((await journeyState(env.DB, journey)).path).toMatchObject({
+      id: version.id,
+      pathId: path.id,
+      name: "Bakery Path",
+    });
+    expect(versions[0].name).toBe("Bakery Path");
+  });
+
+  it("shows the User their newest copy at the root when it's newer than any version still offered", async () => {
+    const { path } = await offeredPath(2, [1, 2]);
+    await addVersion(env.DB, ADDER_ID, path.id, 2);
+
+    await unpublishVersion(env.DB, path, 2);
+
+    expect(await copyAt(path.id, null)).toMatchObject({
+      version: { number: 2 },
+      versions: [{ number: 2 }, { number: 1 }],
+    });
+    expect(await getTrailhead(env.DB, ADDER_ID, path.id, 1)).toMatchObject({
+      status: "offered",
+      version: { number: 1 },
+    });
+  });
+
+  it("answers Add of a version the User holds as already held, even once the Path closes", async () => {
+    const { path } = await offeredPath(1, [1]);
+    await addVersion(env.DB, ADDER_ID, path.id, 1);
+    await closePath(env.DB, path);
+
+    expect(await addVersion(env.DB, ADDER_ID, path.id, 1)).toEqual({
+      ok: true,
+      added: false,
+    });
+  });
+
+  it("refuses a closed Path or an unpublished version, copying nothing", async () => {
+    const { path } = await offeredPath(2, [1]);
+
+    expect(await addVersion(env.DB, ADDER_ID, path.id, 2)).toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+    await closePath(env.DB, path);
+    expect(await addVersion(env.DB, ADDER_ID, path.id, 1)).toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+    expect(await getTrailhead(env.DB, ADDER_ID, path.id, null)).toEqual({
+      status: "unavailable",
+      name: "Bakery Path",
+    });
+    expect(await addedEntries(path.id)).toEqual([]);
+  });
+
+  it("finds nothing to Add on the User's own Path, Dream Sequence, an unknown Path or version", async () => {
+    const { path } = await offeredPath(1, [1]);
+
+    for (const [userId, pathId, number] of [
+      [PUBLISHER_ID, path.id, 1],
+      [ADDER_ID, "dream-sequence", 1],
+      [ADDER_ID, "no-such-path", 1],
+      [ADDER_ID, path.id, 2],
+    ] as const) {
+      expect(await addVersion(env.DB, userId, pathId, number)).toEqual({
+        ok: false,
+        reason: "not-found",
+      });
+    }
+  });
+
+  it("makes a copy nobody can edit, outside the User's own Paths and their cap, with no address of its own", async () => {
+    const { path } = await offeredPath(1, [1]);
+    await seedUser(ADDER_CAP_ID, TEST_EMAILS.pathsModuleAdderCap);
+    await addVersion(env.DB, ADDER_CAP_ID, path.id, 1);
+    const shown = await getTrailhead(env.DB, ADDER_CAP_ID, path.id, 1);
+    if (shown?.status !== "followable") throw new Error("no copy");
+    const copyPathId = shown.version.pathId;
+
+    expect(await getPath(env.DB, ADDER_CAP_ID, copyPathId)).toBeNull();
+    expect(await listPaths(env.DB, ADDER_CAP_ID)).toEqual([]);
+    expect(
+      await getTrailhead(env.DB, ADDER_CAP_ID, copyPathId, null),
+    ).toBeNull();
+    for (let i = 0; i < PATHS_PER_USER; i++) {
+      const created = await createPath(env.DB, ADDER_CAP_ID, {
+        name: `Path ${i}`,
+        description: "",
+      });
+      expect(created.ok).toBe(true);
+    }
+  });
+
+  it("lets nobody but the User who Added it read the copy, and them not the Guide's original", async () => {
+    const { path, versions } = await offeredPath(1, [1]);
+    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
+    await addVersion(env.DB, ADDER_ID, path.id, 1);
+    const { version } = await copyAt(path.id, 1);
+
+    expect(await getVersion(env.DB, STRANGER_ID, version.id)).toBeNull();
+    expect(await getVersion(env.DB, PUBLISHER_ID, version.id)).toBeNull();
+    expect(await getVersion(env.DB, ADDER_ID, versions[0].id)).toBeNull();
+  });
+
+  it("shows the User who Added it nothing about its Guide", async () => {
+    const { path } = await offeredPath(1, [1]);
+    await addVersion(env.DB, ADDER_ID, path.id, 1);
+
+    for (const shown of [
+      await getTrailhead(env.DB, ADDER_ID, path.id, null),
+      await listAddedPaths(env.DB, ADDER_ID),
+    ]) {
+      expect(JSON.stringify(shown)).not.toContain(PUBLISHER_ID);
+      expect(JSON.stringify(shown)).not.toContain(
+        TEST_EMAILS.pathsModulePublisher,
+      );
+    }
+  });
+
+  it("refuses to delete a Path anyone has Added, even closed, deleting nothing", async () => {
+    const { path, versions } = await offeredPath(1, [1]);
+    await addVersion(env.DB, ADDER_ID, path.id, 1);
+    await closePath(env.DB, path);
+
+    expect(await deletePath(env.DB, path)).toEqual({
+      ok: false,
+      reason: "added",
+    });
+    expect(await getVersion(env.DB, PUBLISHER_ID, versions[0].id)).toEqual(
+      versions[0],
+    );
+  });
+
+  it("lists Dream Sequence, then one entry per Path the User Added by its newest copy's name, under the Path's own id", async () => {
+    const { path } = await offeredPath(1, [1]);
+    await addVersion(env.DB, ADDER_ID, path.id, 1);
+    await rename(path, "Renamed Path", "For bakers");
+    await saved(path, PUBLISHER_ID);
+    await publishVersion(env.DB, path, 2);
+    await addVersion(env.DB, ADDER_ID, path.id, 2);
+    const mine = await pathOf(ADDER_ID, "Mine", [BAKE]);
+    await saved(mine, ADDER_ID);
+
+    const listed = await listAddedPaths(env.DB, ADDER_ID);
+    expect(listed[0]).toEqual({ id: "dream-sequence", name: "Dream Sequence" });
+    expect(await addedEntries(path.id)).toEqual([
+      { id: path.id, name: "Renamed Path" },
+    ]);
+    expect(await addedEntries(mine.id)).toEqual([]);
   });
 });

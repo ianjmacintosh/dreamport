@@ -3,11 +3,11 @@ import { expect, test, type Page } from "@playwright/test";
 import { TEST_EMAILS } from "../test/emails";
 import { signIn } from "./sign-in";
 
-/** Make a Path from the Paths list, which opens its editor. */
+/** Make a Path from Pathfinder, which opens its editor. */
 async function addPath(page: Page, name: string) {
-  await page.getByRole("link", { name: "Paths", exact: true }).click();
+  await page.getByRole("link", { name: "Pathfinder", exact: true }).click();
   await expect(
-    page.getByRole("heading", { level: 1, name: "Paths" }),
+    page.getByRole("heading", { level: 1, name: "Pathfinder" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Make New Path" }).click();
   const dialog = page.getByRole("dialog", { name: "Make New Path" });

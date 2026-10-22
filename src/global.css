@@ -1033,9 +1033,10 @@ a.button {
 
 /* Below about 820px the section links and account trigger don't fit
    beside the wordmark, so both collapse into the ☰ menu (#125). Not
-   --breakpoint-sm: with two sections, "Account" starts to clip below
-   about 800px (#167, see docs/design-decisions.md). Adding a section
-   means measuring again. */
+   --breakpoint-sm: with Products and Pathfinder, "Account" starts to clip
+   below about 792px (#167, measured again for #192's longer label; see
+   docs/design-decisions.md). Adding or renaming a section means measuring
+   again. */
 @media (max-width: 820px) {
   .app-nav-content {
     grid-template-columns: auto minmax(0, 1fr);

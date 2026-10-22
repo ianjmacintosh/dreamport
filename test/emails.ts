@@ -192,12 +192,14 @@ export const TEST_EMAILS = {
   pathsModuleSaverDeleted: "delivered+paths-module-saver-deleted@resend.dev",
   /** Makes Paths to discard their Drafts' changes (#179). Never signs in. */
   pathsModuleDiscarder: "delivered+paths-module-discarder@resend.dev",
-  /** Makes the only Paths Pathfinder lists for them (#170). */
-  pathsModulePathfinder: "delivered+paths-module-pathfinder@resend.dev",
   /** Makes Paths and opens their Trailheads (#170). */
   pathsModuleTrailhead: "delivered+paths-module-trailhead@resend.dev",
   /** Publishes and Unpublishes versions, and Opens and Closes Paths (#191). */
   pathsModulePublisher: "delivered+paths-module-publisher@resend.dev",
+  /** Adds `pathsModulePublisher`'s Paths, and must learn nothing about who made them (#192). */
+  pathsModuleAdder: "delivered+paths-module-adder@resend.dev",
+  /** Adds a Path, then makes the most Paths of their own (#192). */
+  pathsModuleAdderCap: "delivered+paths-module-adder-cap@resend.dev",
 
   // --- Seam 1: the Journey routes (#137-#140, #170), one test each ---
   /** Lists a Product's Journeys, none and then one. */
@@ -226,7 +228,9 @@ export const TEST_EMAILS = {
   worksheetsSave: "delivered+worksheets-save@resend.dev",
   /** Checks off a Task on an unknown Journey (404), a bad body (400), then a good one. */
   tasksCheckOff: "delivered+tasks-check-off@resend.dev",
-  /** Opens Pathfinder, before and after following a Path. */
+  /** Adds the Guide's Path and follows their copy of it (#192). */
+  addRoute: "delivered+add-route@resend.dev",
+  /** Lists their Original and Added Paths on Pathfinder (#192). */
   pathfinderRoute: "delivered+pathfinder-route@resend.dev",
   /** Opens Trailheads: Dream Sequence's, their own Path's, and another User's (404). */
   trailheadRoute: "delivered+trailhead-route@resend.dev",
@@ -326,6 +330,8 @@ export const TEST_EMAILS = {
     "delivered+e2e-trailhead-no-products+e2e-test@resend.dev",
   /** #205: open a Guide's published Path, then find it unavailable once closed. */
   e2eTrailheadVisitor: "delivered+e2e-trailhead-visitor+e2e-test@resend.dev",
+  /** #192: Adds a Guide's Path from its link and follows their copy. */
+  e2eAdder: "delivered+e2e-adder+e2e-test@resend.dev",
   /** #137: open a Product, start its Journey, see Milestone 1 current — then advance and return. */
   e2eStartJourney: "delivered+e2e-start-journey+e2e-test@resend.dev",
   /** Finish a Journey, then Return from finished: un-finished, Growth still current. */

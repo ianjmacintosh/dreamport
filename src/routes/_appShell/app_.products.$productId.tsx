@@ -194,7 +194,8 @@ const CONNECTION_FAILED =
  * the description and the Ideas: the Product's active Journeys as the Paths
  * page's `ActionCard`s, or an invitation when it has none, and a link
  * styled as a button: "View Paths" to the Product's Paths page, or
- * "Choose a Path" to Pathfinder before it has any Journeys at all.
+ * "Choose a Path" to Pathfinder (`/app/paths`) before it has any Journeys
+ * at all.
  */
 function ProductHome() {
   const {
@@ -323,10 +324,7 @@ function ProductHome() {
             View Paths
           </Link>
         ) : (
-          <Link
-            href={`/app/products/${product.id}/pathfinder`}
-            className="button button--secondary"
-          >
+          <Link href="/app/paths" className="button button--secondary">
             Choose a Path
           </Link>
         )}

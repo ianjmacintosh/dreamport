@@ -49,5 +49,8 @@ Each file has an H1 and one paragraph, then four H2s in this order:
 - [Ideas](./ideas.md): add, rename, tag, and delete Ideas on a Product home.
 - [Journeys](./journeys.md): start, advance, return and finish a Journey,
   tick Tasks, and fill in the Product Summary Worksheet.
+- [Pathfinder and Adding a Path](./pathfinder.md): the two sections on
+  `/app/paths`, Add This Path on another User's Trailhead, a Journey on the
+  copy, and the Guide's refused delete.
 - [Account](./account.md): the account menu, sign out, Settings, and
   delete account.

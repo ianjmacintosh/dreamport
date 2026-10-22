@@ -35,12 +35,12 @@ type PathEnv = {
 };
 
 /**
- * Every route about one of the User's Paths and its Draft (#167), mounted
- * at `/api/paths/:pathId`. The middleware is the only place a route here
- * learns which Path it's about, the same as `productRoutes`: 401 with no
- * session, and 404 for a Path that doesn't exist, is another User's, or is
- * Dreamport's, all three alike. Past it, a handler gets `c.var.path`, and
- * `c.var.guide`: whether the User is a Guide.
+ * Every route about one of the User's Paths and its Draft (#167), mounted at
+ * `/api/paths/:pathId`. The middleware is the only place a route here learns
+ * which Path it's about, the same as `productRoutes`: 401 with no session, and
+ * 404 for a Path that doesn't exist, is another User's, is Dreamport's, or is
+ * the User's copy of another User's (#192), all alike. Past it, a handler gets
+ * `c.var.path`, and `c.var.guide`: whether the User is a Guide.
  *
  * The origin check on requests that change data is `index.ts`'s, in front
  * of every `/api/*` route.
@@ -78,7 +78,7 @@ pathRoutes.use("/versions/:number/published", guidesOnly);
 pathRoutes.use("/open", guidesOnly);
 
 /** A version number from the address: a positive whole number, or null. */
-function versionNumber(raw: string): number | null {
+export function versionNumber(raw: string): number | null {
   const number = Number(raw);
   return /^[1-9][0-9]*$/.test(raw) && Number.isSafeInteger(number)
     ? number
@@ -95,14 +95,23 @@ pathRoutes.get("/", async (c) => {
 
 /**
  * Delete the Path, its Draft, every saved version and every Journey on any
- * of them, for good. 409 while the Path is open.
+ * of them, for good. 409 while the Path is open, or once anyone has Added
+ * it (#192).
  */
 pathRoutes.delete("/", async (c) => {
   const deleted = await deletePath(c.env.DB, c.var.path);
   if (!deleted.ok) {
-    return deleted.reason === "open"
-      ? c.json({ error: "Close this Path before deleting it." }, 409)
-      : c.json({ error: "Not found" }, 404);
+    switch (deleted.reason) {
+      case "open":
+        return c.json({ error: "Close this Path before deleting it." }, 409);
+      case "added":
+        return c.json(
+          { error: "Someone has Added this Path, so it can't be deleted." },
+          409,
+        );
+      case "not-found":
+        return c.json({ error: "Not found" }, 404);
+    }
   }
 
   return c.json({}, 200);

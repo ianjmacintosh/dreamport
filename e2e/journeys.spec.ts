@@ -49,28 +49,20 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   await signIn(page, TEST_EMAILS.e2eStartJourney);
   await openNewProduct(page, productName);
 
-  // No Journeys yet: the Product home points at Pathfinder.
+  // No Journeys yet: the Product home points at Pathfinder (#192).
   await page.getByRole("link", { name: "Choose a Path" }).click();
-  await expect(page).toHaveURL(/\/app\/products\/.+\/pathfinder$/);
-  // It sits under the Product's Paths (#198).
+  await expect(page).toHaveURL(/\/app\/paths$/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Pathfinder" }),
+  ).toBeVisible();
+  await page
+    .getByRole("list", { name: "Your Added Paths" })
+    .getByRole("link", { name: "Dream Sequence" })
+    .click();
+  await expect(page).toHaveURL(/\/app\/paths\/dream-sequence$/);
   const trail = page.getByRole("navigation", { name: "Breadcrumb" });
   await expect(trail.getByRole("listitem")).toHaveText([
-    "Products",
-    productName,
-    "Paths",
-    "Browse Available Paths",
-  ]);
-  await expect(trail.getByRole("link", { name: "Paths" })).toHaveAttribute(
-    "href",
-    /\/app\/products\/[^/]+\/journeys$/,
-  );
-  await expect(
-    page.getByRole("link", { name: "Make your own Path" }),
-  ).toHaveAttribute("href", "/app/paths");
-  await page.getByRole("link", { name: "Dream Sequence" }).click();
-  await expect(page).toHaveURL(/\/app\/paths\/dream-sequence$/);
-  await expect(trail.getByRole("listitem")).toHaveText([
-    "Paths",
+    "Pathfinder",
     "Dream Sequence",
   ]);
   await expect(page.getByText("Version 1 · Free")).toBeVisible();
@@ -171,12 +163,10 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
   ).toBeVisible();
   await expect(page.getByRole("link", { name: "View Paths" })).toBeVisible();
 
-  // Pathfinder now marks Dream Sequence as followed and links to its
-  // Journey, not back to its Trailhead.
+  // The per-Product Pathfinder's old address lands on Pathfinder (#192).
   const productUrl = page.url();
   await page.goto(`${productUrl}/pathfinder`);
-  await page.getByRole("link", { name: "Dream Sequence Following" }).click();
-  await expect(page).toHaveURL(/\/journeys\/[^/]+$/);
+  await expect(page).toHaveURL(/\/app\/paths$/);
 
   // Its Trailhead, reached directly, starts nothing for a Product already
   // on it, and points at the Journey instead.
@@ -213,7 +203,7 @@ test("make a Path in Trailblazer with a Milestone and a Task, save a version, an
 
   await signIn(page, TEST_EMAILS.e2eFollowOwnPath);
 
-  await page.getByRole("link", { name: "Paths", exact: true }).click();
+  await page.getByRole("link", { name: "Pathfinder", exact: true }).click();
   await page.getByRole("button", { name: "Make New Path" }).click();
   const makePath = page.getByRole("dialog", { name: "Make New Path" });
   await makePath.getByLabel("Path name").fill(pathName);

@@ -95,7 +95,7 @@ test("Start on Path with no Products warns only once pressed, and points at Prod
   await expect(page).toHaveURL(/\/app$/);
 });
 
-test("another User sees a Guide's open Path's published version with no Start or Edit Path, and then that it's no longer available once closed", async ({
+test("another User sees a Guide's open Path's published version with Add This Path, no Start or Edit Path, and then that it's no longer available once closed", async ({
   browser,
   page,
 }) => {
@@ -128,6 +128,9 @@ test("another User sees a Guide's open Path's published version with no Start or
     "Launch",
   );
   await expect(
+    visitor.getByRole("button", { name: "Add This Path" }),
+  ).toBeVisible();
+  await expect(
     visitor.getByRole("button", { name: "Start on Path" }),
   ).toHaveCount(0);
   await expect(visitor.getByRole("link", { name: "Edit Path" })).toHaveCount(0);
@@ -146,7 +149,121 @@ test("another User sees a Guide's open Path's published version with no Start or
   ).toBe(200);
   await visitor.goto(`/app/paths/${path.id}`);
   await expect(unavailable).toBeVisible();
-  await visitor.getByRole("link", { name: "Back to Paths" }).click();
+  await visitor.getByRole("link", { name: "Back to Pathfinder" }).click();
   await expect(visitor).toHaveURL(/\/app\/paths$/);
   await visitorContext.close();
 });
+
+test("another User Adds a Guide's Path from its link, follows their copy, and finds it on Pathfinder; the Guide can then only close it, not delete it", async ({
+  browser,
+  page,
+}) => {
+  const pathName = `Added Launch ${Date.now()}`;
+  const productName = `An added app ${Date.now()}`;
+  await signIn(page, TEST_EMAILS.guide);
+  const path = await savedPathThroughApi(page, pathName, 0);
+  const { draft } = (await (
+    await path.api("PATCH", `/api/paths/${path.id}`, {
+      name: pathName,
+      description: "Two days to sign-ups.",
+      milestones: [
+        { id: (await draftOf(path)).milestones[0].id },
+        {
+          name: "Grow",
+          description: "Find more people.",
+          doneWhen: "Ten people use it.",
+          outcome: "",
+        },
+      ],
+    })
+  ).json()) as { draft: { milestones: { id: string }[] } };
+  expect(
+    (
+      await path.api(
+        "POST",
+        `/api/paths/${path.id}/milestones/${draft.milestones[0].id}/tasks`,
+        { title: "Tell five friends" },
+      )
+    ).status(),
+  ).toBe(201);
+  for (const [method, url] of [
+    ["POST", `/api/paths/${path.id}/versions`],
+    ["PUT", `/api/paths/${path.id}/versions/1/published`],
+    ["PUT", `/api/paths/${path.id}/open`],
+  ]) {
+    expect((await path.api(method, url)).ok()).toBe(true);
+  }
+
+  const adderContext = await browser.newContext();
+  const adder = await adderContext.newPage();
+  await signIn(adder, TEST_EMAILS.e2eAdder);
+  await adder.getByLabel("Product name").fill(productName);
+  await adder.getByRole("button", { name: "Add Product" }).click();
+  await expect(adder.getByRole("link", { name: productName })).toBeVisible();
+
+  await adder.goto(`/app/paths/${path.id}`);
+  await adder.getByRole("button", { name: "Add This Path" }).click();
+  await expect(
+    adder.getByRole("button", { name: "Add This Path" }),
+  ).toHaveCount(0);
+  await adder.getByLabel("Product").selectOption({ label: productName });
+  await adder.getByRole("button", { name: "Start on Path" }).click();
+  await expect(adder).toHaveURL(/\/app\/products\/[^/]+\/journeys\/[^/]+$/);
+  await expect(
+    adder.getByRole("heading", { level: 1, name: pathName }),
+  ).toBeVisible();
+
+  const task = adder.getByRole("checkbox", { name: "Tell five friends" });
+  await task.check();
+  await expect(task).toBeChecked();
+  await adder
+    .getByRole("button", { name: "Advance to Next Milestone" })
+    .click();
+  await adder
+    .getByRole("button", { name: "Return to Previous Milestone" })
+    .click();
+  await expect(
+    adder.getByRole("button", { name: "Advance to Next Milestone" }),
+  ).toBeVisible();
+  await expect(task).toBeChecked();
+
+  // Pathfinder lists it among the Added Paths, linking to its Trailhead.
+  await adder.getByRole("link", { name: "Pathfinder", exact: true }).click();
+  await expect(
+    adder.getByRole("heading", { level: 1, name: "Pathfinder" }),
+  ).toBeVisible();
+  await expect(
+    adder
+      .getByRole("list", { name: "Your Added Paths" })
+      .getByRole("link", { name: pathName }),
+  ).toHaveAttribute("href", `/app/paths/${path.id}`);
+
+  // Closed, their copy still shows them, with nothing about the Guide.
+  expect(
+    (await path.api("DELETE", `/api/paths/${path.id}/open`)).status(),
+  ).toBe(200);
+  await adder.goto(`/app/paths/${path.id}`);
+  await expect(
+    adder.getByRole("button", { name: "Start on Path" }),
+  ).toBeVisible();
+  await expect(adder.locator("main")).not.toContainText(TEST_EMAILS.guide);
+  await adderContext.close();
+
+  // The Guide's Delete Path is refused, saying why.
+  await page.goto(`/app/paths/${path.id}/edit`);
+  await page.getByRole("button", { name: "Delete Path" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Delete Path Permanently?",
+  });
+  await dialog.getByRole("button", { name: "Delete Path" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Someone has Added this Path, so it can't be deleted.",
+  );
+});
+
+/** The Path's Draft, as its owner reads it through the API. */
+async function draftOf(path: Awaited<ReturnType<typeof savedPathThroughApi>>) {
+  const res = await path.api("GET", `/api/paths/${path.id}`);
+  return ((await res.json()) as { draft: { milestones: { id: string }[] } })
+    .draft;
+}

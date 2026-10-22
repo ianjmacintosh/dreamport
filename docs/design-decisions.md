@@ -281,7 +281,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
   a new User in the nav. With two sections and
   the "Account" trigger the bar collapses into the ☰ menu below about
   820px, not 640px: "Account" starts to clip below about 800px (decided
-  in #167).
+  in #167). _(Superseded by #192: the section, its h1 and its crumbs say
+  "Pathfinder". Measured again with that label, "Account" starts to clip
+  below about 792px, so the ☰ breakpoint stays at 820px.)_
 
 - White (`--color-sheet`) is not a surface color. It's kept for a
   Worksheet's paper (`.sheet`) and for the few places that need emphasis
@@ -369,7 +371,10 @@ Add an entry only once a sign-off conversation resolves something repeatable
     before, but isn't now, is marked "Completed" or "Abandoned" for its
     latest Journey and goes to its Trailhead, to start again (#172). A "Make Your Own Path" h3 ends
     it: "Not finding a Path that does quite what you need? Make your own
-    Path", the last three words linking to Trailblazer.
+    Path", the last three words linking to Trailblazer. _(Superseded by
+    #192: Pathfinder is `/app/paths`, for the User rather than a Product,
+    without the "Following", "Completed" or "Abandoned" marks; this
+    address redirects there.)_
   - **Trailhead** (`/app/products/:productId/paths/:pathId/trailhead`):
     the pre-start Journey page #137 drew, with the Path's name as the h1:
     the route with every outcome line on the left, the pitch and "Start
@@ -394,7 +399,7 @@ Add an entry only once a sign-off conversation resolves something repeatable
     `ActionCard`s (path icon, white card, "In Progress"), or "Looking for
     some structure? Follow a marked path to success." when there are none.
     Its button reads "View Journeys", or "Choose a Path" (to Pathfinder)
-    when the Product has no Journeys at all.
+    when the Product has no Journeys at all. _(Since #192, "Choose a Path" and the Journeys page's "Open Pathfinder" both go to `/app/paths`.)_
   - A Path's editor is `/app/paths/:pathId/edit`, its crumb "Edit", so the
     Path's own URL is free for a page about the Path later.
 
@@ -468,7 +473,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
     Journey List shows only the active ones (above); Pathfinder marks a Path it isn't
     following but has followed with how its latest Journey ended (decided
     in #172, in words, without a prototype; Pause was dropped for
-    Abandon).
+    Abandon). _(#192 dropped Pathfinder's marks: the Journeys page lists
+    those Journeys, and the Trailhead says when the picked Product is
+    already on the Path.)_
 
 - Why an action didn't go through (a refused save, start or resume) is a
   `role="alert"` paragraph right after the action's `.button-group`, with
@@ -496,6 +503,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
   {Path}), so a Journey is a page under its Path's Trailhead. The Pathfinder name is kept for the
   directory it grows into. URLs, code and `CONTEXT.md`'s terms are
   unchanged. The labels in earlier entries above predate this.
+  _(Superseded by #205 and #192: a Trailhead's trail is Pathfinder ›
+  {Path}, and Pathfinder is its own page at `/app/paths`, with no crumbs
+  above it and no "Browse Available Paths".)_
 
 - A linked `ActionCard` (a Worksheet, a Path) shows it's clickable the
   way a button does: hover outlines the whole card with `.button:hover`'s
@@ -572,11 +582,13 @@ Add an entry only once a sign-off conversation resolves something repeatable
   parts split by middle dots hidden from screen readers, as the in-app
   `Footer` does; an older version adds "A newer version is available.",
   linking to the newest. **Add This Path**, for a User who hasn't Added
-  another User's Path, arrives with #192. Once it can be followed, a native
+  another User's Path, is built in #192: a primary button where the
+  picker goes, and once Added, the same page shows the User's copy.
+  Once it can be followed, a native
   select of the User's Products sits beside **Start on Path** as a
   `.field-row`. "Looking for an older version?" under that opens a
-  `Dialog` of the published versions, as before. Its trail is Paths ›
-  {Path}, replacing the Product-scoped Trailhead trail above. Nothing
+  `Dialog` of the published versions, as before. Its trail is Pathfinder
+  › {Path} (Paths until #192), replacing the Product-scoped Trailhead trail above. Nothing
   warns ahead of a click: pressing Start on Path with no Product, or for
   a Product already on the Path, shows why after the button ("You don't
   have a Product yet, and a Journey needs one. [Add a Product] first."; or
@@ -584,10 +596,51 @@ Add an entry only once a sign-off conversation resolves something repeatable
   your current Journey]? If you'd like to restart, you'll have to do it
   from within your current Journey."). There's no Restart on the
   Trailhead. A closed Path or an unpublished version shows "This Path
-  ({Path}) is no longer available." These messages are #191's `Notice`
+  ({Path}) is no longer available." Another User's Path with nothing
+  published reads like an unknown one, so its name isn't shown (decided
+  with Ian in #192). These messages are #191's `Notice`
   (decided in #205, from a prototype on local branch
   `205-prototype-trailhead`: six rounds across six viewers, from three
   layouts (the right column as today, one action beside the h1 with the
   picker in a Dialog, a numbered checklist) down to round 1's first, then
   older versions as a Dialog or a popover, and the version line as small
   italics, body-size italics or small dotted text).
+
+- Pathfinder is the page at `/app/paths`, no longer under a Product: one
+  page listing every Available Path, reached from `AppNav` and from a
+  Product's links to find a Path (decided in #192, from a prototype on
+  local branch `192-prototype-added-copy`: eight rounds, from four
+  layouts (one list with the version beside a copy's name, two sections,
+  one row per Path with its versions inside, rows with Edit Path / View
+  Path buttons) to the last one's cards, then icons, sections, spacing,
+  where Dream Sequence goes and where the name shows). It replaces #170's
+  per-Product Pathfinder and #198's "Browse Available Paths" crumb; a
+  Product's own Journeys stay on its Journeys page.
+  - `AppNav`'s section, the page's h1 and the crumbs above it say
+    "Pathfinder", replacing #167's "Paths". The URL stays `/app/paths`,
+    so a Path's Trailhead (`/app/paths/:pathId`) still sits under it.
+  - Two sections, each an h2: "Your Original Paths" (the Paths the User
+    made) and "Your Added Paths" (Dream Sequence first, then their Added
+    copies). Dream Sequence needs no Add, but on this page it is grouped
+    with the Paths someone else made.
+  - Each card is a linked `ActionCard`: the compass, the Path's name in
+    bold, and nothing else: no version, no Draft or saved state, nothing
+    about who made it. The whole card links to the Path's Trailhead, an
+    Original Path's too (its Trailhead has Edit Path). There are no
+    buttons on the cards.
+  - A User holding copies of several versions of one Path sees one card
+    for it, not one per version. The Trailhead shows their copies.
+  - Make New Path sits under the "Your Original Paths" cards, bottom left,
+    not bottom right: it doesn't act on the cards above it. With no
+    Original Paths, "No Paths yet." takes the cards' place.
+  - Under "Your Added Paths", before the cards: "The paths listed below
+    were made by other people. You can follow these paths, but you cannot
+    make changes to them." Its "paths" stays lowercase: it's plain prose,
+    and capitalized there it reads oddly. The heading and that line are
+    the only signs a Path is read-only; the card looks the same as an
+    Original Path's.
+  - The page keeps the design system's spacing, `main > * + *`'s 1rem,
+    with no extra room above the headings or after the cards. Rounds with
+    2rem above them read as too much.
+  - Picked over a pencil (yours) or padlock (read-only) icon, and a person
+    or open book: the compass stays every Path's icon (#199).

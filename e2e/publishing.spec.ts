@@ -3,9 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { TEST_EMAILS } from "../test/emails";
 import { signIn } from "./sign-in";
 
-/** Make a Path with one Milestone from the Paths list, and save Version 1. */
+/** Make a Path with one Milestone from Pathfinder, and save Version 1. */
 async function savedPath(page: Page, name: string) {
-  await page.getByRole("link", { name: "Paths", exact: true }).click();
+  await page.getByRole("link", { name: "Pathfinder", exact: true }).click();
   await page.getByRole("button", { name: "Make New Path" }).click();
   const make = page.getByRole("dialog", { name: "Make New Path" });
   await make.getByLabel("Path name").fill(name);

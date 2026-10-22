@@ -54,13 +54,12 @@ export const Route = createFileRoute(
 
 /**
  * A Product's Paths page (#170, #198; the URL still says journeys): its
- * Journeys, split into Active Paths (in progress) and Inactive Paths
- * (completed or abandoned), each oldest first and
- * left out when empty (#172). Each is an `ActionCard` link to its Journey
- * page, saying whether it's in progress, completed or abandoned. Below
- * them, "Find More Paths" points to Pathfinder, which lists the Paths
- * to start on. With no Journeys yet, the page says so rather than sending
- * the User straight to Pathfinder.
+ * Journeys, split into Active Paths (in progress) and Inactive Paths (completed
+ * or abandoned), each oldest first and left out when empty (#172). Each is an
+ * `ActionCard` link to its Journey page, saying whether it's in progress,
+ * completed or abandoned. Below them, "Find More Paths" points to Pathfinder
+ * (`/app/paths`), which lists the Paths to start on. With no Journeys yet, the
+ * page says so rather than sending the User straight to Pathfinder.
  */
 function ProductJourneys() {
   const { product, journeys } = Route.useRouteContext();
@@ -106,12 +105,9 @@ function ProductJourneys() {
         </>
       )}
       <h2>Find More Paths</h2>
-      <p>Pathfinder lists every Path this Product can follow.</p>
+      <p>Pathfinder lists every Path you can follow.</p>
       <p>
-        <Link
-          href={`/app/products/${product.id}/pathfinder`}
-          className="button button--secondary"
-        >
+        <Link href="/app/paths" className="button button--secondary">
           Open Pathfinder
         </Link>
       </p>

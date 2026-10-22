@@ -618,7 +618,8 @@ export async function journeyState(
   if (!journey) {
     throw new Error(`Journey ${started.id} is gone`);
   }
-  const { id, pathId, name, milestones } = version;
+  // `pathId` links to the Trailhead, which for a copy is its source's.
+  const { id, trailheadPathId: pathId, name, milestones } = version;
   return { path: { id, pathId, name, milestones }, journey, worksheets, tasks };
 }
 

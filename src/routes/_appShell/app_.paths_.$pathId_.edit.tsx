@@ -205,7 +205,7 @@ export const Route = createFileRoute("/_appShell/app_/paths_/$pathId_/edit")({
         // The Path's own address is its Trailhead, or back here while it
         // has only a Draft.
         trail: [
-          { label: "Paths", href: "/app/paths" },
+          { label: "Pathfinder", href: "/app/paths" },
           { label: draft.name, href: `/app/paths/${draft.id}` },
         ],
         current: "Edit",
@@ -1027,7 +1027,8 @@ function DeletePathForm({
         onDeleted();
         return;
       }
-      setError(DELETE_FAILED);
+      // A 409's own words: someone has Added the Path (#192).
+      setError(deleted.conflict ?? DELETE_FAILED);
     } catch {
       setError(CONNECTION_FAILED);
     }
