@@ -35,12 +35,12 @@ type PathEnv = {
 };
 
 /**
- * Every route about one of the User's Paths and its Draft (#167), mounted
- * at `/api/paths/:pathId`. The middleware is the only place a route here
- * learns which Path it's about, the same as `productRoutes`: 401 with no
- * session, and 404 for a Path that doesn't exist, is another User's, is
- * Dreamport's, or is the User's copy of another User's (#192), all alike. Past it, a handler gets `c.var.path`, and
- * `c.var.guide`: whether the User is a Guide.
+ * Every route about one of the User's Paths and its Draft (#167), mounted at
+ * `/api/paths/:pathId`. The middleware is the only place a route here learns
+ * which Path it's about, the same as `productRoutes`: 401 with no session, and
+ * 404 for a Path that doesn't exist, is another User's, is Dreamport's, or is
+ * the User's copy of another User's (#192), all alike. Past it, a handler gets
+ * `c.var.path`, and `c.var.guide`: whether the User is a Guide.
  *
  * The origin check on requests that change data is `index.ts`'s, in front
  * of every `/api/*` route.
@@ -78,7 +78,7 @@ pathRoutes.use("/versions/:number/published", guidesOnly);
 pathRoutes.use("/open", guidesOnly);
 
 /** A version number from the address: a positive whole number, or null. */
-function versionNumber(raw: string): number | null {
+export function versionNumber(raw: string): number | null {
   const number = Number(raw);
   return /^[1-9][0-9]*$/.test(raw) && Number.isSafeInteger(number)
     ? number

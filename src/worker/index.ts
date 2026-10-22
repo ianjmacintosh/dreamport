@@ -24,7 +24,7 @@ import {
   PRODUCT_NAME_MAX_LENGTH,
 } from "./products";
 import { productRoutes } from "./product-routes";
-import { pathRoutes } from "./path-routes";
+import { pathRoutes, versionNumber } from "./path-routes";
 import { productsOnPath } from "./journeys";
 import {
   addVersion,
@@ -459,15 +459,16 @@ export function createApp(deps: AppDeps = {}) {
       return c.json({ error: "Not signed in" }, 401);
     }
 
-    const number = Number(c.req.param("number"));
-    const added = Number.isSafeInteger(number)
-      ? await addVersion(
-          c.env.DB,
-          session.user.id,
-          c.req.param("pathId"),
-          number,
-        )
-      : null;
+    const number = versionNumber(c.req.param("number"));
+    const added =
+      number !== null
+        ? await addVersion(
+            c.env.DB,
+            session.user.id,
+            c.req.param("pathId"),
+            number,
+          )
+        : null;
     if (!added || (!added.ok && added.reason === "not-found")) {
       return c.json({ error: "Not found" }, 404);
     }

@@ -208,8 +208,8 @@ type TrailheadRow = Omit<
  * On another User's Path, the viewer's copies (#192) join the versions
  * offered, and a version they hold shows their copy, followable, whatever
  * became of the original: closed, unpublished or gone. The root shows the
- * newest version offered, or with none offered, their newest copy. A copy's
- * own id has no Trailhead.
+ * newest of the two: a newer version offered, or their newest copy. A
+ * copy's own id has no Trailhead.
  */
 export async function getTrailhead(
   db: D1Database,
@@ -251,9 +251,9 @@ export async function getTrailhead(
     (row): row is TrailheadRow & { id: string } => row.id !== null,
   );
   const published = saved.filter((v) => v.published === 1);
-  const followable = head !== undefined && head.userId === null;
+  const dreamports = head !== undefined && head.userId === null;
   const own = head !== undefined && head.userId === userId;
-  if (followable || own) {
+  if (dreamports || own) {
     return ownTrailhead(db, pathId, own, saved, published, number);
   }
 
@@ -262,7 +262,7 @@ export async function getTrailhead(
   const versions = [
     ...new Set([...copies, ...offered].map((v) => v.number)),
   ].sort((a, b) => b - a);
-  const shownNumber = number ?? offered[0]?.number ?? copies[0]?.number;
+  const shownNumber = number ?? versions[0];
   const copy = copies.find((v) => v.number === shownNumber);
   const offer = offered.find((v) => v.number === shownNumber);
   const summaries = versions.map((n) =>
@@ -299,7 +299,7 @@ export async function getTrailhead(
   };
 }
 
-/** `getTrailhead` for Dream Sequence or the viewer's own Path. */
+/** `getTrailhead` for Dream Sequence or the viewer's own Path: no copies. */
 async function ownTrailhead(
   db: D1Database,
   pathId: string,
@@ -588,8 +588,8 @@ export type CreatePathResult =
 
 /**
  * Make a Path with an empty Draft, unless the User already made
- * `PATHS_PER_USER`; their copies don't count. The count and the insert are one statement, so two
- * creates at once can't both land at the cap.
+ * `PATHS_PER_USER`; their copies don't count. The count and the insert are one
+ * statement, so two creates at once can't both land at the cap.
  */
 export async function createPath(
   db: D1Database,
@@ -694,15 +694,21 @@ export async function addVersion(
 ): Promise<AddVersionResult> {
   const source = await db
     .prepare(
-      `SELECT "path_versions"."id", "paths"."open", "path_versions"."published"
+      `SELECT "path_versions"."id", "paths"."open", "path_versions"."published",
+         EXISTS (SELECT 1 FROM "paths" AS "copy"
+           JOIN "path_versions" AS "held" ON "held"."pathId" = "copy"."id"
+           WHERE "copy"."userId" = ?3 AND "copy"."addedFrom" = ?1 AND "held"."number" = ?2) AS "held"
        FROM "paths"
        JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id" AND "path_versions"."number" = ?2
        WHERE "paths"."id" = ?1 AND "paths"."userId" <> ?3 AND "paths"."addedFrom" IS NULL`,
     )
     .bind(pathId, number, userId)
-    .first<{ id: string; open: number; published: number }>();
+    .first<{ id: string; open: number; published: number; held: number }>();
   if (!source) {
     return { ok: false, reason: "not-found" };
+  }
+  if (source.held === 1) {
+    return { ok: true, added: false };
   }
   if (source.open !== 1 || source.published !== 1) {
     return { ok: false, reason: "unavailable" };

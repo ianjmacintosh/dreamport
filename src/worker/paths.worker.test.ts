@@ -1974,6 +1974,33 @@ describe("Adding a published version as a read-only copy (#192)", () => {
     expect(versions[0].name).toBe("Bakery Path");
   });
 
+  it("shows the User their newest copy at the root when it's newer than any version still offered", async () => {
+    const { path } = await offeredPath(2, [1, 2]);
+    await addVersion(env.DB, ADDER_ID, path.id, 2);
+
+    await unpublishVersion(env.DB, path, 2);
+
+    expect(await copyAt(path.id, null)).toMatchObject({
+      version: { number: 2 },
+      versions: [{ number: 2 }, { number: 1 }],
+    });
+    expect(await getTrailhead(env.DB, ADDER_ID, path.id, 1)).toMatchObject({
+      status: "offered",
+      version: { number: 1 },
+    });
+  });
+
+  it("answers Add of a version the User holds as already held, even once the Path closes", async () => {
+    const { path } = await offeredPath(1, [1]);
+    await addVersion(env.DB, ADDER_ID, path.id, 1);
+    await closePath(env.DB, path);
+
+    expect(await addVersion(env.DB, ADDER_ID, path.id, 1)).toEqual({
+      ok: true,
+      added: false,
+    });
+  });
+
   it("refuses a closed Path or an unpublished version, copying nothing", async () => {
     const { path } = await offeredPath(2, [1]);
 
