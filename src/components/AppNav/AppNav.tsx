@@ -35,7 +35,7 @@ const SECTIONS = [
       pathname === "/app" || pathname.startsWith("/app/products/"),
   },
   {
-    label: "Paths",
+    label: "Pathfinder",
     href: "/app/paths",
     icon: <CompassIcon />,
     matches: (pathname: string) =>

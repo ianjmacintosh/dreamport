@@ -157,8 +157,8 @@ The one tool in which any User makes and edits a Path. Making a Path for
 yourself and following it on your own Product is **self-guiding**, and
 needs nothing beyond an account. Milestones and Tasks are always called by
 name; there is no umbrella word for the two together. The app's section for
-Paths is called Paths; Trailblazer names the adding and editing inside it,
-not the section.
+Paths is called Pathfinder; Trailblazer names the adding and editing inside
+it, not the section.
 _Avoid_: editor, builder, path builder; asset or item (for Milestones and
 Tasks together)
 
@@ -178,12 +178,11 @@ Paths: that is Trailblazer's job, open to any User.
 _Avoid_: system administrator, staff, superuser
 
 **Pathfinder**:
-The bookstore: where a User finds Paths they don't have yet, with search,
-filters and sorting. It doesn't exist yet; until it does, a shared Path is
-found only through the Trailhead link its Guide gives out. Today's page of
-that name, on each Product, lists the User's Available Paths, marking the
-ones the Product already follows, and is to be renamed when the bookstore
-arrives.
+The page listing a User's Available Paths, at `/app/paths`: the Paths they
+made, then Dream Sequence and the copies they've Added. It grows later into
+the bookstore, where a User finds Paths they don't have yet, with search,
+filters and sorting; until then, a shared Path is found only through the
+Trailhead link its Guide gives out.
 _Avoid_: marketplace, catalog, store
 
 **Purchase**:

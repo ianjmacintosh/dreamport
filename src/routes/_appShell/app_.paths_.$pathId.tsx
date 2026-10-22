@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  redirect,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 
 import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
@@ -73,6 +78,7 @@ const LONG_DATE = new Intl.DateTimeFormat(undefined, { dateStyle: "long" });
 
 const START_JOURNEY_FAILED =
   "We couldn't start on this Path. Try again in a moment.";
+const ADD_FAILED = "We couldn't add this Path. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -104,7 +110,7 @@ export const Route = createFileRoute("/_appShell/app_/paths_/$pathId")({
     return {
       trailhead,
       breadcrumbs: {
-        trail: [{ label: "Paths", href: "/app/paths" }],
+        trail: [{ label: "Pathfinder", href: "/app/paths" }],
         current: trailhead.path.name,
       } satisfies BreadcrumbsProps,
     };
@@ -119,9 +125,10 @@ export const Route = createFileRoute("/_appShell/app_/paths_/$pathId")({
  * `.journey-split`: the version's Milestones as a route on the left, and
  * on the right the pitch (Dream Sequence's own words, or the version's
  * description), then, on a Path the User can follow, a Product picker
- * beside Start on Path. Another User's Path has no action until Add
- * (#192). A closed Path or an unpublished version of another User's says
- * it's no longer available.
+ * beside Start on Path. On another User's Path, that's Add This Path
+ * (#192) until the User holds a copy of the version shown, which the page
+ * then shows them. A closed Path or an unpublished version of another
+ * User's, with no copy, says it's no longer available.
  *
  * It opens on the newest version offered. "Looking for an older version?"
  * opens a Dialog listing the rest, and an older version says a newer one
@@ -137,18 +144,27 @@ function TrailheadPage() {
           <p>This Path ({trailhead.path.name}) is no longer available.</p>
         </Notice>
         <p>
-          <Link href="/app/paths">Back to Paths</Link>
+          <Link href="/app/paths">Back to Pathfinder</Link>
         </p>
       </>
     );
   }
-  return <ShownVersion trailhead={trailhead} />;
+  // Keyed so an Add, which turns the version shown into the User's copy,
+  // starts the Product picker afresh.
+  return (
+    <ShownVersion
+      key={`${trailhead.status}:${trailhead.version.id}`}
+      trailhead={trailhead}
+    />
+  );
 }
 
 function ShownVersion({ trailhead }: { trailhead: Shown }) {
   const { path, version, versions, newestNumber, products } = trailhead;
   const search = Route.useSearch();
   const navigate = useNavigate();
+  const router = useRouter();
+  const [isAdding, setIsAdding] = useState(false);
   const pathHref = `/app/paths/${path.id}`;
   const [productId, setProductId] = useState(products?.[0]?.id ?? "");
   const [refusal, setRefusal] = useState<Refusal | null>(null);
@@ -164,6 +180,33 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
       search: { version: search.version },
       replace: true,
     });
+  }
+
+  /** Add the version shown, then load the page again to show the copy. */
+  async function addPath() {
+    setError("");
+    setIsAdding(true);
+    try {
+      const failed = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(
+          `/api/paths/${path.id}/versions/${version.number}/add`,
+          { method: "POST", headers: { "content-type": "application/json" } },
+        );
+        if (res.status === 409) {
+          return ((await res.json()) as { error: string }).error;
+        }
+        return res.ok ? null : ADD_FAILED;
+      });
+      if (failed) {
+        setError(failed);
+        return;
+      }
+      await router.invalidate();
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setIsAdding(false);
+    }
   }
 
   async function startJourney() {
@@ -272,6 +315,21 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
             </>
           ) : (
             <p>{version.description}</p>
+          )}
+          {trailhead.status === "offered" && (
+            <>
+              <p>
+                <Button
+                  disabled={isAdding}
+                  state={isAdding ? "pending" : "ready"}
+                  onClick={() => void addPath()}
+                >
+                  <Button.State name="ready">Add This Path</Button.State>
+                  <Button.State name="pending">Adding…</Button.State>
+                </Button>
+              </p>
+              {error && <p role="alert">{error}</p>}
+            </>
           )}
           {products && (
             <>

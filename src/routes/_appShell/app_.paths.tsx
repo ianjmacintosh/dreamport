@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { CompassIcon } from "@phosphor-icons/react";
 
+import ActionCard from "../../components/ActionCard";
 import Button from "../../components/Button";
 import Dialog from "../../components/Dialog";
-import Link from "../../components/Link";
 import TextArea from "../../components/TextArea";
 import TextInput from "../../components/TextInput";
 
@@ -12,6 +13,12 @@ interface PathSummary {
   id: string;
   name: string;
   createdAt: string;
+}
+
+/** As `/api/paths` lists `added` (see `AddedPath` in `src/worker/paths.ts`). */
+interface AddedPath {
+  id: string;
+  name: string;
 }
 
 /** Mirror `src/worker/paths.ts`; the server enforces the real limits. */
@@ -63,11 +70,11 @@ export const Route = createFileRoute("/_appShell/app_/paths")({
     // The session is already proven by `_appShell`. A failed fetch starts
     // the page empty, as `/app` does with its Products.
     const res = await fetch("/api/paths").catch(() => null);
-    const paths =
+    const { paths, added } =
       res && res.ok
-        ? ((await res.json()) as { paths: PathSummary[] }).paths
-        : [];
-    return { paths };
+        ? ((await res.json()) as { paths: PathSummary[]; added: AddedPath[] })
+        : { paths: [], added: [] };
+    return { paths, added };
   },
   component: Paths,
 });
@@ -77,19 +84,42 @@ const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
 /**
- * Paths (#167): the User's own Paths, each linking to its Draft, and
- * "Make New Path", which opens a `Dialog` for the new Path's name and
- * description and then goes straight to the new Path's editor. A refusal (the 30-Path cap) shows the server's own words in
- * the Dialog, which stays open so nothing typed is lost.
+ * Pathfinder (#167, #192): every Path the User can follow, in two
+ * sections. "Your Original Paths" are the ones they made, then "Make New
+ * Path", which opens a `Dialog` for the new Path's name and description
+ * and then goes straight to the new Path's editor. A refusal (the 30-Path
+ * cap) shows the server's own words in the Dialog, which stays open so
+ * nothing typed is lost. "Your Added Paths" are Dream Sequence, then the
+ * Paths they've Added, one card per Path. Every card links to the Path's
+ * Trailhead.
  */
 function Paths() {
-  const { paths } = Route.useRouteContext();
+  const { paths, added } = Route.useRouteContext();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState("");
+
+  // Each Path as a linked `ActionCard` to its Trailhead: compass and name.
+  const cards = (
+    list: readonly { id: string; name: string }[],
+    labelledBy: string,
+  ) => (
+    <ul className="action-card-list" aria-labelledby={labelledBy}>
+      {list.map((path) => (
+        <li key={path.id}>
+          <ActionCard
+            href={`/app/paths/${path.id}`}
+            leading={<CompassIcon weight="bold" aria-hidden="true" />}
+          >
+            {path.name}
+          </ActionCard>
+        </li>
+      ))}
+    </ul>
+  );
 
   function openDialog() {
     setName("");
@@ -131,7 +161,7 @@ function Paths() {
 
   return (
     <>
-      <h1 id="paths-heading">Paths</h1>
+      <h1>Pathfinder</h1>
       <p>
         If you&apos;d like your Product to follow a structured program with
         milestones and tasks along the way to a certain goal, that&apos;s
@@ -143,25 +173,21 @@ function Paths() {
         Product to follow instead. You make the milestones and tasks and put
         your Product on that path.
       </p>
-      <p>
-        <Button onClick={openDialog}>Make New Path</Button>
-      </p>
+      <h2 id="original-paths">Your Original Paths</h2>
       {paths.length === 0 ? (
         <p>No Paths yet.</p>
       ) : (
-        <ul className="list" aria-labelledby="paths-heading">
-          {paths.map((path) => (
-            <li className="list-row" key={path.id}>
-              <Link
-                className="list-row-name"
-                href={`/app/paths/${path.id}/edit`}
-              >
-                {path.name}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        cards(paths, "original-paths")
       )}
+      <p>
+        <Button onClick={openDialog}>Make New Path</Button>
+      </p>
+      <h2 id="added-paths">Your Added Paths</h2>
+      <p>
+        The paths listed below were made by other people. You can follow these
+        paths, but you cannot make changes to them.
+      </p>
+      {cards(added, "added-paths")}
 
       <Dialog
         open={isOpen}
