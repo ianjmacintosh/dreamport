@@ -203,7 +203,7 @@ type TrailheadRow = Omit<
  * published, which offers every saved version: a plain User can't
  * publish. Its owner never sees "unavailable", open or closed: a version
  * it doesn't offer them is `null`, as is an unknown Path, or another
- * User's with nothing saved.
+ * User's with nothing published.
  *
  * On another User's Path, the viewer's copies (#192) join the versions
  * offered, and a version they hold shows their copy, followable, whatever
@@ -285,7 +285,9 @@ export async function getTrailhead(
       versions: summaries,
     };
   }
-  const newest = published[0] ?? saved[0];
+  // Nothing published reads like an unknown Path: no name for a Path its
+  // Guide never offered, or has withdrawn.
+  const newest = published[0];
   if (!newest) {
     return null;
   }

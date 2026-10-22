@@ -1668,10 +1668,6 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
     const { path } = await publishersPath(1);
     const unavailable = { status: "unavailable", name: "Bakery Path" };
 
-    expect(await getTrailhead(env.DB, STRANGER_ID, path.id, null)).toEqual(
-      unavailable,
-    );
-
     await publishVersion(env.DB, path, 1);
     await openPath(env.DB, path);
     await rename(path, "Renamed Path", "For bakers");
@@ -1689,6 +1685,17 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
       expect(await getTrailhead(env.DB, STRANGER_ID, path.id, number)).toEqual(
         unavailable,
       );
+    }
+  });
+
+  it("has nothing to show another User for a Path with nothing published, saying nothing of its name", async () => {
+    await seedUser(STRANGER_ID, TEST_EMAILS.pathsModuleStranger);
+    const { path } = await publishersPath(2);
+
+    for (const number of [null, 1, 2]) {
+      expect(
+        await getTrailhead(env.DB, STRANGER_ID, path.id, number),
+      ).toBeNull();
     }
   });
 
