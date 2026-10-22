@@ -24,11 +24,9 @@ import {
   setTaskDone,
   startJourney,
   worksheetState,
-  type JourneyStatus,
-  type JourneySummary,
   type StartedJourney,
 } from "./journeys";
-import { getTrailheadVersion, getVersion, listFollowable } from "./paths";
+import { getTrailheadVersion, getVersion } from "./paths";
 import {
   deleteProduct,
   getProduct,
@@ -434,7 +432,7 @@ productRoutes.delete("/journeys/:journeyId", async (c) => {
 
 /** The Path a Journey follows, for a Worksheet page's breadcrumbs. */
 function pathOf({ version }: StartedJourney) {
-  return { id: version.pathId, name: version.name };
+  return { id: version.trailheadPathId, name: version.name };
 }
 
 /**
@@ -531,52 +529,4 @@ productRoutes.put("/journeys/:journeyId/tasks/:taskId", async (c) => {
   }
 
   return c.json(await journeyState(c.env.DB, journey), 200);
-});
-
-/**
- * The Product's Journeys by Path id: the one in progress on each Path, if
- * any (`startJourney` keeps it to one), and how the latest of the rest
- * ended.
- */
-async function journeysByPath(
-  db: D1Database,
-  product: OwnedProduct,
-): Promise<{
-  inProgress: Map<string, JourneySummary>;
-  lastEnded: Map<string, Exclude<JourneyStatus, "in-progress">>;
-}> {
-  const inProgress = new Map<string, JourneySummary>();
-  const lastEnded = new Map<string, Exclude<JourneyStatus, "in-progress">>();
-  // Oldest first, so a later Journey on a Path overwrites an earlier one.
-  for (const journey of await listJourneys(db, product)) {
-    if (journey.status === "in-progress") {
-      inProgress.set(journey.pathId, journey);
-    } else {
-      lastEnded.set(journey.pathId, journey.status);
-    }
-  }
-  return { inProgress, lastEnded };
-}
-
-/**
- * Pathfinder (#170): every Path the User can follow, with the Product's
- * Journey in progress on each one it's following, so the page can link to
- * that Journey and not invite a second start, and how its latest other
- * Journey on the Path ended, if it has one (#172).
- */
-productRoutes.get("/pathfinder", async (c) => {
-  const { product } = c.var;
-  const [paths, journeys] = await Promise.all([
-    listFollowable(c.env.DB, c.var.userId),
-    journeysByPath(c.env.DB, product),
-  ]);
-  return c.json({
-    product,
-    paths: paths.map(({ id, name }) => ({
-      id,
-      name,
-      journeyId: journeys.inProgress.get(id)?.id ?? null,
-      lastEnded: journeys.lastEnded.get(id) ?? null,
-    })),
-  });
 });

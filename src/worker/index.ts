@@ -27,8 +27,10 @@ import { productRoutes } from "./product-routes";
 import { pathRoutes } from "./path-routes";
 import { productsOnPath } from "./journeys";
 import {
+  addVersion,
   createPath,
   getTrailhead,
+  listAddedPaths,
   listPaths,
   parsePathFields,
   PATHS_PER_USER,
@@ -341,14 +343,21 @@ export function createApp(deps: AppDeps = {}) {
   // in front of them all — see `product-routes.ts`.
   app.route("/api/products/:productId", productRoutes);
 
-  /** Trailblazer (#167): the signed-in User's own Paths, oldest first. */
+  /**
+   * Pathfinder (#192): the Paths the signed-in User made, oldest first,
+   * and `added`: Dream Sequence, then each Path they've Added.
+   */
   app.get("/api/paths", async (c) => {
     const session = await currentSession(c.env, c.req.raw);
     if (!session) {
       return c.json({ error: "Not signed in" }, 401);
     }
 
-    return c.json({ paths: await listPaths(c.env.DB, session.user.id) });
+    const [paths, added] = await Promise.all([
+      listPaths(c.env.DB, session.user.id),
+      listAddedPaths(c.env.DB, session.user.id),
+    ]);
+    return c.json({ paths, added });
   });
 
   /** Make a Path with an empty Draft. 409 once the User has the most. */
@@ -426,10 +435,47 @@ export function createApp(deps: AppDeps = {}) {
       },
       versions: versions.map(({ number, savedAt }) => ({ number, savedAt })),
       newestNumber: versions[0].number,
+      // A copy's Journeys are on the copy, under its own id.
       ...(trailhead.status === "followable" && {
-        products: await productsOnPath(c.env.DB, session.user.id, pathId),
+        products: await productsOnPath(
+          c.env.DB,
+          session.user.id,
+          version.pathId,
+        ),
       }),
     });
+  });
+
+  /**
+   * Add version `:number` of another User's Path (#192): 201 with a copy
+   * made, 200 if the User already held one. 409 for a closed Path or an
+   * unpublished version; 404 for an unknown one, and for the User's own
+   * Path or Dream Sequence, which need no Add. Ahead of `pathRoutes`, like
+   * the Trailhead.
+   */
+  app.post("/api/paths/:pathId/versions/:number/add", async (c) => {
+    const session = await currentSession(c.env, c.req.raw);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const number = Number(c.req.param("number"));
+    const added = Number.isSafeInteger(number)
+      ? await addVersion(
+          c.env.DB,
+          session.user.id,
+          c.req.param("pathId"),
+          number,
+        )
+      : null;
+    if (!added || (!added.ok && added.reason === "not-found")) {
+      return c.json({ error: "Not found" }, 404);
+    }
+    if (!added.ok) {
+      return c.json({ error: "This Path is no longer available." }, 409);
+    }
+
+    return c.json({}, added.added ? 201 : 200);
   });
 
   // Every route about one Path: session and ownership checked once, in

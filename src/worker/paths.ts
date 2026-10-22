@@ -6,6 +6,14 @@
  * addresses show any viewer, which for another User's Path is only ever a
  * published version, and never anything about its owner.
  *
+ * A User's Path is one they made, or their copy of another User's (#192):
+ * `addVersion` copies a published version into a `paths` row of the
+ * Adder's, its `addedFrom` the Path it came from. A copy is theirs to
+ * follow, so the owner check holds for it, but it has no Draft, no address
+ * of its own (the Trailhead at its source's address shows it), and isn't
+ * one of the Paths they made: `getPath`, `listPaths` and the cap leave it
+ * out, so it never opens in Trailblazer.
+ *
  * A saved version never changes, so a loaded `PathVersion` never goes
  * stale, unlike a Journey's progress. Callers can hold one and pass it on.
  *
@@ -37,6 +45,11 @@ export interface Milestone {
 export interface PathVersion {
   readonly id: string;
   readonly pathId: string;
+  /**
+   * The Path id its Trailhead's address uses: `pathId`, or for an Added
+   * copy, the Path it was Added from.
+   */
+  readonly trailheadPathId: string;
   /** 1, 2, 3… within its Path, in the order saved. */
   readonly number: number;
   readonly name: string;
@@ -67,36 +80,40 @@ export function getVersion(
   return loadVersion(db, versionId, userId);
 }
 
-/** Whose a Path is: Dreamport's own (Dream Sequence) or one User's. */
-export type PathOwner = "dreamport" | "user";
+/**
+ * Whose a Path is: Dreamport's own (Dream Sequence), the User's own, or
+ * the User's copy of another User's.
+ */
+export type PathOwner = "dreamport" | "user" | "added";
 
-/** A Path the User can start a Journey on, as Pathfinder lists it. */
-export interface FollowablePath {
+/** A Path someone else made, as Pathfinder's "Your Added Paths" lists it. */
+export interface AddedPath {
+  /** The id its Trailhead's address uses: for a copy, its source's. */
   readonly id: string;
-  /** Its latest version's name: the one its Trailhead opens on. */
+  /** Its latest version's name, or for a copy, its newest copy's. */
   readonly name: string;
 }
 
 /**
- * Every Path the User can follow: Dreamport's first, then the User's own
- * that have a saved version, in `listPaths` order. A Path with only a
- * Draft has nothing to follow yet, so it's left out.
+ * Dream Sequence, then each Path the User has Added, in the order they
+ * first Added it: one entry per Path, however many of its versions they
+ * hold.
  */
-export async function listFollowable(
+export async function listAddedPaths(
   db: D1Database,
   userId: string,
-): Promise<FollowablePath[]> {
+): Promise<AddedPath[]> {
   const { results } = await db
     .prepare(
-      `SELECT "paths"."id", "latest"."name"
+      `SELECT coalesce("paths"."addedFrom", "paths"."id") AS "id", "latest"."name"
        FROM "paths"
        JOIN "path_versions" AS "latest" ON "latest"."pathId" = "paths"."id"
          AND "latest"."number" = (SELECT max("number") FROM "path_versions" WHERE "pathId" = "paths"."id")
-       WHERE "paths"."userId" IS NULL OR "paths"."userId" = ?
+       WHERE "paths"."userId" IS NULL OR ("paths"."userId" = ? AND "paths"."addedFrom" IS NOT NULL)
        ORDER BY "paths"."userId" IS NOT NULL, "paths"."createdAt" ASC, "paths"."rowid" ASC`,
     )
     .bind(userId)
-    .all<FollowablePath>();
+    .all<AddedPath>();
   return results;
 }
 
@@ -111,7 +128,9 @@ export interface TrailheadVersion {
 /**
  * Version `number` of a Path the User may follow, or its latest for
  * `null`. `null` for another User's Path, an unknown one, one with no
- * saved version, or a number it doesn't have: all read the same.
+ * saved version, or a number it doesn't have: all read the same. A copy
+ * goes by its own id here, so restarting a Journey on one finds the
+ * newest copy the User holds.
  */
 export async function getTrailheadVersion(
   db: D1Database,
@@ -137,7 +156,11 @@ export async function getTrailheadVersion(
     return null;
   }
   return {
-    owner: picked.dreamports ? "dreamport" : "user",
+    owner: picked.dreamports
+      ? "dreamport"
+      : version.trailheadPathId === version.pathId
+        ? "user"
+        : "added",
     version,
     versions: results.map(versionSummary),
   };
@@ -158,13 +181,20 @@ export type Trailhead =
       readonly version: PathVersion;
       readonly versions: readonly VersionSummary[];
     }
-  /** Dream Sequence, or the viewer's own Path. */
+  /** Dream Sequence, the viewer's own Path, or their copy of another User's. */
   | {
       readonly status: "followable";
       readonly owner: PathOwner;
       readonly version: FollowableVersion;
       readonly versions: readonly VersionSummary[];
     };
+
+type TrailheadRow = Omit<
+  PathVersion,
+  "pathId" | "trailheadPathId" | "milestones"
+> & {
+  readonly published: number;
+};
 
 /**
  * The Trailhead offers a Path's published versions, newest first, in
@@ -174,6 +204,12 @@ export type Trailhead =
  * publish. Its owner never sees "unavailable", open or closed: a version
  * it doesn't offer them is `null`, as is an unknown Path, or another
  * User's with nothing saved.
+ *
+ * On another User's Path, the viewer's copies (#192) join the versions
+ * offered, and a version they hold shows their copy, followable, whatever
+ * became of the original: closed, unpublished or gone. The root shows the
+ * newest version offered, or with none offered, their newest copy. A copy's
+ * own id has no Trailhead.
  */
 export async function getTrailhead(
   db: D1Database,
@@ -181,61 +217,129 @@ export async function getTrailhead(
   pathId: string,
   number: number | null,
 ): Promise<Trailhead | null> {
-  const { results } = await db
-    .prepare(
-      `SELECT "paths"."userId", "paths"."open", "path_versions"."id", "path_versions"."number",
-         "path_versions"."name", "path_versions"."description", "path_versions"."savedAt",
-         "path_versions"."published"
-       FROM "paths"
-       LEFT JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
-       WHERE "paths"."id" = ?
-       ORDER BY "path_versions"."number" DESC`,
-    )
-    .bind(pathId)
-    .all<
-      Omit<PathVersion, "pathId" | "milestones" | "id"> & {
-        id: string | null;
-        published: number;
-        userId: string | null;
-        open: number;
-      }
-    >();
-  const owner = results[0]?.userId;
-  const own = owner === userId;
-  const followable = own || owner === null;
-  const saved = results.filter(
-    (row): row is (typeof results)[number] & { id: string } => row.id !== null,
+  const [{ results }, { results: held }] = await db.batch([
+    db
+      .prepare(
+        `SELECT "paths"."userId", "paths"."addedFrom", "paths"."open", "path_versions"."id",
+           "path_versions"."number", "path_versions"."name", "path_versions"."description",
+           "path_versions"."savedAt", "path_versions"."published"
+         FROM "paths"
+         LEFT JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
+         WHERE "paths"."id" = ?
+         ORDER BY "path_versions"."number" DESC`,
+      )
+      .bind(pathId),
+    db
+      .prepare(
+        `SELECT "path_versions"."id", "path_versions"."pathId", "path_versions"."number",
+           "path_versions"."name", "path_versions"."description", "path_versions"."savedAt",
+           "path_versions"."published"
+         FROM "paths"
+         JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
+         WHERE "paths"."userId" = ? AND "paths"."addedFrom" = ?
+         ORDER BY "path_versions"."number" DESC`,
+      )
+      .bind(userId, pathId),
+  ]);
+  const head = results[0] as
+    | { userId: string | null; addedFrom: string | null; open: number }
+    | undefined;
+  if (head?.addedFrom) {
+    return null;
+  }
+  const saved = (results as (TrailheadRow & { id: string | null })[]).filter(
+    (row): row is TrailheadRow & { id: string } => row.id !== null,
   );
   const published = saved.filter((v) => v.published === 1);
+  const followable = head !== undefined && head.userId === null;
+  const own = head !== undefined && head.userId === userId;
+  if (followable || own) {
+    return ownTrailhead(db, pathId, own, saved, published, number);
+  }
+
+  const copies = held as (TrailheadRow & { pathId: string })[];
+  const offered = head?.open === 1 ? published : [];
+  const versions = [
+    ...new Set([...copies, ...offered].map((v) => v.number)),
+  ].sort((a, b) => b - a);
+  const shownNumber = number ?? offered[0]?.number ?? copies[0]?.number;
+  const copy = copies.find((v) => v.number === shownNumber);
+  const offer = offered.find((v) => v.number === shownNumber);
+  const summaries = versions.map((n) =>
+    versionSummary(
+      copies.find((v) => v.number === n) ??
+        (offered.find((v) => v.number === n) as TrailheadRow),
+    ),
+  );
+
+  if (copy) {
+    return {
+      status: "followable",
+      owner: "added",
+      version: (await versionWithMilestones(
+        db,
+        copy,
+        copy.pathId,
+        pathId,
+      )) as FollowableVersion,
+      versions: summaries,
+    };
+  }
+  const newest = published[0] ?? saved[0];
+  if (!newest) {
+    return null;
+  }
+  if (!offer) {
+    return { status: "unavailable", name: newest.name };
+  }
+  return {
+    status: "offered",
+    version: await versionWithMilestones(db, offer, pathId, pathId),
+    versions: summaries,
+  };
+}
+
+/** `getTrailhead` for Dream Sequence or the viewer's own Path. */
+async function ownTrailhead(
+  db: D1Database,
+  pathId: string,
+  own: boolean,
+  saved: readonly TrailheadRow[],
+  published: readonly TrailheadRow[],
+  number: number | null,
+): Promise<Trailhead | null> {
   const shown = own && published.length === 0 ? saved : published;
   const picked =
     number === null ? shown[0] : shown.find((v) => v.number === number);
-
-  const newest = published[0] ?? saved[0];
-  if (!newest) {
+  if (saved.length === 0) {
     return own ? { status: "unsaved" } : null;
-  }
-  if (!followable && (!picked || results[0]?.open !== 1)) {
-    return { status: "unavailable", name: newest.name };
   }
   if (!picked) {
     return null;
   }
+  return {
+    status: "followable",
+    owner: own ? "user" : "dreamport",
+    version: (await versionWithMilestones(
+      db,
+      picked,
+      pathId,
+      pathId,
+    )) as FollowableVersion,
+    versions: shown.map(versionSummary),
+  };
+}
 
-  const { id, name, description, savedAt } = picked;
-  const version = withMilestones(
-    { id, pathId, number: picked.number, name, description, savedAt },
+async function versionWithMilestones(
+  db: D1Database,
+  { id, number, name, description, savedAt }: TrailheadRow,
+  pathId: string,
+  trailheadPathId: string,
+): Promise<PathVersion> {
+  return withMilestones(
+    { id, pathId, trailheadPathId, number, name, description, savedAt },
     await loadMilestones(db, id),
   );
-  const versions = shown.map(versionSummary);
-  return followable
-    ? {
-        status: "followable",
-        owner: own ? "user" : "dreamport",
-        version: version as FollowableVersion,
-        versions,
-      }
-    : { status: "offered", version, versions };
 }
 
 async function loadVersion(
@@ -246,7 +350,8 @@ async function loadVersion(
   const [version, milestones] = await Promise.all([
     db
       .prepare(
-        `SELECT "path_versions"."id", "path_versions"."pathId", "path_versions"."number",
+        `SELECT "path_versions"."id", "path_versions"."pathId",
+           coalesce("paths"."addedFrom", "paths"."id") AS "trailheadPathId", "path_versions"."number",
            "path_versions"."name", "path_versions"."description", "path_versions"."savedAt"
          FROM "path_versions"
          JOIN "paths" ON "paths"."id" = "path_versions"."pathId"
@@ -445,14 +550,14 @@ export function parseTaskFields(body: unknown): Parsed<TaskFields> {
   return parseFields(TASK_FIELDS, body);
 }
 
-/** A User's own Paths, oldest first. Never Dreamport's. */
+/** The Paths a User made, oldest first. Never Dreamport's, nor their copies. */
 export async function listPaths(
   db: D1Database,
   userId: string,
 ): Promise<PathSummary[]> {
   const { results } = await db
     .prepare(
-      'SELECT "id", "name", "createdAt" FROM "paths" WHERE "userId" = ? ORDER BY "createdAt" ASC, "rowid" ASC',
+      'SELECT "id", "name", "createdAt" FROM "paths" WHERE "userId" = ? AND "addedFrom" IS NULL ORDER BY "createdAt" ASC, "rowid" ASC',
     )
     .bind(userId)
     .all<PathSummary>();
@@ -460,8 +565,9 @@ export async function listPaths(
 }
 
 /**
- * A User's own Path by id, or null if it doesn't exist, is another User's,
- * or is Dreamport's: `"userId" = ?` never matches a null owner.
+ * A Path the User made, by id, or null if it doesn't exist, is another
+ * User's, is Dreamport's (`"userId" = ?` never matches a null owner), or is
+ * their copy of another User's, which nobody edits.
  */
 export function getPath(
   db: D1Database,
@@ -470,7 +576,7 @@ export function getPath(
 ): Promise<OwnedPath | null> {
   return db
     .prepare(
-      'SELECT "id", "name", "description", "createdAt" FROM "paths" WHERE "id" = ? AND "userId" = ?',
+      'SELECT "id", "name", "description", "createdAt" FROM "paths" WHERE "id" = ? AND "userId" = ? AND "addedFrom" IS NULL',
     )
     .bind(pathId, userId)
     .first<OwnedPath>();
@@ -481,8 +587,8 @@ export type CreatePathResult =
   | { readonly ok: false; readonly reason: "cap" };
 
 /**
- * Make a Path with an empty Draft, unless the User already has
- * `PATHS_PER_USER`. The count and the insert are one statement, so two
+ * Make a Path with an empty Draft, unless the User already made
+ * `PATHS_PER_USER`; their copies don't count. The count and the insert are one statement, so two
  * creates at once can't both land at the cap.
  */
 export async function createPath(
@@ -500,7 +606,7 @@ export async function createPath(
     .prepare(
       `INSERT INTO "paths" ("id", "userId", "name", "description", "createdAt", "updatedAt")
        SELECT ?, ?, ?, ?, ?, ?
-       WHERE (SELECT count(*) FROM "paths" WHERE "userId" = ?) < ?`,
+       WHERE (SELECT count(*) FROM "paths" WHERE "userId" = ? AND "addedFrom" IS NULL) < ?`,
     )
     .bind(
       path.id,
@@ -521,31 +627,159 @@ export async function createPath(
 
 export type DeletePathResult =
   | { readonly ok: true }
-  | { readonly ok: false; readonly reason: "not-found" | "open" };
+  | { readonly ok: false; readonly reason: "not-found" | "open" | "added" };
 
 /**
  * Delete a Path for good. The rows under it cascade: its Draft's
  * Milestones and Tasks, and its saved versions, each of which takes its
  * Journeys and their records with it (migration `0022`'s trigger). Saved
  * versions belong to one Path, so no other Path loses anything. Refused,
- * deleting nothing, while the Path is open: its Guide closes it first.
+ * deleting nothing, while the Path is open (its Guide closes it first) or
+ * once anyone has Added it (#192): then it can only be closed.
  */
 export async function deletePath(
   db: D1Database,
   path: OwnedPath,
 ): Promise<DeletePathResult> {
   const { meta } = await db
-    .prepare('DELETE FROM "paths" WHERE "id" = ? AND "open" = 0')
+    .prepare(
+      `DELETE FROM "paths" WHERE "id" = ?1 AND "open" = 0
+         AND NOT EXISTS (SELECT 1 FROM "paths" WHERE "addedFrom" = ?1)`,
+    )
     .bind(path.id)
     .run();
   if (meta.changes > 0) {
     return { ok: true };
   }
   const still = await db
-    .prepare('SELECT 1 FROM "paths" WHERE "id" = ?')
+    .prepare(
+      `SELECT "open", EXISTS (SELECT 1 FROM "paths" WHERE "addedFrom" = ?1) AS "added"
+       FROM "paths" WHERE "id" = ?1`,
+    )
     .bind(path.id)
+    .first<{ open: number; added: number }>();
+  if (!still) {
+    return { ok: false, reason: "not-found" };
+  }
+  return { ok: false, reason: still.open === 1 ? "open" : "added" };
+}
+
+export type AddVersionResult =
+  /** `added` is false when the User already held a copy of it. */
+  | { readonly ok: true; readonly added: boolean }
+  /**
+   * `not-found`: no such version of another User's Path, which takes in
+   * the User's own and Dream Sequence, neither needing an Add.
+   * `unavailable`: the Path is closed or the version isn't published.
+   */
+  | { readonly ok: false; readonly reason: "not-found" | "unavailable" };
+
+/**
+ * Add version `number` of another User's Path (#192): copy its name,
+ * description, Milestones and Tasks to the User, under their one copy of
+ * the Path, made with the first Add. Adding a version they hold changes
+ * nothing.
+ *
+ * One batch is one transaction. Every insert re-checks that the Path is
+ * open and the version published, so a Close landing first stops it, and
+ * the copy's contents go in only if its version row landed in this batch,
+ * the same pattern as `saveVersion`. The unique indexes on (User, source
+ * Path) and (copy, number) make two Adds at once land one copy.
+ */
+export async function addVersion(
+  db: D1Database,
+  userId: string,
+  pathId: string,
+  number: number,
+): Promise<AddVersionResult> {
+  const source = await db
+    .prepare(
+      `SELECT "path_versions"."id", "paths"."open", "path_versions"."published"
+       FROM "paths"
+       JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id" AND "path_versions"."number" = ?2
+       WHERE "paths"."id" = ?1 AND "paths"."userId" <> ?3 AND "paths"."addedFrom" IS NULL`,
+    )
+    .bind(pathId, number, userId)
+    .first<{ id: string; open: number; published: number }>();
+  if (!source) {
+    return { ok: false, reason: "not-found" };
+  }
+  if (source.open !== 1 || source.published !== 1) {
+    return { ok: false, reason: "unavailable" };
+  }
+
+  // ?1 the version Added, ?2 its copy's id, ?3 the Path, ?4 the User. Each
+  // statement binds as many as its highest number, as D1 requires.
+  const offered = `EXISTS (SELECT 1 FROM "paths"
+    JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
+    WHERE "paths"."id" = ?3 AND "paths"."open" = 1
+      AND "path_versions"."id" = ?1 AND "path_versions"."published" = 1)`;
+  const landed = `EXISTS (SELECT 1 FROM "path_versions" WHERE "id" = ?2)`;
+  /** A source row's id with the copy's version id in place of the source's. */
+  const copied = (column: string) => `?2 || substr(${column}, length(?1) + 1)`;
+  const copyId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const [, version] = await db.batch([
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO "paths" ("id", "userId", "addedFrom", "createdAt", "updatedAt")
+         SELECT ?5, ?4, ?3, ?6, ?6 WHERE ${offered}`,
+      )
+      .bind(source.id, copyId, pathId, userId, crypto.randomUUID(), now),
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO "path_versions" ("id", "pathId", "number", "name", "description", "savedAt", "copiedFrom")
+         SELECT ?2, "copy"."id", "source"."number", "source"."name", "source"."description",
+           "source"."savedAt", "source"."id"
+         FROM "path_versions" AS "source", "paths" AS "copy"
+         WHERE "source"."id" = ?1 AND "copy"."userId" = ?4 AND "copy"."addedFrom" = ?3
+           AND ${offered}`,
+      )
+      .bind(source.id, copyId, pathId, userId),
+    db
+      .prepare(
+        `INSERT INTO "milestones" ("id", "versionId", "position", "name", "description", "doneWhen", "outcome")
+         SELECT ${copied('"id"')}, ?2, "position", "name", "description", "doneWhen", "outcome"
+         FROM "milestones"
+         WHERE "versionId" = ?1 AND ${landed}`,
+      )
+      .bind(source.id, copyId),
+    db
+      .prepare(
+        `INSERT INTO "tasks" ("id", "title")
+         SELECT ${copied('"tasks"."id"')}, "tasks"."title"
+         FROM "milestone_tasks"
+         JOIN "milestones" ON "milestones"."id" = "milestone_tasks"."milestoneId"
+         JOIN "tasks" ON "tasks"."id" = "milestone_tasks"."taskId"
+         WHERE "milestones"."versionId" = ?1 AND ${landed}`,
+      )
+      .bind(source.id, copyId),
+    db
+      .prepare(
+        `INSERT INTO "milestone_tasks" ("milestoneId", "taskId", "position")
+         SELECT ${copied('"milestone_tasks"."milestoneId"')}, ${copied('"milestone_tasks"."taskId"')},
+           "milestone_tasks"."position"
+         FROM "milestone_tasks"
+         JOIN "milestones" ON "milestones"."id" = "milestone_tasks"."milestoneId"
+         WHERE "milestones"."versionId" = ?1 AND ${landed}`,
+      )
+      .bind(source.id, copyId),
+  ]);
+  if (version.meta.changes > 0) {
+    return { ok: true, added: true };
+  }
+
+  const held = await db
+    .prepare(
+      `SELECT 1 FROM "paths"
+       JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
+       WHERE "paths"."userId" = ? AND "paths"."addedFrom" = ? AND "path_versions"."number" = ?`,
+    )
+    .bind(userId, pathId, number)
     .first();
-  return { ok: false, reason: still ? "open" : "not-found" };
+  return held
+    ? { ok: true, added: false }
+    : { ok: false, reason: "unavailable" };
 }
 
 export async function getDraft(

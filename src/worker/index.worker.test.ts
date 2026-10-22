@@ -1826,6 +1826,35 @@ async function savedPath(email: string) {
   return { cookie, path, version };
 }
 
+/**
+ * The Guide's Path with a Milestone and a Task, saved as version 1,
+ * published and open, for another User to Add (#192).
+ */
+async function openGuidesPath() {
+  const cookie = await signIn(TEST_EMAILS.guide);
+  const path = await addPath(cookie);
+  const milestoneId = await addMilestoneOn(cookie, path.id);
+  await addTaskOn(
+    cookie,
+    `/api/paths/${path.id}/milestones/${milestoneId}/tasks`,
+    "Ask five people",
+  );
+  const saved = await callApi("POST", `/api/paths/${path.id}/versions`, cookie);
+  expect(saved.status).toBe(201);
+  const { version } = (await saved.json()) as {
+    version: { id: string; number: number; savedAt: string };
+  };
+  await callApi("PUT", `/api/paths/${path.id}/versions/1/published`, cookie);
+  expect(
+    (await callApi("PUT", `/api/paths/${path.id}/open`, cookie)).status,
+  ).toBe(200);
+  const user = await env.DB.prepare('SELECT "id" FROM "user" WHERE "email" = ?')
+    .bind(TEST_EMAILS.guide)
+    .first<{ id: string }>();
+  if (!user) throw new Error("The Guide has no user row");
+  return { cookie, path, version, userId: user.id };
+}
+
 describe("Journey routes", () => {
   it("GET /journeys lists none, then each Journey with its Path and current Milestone, with the Product", async () => {
     const { cookie, product } = await unstartedProduct(
@@ -2263,58 +2292,173 @@ describe("Journey routes", () => {
 });
 
 describe("Pathfinder and Trailhead routes", () => {
-  it("GET /pathfinder lists Dream Sequence and the User's saved Paths, marking the ones the Product is following and how its last Journey on the rest ended", async () => {
-    const { cookie, path } = await savedPath(TEST_EMAILS.pathfinderRoute);
-    await addPath(cookie, "Never Saved");
-    const { product } = (await (
-      await addProduct(cookie, "A phone-scale app")
-    ).json()) as { product: { id: string; name: string } };
-    const pathfinder = async () => {
+  it("POST /api/paths/:pathId/versions/:number/add gives the User a copy to follow, once, saying nothing about the Guide", async () => {
+    const guide = await openGuidesPath();
+    const { cookie, product } = await unstartedProduct(TEST_EMAILS.addRoute);
+    const pathUrl = `/api/paths/${guide.path.id}`;
+    const add = (number = 1, as = cookie) =>
+      callApi("POST", `${pathUrl}/versions/${number}/add`, as);
+
+    expect((await add(1, "")).status).toBe(401);
+    const added = await add();
+    expect(added.status).toBe(201);
+    const addedText = await added.text();
+    expect(JSON.parse(addedText)).toEqual({});
+    expect((await add()).status).toBe(200);
+
+    const read = await callApi("GET", `${pathUrl}/trailhead`, cookie);
+    const readText = await read.text();
+    const trailhead = JSON.parse(readText) as {
+      version: { id: string };
+    };
+    expect(trailhead).toMatchObject({
+      status: "followable",
+      path: { id: guide.path.id, dreamport: false, own: false },
+      version: { number: 1 },
+      products: [{ id: product.id, journeyId: null }],
+    });
+    expect(trailhead.version.id).not.toBe(guide.version.id);
+    for (const secret of [guide.userId, TEST_EMAILS.guide]) {
+      expect(addedText + readText).not.toContain(secret);
+    }
+
+    // Start, check a Task, Advance and Return, all on the copy.
+    const started = await startJourney(
+      product.id,
+      cookie,
+      trailhead.version.id,
+    );
+    expect(started.status).toBe(201);
+    const { journeyId } = (await started.json()) as { journeyId: string };
+    const state = (await (
+      await callApi("GET", journeyUrl(product.id, journeyId), cookie)
+    ).json()) as { path: { pathId: string }; tasks: { id: string }[] };
+    expect(state.path.pathId).toBe(guide.path.id);
+    const checked = await callApi(
+      "PUT",
+      journeyUrl(product.id, journeyId, `/tasks/${state.tasks[0].id}`),
+      cookie,
+      { done: true },
+    );
+    expect(await checked.json()).toMatchObject({ tasks: [{ done: true }] });
+    for (const step of ["/advance", "/return"]) {
       const res = await callApi(
-        "GET",
-        `/api/products/${product.id}/pathfinder`,
+        "POST",
+        journeyUrl(product.id, journeyId, step),
         cookie,
       );
       expect(res.status).toBe(200);
-      return res.json();
-    };
+    }
+    expect(
+      await (await callApi("GET", `${pathUrl}/trailhead`, cookie)).json(),
+    ).toMatchObject({ products: [{ id: product.id, journeyId }] });
+  });
 
-    expect(await pathfinder()).toEqual({
-      product,
-      paths: [
-        {
-          id: "dream-sequence",
-          name: "Dream Sequence",
-          journeyId: null,
-          lastEnded: null,
-        },
-        { id: path.id, name: path.name, journeyId: null, lastEnded: null },
+  it("POST /api/paths/:pathId/versions/:number/add refuses an unpublished version or a closed Path with 409, and 404s what needs no Add", async () => {
+    const guide = await openGuidesPath();
+    const cookie = await signIn(TEST_EMAILS.addRoute);
+    const add = (pathId: string, number: number, as = cookie) =>
+      callApi("POST", `/api/paths/${pathId}/versions/${number}/add`, as);
+    const unavailable = { error: "This Path is no longer available." };
+
+    expect(
+      (
+        await callApi(
+          "POST",
+          `/api/paths/${guide.path.id}/versions`,
+          guide.cookie,
+        )
+      ).status,
+    ).toBe(201);
+    const unpublished = await add(guide.path.id, 2);
+    expect(unpublished.status).toBe(409);
+    expect(await unpublished.json()).toEqual(unavailable);
+
+    for (const [pathId, number, as] of [
+      [guide.path.id, 1, guide.cookie],
+      ["dream-sequence", 1, cookie],
+      ["no-such-path", 1, cookie],
+      [guide.path.id, 3, cookie],
+    ] as const) {
+      expect((await add(pathId, number, as)).status).toBe(404);
+    }
+
+    await callApi("DELETE", `/api/paths/${guide.path.id}/open`, guide.cookie);
+    const closed = await add(guide.path.id, 1);
+    expect(closed.status).toBe(409);
+    expect(await closed.json()).toEqual(unavailable);
+  });
+
+  it("GET /api/paths lists the User's Original Paths, then Dream Sequence and one entry per Path they've Added", async () => {
+    const guide = await openGuidesPath();
+    const cookie = await signIn(TEST_EMAILS.pathfinderRoute);
+    const mine = await addPath(cookie, "Mine");
+    const copy = (number: number) =>
+      callApi(
+        "POST",
+        `/api/paths/${guide.path.id}/versions/${number}/add`,
+        cookie,
+      );
+    expect((await copy(1)).status).toBe(201);
+    await callApi("POST", `/api/paths/${guide.path.id}/versions`, guide.cookie);
+    await callApi(
+      "PUT",
+      `/api/paths/${guide.path.id}/versions/2/published`,
+      guide.cookie,
+    );
+    expect((await copy(2)).status).toBe(201);
+
+    expect(await (await callApi("GET", "/api/paths", cookie)).json()).toEqual({
+      paths: [{ id: mine.id, name: "Mine", createdAt: mine.createdAt }],
+      added: [
+        { id: "dream-sequence", name: "Dream Sequence" },
+        { id: guide.path.id, name: guide.path.name },
       ],
     });
+  });
 
-    const { journeyId } = (await (
-      await startJourney(product.id, cookie)
-    ).json()) as { journeyId: string };
-    expect(await pathfinder()).toEqual({
-      product,
-      paths: [
-        {
-          id: "dream-sequence",
-          name: "Dream Sequence",
-          journeyId,
-          lastEnded: null,
-        },
-        { id: path.id, name: path.name, journeyId: null, lastEnded: null },
-      ],
+  it("refuses to delete a Path anyone has Added with 409, and never lets the copy into Trailblazer", async () => {
+    const guide = await openGuidesPath();
+    const cookie = await signIn(TEST_EMAILS.addRoute);
+    await callApi("POST", `/api/paths/${guide.path.id}/versions/1/add`, cookie);
+    await callApi("DELETE", `/api/paths/${guide.path.id}/open`, guide.cookie);
+
+    const deleted = await callApi(
+      "DELETE",
+      `/api/paths/${guide.path.id}`,
+      guide.cookie,
+    );
+    expect(deleted.status).toBe(409);
+    expect(await deleted.json()).toEqual({
+      error: "Someone has Added this Path, so it can't be deleted.",
     });
 
-    await finishJourney(product.id, journeyId, cookie);
-    expect(await pathfinder()).toMatchObject({
-      paths: [
-        { id: "dream-sequence", journeyId: null, lastEnded: "completed" },
-        { id: path.id, journeyId: null, lastEnded: null },
-      ],
-    });
+    const copy = await env.DB.prepare(
+      'SELECT "id" FROM "paths" WHERE "addedFrom" = ?',
+    )
+      .bind(guide.path.id)
+      .first<{ id: string }>();
+    if (!copy) throw new Error("no copy");
+    for (const [method, url] of [
+      ["GET", `/api/paths/${copy.id}`],
+      ["GET", `/api/paths/${copy.id}/trailhead`],
+      ["PATCH", `/api/paths/${copy.id}`],
+      ["POST", `/api/paths/${copy.id}/versions`],
+      ["DELETE", `/api/paths/${copy.id}`],
+    ] as const) {
+      const body = method === "GET" ? undefined : {};
+      expect((await callApi(method, url, cookie, body)).status).toBe(404);
+    }
+  });
+
+  it("no longer answers the per-Product Pathfinder", async () => {
+    const { cookie, product } = await unstartedProduct(
+      TEST_EMAILS.pathfinderRoute,
+    );
+    expect(
+      (await callApi("GET", `/api/products/${product.id}/pathfinder`, cookie))
+        .status,
+    ).toBe(404);
   });
 
   it("GET /api/paths/:pathId/trailhead shows the User's own Path with their Products and each one's Journey on it, and 404s a version it doesn't offer", async () => {
@@ -2524,6 +2668,7 @@ describe("Trailblazer routes", () => {
     const cookie = await signIn(TEST_EMAILS.pathsRoutesList);
     expect(await (await callApi("GET", "/api/paths", cookie)).json()).toEqual({
       paths: [],
+      added: [{ id: "dream-sequence", name: "Dream Sequence" }],
     });
 
     const blank = await callApi("POST", "/api/paths", cookie, { name: " " });
@@ -2541,6 +2686,7 @@ describe("Trailblazer routes", () => {
       paths: [
         { id: path.id, name: "Weekend Launch", createdAt: path.createdAt },
       ],
+      added: [{ id: "dream-sequence", name: "Dream Sequence" }],
     });
   });
 
@@ -2932,6 +3078,7 @@ describe("Trailblazer routes", () => {
     }
     expect(await (await callApi("GET", "/api/paths", cookie)).json()).toEqual({
       paths: [],
+      added: [{ id: "dream-sequence", name: "Dream Sequence" }],
     });
   });
 });
@@ -3254,10 +3401,12 @@ describe("request gates, across every route (#154)", () => {
   describe("Path ownership", () => {
     // The Trailhead answers every signed-in User, by design (#205); what it
     // tells a stranger is tested with the Trailhead routes.
+    // So does Add (#192), which is for anyone but the owner.
     const pathScoped = routes.filter(
       (route) =>
         route.path.startsWith("/api/paths/:") &&
-        route.path !== "/api/paths/:pathId/trailhead",
+        route.path !== "/api/paths/:pathId/trailhead" &&
+        route.path !== "/api/paths/:pathId/versions/:number/add",
     );
 
     async function ownedPath() {
