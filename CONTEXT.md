@@ -97,7 +97,8 @@ Guide gives out. Everyone, its Guide included, sees the newest published
 version (or the one they asked for); a Path never published, such as a
 User's own, shows its latest saved version. Another User Adds it there, or
 sees their own copy once they have; a closed Path or an unpublished version
-shows "no longer available" to anyone without a copy. A copy has no page of
+shows "no longer available" to anyone without a copy, and a Path with nothing
+published reads like one that doesn't exist. A copy has no page of
 its own. Its Guide's way into Trailblazer is the only difference for them.
 Dream Sequence's pitch is written by Dreamport; a User's own Path shows its
 description in its place.
