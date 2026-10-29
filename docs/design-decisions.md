@@ -702,3 +702,36 @@ Add an entry only once a sign-off conversation resolves something repeatable
     the Path Status line. Round 3 compared three ways of lining up the
     check box: making it inline, a box column beside a text column, and
     an `ActionCard`.
+
+- **Information the User needs from outside the page's subject goes in a
+  `Notice`, above the action it affects.** A page about one thing (a
+  Path's Milestones and description) sometimes can't offer its action
+  until the User knows something that isn't about that thing and that they
+  wouldn't guess: the Guide has to say yes before the Path can be Added.
+  That is a `Notice` (the icon, the left accent bar, italics), placed
+  directly above the button it explains, not an italic line in the page's
+  flow, numbered steps, or text left for a Dialog to carry. The button
+  that proceeds sits at the right (`.button-group--end`), as every
+  confirming button does. Once the User has acted, the `Notice` changes to
+  say where things stand. It is not for a request that failed (a plain
+  `role="alert"` line under the button), and not for what the page is
+  about. Decided in #215.
+
+- **Request** (a Path version needing the Guide's permission, #215): on the
+  Trailhead of a By Request Path, for a User who doesn't hold the
+  version shown, the right column ends with a `Notice` and, under it, a
+  **Request** button at the right. The `Notice` reads "The Guide of this
+  Path decides who can Add it." then "Request it, and you'll find the
+  answer here when you come back. There are no notifications." Pressing
+  Request opens a `Dialog` titled "Request Version {n}?" every time: "The
+  Guide will see your email address ({address}) with your Request.",
+  then Cancel and **Send Request** at the right. Once sent, the `Notice`
+  reads "You've Requested Version {n}." then "Waiting on the Guide. Come
+  back to this page to see their answer.", and the button reads
+  **Requested**, disabled; a Request can't be withdrawn. After a Deny the
+  User just sees Request again, with no message. Each version is its own
+  Request: a version's own address shows that version's state, and holding
+  v1 doesn't cover v2. Approved shows the version as Added, as #192
+  does. Picked from a prototype on local branch `215-prototype-request`
+  (four variants: an italic line, the `Notice`, numbered steps, a button
+  beside the h1).
