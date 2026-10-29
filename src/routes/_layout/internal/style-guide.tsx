@@ -12,6 +12,7 @@ import ActionCard from "../../../components/ActionCard";
 import Breadcrumbs from "../../../components/Breadcrumbs";
 import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
+import Radio from "../../../components/Radio";
 import AppNav from "../../../components/AppNav";
 import Dialog from "../../../components/Dialog";
 import Dropdown from "../../../components/Dropdown";
@@ -42,6 +43,28 @@ function Snippet({ code }: { code: string }) {
     <pre className="sg-snippet">
       <code>{code}</code>
     </pre>
+  );
+}
+
+function RadioDemo() {
+  const [access, setAccess] = useState("free");
+  return (
+    <div className="radio-group" role="radiogroup" aria-label="Access">
+      {[
+        ["free", "Free"],
+        ["permission", "Permission required"],
+      ].map(([value, label]) => (
+        <label key={value}>
+          <Radio
+            name="sg-access"
+            value={value}
+            checked={access === value}
+            onChange={() => setAccess(value)}
+          />
+          {label}
+        </label>
+      ))}
+    </div>
   );
 }
 
@@ -338,6 +361,7 @@ function StyleGuide() {
         <a href="#button-label-stack">Button label stack</a>
         <a href="#button-group">Button group</a>
         <a href="#checkbox">Check box</a>
+        <a href="#radio">Radio</a>
         <a href="#action-card">Action card</a>
         <a href="#dropdown">Dropdown</a>
         <a href="#dialog">Dialog</a>
@@ -682,9 +706,44 @@ function StyleGuide() {
           Hovering it outlines it the way a button&apos;s hover does. It has no
           label of its own — put it inside one, usually an{" "}
           <code>ActionCard</code> (below), so the whole row is the click target
-          (#140). Disabled, it keeps its look and only refuses the click (a
-          not-allowed cursor): it&apos;s meant for the moment a tick is saving,
-          when greying it out would just flash.
+          (#140). In a plain <code>&lt;label&gt;</code> it sits in the line of
+          text beside it, centred on the capitals, with the same gap before the
+          text as an <code>ActionCard</code> leaves; text that wraps runs under
+          the box (#214). Disabled, it keeps its look and only refuses the click
+          (a not-allowed cursor): it&apos;s meant for the moment a tick is
+          saving, when greying it out would just flash.
+        </p>
+      </Section>
+
+      <Section id="radio" label="Radio">
+        <div className="sg-checkbox-demo">
+          <Radio name="sg-radio-bare" aria-label="Not picked" />
+          <Radio name="sg-radio-bare" aria-label="Picked" defaultChecked />
+        </div>
+        <RadioDemo />
+        <Snippet
+          code={`<div className="radio-group" role="radiogroup" aria-label="Access">\n  <label>\n    <Radio name="access" value="free" checked={access === "free"} onChange={…} />\n    Free\n  </label>\n  …\n</div>`}
+        />
+        <p className="sg-note">
+          <code>&lt;Radio&gt;</code> is a real{" "}
+          <code>&lt;input type=&quot;radio&quot;&gt;</code>, restyled to match{" "}
+          <code>Checkbox</code>: 1.5rem and round, its border turning the accent
+          with an accent dot in the middle when picked. Hovering it outlines it
+          the way a button&apos;s hover does. Use it for one choice of several
+          (a Path&apos;s Access, #214); give every radio in the set the same{" "}
+          <code>name</code>. It has no label of its own: put it inside a{" "}
+          <code>&lt;label&gt;</code> with the choice&apos;s name after it, so
+          the whole label is the click target. It sits in that line of text the
+          way <code>Checkbox</code> does: centred on the capitals, with an{" "}
+          <code>ActionCard</code>&apos;s gap before the text.
+        </p>
+        <p className="sg-note">
+          Put a set&apos;s labels straight inside a <code>.radio-group</code>{" "}
+          with <code>role=&quot;radiogroup&quot;</code> and an{" "}
+          <code>aria-label</code>. It stacks them in a column as wide as the
+          widest choice and stretches each label to it, so every choice is the
+          same size to click; hovering anywhere on a label outlines its radio,
+          as hovering an <code>ActionCard</code> outlines its check box.
         </p>
       </Section>
 

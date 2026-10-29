@@ -1538,10 +1538,11 @@ button.tag-more[data-popup-open] {
 /* `Checkbox` (#140): a real checkbox, restyled — 1.5rem, rounded, filled
    with the accent and a bold check (`.checkbox-mark`, drawn over it) when
    ticked. Hover gets `.button:hover`'s outline, as does hovering the
-   `ActionCard` it sits in. */
+   `ActionCard` it sits in. Inline, so in a plain `<label>` it sits in the
+   line of text beside it (#214; see `label > .checkbox` below). */
 .checkbox {
   position: relative;
-  display: grid;
+  display: inline-grid;
   place-items: center;
   width: 1.5rem;
   height: 1.5rem;
@@ -1591,6 +1592,74 @@ button.tag-more[data-popup-open] {
 
 .checkbox > input:checked + .checkbox-mark {
   opacity: 1;
+}
+
+/* ── Components: radio ────────────────────────────────────── */
+/* `Radio` (#214): a real radio, restyled to `.checkbox`'s size and border,
+   round. Picked, its border turns the accent and an inset ring of the
+   page's cream leaves an accent dot in the middle. Inline, like
+   `.checkbox`, so it sits in the line of its label's text. */
+.radio {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.radio > input {
+  appearance: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0;
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-page-bg);
+  cursor: pointer;
+}
+
+.radio > input:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  box-shadow: inset 0 0 0 4px var(--color-page-bg);
+}
+
+.radio > input:disabled {
+  cursor: not-allowed;
+}
+
+.radio > input:not(:disabled):hover,
+.radio > input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* A set of `Radio`s (#214): their `<label>`s one under another in a
+   column as wide as the widest, each stretched to it, so every choice is
+   the same size to click. Hovering anywhere on a label outlines its
+   radio, as hovering an `ActionCard` outlines its check box. */
+.radio-group {
+  display: grid;
+  justify-content: start;
+  row-gap: var(--space-4);
+}
+
+.radio-group > label {
+  cursor: pointer;
+}
+
+.radio-group > label:hover .radio > input:not(:disabled) {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* A check box or radio straight inside a plain `<label>` (#214): centred
+   on the text's capitals rather than its lowercase letters (`middle`
+   left the text looking high), with `ActionCard`'s gap before the text.
+   Text that wraps runs under the box. An `ActionCard`'s check box sits in
+   its own slot, so this doesn't reach it. */
+label > :is(.checkbox, .radio) {
+  vertical-align: calc(0.35em - 0.75rem);
+  margin-inline-end: var(--space-3);
 }
 
 /* ── Components: action card ───────────────────────────────── */
