@@ -644,3 +644,42 @@ Add an entry only once a sign-off conversation resolves something repeatable
     2rem above them read as too much.
   - Picked over a pencil (yours) or padlock (read-only) icon, and a person
     or open book: the compass stays every Path's icon (#199).
+
+- **Access in the Path editor** (#214): a Guide sees their Path's Access
+  on a line of its own under the version line, at `.text-sm`: "Access:
+  Free" or "Access: Permission required", a middle dot (hidden from
+  screen readers), then a `.link-quiet` **Change Access**. A plain User
+  sees no Access line. Dream Sequence's line would read "Access: Free ·
+  _Dream Sequence is always Free._" with no link.
+  - Change Access opens a `Dialog` titled "Change Access": "Access
+    affects only Users who Add this Path from now on. Users who already
+    Added it keep it.", then a radio for each value, its name in bold
+    and a `.text-sm` line under it ("Any User can Add this Path straight
+    away."; "A User Requests this Path, and you Approve or Deny each
+    Request."), the current one marked "_(current)_". Cancel and **Save**
+    sit at the bottom right. The radios are native `<input type="radio">`:
+    there is no radio component yet.
+  - A change with no consequence saves on one click. Picking Free while
+    Requests are pending shows a `Notice` in the Dialog straight away:
+    "This Path has {n} pending Requests. Making it Free Approves them all:
+    each of those Users gets the version they asked for." Under it is a
+    check box, "Approve the {n} pending Requests", and Save stays disabled
+    until it's ticked. After saving, a `Notice` under the Path's status
+    lines says "{n} Requests were Approved: those Users have the version
+    they asked for."
+  - `Checkbox` in a plain `<label>` (here, and the style guide's example)
+    sits in the line of text: `.checkbox` is `inline-grid` with
+    `vertical-align: middle`, not a block-level `grid`, which left the
+    text out of line with the box. Text that wraps runs under the box.
+    `ActionCard`'s check box is unaffected, since its slot places it.
+  - Picked from a prototype on local branch `214-prototype-access`. Round
+    1 compared five placements: the status line with a button at the
+    page's end, a select with Change Access beside it, #209's Path
+    Settings `Dialog`, a quiet link with a reveal in place, and an Access
+    section. Ian chose a quiet link opening a `Dialog` of radios. Round 2
+    compared how the Approve warning confirms: a `Notice` after Save and
+    then a second Save, a `Notice` on picking with a check box to tick,
+    and Save's own label naming the Approval. It also tried the link on
+    the Path Status line. Round 3 compared three ways of lining up the
+    check box: making it inline, a box column beside a text column, and
+    an `ActionCard`.
