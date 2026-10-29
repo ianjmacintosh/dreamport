@@ -99,7 +99,8 @@ User's own, shows its latest saved version. Another User Adds it there, or
 sees their own copy once they have; a closed Path or an unpublished version
 shows "no longer available" to anyone without a copy, and a Path with nothing
 published reads like one that doesn't exist. A copy has no page of
-its own. Its Guide's way into Trailblazer is the only difference for them.
+its own. Its Guide sees two things nobody else does: a way into
+Trailblazer, and the Path's pending Requests, which open as a list.
 Dream Sequence's pitch is written by Dreamport; a User's own Path shows its
 description in its place.
 _Avoid_: intro, introduction, summary, landing page, version page
@@ -116,7 +117,8 @@ _Avoid_: release, launch, go live, share (as a noun for this)
 **Unpublish**:
 Stop offering one published Path version to Users who haven't Added it.
 Users who already Added it keep their copies, and their Journeys on them
-carry on. If it was the newest, the Path's Trailhead falls back to the next
+carry on. Pending Requests for it are Denied, and the Guide is told how
+many. If it was the newest, the Path's Trailhead falls back to the next
 newest published version; if it was the only one, the Path closes. The
 mirror of Publish.
 _Avoid_: retract, withdraw, take down, hide
@@ -131,7 +133,9 @@ _Avoid_: publish (for this), launch, go live
 Stop a whole Path accepting new Adds ("Close This Path"), like a trail
 closed to new hikers while those already on it finish. Users who Added it
 keep their copies, and their Journeys on them carry on; its Trailhead still
-shows them their copy. Nothing reopens it but its Guide Opening it again.
+shows them their copy. Closing it Denies every pending Request, and the
+Guide is told how many. Nothing
+reopens it but its Guide Opening it again.
 The mirror of Open, and how a Guide retires a Path someone has Added.
 _Avoid_: unpublish (for this), archive, retire, delete (for this)
 
@@ -142,9 +146,43 @@ is yours, it doesn't change when the Guide publishes a later version (no
 later versions reach you, for now), and you can't change it either. Any
 published version can be Added, and you can hold copies of several versions
 of the same Path. Nobody starts a Journey on another User's Path without
-Adding it first. Adding is free for a free Path; a Purchase Adds the
-version it pays for.
+Adding it first. A User Adds a Path whose Access is Free themselves; on a
+Path whose Access is Permission required, they Request it and the Guide's
+Approve Adds it for them. Later, a Purchase Adds the version it pays for.
 _Avoid_: import, save, subscribe, install, clone, fork, follow (for this)
+
+**Access** _(working term)_:
+Whether a User may Add a Path straight away or has to ask first. It's set
+for the whole Path, not per version, by its Guide in Trailblazer, beside
+Open and Close. Two values for now: **Free**, where any User Adds it, and
+**Permission required**, where a User Requests it and its Guide decides. A
+Path's Access is Free until its Guide changes it, and Dream Sequence's is
+always Free. Changing it affects only later Adds and Requests: copies
+already Added stay with their Users. Changing it to Free Approves every
+pending Request, so the Guide is warned how many first. There is no
+payment inside Dreamport yet: any a Guide asks for happens between them
+and the User, and Dreamport plays no part in a dispute over it.
+_Avoid_: visibility, privacy, public, private (Private space means
+something else)
+
+**Request** _(working term)_:
+A User asking a Path's Guide for permission to Add one published version
+of it, the one shown on the Trailhead they asked from, when the Path's
+Access is Permission required. Like asking for one edition of a book: each
+version is its own Request, even for a User who already holds a copy of
+another. Every time, before it's sent, the User is warned that the Guide
+will see their email address, the one thing about a User a Guide ever
+sees. Until the Guide decides, the User sees it as Requested, and can't
+withdraw it; they find out by coming back to the page, not by being
+notified. A User can have Requests pending for several versions at once,
+but asking again for a version already Requested changes nothing. The
+Guide sees every pending Request for every version in one list, oldest
+first, each with the requester's email address and its version, and
+**Approves** one, which Adds that version for the User, or **Denies** it,
+which leaves no trace: the User can Request again, and the Guide sees only
+pending Requests, never past ones. Neither needs confirming.
+_Avoid_: application, invite (an invitation is the Guide choosing, a
+different thing)
 
 **Available Paths**:
 Every Path a User can start a Journey on: Dream Sequence, their own Paths
@@ -166,9 +204,10 @@ Tasks together)
 **Guide**:
 A User with permission to share and sell Paths they made, so that other
 Users can follow them. Becoming one is by invitation at first. Neither side
-sees the other: a Guide sees none of the work of Users who've Added their
-Path, and those Users see nothing about the Guide (no name, no email
-address).
+sees the other's work: a Guide sees none of the work of Users who've Added
+their Path, and those Users see nothing about the Guide (no name, no email
+address). The one exception is a Request, which shows the Guide the
+requester's email address.
 _Avoid_: coach, author, creator, instructor, seller, maker
 
 **Admin**:
