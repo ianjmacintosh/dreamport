@@ -653,12 +653,13 @@ Add an entry only once a sign-off conversation resolves something repeatable
   _Dream Sequence is always Free._" with no link.
   - Change Access opens a `Dialog` titled "Change Access": "Access
     affects only Users who Add this Path from now on. Users who already
-    Added it keep it.", then a radio for each value, its name in bold
-    and a `.text-sm` line under it ("Any User can Add this Path straight
-    away."; "A User Requests this Path, and you Approve or Deny each
-    Request."), the current one marked "_(current)_". Cancel and **Save**
-    sit at the bottom right. The radios are native `<input type="radio">`:
-    there is no radio component yet.
+    Added it keep it.", then a `.radio-group` with a `Radio` for each
+    value (below). Each label holds the value's name in bold, the current
+    one marked "_(current)_", and a `.text-sm` hint on its own line under
+    it ("Any User can Add this Path straight away."; "A User Requests this
+    Path, and you Approve or Deny each Request."). The hint is inside the
+    label, so it is part of what's clicked and sets the group's width.
+    Cancel and **Save** sit at the bottom right.
   - A change with no consequence saves on one click. Picking Free while
     Requests are pending shows a `Notice` in the Dialog straight away:
     "This Path has {n} pending Requests. Making it Free Approves them all:
@@ -668,10 +669,23 @@ Add an entry only once a sign-off conversation resolves something repeatable
     lines says "{n} Requests were Approved: those Users have the version
     they asked for."
   - `Checkbox` in a plain `<label>` (here, and the style guide's example)
-    sits in the line of text: `.checkbox` is `inline-grid` with
-    `vertical-align: middle`, not a block-level `grid`, which left the
-    text out of line with the box. Text that wraps runs under the box.
-    `ActionCard`'s check box is unaffected, since its slot places it.
+    sits in the line of text: `.checkbox` is `inline-grid`, not a
+    block-level `grid`, which left the text out of line with the box.
+    Straight inside a `<label>`, it is centred on the text's capitals
+    (`vertical-align: middle` centred it on the lowercase letters, and the
+    text looked high) with `ActionCard`'s gap, `--space-3`, before the
+    text, picked over `--space-2` to match. Text that wraps runs under the
+    box. `ActionCard`'s check box is unaffected, since its slot places it.
+  - `Radio` is a new Component for one choice of several: a real
+    `<input type="radio">` restyled to `Checkbox`'s 1.5rem and border,
+    round, its border turning the accent around an accent dot when picked,
+    with the same hover outline. Like `Checkbox` it has no label of its
+    own and sits inline in a `<label>`, the choice's name after it, lined
+    up and spaced the way `Checkbox` is. A set's labels go straight inside
+    a `.radio-group` (`role="radiogroup"`): one column as wide as the
+    widest choice, each label stretched to it, so every choice is the same
+    size to click, and hovering anywhere on a label outlines its radio.
+    See the style guide's "Radio" section (Ian asked for it in #214).
   - Picked from a prototype on local branch `214-prototype-access`. Round
     1 compared five placements: the status line with a button at the
     page's end, a select with Change Access beside it, #209's Path
