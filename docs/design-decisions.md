@@ -756,7 +756,8 @@ Add an entry only once a sign-off conversation resolves something repeatable
   "Approving…" while it runs. The row leaves the list once the server
   confirms, and that is the only sign it worked: no message names the
   decision. If it fails, the row stays and a `role="alert"` line under
-  its buttons says why, as for any action that didn't go through (#172). An empty list reads "No one is waiting." Done closes it.
+  its buttons says why, as for any action that didn't go through
+  (#172). An empty list reads "No one is waiting." Done closes it.
   Picked from a prototype on local branch `216-prototype-request-list`
   (four variants: this button, a link in the version line, a `Notice`
   above the version line, a line and button at the end of the right
