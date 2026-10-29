@@ -656,10 +656,11 @@ Add an entry only once a sign-off conversation resolves something repeatable
   hidden from screen readers) with no timestamp, then Deny and Approve,
   both secondary, as Manage Versions' row buttons are. Each acts on one
   click, with no confirmation, relabelling to "Denying…" or
-  "Approving…" while it runs; then the row leaves the list and a
-  `Notice` at the top of the Dialog names the last decision ("Approved
-  {email address} for Version {n}."), replaced by each one after it.
-  An empty list reads "No one is waiting." Done closes it. Picked from a
-  prototype on local branch `216-prototype-request-list` (four variants:
-  this button, a link in the version line, a `Notice` above the version
-  line, a line and button at the end of the right column).
+  "Approving…" while it runs. The row leaves the list once the server
+  confirms, and that is the only sign it worked: no message names the
+  decision. If it fails, the row stays and a `Notice` under its buttons
+  says why. An empty list reads "No one is waiting." Done closes it.
+  Picked from a prototype on local branch `216-prototype-request-list`
+  (four variants: this button, a link in the version line, a `Notice`
+  above the version line, a line and button at the end of the right
+  column); its `Notice` naming each decision was dropped at sign-off.
