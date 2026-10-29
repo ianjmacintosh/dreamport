@@ -741,3 +741,22 @@ Add an entry only once a sign-off conversation resolves something repeatable
   were Denied: this Path is closed." after Close, and after Unpublish
   "{n} Requests for it were Denied." (or "{n} Requests were Denied." when
   it closed the Path too). Nothing is added when none were pending.
+
+- **The Guide's Request list** (#216): on the Trailhead of their own
+  Permission-required Path, the Guide alone sees **Requests ({n})**, a
+  secondary button beside Edit Path at the h1's end (a `.button-group`
+  in the `.heading-row`, Requests first). It shows the count even at
+  zero, "Requests (0)", so the Guide can always see whether anyone is
+  waiting. A Free Path shows no Requests button. It opens a `Dialog`
+  titled "Requests": every pending Request for every version, oldest
+  first, as `.list` rows, "{email address} · Version {n}" (the dot
+  hidden from screen readers) with no timestamp, then Deny and Approve,
+  both secondary, as Manage Versions' row buttons are. Each acts on one
+  click, with no confirmation, relabelling to "Denying…" or
+  "Approving…" while it runs; then the row leaves the list and a
+  `Notice` at the top of the Dialog names the last decision ("Approved
+  {email address} for Version {n}."), replaced by each one after it.
+  An empty list reads "No one is waiting." Done closes it. Picked from a
+  prototype on local branch `216-prototype-request-list` (four variants:
+  this button, a link in the version line, a `Notice` above the version
+  line, a line and button at the end of the right column).
