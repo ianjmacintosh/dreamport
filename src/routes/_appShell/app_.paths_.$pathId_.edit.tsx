@@ -1001,11 +1001,6 @@ function MilestoneInputs({
   );
 }
 
-/**
- * Opened from the Edit Path Dialog, on top of it. The new Milestone joins
- * that Dialog's list and is sent with Update Path, so adding sends
- * nothing.
- */
 const ACCESS_CHOICES: { value: Access; name: string; hint: string }[] = [
   {
     value: "free",
@@ -1136,6 +1131,11 @@ function ChangeAccessForm({
   );
 }
 
+/**
+ * Opened from the Edit Path Dialog, on top of it. The new Milestone joins
+ * that Dialog's list and is sent with Update Path, so adding sends
+ * nothing.
+ */
 function DeletePathDialog({
   open,
   path,
