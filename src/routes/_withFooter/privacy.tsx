@@ -11,7 +11,7 @@ function Privacy() {
     <>
       <header>
         <h1>Privacy Policy</h1>
-        <p className="text-sm">Last updated: September 30, 2026</p>
+        <p className="text-sm">Last updated: October 30, 2026</p>
       </header>
 
       <section>
@@ -68,7 +68,9 @@ function Privacy() {
           bot-protection challenge on the sign-in page, and an email delivery
           provider sends sign-in codes. They process information only as needed
           to provide those services. Information may also be disclosed if
-          required by law.
+          required by law. If you request access to a Path that requires
+          approval to access, the Guide can see the email address you use to log
+          into Dreamport.
         </p>
       </section>
 
