@@ -6,13 +6,16 @@ import type { WorkerEnv } from "./env";
 import { isGuide } from "./guides";
 import {
   addTask,
+  approveRequest,
   closePath,
   deleteMilestone,
   deletePath,
   deleteTask,
+  denyRequest,
   discardChanges,
   getDraft,
   getPath,
+  listRequests,
   MILESTONES_AND_TASKS_PER_PATH,
   openPath,
   type OwnedPath,
@@ -79,6 +82,8 @@ const guidesOnly = createMiddleware<PathEnv>(async (c, next) => {
 pathRoutes.use("/versions/:number/published", guidesOnly);
 pathRoutes.use("/open", guidesOnly);
 pathRoutes.use("/access", guidesOnly);
+pathRoutes.use("/requests/*", guidesOnly);
+pathRoutes.use("/requests", guidesOnly);
 
 /** A version number from the address: a positive whole number, or null. */
 export function versionNumber(raw: string): number | null {
@@ -239,6 +244,50 @@ pathRoutes.put("/access", async (c) => {
 
   const approved = await setAccess(c.env.DB, c.var.path, access);
   return c.json({ access, approved }, 200);
+});
+
+/**
+ * Every pending Request on the Path, for every version, oldest first (#216):
+ * each its id, the requester's email address and the version, and nothing
+ * else about them.
+ */
+pathRoutes.get("/requests", async (c) => {
+  return c.json({ requests: await listRequests(c.env.DB, c.var.path) });
+});
+
+/**
+ * Approve a pending Request (#216): Add its version for its User, through
+ * the same Add as ever. 404 if it's no longer pending; 409 where Add would
+ * refuse it, leaving the Request.
+ */
+pathRoutes.post("/requests/:requestId/approve", async (c) => {
+  const approved = await approveRequest(
+    c.env.DB,
+    c.var.path,
+    c.req.param("requestId"),
+  );
+  if (!approved.ok && approved.reason === "gone") {
+    return c.json({ error: "That Request is no longer pending." }, 404);
+  }
+  if (!approved.ok) {
+    return c.json({ error: "This Path is no longer available." }, 409);
+  }
+
+  return c.json({}, 200);
+});
+
+/** Deny a pending Request (#216), leaving no trace. 404 if it's no longer pending. */
+pathRoutes.post("/requests/:requestId/deny", async (c) => {
+  const denied = await denyRequest(
+    c.env.DB,
+    c.var.path,
+    c.req.param("requestId"),
+  );
+  if (!denied) {
+    return c.json({ error: "That Request is no longer pending." }, 404);
+  }
+
+  return c.json({}, 200);
 });
 
 /**

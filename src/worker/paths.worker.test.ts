@@ -41,6 +41,9 @@ import {
   publishVersion,
   reorderTasks,
   requestVersion,
+  listRequests,
+  approveRequest,
+  denyRequest,
   saveVersion,
   setAccess,
   TASK_TITLE_MAX_LENGTH,
@@ -1928,6 +1931,97 @@ describe("Requesting a version (#215)", () => {
       .bind(path.id)
       .run();
     expect(await pending(path.id)).toEqual([]);
+  });
+
+  it("lists the pending Requests oldest first, with the requester's email address and the version, and no user id", async () => {
+    const { path } = await byRequestPath(2);
+    expect(await listRequests(env.DB, path)).toEqual([]);
+
+    await requestVersion(env.DB, REQUESTER_TWO_ID, path.id, 2);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 1);
+
+    const listed = await listRequests(env.DB, path);
+    expect(listed.map(({ email, number }) => ({ email, number }))).toEqual([
+      { email: TEST_EMAILS.pathsModuleRequesterTwo, number: 2 },
+      { email: TEST_EMAILS.pathsModuleRequester, number: 1 },
+    ]);
+    expect(Object.keys(listed[0]).sort()).toEqual(["email", "id", "number"]);
+  });
+
+  it("Approves one Request: Adds that version for its User and nothing else, and the Request is gone", async () => {
+    const { path } = await byRequestPath(2);
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 1);
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 2);
+    const [first] = await listRequests(env.DB, path);
+
+    expect(await approveRequest(env.DB, path, first.id)).toEqual({ ok: true });
+
+    const status = async (userId: string, n: number) =>
+      (await getTrailhead(env.DB, userId, path.id, n))?.status;
+    expect(await status(REQUESTER_ID, first.number)).toBe("followable");
+    const other = first.number === 1 ? 2 : 1;
+    expect(await status(REQUESTER_ID, other)).toBe("offered");
+    expect((await listRequests(env.DB, path)).map((r) => r.number)).toEqual([
+      other,
+    ]);
+    expect(await approveRequest(env.DB, path, first.id)).toEqual({
+      ok: false,
+      reason: "gone",
+    });
+  });
+
+  it("Denies one Request and leaves no trace: the User can Request again", async () => {
+    const { path } = await byRequestPath(1);
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 1);
+    await requestVersion(env.DB, REQUESTER_TWO_ID, path.id, 1);
+    const listed = await listRequests(env.DB, path);
+    const theirs = listed.find(
+      (r) => r.email === TEST_EMAILS.pathsModuleRequester,
+    )!;
+
+    expect(await denyRequest(env.DB, path, theirs.id)).toBe(true);
+    expect(await denyRequest(env.DB, path, theirs.id)).toBe(false);
+    expect(await pending(path.id)).toEqual([
+      { userId: REQUESTER_TWO_ID, number: 1 },
+    ]);
+    expect((await getTrailhead(env.DB, REQUESTER_ID, path.id, 1))?.status).toBe(
+      "offered",
+    );
+    expect(await requestVersion(env.DB, REQUESTER_ID, path.id, 1)).toEqual({
+      ok: true,
+      requested: true,
+    });
+  });
+
+  it("decides only Requests on the Guide's own Path", async () => {
+    const { path } = await byRequestPath(1);
+    const elsewhere = await pathOf(REQUESTER_TWO_ID, "Other Path", [BAKE]);
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 1);
+    const [request] = await listRequests(env.DB, path);
+
+    expect(await denyRequest(env.DB, elsewhere, request.id)).toBe(false);
+    expect(await approveRequest(env.DB, elsewhere, request.id)).toEqual({
+      ok: false,
+      reason: "gone",
+    });
+    expect(await pending(path.id)).toHaveLength(1);
+  });
+
+  it("refuses to Approve what Add would refuse, leaving the Request", async () => {
+    const { path } = await byRequestPath(1);
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 1);
+    const [request] = await listRequests(env.DB, path);
+    // Bypass Close, which would Deny the Request first.
+    await env.DB.prepare('UPDATE "paths" SET "open" = 0 WHERE "id" = ?')
+      .bind(path.id)
+      .run();
+
+    expect(await approveRequest(env.DB, path, request.id)).toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+    expect(await pending(path.id)).toHaveLength(1);
   });
 });
 

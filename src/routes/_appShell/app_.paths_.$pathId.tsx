@@ -62,6 +62,8 @@ interface Shown {
   };
   /** `request` when a User has to Request the Path rather than Add it (#214). */
   access: "everyone" | "request";
+  /** A Guide's own Path only: how many Requests are waiting on it (#216). */
+  pendingRequests?: number;
   /** Offered only: whether the User has a Request pending for this version (#215). */
   requested?: boolean;
   /** Newest first. */
@@ -75,6 +77,13 @@ type Trailhead =
   | { status: "unavailable"; path: { id: string; name: string } }
   | Shown;
 
+/** One pending Request in the Guide's list (#216). */
+interface PendingRequest {
+  id: string;
+  email: string;
+  number: number;
+}
+
 /** Why Start on Path didn't start, shown after it's pressed. */
 type Refusal = "no-products" | "on-path";
 
@@ -84,6 +93,9 @@ const START_JOURNEY_FAILED =
   "We couldn't start on this Path. Try again in a moment.";
 const ADD_FAILED = "We couldn't add this Path. Try again in a moment.";
 const REQUEST_FAILED = "We couldn't send your Request. Try again in a moment.";
+const REQUESTS_FAILED = "We couldn't load the Requests. Try again in a moment.";
+const DECISION_FAILED = "We couldn't save that. Try again in a moment.";
+const NO_LONGER_PENDING = "That Request is no longer pending.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -180,6 +192,16 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState("");
   const product = products?.find((p) => p.id === productId);
+  const [isListingRequests, setIsListingRequests] = useState(false);
+  const [requests, setRequests] = useState<PendingRequest[] | null>(null);
+  const [requestsError, setRequestsError] = useState("");
+  const [deciding, setDeciding] = useState<{
+    id: string;
+    verb: "approve" | "deny";
+  } | null>(null);
+  const [decisionErrors, setDecisionErrors] = useState<Record<string, string>>(
+    {},
+  );
 
   /** Drop `?versions` without a new history entry, keeping the version shown. */
   function closeVersions() {
@@ -189,6 +211,67 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
       search: { version: search.version },
       replace: true,
     });
+  }
+
+  /** Open the Guide's Request list, loading it fresh. */
+  async function openRequests() {
+    setRequests(null);
+    setRequestsError("");
+    setDecisionErrors({});
+    setIsListingRequests(true);
+    try {
+      const res = await fetchWithTimeout(`/api/paths/${path.id}/requests`, {});
+      if (!res.ok) {
+        setRequestsError(REQUESTS_FAILED);
+        return;
+      }
+      setRequests(
+        ((await res.json()) as { requests: PendingRequest[] }).requests,
+      );
+    } catch {
+      setRequestsError(CONNECTION_FAILED);
+    }
+  }
+
+  /** Close the list, then reload the page so the count is the server's. */
+  async function closeRequests() {
+    setIsListingRequests(false);
+    await router.invalidate();
+    setRequests(null);
+  }
+
+  /** Approve or Deny one Request: its row leaves once the server confirms. */
+  async function decide(request: PendingRequest, verb: "approve" | "deny") {
+    setDecisionErrors((errors) => ({ ...errors, [request.id]: "" }));
+    setDeciding({ id: request.id, verb });
+    const fail = (message: string) =>
+      setDecisionErrors((errors) => ({ ...errors, [request.id]: message }));
+    try {
+      const failed = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(
+          `/api/paths/${path.id}/requests/${request.id}/${verb}`,
+          { method: "POST", headers: { "content-type": "application/json" } },
+        );
+        if (res.status === 404) {
+          return NO_LONGER_PENDING;
+        }
+        if (res.status === 409) {
+          return ((await res.json()) as { error: string }).error;
+        }
+        return res.ok ? null : DECISION_FAILED;
+      });
+      if (failed) {
+        fail(failed);
+        return;
+      }
+      setRequests(
+        (current) => current?.filter(({ id }) => id !== request.id) ?? null,
+      );
+    } catch {
+      fail(CONNECTION_FAILED);
+    } finally {
+      setDeciding(null);
+    }
   }
 
   /** Add the version shown, then load the page again to show the copy. */
@@ -293,9 +376,20 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
       {path.own ? (
         <div className="heading-row">
           <h1>{path.name}</h1>
-          <Link href={`${pathHref}/edit`} className="button button--secondary">
-            Edit Path
-          </Link>
+          <div className="button-group">
+            {trailhead.pendingRequests !== undefined &&
+              trailhead.access === "request" && (
+                <Button variant="secondary" onClick={() => void openRequests()}>
+                  Requests ({requests?.length ?? trailhead.pendingRequests})
+                </Button>
+              )}
+            <Link
+              href={`${pathHref}/edit`}
+              className="button button--secondary"
+            >
+              Edit Path
+            </Link>
+          </div>
         </div>
       ) : (
         <h1>{path.name}</h1>
@@ -509,6 +603,69 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
           >
             <Button.State name="ready">Send Request</Button.State>
             <Button.State name="pending">Sending…</Button.State>
+          </Button>
+        </div>
+      </Dialog>
+      <Dialog
+        open={isListingRequests}
+        onOpenChange={(open) => {
+          if (!open) {
+            void closeRequests();
+          }
+        }}
+        title="Requests"
+      >
+        {requestsError ? (
+          <p role="alert">{requestsError}</p>
+        ) : requests === null ? (
+          <p>Loading…</p>
+        ) : requests.length === 0 ? (
+          <p>No one is waiting.</p>
+        ) : (
+          <ul className="list">
+            {requests.map((request) => {
+              const isBusy = deciding !== null;
+              const mine = deciding?.id === request.id ? deciding.verb : null;
+              return (
+                <li key={request.id} className="list-row">
+                  <span className="list-row-name">
+                    {request.email}
+                    <span aria-hidden="true"> · </span>
+                    Version {request.number}
+                  </span>
+                  <div className="list-row-action">
+                    <div className="button-group">
+                      <Button
+                        variant="secondary"
+                        disabled={isBusy}
+                        state={mine === "deny" ? "pending" : "ready"}
+                        onClick={() => void decide(request, "deny")}
+                      >
+                        <Button.State name="ready">Deny</Button.State>
+                        <Button.State name="pending">Denying…</Button.State>
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={isBusy}
+                        state={mine === "approve" ? "pending" : "ready"}
+                        onClick={() => void decide(request, "approve")}
+                      >
+                        <Button.State name="ready">Approve</Button.State>
+                        <Button.State name="pending">Approving…</Button.State>
+                      </Button>
+                    </div>
+                    {decisionErrors[request.id] && (
+                      <p role="alert">{decisionErrors[request.id]}</p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="button-group button-group--end">
+          <Button variant="secondary" onClick={() => void closeRequests()}>
+            Done
           </Button>
         </div>
       </Dialog>

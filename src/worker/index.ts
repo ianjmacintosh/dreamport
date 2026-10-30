@@ -28,6 +28,7 @@ import { pathRoutes, versionNumber } from "./path-routes";
 import { productsOnPath } from "./journeys";
 import {
   addVersion,
+  countRequests,
   requestVersion,
   createPath,
   getTrailhead,
@@ -435,6 +436,12 @@ export function createApp(deps: AppDeps = {}) {
         milestones: version.milestones,
       },
       access: trailhead.access,
+      // Only a Guide, on their own Path, hears how many are waiting (#216).
+      ...(trailhead.status === "followable" &&
+        trailhead.owner === "user" &&
+        isGuide(c.env, session.user.email) && {
+          pendingRequests: await countRequests(c.env.DB, pathId),
+        }),
       ...(trailhead.status === "offered" && {
         requested: trailhead.requested,
       }),
