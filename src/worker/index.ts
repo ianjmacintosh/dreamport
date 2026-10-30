@@ -28,6 +28,7 @@ import { pathRoutes, versionNumber } from "./path-routes";
 import { productsOnPath } from "./journeys";
 import {
   addVersion,
+  requestVersion,
   createPath,
   getTrailhead,
   listAddedPaths,
@@ -434,6 +435,9 @@ export function createApp(deps: AppDeps = {}) {
         milestones: version.milestones,
       },
       access: trailhead.access,
+      ...(trailhead.status === "offered" && {
+        requested: trailhead.requested,
+      }),
       versions: versions.map(({ number, savedAt }) => ({ number, savedAt })),
       newestNumber: versions[0].number,
       // A copy's Journeys are on the copy, under its own id.
@@ -486,6 +490,45 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     return c.json({}, added.added ? 201 : 200);
+  });
+
+  /**
+   * Request version `:number` of another User's By Request Path (#215):
+   * 201 with a Request made, 200 if one was already pending. 409 for a
+   * closed Path, an unpublished version, an Everyone Path (Add it instead)
+   * or a version the User holds; 404 for an unknown one, and for the User's
+   * own Path or Dream Sequence. Ahead of `pathRoutes`, like Add.
+   */
+  app.post("/api/paths/:pathId/versions/:number/request", async (c) => {
+    const session = await currentSession(c.env, c.req.raw);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+
+    const number = versionNumber(c.req.param("number"));
+    const requested =
+      number !== null
+        ? await requestVersion(
+            c.env.DB,
+            session.user.id,
+            c.req.param("pathId"),
+            number,
+          )
+        : null;
+    if (!requested || (!requested.ok && requested.reason === "not-found")) {
+      return c.json({ error: "Not found" }, 404);
+    }
+    if (!requested.ok && requested.reason === "everyone") {
+      return c.json({ error: "This Path is Everyone. Add it instead." }, 409);
+    }
+    if (!requested.ok && requested.reason === "held") {
+      return c.json({ error: "You already have this version." }, 409);
+    }
+    if (!requested.ok) {
+      return c.json({ error: "This Path is no longer available." }, 409);
+    }
+
+    return c.json({}, requested.requested ? 201 : 200);
   });
 
   // Every route about one Path: session and ownership checked once, in

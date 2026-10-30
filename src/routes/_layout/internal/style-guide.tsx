@@ -880,7 +880,11 @@ function StyleGuide() {
           Path&apos;s Trailhead uses it for a Path that&apos;s no longer
           available, and for why Start on Path didn&apos;t start (#205). Not for
           a request that failed: that stays a plain{" "}
-          <code>role=&quot;alert&quot;</code> line under its buttons.
+          <code>role=&quot;alert&quot;</code> line under its buttons. Use it
+          when the User needs something from outside the page&apos;s subject to
+          take their next step, such as the Guide having to say yes before a
+          Path can be Added (#215): put it directly above the button it
+          explains, with that button at the right.
         </p>
       </Section>
 

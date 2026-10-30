@@ -200,6 +200,12 @@ export const TEST_EMAILS = {
   pathsModuleAdder: "delivered+paths-module-adder@resend.dev",
   /** Adds a Path, then makes the most Paths of their own (#192). */
   pathsModuleAdderCap: "delivered+paths-module-adder-cap@resend.dev",
+  /** Requests `pathsModulePublisher`'s By Request Paths (#215). */
+  pathsModuleRequester: "delivered+paths-module-requester@resend.dev",
+  /** The Guide whose Paths those two Request (#215). */
+  pathsModuleRequestsGuide: "delivered+paths-module-requests-guide@resend.dev",
+  /** A second Requester, so the Guide's Paths hold Requests from two Users (#215). */
+  pathsModuleRequesterTwo: "delivered+paths-module-requester-two@resend.dev",
 
   // --- Seam 1: the Journey routes (#137-#140, #170), one test each ---
   /** Lists a Product's Journeys, none and then one. */
@@ -226,6 +232,8 @@ export const TEST_EMAILS = {
   worksheetsJourneyStatus: "delivered+worksheets-journey-status@resend.dev",
   /** Saves the Product Summary on an unknown Journey (404), a bad body (400), then a good one. */
   worksheetsSave: "delivered+worksheets-save@resend.dev",
+  /** A third Requester on the Request route's tests (#215). */
+  requestRoute: "delivered+request-route@resend.dev",
   /** Checks off a Task on an unknown Journey (404), a bad body (400), then a good one. */
   tasksCheckOff: "delivered+tasks-check-off@resend.dev",
   /** Adds the Guide's Path and follows their copy of it (#192). */
