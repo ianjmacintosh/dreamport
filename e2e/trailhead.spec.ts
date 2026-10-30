@@ -305,7 +305,7 @@ test("a Guide changes a Path's Access in the editor, and another User's Trailhea
   await visitorContext.close();
 });
 
-test("a User Requests a By Request Path after the email warning, sees Requested after a reload, and the Guide Approving by switching to Everyone gives them the version", async ({
+test("a User Requests a By Request Path after the email warning, sees Requested after a reload, and the Guide, whose editor was open from before, is warned of it and Approves it by switching to Everyone", async ({
   browser,
   page,
 }) => {
@@ -315,6 +315,9 @@ test("a User Requests a By Request Path after the email warning, sees Requested 
   await path.api("PUT", `/api/paths/${path.id}/versions/1/published`);
   await path.api("PUT", `/api/paths/${path.id}/open`);
   await path.api("PUT", `/api/paths/${path.id}/access`, { access: "request" });
+  // Loaded before the Request, so its pending count starts at 0.
+  await page.goto(`/app/paths/${path.id}/edit`);
+  await expect(page.getByText("Access: By Request")).toBeVisible();
 
   const visitorContext = await browser.newContext();
   const visitor = await visitorContext.newPage();
@@ -337,12 +340,11 @@ test("a User Requests a By Request Path after the email warning, sees Requested 
   await visitor.reload();
   await expect(requested).toBeDisabled();
 
-  await page.goto(`/app/paths/${path.id}/edit`);
   await page.getByRole("button", { name: "Change Access" }).click();
   const dialog = page.getByRole("dialog", { name: "Change Access" });
   await dialog.getByRole("radio", { name: /^Everyone/ }).check();
   await expect(dialog.getByRole("button", { name: "Save" })).toBeDisabled();
-  await dialog.getByLabel("Approve the 1 Request pending").check();
+  await dialog.getByLabel("Approve the 1 pending Request").check();
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(
     page.getByText(
@@ -459,4 +461,78 @@ test("a Guide Denies one Request and Approves another from the Requests list, an
       .locator('[aria-current="step"]'),
   ).toContainText("Grow");
   await approved.context.close();
+});
+
+test("a Guide's failed Approve keeps its row with the reason under its buttons, and another row can be decided while one is still running", async ({
+  browser,
+  page,
+}) => {
+  const pathName = `Failing Launch ${Date.now()}`;
+  await signIn(page, TEST_EMAILS.guide);
+  const path = await savedPathThroughApi(page, pathName);
+  for (const [method, url, data] of [
+    ["PUT", `/api/paths/${path.id}/versions/1/published`],
+    ["PUT", `/api/paths/${path.id}/open`],
+    ["PUT", `/api/paths/${path.id}/access`, { access: "request" }],
+  ] as const) {
+    expect((await path.api(method, url, data)).ok()).toBe(true);
+  }
+  for (const email of [
+    TEST_EMAILS.e2eRequestFailed,
+    TEST_EMAILS.e2eRequestWaiting,
+  ]) {
+    const context = await browser.newContext();
+    const user = await context.newPage();
+    await signIn(user, email);
+    const sent = await user.request.fetch(
+      `/api/paths/${path.id}/versions/1/request`,
+      { method: "POST", headers: { origin: new URL(user.url()).origin } },
+    );
+    expect(sent.status()).toBe(201);
+    await context.close();
+  }
+
+  await page.goto(`/app/paths/${path.id}`);
+  await page.getByRole("button", { name: "Requests (2)" }).click();
+  const list = page.getByRole("dialog", { name: "Requests" });
+  const failedRow = list
+    .getByRole("listitem")
+    .filter({ hasText: TEST_EMAILS.e2eRequestFailed });
+  const waitingRow = list
+    .getByRole("listitem")
+    .filter({ hasText: TEST_EMAILS.e2eRequestWaiting });
+
+  await page.route(
+    "**/requests/*/approve",
+    (route) => route.fulfill({ status: 500, body: "" }),
+    { times: 1 },
+  );
+  await failedRow.getByRole("button", { name: "Approve" }).click();
+  await expect(failedRow.getByRole("alert")).toHaveText(
+    "We couldn't save that. Try again in a moment.",
+  );
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(
+    "**/requests/*/approve",
+    async (route) => {
+      await held;
+      await route.continue();
+    },
+    { times: 1 },
+  );
+  await failedRow.getByRole("button", { name: "Approve" }).click();
+  await expect(failedRow.getByRole("button", { name: "Deny" })).toBeDisabled();
+  await expect(failedRow.getByRole("alert")).toHaveCount(0);
+  // Well inside the page's 5s fetch timeout, which would free the rows anyway.
+  await expect(waitingRow.getByRole("button", { name: "Deny" })).toBeEnabled({
+    timeout: 1_000,
+  });
+  await waitingRow.getByRole("button", { name: "Deny" }).click();
+  await expect(waitingRow).toHaveCount(0);
+  release();
+  await expect(failedRow).toHaveCount(0);
+  await expect(list).toContainText("No one is waiting.");
 });

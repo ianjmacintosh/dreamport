@@ -720,6 +720,11 @@ export type AddVersionResult =
       readonly reason: "not-found" | "unavailable" | "request";
     };
 
+/** Whether User ?3 holds a copy of version ?2 of Path ?1. */
+const HOLDS_VERSION = `EXISTS (SELECT 1 FROM "paths" AS "copy"
+  JOIN "path_versions" AS "held" ON "held"."pathId" = "copy"."id"
+  WHERE "copy"."userId" = ?3 AND "copy"."addedFrom" = ?1 AND "held"."number" = ?2)`;
+
 /**
  * Add version `number` of another User's Path (#192): copy its name,
  * description, Milestones and Tasks to the User, under their one copy of
@@ -744,9 +749,7 @@ export async function addVersion(
   const source = await db
     .prepare(
       `SELECT "path_versions"."id", "paths"."open", "paths"."access", "path_versions"."published",
-         EXISTS (SELECT 1 FROM "paths" AS "copy"
-           JOIN "path_versions" AS "held" ON "held"."pathId" = "copy"."id"
-           WHERE "copy"."userId" = ?3 AND "copy"."addedFrom" = ?1 AND "held"."number" = ?2) AS "held"
+         ${HOLDS_VERSION} AS "held"
        FROM "paths"
        JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id" AND "path_versions"."number" = ?2
        WHERE "paths"."id" = ?1 AND "paths"."userId" <> ?3 AND "paths"."addedFrom" IS NULL`,
@@ -884,9 +887,7 @@ export async function requestVersion(
        JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id" AND "path_versions"."number" = ?2
        WHERE "paths"."id" = ?1 AND "paths"."userId" <> ?3 AND "paths"."addedFrom" IS NULL
          AND "paths"."open" = 1 AND "paths"."access" = 'request' AND "path_versions"."published" = 1
-         AND NOT EXISTS (SELECT 1 FROM "paths" AS "copy"
-           JOIN "path_versions" AS "held" ON "held"."pathId" = "copy"."id"
-           WHERE "copy"."userId" = ?3 AND "copy"."addedFrom" = ?1 AND "held"."number" = ?2)`,
+         AND NOT ${HOLDS_VERSION}`,
     )
     .bind(pathId, number, userId, new Date().toISOString(), crypto.randomUUID())
     .run();
@@ -897,9 +898,7 @@ export async function requestVersion(
   const source = await db
     .prepare(
       `SELECT "paths"."open", "paths"."access", "path_versions"."published",
-         EXISTS (SELECT 1 FROM "paths" AS "copy"
-           JOIN "path_versions" AS "held" ON "held"."pathId" = "copy"."id"
-           WHERE "copy"."userId" = ?3 AND "copy"."addedFrom" = ?1 AND "held"."number" = ?2) AS "held",
+         ${HOLDS_VERSION} AS "held",
          EXISTS (SELECT 1 FROM "path_requests"
            WHERE "userId" = ?3 AND "pathId" = ?1 AND "number" = ?2) AS "pending"
        FROM "paths"
@@ -999,17 +998,16 @@ export async function approveRequest(
   if (!added.ok && added.reason === "unavailable") {
     return { ok: false, reason: "unavailable" };
   }
-  if (!added.ok) {
-    // Its version is gone, so it can never be Approved: clear it.
-    await denyRequest(db, path, requestId);
-    return { ok: false, reason: "gone" };
-  }
-  await denyRequest(db, path, requestId);
-  return { ok: true };
+  // Approved, or its version is gone so it never can be: either way it's done.
+  await deleteRequest(db, path, requestId);
+  return added.ok ? { ok: true } : { ok: false, reason: "gone" };
 }
 
-/** Delete one pending Request on the Path, leaving no trace (#216). False if it wasn't pending. */
-export async function denyRequest(
+/**
+ * Delete one pending Request on the Path, leaving no trace: a Deny, or the
+ * end of an Approve (#216). False if it wasn't pending.
+ */
+export async function deleteRequest(
   db: D1Database,
   path: OwnedPath,
   requestId: string,
@@ -1065,10 +1063,7 @@ export async function getDraft(
       )
       .bind(path.id)
       .all<VersionRow>(),
-    db
-      .prepare('SELECT count(*) AS "n" FROM "path_requests" WHERE "pathId" = ?')
-      .bind(path.id)
-      .first<{ n: number }>(),
+    countRequests(db, path.id),
   ]);
   const versions = saved.map(versionSummary);
   const tasksOf = new Map<string, DraftTask[]>();
@@ -1089,7 +1084,7 @@ export async function getDraft(
       versions.length > 0 && !!edited && edited.updatedAt <= edited.matchedAt,
     open: edited?.open === 1,
     access: edited?.access ?? "everyone",
-    pendingRequests: pending?.n ?? 0,
+    pendingRequests: pending,
     versions,
     latestVersion: versions[0] ?? null,
   };
@@ -1367,6 +1362,8 @@ export async function setAccess(
   let approved = 0;
   for (const { userId, number } of results) {
     const added = await addVersion(db, userId, path.id, number);
+    // Access went back to By Request mid-sweep: the rest stay pending.
+    if (!added.ok && added.reason === "request") break;
     if (added.ok) approved++;
     await db
       .prepare(

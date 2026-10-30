@@ -202,7 +202,7 @@ export const TEST_EMAILS = {
   pathsModuleAdderCap: "delivered+paths-module-adder-cap@resend.dev",
   /** Requests `pathsModulePublisher`'s By Request Paths (#215). */
   pathsModuleRequester: "delivered+paths-module-requester@resend.dev",
-  /** The Guide whose Paths those two Request (#215). */
+  /** The Guide whose Paths the paths-module Requesters Request (#215). */
   pathsModuleRequestsGuide: "delivered+paths-module-requests-guide@resend.dev",
   /** A second Requester, so the Guide's Paths hold Requests from two Users (#215). */
   pathsModuleRequesterTwo: "delivered+paths-module-requester-two@resend.dev",
@@ -234,6 +234,8 @@ export const TEST_EMAILS = {
   worksheetsSave: "delivered+worksheets-save@resend.dev",
   /** A third Requester on the Request route's tests (#215). */
   requestRoute: "delivered+request-route@resend.dev",
+  /** Moves one Request through each state, deleting their account in some (#213). */
+  requestStates: "delivered+request-states@resend.dev",
   /** Checks off a Task on an unknown Journey (404), a bad body (400), then a good one. */
   tasksCheckOff: "delivered+tasks-check-off@resend.dev",
   /** Adds the Guide's Path and follows their copy of it (#192). */
@@ -342,6 +344,10 @@ export const TEST_EMAILS = {
   e2eRequestApproved: "delivered+e2e-request-approved+e2e-test@resend.dev",
   /** #216: Requests a Guide's Path and is Denied, so is offered Request again. */
   e2eRequestDenied: "delivered+e2e-request-denied+e2e-test@resend.dev",
+  /** #213: Requests a Guide's Path whose Approve fails, then waits while the Guide decides another. */
+  e2eRequestFailed: "delivered+e2e-request-failed+e2e-test@resend.dev",
+  /** #213: Requests the same Path, decided while the other row's Approve is still running. */
+  e2eRequestWaiting: "delivered+e2e-request-waiting+e2e-test@resend.dev",
   /** #192: Adds a Guide's Path from its link and follows their copy. */
   e2eAdder: "delivered+e2e-adder+e2e-test@resend.dev",
   /** #137: open a Product, start its Journey, see Milestone 1 current — then advance and return. */

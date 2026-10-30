@@ -11,7 +11,7 @@ import {
   deleteMilestone,
   deletePath,
   deleteTask,
-  denyRequest,
+  deleteRequest,
   discardChanges,
   getDraft,
   getPath,
@@ -278,7 +278,7 @@ pathRoutes.post("/requests/:requestId/approve", async (c) => {
 
 /** Deny a pending Request (#216), leaving no trace. 404 if it's no longer pending. */
 pathRoutes.post("/requests/:requestId/deny", async (c) => {
-  const denied = await denyRequest(
+  const denied = await deleteRequest(
     c.env.DB,
     c.var.path,
     c.req.param("requestId"),
