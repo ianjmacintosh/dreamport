@@ -2568,6 +2568,7 @@ describe("Pathfinder and Trailhead routes", () => {
     const text = await res.text();
     expect(JSON.parse(text)).toEqual({
       status: "offered",
+      requested: false,
       access: "everyone",
       path: { id: path.id, name: path.name, dreamport: false, own: false },
       version: {
@@ -2721,6 +2722,7 @@ describe("Trailblazer routes", () => {
         updatedAt: path.createdAt,
         matchesLatest: false,
         open: false,
+        pendingRequests: 0,
         access: "everyone",
         versions: [],
         latestVersion: null,
@@ -2747,6 +2749,7 @@ describe("Trailblazer routes", () => {
         updatedAt: expect.any(String),
         matchesLatest: false,
         open: false,
+        pendingRequests: 0,
         access: "everyone",
         versions: [],
         latestVersion: null,
@@ -3406,12 +3409,13 @@ describe("request gates, across every route (#154)", () => {
   describe("Path ownership", () => {
     // The Trailhead answers every signed-in User, by design (#205); what it
     // tells a stranger is tested with the Trailhead routes.
-    // So does Add (#192), which is for anyone but the owner.
+    // So do Add (#192) and Request (#215), which are for anyone but the owner.
     const pathScoped = routes.filter(
       (route) =>
         route.path.startsWith("/api/paths/:") &&
         route.path !== "/api/paths/:pathId/trailhead" &&
-        route.path !== "/api/paths/:pathId/versions/:number/add",
+        route.path !== "/api/paths/:pathId/versions/:number/add" &&
+        route.path !== "/api/paths/:pathId/versions/:number/request",
     );
 
     async function ownedPath() {
@@ -3491,7 +3495,7 @@ describe("Access routes (#214)", () => {
 
     const set = await setAccess(guide.cookie, guide.path.id, "request");
     expect(set.status).toBe(200);
-    expect(await set.json()).toEqual({ access: "request" });
+    expect(await set.json()).toEqual({ access: "request", approved: 0 });
     expect(await accessOf(guide.cookie, guide.path.id)).toBe("request");
 
     expect(
@@ -3548,5 +3552,105 @@ describe("Access routes (#214)", () => {
 
     await setAccess(guide.cookie, guide.path.id, "everyone");
     expect((await add(other)).status).toBe(201);
+  });
+});
+
+describe("Request route (#215)", () => {
+  const request = (cookie: string, pathId: string, number: number | string) =>
+    callApi("POST", `/api/paths/${pathId}/versions/${number}/request`, cookie);
+  const trailhead = async (cookie: string, pathId: string) =>
+    (await (
+      await callApi("GET", `/api/paths/${pathId}/trailhead`, cookie)
+    ).json()) as { status: string; requested?: boolean };
+  const byRequest = async () => {
+    const guide = await openGuidesPath();
+    await callApi("PUT", `/api/paths/${guide.path.id}/access`, guide.cookie, {
+      access: "request",
+    });
+    return guide;
+  };
+
+  it("makes a Request with 201, answers 200 to a repeat, and the Trailhead remembers it", async () => {
+    const guide = await byRequest();
+    const user = await signIn(TEST_EMAILS.addRoute);
+
+    expect(await trailhead(user, guide.path.id)).toMatchObject({
+      status: "offered",
+      requested: false,
+    });
+    expect((await request(user, guide.path.id, 1)).status).toBe(201);
+    expect((await request(user, guide.path.id, 1)).status).toBe(200);
+    expect(await trailhead(user, guide.path.id)).toMatchObject({
+      status: "offered",
+      requested: true,
+    });
+  });
+
+  it("refuses with 409 an Everyone Path and a closed Path, and 404s the Guide's own Path, an unknown version and Dream Sequence", async () => {
+    const guide = await byRequest();
+    const user = await signIn(TEST_EMAILS.addRoute);
+
+    expect((await request(guide.cookie, guide.path.id, 1)).status).toBe(404);
+    expect((await request(user, guide.path.id, 2)).status).toBe(404);
+    expect((await request(user, guide.path.id, "one")).status).toBe(404);
+    expect((await request(user, "dream-sequence", 1)).status).toBe(404);
+
+    await callApi("PUT", `/api/paths/${guide.path.id}/access`, guide.cookie, {
+      access: "everyone",
+    });
+    const everyone = await request(user, guide.path.id, 1);
+    expect(everyone.status).toBe(409);
+    expect(await everyone.json()).toEqual({
+      error: "This Path is Everyone. Add it instead.",
+    });
+
+    await callApi("PUT", `/api/paths/${guide.path.id}/access`, guide.cookie, {
+      access: "request",
+    });
+    await callApi("DELETE", `/api/paths/${guide.path.id}/open`, guide.cookie);
+    expect((await request(user, guide.path.id, 1)).status).toBe(409);
+  });
+
+  it("tells the Guide how many Requests Everyone Approved", async () => {
+    const guide = await byRequest();
+    const user = await signIn(TEST_EMAILS.addRoute);
+    const other = await signIn(TEST_EMAILS.pathsRoutesPlainUser);
+    await request(user, guide.path.id, 1);
+    await request(other, guide.path.id, 1);
+
+    const approved = await callApi(
+      "PUT",
+      `/api/paths/${guide.path.id}/access`,
+      guide.cookie,
+      { access: "everyone" },
+    );
+    expect(await approved.json()).toEqual({ access: "everyone", approved: 2 });
+    expect(await trailhead(user, guide.path.id)).toMatchObject({
+      status: "followable",
+    });
+  });
+
+  it("tells the Guide how many Requests Closing the Path Denied", async () => {
+    const guide = await byRequest();
+    const user = await signIn(TEST_EMAILS.requestRoute);
+    await request(user, guide.path.id, 1);
+    const closed = await callApi(
+      "DELETE",
+      `/api/paths/${guide.path.id}/open`,
+      guide.cookie,
+    );
+    expect(await closed.json()).toEqual({ denied: 1 });
+  });
+
+  it("tells the Guide how many Requests Unpublishing the last version Denied", async () => {
+    const guide = await byRequest();
+    const user = await signIn(TEST_EMAILS.requestRoute);
+    await request(user, guide.path.id, 1);
+    const unpublished = await callApi(
+      "DELETE",
+      `/api/paths/${guide.path.id}/versions/1/published`,
+      guide.cookie,
+    );
+    expect(await unpublished.json()).toMatchObject({ closed: true, denied: 1 });
   });
 });

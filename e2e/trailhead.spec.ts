@@ -304,3 +304,58 @@ test("a Guide changes a Path's Access in the editor, and another User's Trailhea
   ).toHaveCount(0);
   await visitorContext.close();
 });
+
+test("a User Requests a By Request Path after the email warning, sees Requested after a reload, and the Guide Approving by switching to Everyone gives them the version", async ({
+  browser,
+  page,
+}) => {
+  const pathName = `Requested Launch ${Date.now()}`;
+  await signIn(page, TEST_EMAILS.guide);
+  const path = await savedPathThroughApi(page, pathName);
+  await path.api("PUT", `/api/paths/${path.id}/versions/1/published`);
+  await path.api("PUT", `/api/paths/${path.id}/open`);
+  await path.api("PUT", `/api/paths/${path.id}/access`, { access: "request" });
+
+  const visitorContext = await browser.newContext();
+  const visitor = await visitorContext.newPage();
+  await signIn(visitor, TEST_EMAILS.e2eTrailheadVisitor);
+  await visitor.goto(`/app/paths/${path.id}`);
+  await expect(
+    visitor.getByText("The Guide of this Path decides who can Add it."),
+  ).toBeVisible();
+
+  await visitor.getByRole("button", { name: "Request", exact: true }).click();
+  const warning = visitor.getByRole("dialog", { name: "Request Version 1?" });
+  await expect(warning).toContainText(
+    `The Guide will see your email address (${TEST_EMAILS.e2eTrailheadVisitor}) with your Request.`,
+  );
+  await warning.getByRole("button", { name: "Send Request" }).click();
+
+  const requested = visitor.getByRole("button", { name: "Requested" });
+  await expect(requested).toBeDisabled();
+  await expect(visitor.getByText("You've Requested Version 1.")).toBeVisible();
+  await visitor.reload();
+  await expect(requested).toBeDisabled();
+
+  await page.goto(`/app/paths/${path.id}/edit`);
+  await page.getByRole("button", { name: "Change Access" }).click();
+  const dialog = page.getByRole("dialog", { name: "Change Access" });
+  await dialog.getByRole("radio", { name: /^Everyone/ }).check();
+  await expect(dialog.getByRole("button", { name: "Save" })).toBeDisabled();
+  await dialog.getByLabel("Approve the 1 Request pending").check();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(
+    page.getByText(
+      "1 Request was Approved: that User has the version they asked for.",
+    ),
+  ).toBeVisible();
+
+  await visitor.reload();
+  await expect(visitor.getByRole("button", { name: "Requested" })).toHaveCount(
+    0,
+  );
+  await expect(
+    visitor.getByRole("button", { name: "Start on Path" }),
+  ).toBeVisible();
+  await visitorContext.close();
+});

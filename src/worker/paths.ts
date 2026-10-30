@@ -187,6 +187,8 @@ export type Trailhead =
       readonly access: Access;
       readonly version: PathVersion;
       readonly versions: readonly VersionSummary[];
+      /** Whether the viewer has a Request pending for `version` (#215). */
+      readonly requested: boolean;
     }
   /** Dream Sequence, the viewer's own Path, or their copy of another User's. */
   | {
@@ -225,7 +227,7 @@ export async function getTrailhead(
   pathId: string,
   number: number | null,
 ): Promise<Trailhead | null> {
-  const [{ results }, { results: held }] = await db.batch([
+  const [{ results }, { results: held }, { results: asked }] = await db.batch([
     db
       .prepare(
         `SELECT "paths"."userId", "paths"."addedFrom", "paths"."open", "paths"."access", "path_versions"."id",
@@ -246,6 +248,11 @@ export async function getTrailhead(
          JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
          WHERE "paths"."userId" = ? AND "paths"."addedFrom" = ?
          ORDER BY "path_versions"."number" DESC`,
+      )
+      .bind(userId, pathId),
+    db
+      .prepare(
+        'SELECT "number" FROM "path_requests" WHERE "userId" = ? AND "pathId" = ?',
       )
       .bind(userId, pathId),
   ]);
@@ -321,6 +328,9 @@ export async function getTrailhead(
     access: head?.access ?? "everyone",
     version: await versionWithMilestones(db, offer, pathId, pathId),
     versions: summaries,
+    requested: (asked as { number: number }[]).some(
+      (r) => r.number === offer.number,
+    ),
   };
 }
 
@@ -490,6 +500,8 @@ export interface Draft extends PathSummary {
   readonly open: boolean;
   /** Whether Users Add the Path straight away or Request it (#214). */
   readonly access: Access;
+  /** Requests waiting on the Guide, across every version (#215). */
+  readonly pendingRequests: number;
   /** Every saved version, newest first. */
   readonly versions: readonly VersionSummary[];
   readonly latestVersion: VersionSummary | null;
@@ -831,6 +843,88 @@ export async function addVersion(
     : { ok: false, reason: "unavailable" };
 }
 
+export type RequestVersionResult =
+  /** `requested` is false when the User already had this Request pending. */
+  | { readonly ok: true; readonly requested: boolean }
+  /**
+   * `not-found`: no such version of another User's Path (the User's own and
+   * Dream Sequence read the same). `unavailable`: the Path is closed or the
+   * version isn't published. `everyone`: the Path's Access is Everyone, so
+   * they Add it. `held`: they already hold a copy of the version.
+   */
+  | {
+      readonly ok: false;
+      readonly reason: "not-found" | "unavailable" | "everyone" | "held";
+    };
+
+/**
+ * Ask a Path's Guide to let the User Add version `number` (#215). Only a
+ * published version of an open, By Request Path the User doesn't hold. A
+ * Request is one pending row, unique on (User, Path, number): asking again
+ * changes nothing, however many tabs ask at once. Nothing is notified.
+ *
+ * The insert carries every check itself, so a Close, Unpublish or Access
+ * change landing first stops it. The reads after it only explain a refusal.
+ */
+export async function requestVersion(
+  db: D1Database,
+  userId: string,
+  pathId: string,
+  number: number,
+): Promise<RequestVersionResult> {
+  const { meta } = await db
+    .prepare(
+      `INSERT OR IGNORE INTO "path_requests" ("userId", "pathId", "number", "createdAt")
+       SELECT ?3, ?1, ?2, ?4
+       FROM "paths"
+       JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id" AND "path_versions"."number" = ?2
+       WHERE "paths"."id" = ?1 AND "paths"."userId" <> ?3 AND "paths"."addedFrom" IS NULL
+         AND "paths"."open" = 1 AND "paths"."access" = 'request' AND "path_versions"."published" = 1
+         AND NOT EXISTS (SELECT 1 FROM "paths" AS "copy"
+           JOIN "path_versions" AS "held" ON "held"."pathId" = "copy"."id"
+           WHERE "copy"."userId" = ?3 AND "copy"."addedFrom" = ?1 AND "held"."number" = ?2)`,
+    )
+    .bind(pathId, number, userId, new Date().toISOString())
+    .run();
+  if (meta.changes > 0) {
+    return { ok: true, requested: true };
+  }
+
+  const source = await db
+    .prepare(
+      `SELECT "paths"."open", "paths"."access", "path_versions"."published",
+         EXISTS (SELECT 1 FROM "paths" AS "copy"
+           JOIN "path_versions" AS "held" ON "held"."pathId" = "copy"."id"
+           WHERE "copy"."userId" = ?3 AND "copy"."addedFrom" = ?1 AND "held"."number" = ?2) AS "held",
+         EXISTS (SELECT 1 FROM "path_requests"
+           WHERE "userId" = ?3 AND "pathId" = ?1 AND "number" = ?2) AS "pending"
+       FROM "paths"
+       JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id" AND "path_versions"."number" = ?2
+       WHERE "paths"."id" = ?1 AND "paths"."userId" <> ?3 AND "paths"."addedFrom" IS NULL`,
+    )
+    .bind(pathId, number, userId)
+    .first<{
+      open: number;
+      access: Access;
+      published: number;
+      held: number;
+      pending: number;
+    }>();
+  if (!source) {
+    return { ok: false, reason: "not-found" };
+  }
+  if (source.pending === 1) {
+    return { ok: true, requested: false };
+  }
+  if (source.held === 1) {
+    return { ok: false, reason: "held" };
+  }
+  if (source.open !== 1 || source.published !== 1) {
+    return { ok: false, reason: "unavailable" };
+  }
+  return { ok: false, reason: "everyone" };
+}
+
 export async function getDraft(
   db: D1Database,
   path: OwnedPath,
@@ -840,6 +934,7 @@ export async function getDraft(
     { results: tasks },
     edited,
     { results: saved },
+    pending,
   ] = await Promise.all([
     db
       .prepare(
@@ -874,6 +969,10 @@ export async function getDraft(
       )
       .bind(path.id)
       .all<VersionRow>(),
+    db
+      .prepare('SELECT count(*) AS "n" FROM "path_requests" WHERE "pathId" = ?')
+      .bind(path.id)
+      .first<{ n: number }>(),
   ]);
   const versions = saved.map(versionSummary);
   const tasksOf = new Map<string, DraftTask[]>();
@@ -894,6 +993,7 @@ export async function getDraft(
       versions.length > 0 && !!edited && edited.updatedAt <= edited.matchedAt,
     open: edited?.open === 1,
     access: edited?.access ?? "everyone",
+    pendingRequests: pending?.n ?? 0,
     versions,
     latestVersion: versions[0] ?? null,
   };
@@ -1043,6 +1143,8 @@ export type UnpublishResult =
       readonly version: VersionSummary;
       /** Whether this closed the Path: it was open, and nothing's published now. */
       readonly closed: boolean;
+      /** Pending Requests Denied: the version's, or all of them if it closed. */
+      readonly denied: number;
     }
   | { readonly ok: false; readonly reason: "not-found" };
 
@@ -1050,14 +1152,15 @@ export type UnpublishResult =
  * Stop offering saved version `number` to Users who haven't Added it.
  * Unpublishing an unpublished version changes nothing. If no version is
  * left published, the Path closes in the same transaction, so an open Path
- * always has a published version.
+ * always has a published version. The version's pending Requests are Denied
+ * in the same transaction, and all of the Path's if it closed (#215).
  */
 export async function unpublishVersion(
   db: D1Database,
   path: OwnedPath,
   number: number,
 ): Promise<UnpublishResult> {
-  const [unpublished, closed] = await db.batch<VersionRow>([
+  const [unpublished, closed, denied] = await db.batch<VersionRow>([
     db
       .prepare(
         `UPDATE "path_versions" SET "published" = 0 WHERE "pathId" = ?1 AND "number" = ?2
@@ -1072,6 +1175,14 @@ export async function unpublishVersion(
          RETURNING "id"`,
       )
       .bind(path.id),
+    db
+      .prepare(
+        `DELETE FROM "path_requests"
+         WHERE "pathId" = ?1 AND ("number" = ?2
+           OR NOT EXISTS (SELECT 1 FROM "path_versions" WHERE "pathId" = ?1 AND "published" = 1))
+         RETURNING "number"`,
+      )
+      .bind(path.id, number),
   ]);
   const [version] = unpublished.results;
   if (!version) {
@@ -1081,6 +1192,7 @@ export async function unpublishVersion(
     ok: true,
     version: versionSummary(version),
     closed: closed.results.length > 0,
+    denied: denied.results.length,
   };
 }
 
@@ -1108,27 +1220,64 @@ export async function openPath(
   return opened ? { ok: true } : { ok: false, reason: "none-published" };
 }
 
-/** Stop the Path accepting new Adds. Closing a closed Path changes nothing. */
+/**
+ * Stop the Path accepting new Adds, and Deny every pending Request in the
+ * same transaction (#215). Answers how many were Denied. Closing a closed
+ * Path changes nothing.
+ */
 export async function closePath(
   db: D1Database,
   path: OwnedPath,
-): Promise<void> {
-  await db
-    .prepare('UPDATE "paths" SET "open" = 0 WHERE "id" = ?')
-    .bind(path.id)
-    .run();
+): Promise<number> {
+  const [, denied] = await db.batch<{ number: number }>([
+    db.prepare('UPDATE "paths" SET "open" = 0 WHERE "id" = ?').bind(path.id),
+    db
+      .prepare(
+        'DELETE FROM "path_requests" WHERE "pathId" = ? RETURNING "number"',
+      )
+      .bind(path.id),
+  ]);
+  return denied.results.length;
 }
 
-/** Set the Path's Access. Affects only later Adds; held copies are untouched. */
+/**
+ * Set the Path's Access. Affects only later Adds and Requests; held copies
+ * are untouched, except that Everyone Approves every pending Request: each
+ * Adds its version for its User, through `addVersion`, and its row is
+ * deleted (#215). Answers how many were Approved.
+ *
+ * The Access changes first, so no Request can land during the sweep, and
+ * the sweep runs whenever the Access is Everyone, so one a crash left
+ * behind is Approved by the next call.
+ */
 export async function setAccess(
   db: D1Database,
   path: OwnedPath,
   access: Access,
-): Promise<void> {
+): Promise<number> {
   await db
     .prepare('UPDATE "paths" SET "access" = ? WHERE "id" = ?')
     .bind(access, path.id)
     .run();
+  if (access !== "everyone") {
+    return 0;
+  }
+  const { results } = await db
+    .prepare(
+      'SELECT "userId", "number" FROM "path_requests" WHERE "pathId" = ? ORDER BY "createdAt" ASC',
+    )
+    .bind(path.id)
+    .all<{ userId: string; number: number }>();
+  for (const { userId, number } of results) {
+    await addVersion(db, userId, path.id, number);
+    await db
+      .prepare(
+        'DELETE FROM "path_requests" WHERE "userId" = ? AND "pathId" = ? AND "number" = ?',
+      )
+      .bind(userId, path.id, number)
+      .run();
+  }
+  return results.length;
 }
 
 export function parseAccess(body: unknown): Access | null {

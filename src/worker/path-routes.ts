@@ -198,7 +198,11 @@ pathRoutes.delete("/versions/:number/published", async (c) => {
   }
 
   return c.json(
-    { version: unpublished.version, closed: unpublished.closed },
+    {
+      version: unpublished.version,
+      closed: unpublished.closed,
+      denied: unpublished.denied,
+    },
     200,
   );
 });
@@ -217,13 +221,15 @@ pathRoutes.put("/open", async (c) => {
 });
 
 pathRoutes.delete("/open", async (c) => {
-  await closePath(c.env.DB, c.var.path);
-  return c.json({}, 200);
+  const denied = await closePath(c.env.DB, c.var.path);
+  return c.json({ denied }, 200);
 });
 
 /**
  * Set the Path's Access (#214): `{ access: "everyone" | "request" }`. Only
- * later Adds are affected. Answers the Access as it now stands.
+ * later Adds are affected, except that Everyone Approves every pending
+ * Request (#215). Answers the Access as it now stands and how many Requests
+ * were Approved.
  */
 pathRoutes.put("/access", async (c) => {
   const access = parseAccess(await c.req.json().catch(() => null));
@@ -231,8 +237,8 @@ pathRoutes.put("/access", async (c) => {
     return c.json({ error: 'access must be "everyone" or "request".' }, 400);
   }
 
-  await setAccess(c.env.DB, c.var.path, access);
-  return c.json({ access }, 200);
+  const approved = await setAccess(c.env.DB, c.var.path, access);
+  return c.json({ access, approved }, 200);
 });
 
 /**

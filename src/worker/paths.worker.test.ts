@@ -40,7 +40,9 @@ import {
   PATHS_PER_USER,
   publishVersion,
   reorderTasks,
+  requestVersion,
   saveVersion,
+  setAccess,
   TASK_TITLE_MAX_LENGTH,
   unpublishVersion,
   updateMilestone,
@@ -447,6 +449,7 @@ describe("a Path's Draft", () => {
       matchesLatest: false,
       open: false,
       access: "everyone",
+      pendingRequests: 0,
       versions: [],
       latestVersion: null,
     });
@@ -1656,12 +1659,14 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
       access: "everyone",
       version: two,
       versions: published,
+      requested: false,
     });
     expect(await getTrailhead(env.DB, STRANGER_ID, path.id, 1)).toEqual({
       status: "offered",
       access: "everyone",
       version: one,
       versions: published,
+      requested: false,
     });
     expect(JSON.stringify(root)).not.toContain(PUBLISHER_ID);
     expect(JSON.stringify(root)).not.toContain(
@@ -1736,6 +1741,193 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
     expect(
       await getTrailhead(env.DB, PUBLISHER_ID, "no-such-path", null),
     ).toBeNull();
+  });
+});
+
+describe("Requesting a version (#215)", () => {
+  const REQUESTER_ID = "paths-module-requester";
+  const REQUESTER_TWO_ID = "paths-module-requester-two";
+  const GUIDE_ID = "paths-module-requests-guide";
+
+  /** An open By Request Path of its own Guide's, with `count` versions all published. */
+  async function byRequestPath(count: number) {
+    await seedUser(REQUESTER_ID, TEST_EMAILS.pathsModuleRequester);
+    await seedUser(REQUESTER_TWO_ID, TEST_EMAILS.pathsModuleRequesterTwo);
+    await seedUser(GUIDE_ID, TEST_EMAILS.pathsModuleRequestsGuide);
+    const path = await pathOf(GUIDE_ID, "Bakery Path", [BAKE]);
+    for (let i = 0; i < count; i++) {
+      await saved(path, GUIDE_ID);
+      await publishVersion(env.DB, path, i + 1);
+    }
+    await openPath(env.DB, path);
+    await setAccess(env.DB, path, "request");
+    return { path };
+  }
+
+  const pending = async (pathId: string) => {
+    const { results } = await env.DB.prepare(
+      'SELECT "userId", "number" FROM "path_requests" WHERE "pathId" = ? ORDER BY "userId", "number"',
+    )
+      .bind(pathId)
+      .all<{ userId: string; number: number }>();
+    return results;
+  };
+
+  it("makes one pending Request per User and version, however many times it's asked", async () => {
+    const { path } = await byRequestPath(2);
+
+    expect(await requestVersion(env.DB, REQUESTER_ID, path.id, 1)).toEqual({
+      ok: true,
+      requested: true,
+    });
+    expect(await requestVersion(env.DB, REQUESTER_ID, path.id, 1)).toEqual({
+      ok: true,
+      requested: false,
+    });
+    await Promise.all([
+      requestVersion(env.DB, REQUESTER_ID, path.id, 2),
+      requestVersion(env.DB, REQUESTER_ID, path.id, 2),
+      requestVersion(env.DB, REQUESTER_TWO_ID, path.id, 2),
+    ]);
+
+    expect(await pending(path.id)).toEqual([
+      { userId: REQUESTER_ID, number: 1 },
+      { userId: REQUESTER_ID, number: 2 },
+      { userId: REQUESTER_TWO_ID, number: 2 },
+    ]);
+    expect((await getDraft(env.DB, path)).pendingRequests).toBe(3);
+  });
+
+  it("says on the Trailhead which version the viewer has Requested", async () => {
+    const { path } = await byRequestPath(2);
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 1);
+    const requested = async (userId: string, number: number | null) => {
+      const trailhead = await getTrailhead(env.DB, userId, path.id, number);
+      if (trailhead?.status !== "offered") throw new Error("not offered");
+      return trailhead.requested;
+    };
+
+    expect(await requested(REQUESTER_ID, 1)).toBe(true);
+    expect(await requested(REQUESTER_ID, 2)).toBe(false);
+    expect(await requested(REQUESTER_ID, null)).toBe(false);
+    expect(await requested(REQUESTER_TWO_ID, 1)).toBe(false);
+  });
+
+  it("refuses an Everyone Path, a closed Path, an unpublished version, a held version, and the Guide's own Path and Dream Sequence", async () => {
+    const { path } = await byRequestPath(2);
+    await unpublishVersion(env.DB, path, 2);
+
+    expect(await requestVersion(env.DB, REQUESTER_ID, path.id, 2)).toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+    expect(await requestVersion(env.DB, REQUESTER_ID, path.id, 3)).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
+    expect(await requestVersion(env.DB, GUIDE_ID, path.id, 1)).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
+    expect(
+      await requestVersion(env.DB, REQUESTER_ID, "dream-sequence", 1),
+    ).toEqual({ ok: false, reason: "not-found" });
+
+    await setAccess(env.DB, path, "everyone");
+    expect(await requestVersion(env.DB, REQUESTER_ID, path.id, 1)).toEqual({
+      ok: false,
+      reason: "everyone",
+    });
+    await addVersion(env.DB, REQUESTER_ID, path.id, 1);
+    await setAccess(env.DB, path, "request");
+    expect(await requestVersion(env.DB, REQUESTER_ID, path.id, 1)).toEqual({
+      ok: false,
+      reason: "held",
+    });
+
+    await closePath(env.DB, path);
+    expect(await requestVersion(env.DB, REQUESTER_TWO_ID, path.id, 1)).toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+    expect(await pending(path.id)).toEqual([]);
+  });
+
+  it("Denies every pending Request when the Path closes", async () => {
+    const { path } = await byRequestPath(2);
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 1);
+    await requestVersion(env.DB, REQUESTER_TWO_ID, path.id, 2);
+
+    expect(await closePath(env.DB, path)).toBe(2);
+    expect(await pending(path.id)).toEqual([]);
+    expect(await closePath(env.DB, path)).toBe(0);
+  });
+
+  it("Denies only an Unpublished version's Requests, or all of them when it was the last", async () => {
+    const { path } = await byRequestPath(2);
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 1);
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 2);
+    await requestVersion(env.DB, REQUESTER_TWO_ID, path.id, 2);
+
+    expect(await unpublishVersion(env.DB, path, 2)).toMatchObject({
+      ok: true,
+      closed: false,
+      denied: 2,
+    });
+    expect(await pending(path.id)).toEqual([
+      { userId: REQUESTER_ID, number: 1 },
+    ]);
+
+    expect(await unpublishVersion(env.DB, path, 1)).toMatchObject({
+      ok: true,
+      closed: true,
+      denied: 1,
+    });
+    expect(await pending(path.id)).toEqual([]);
+  });
+
+  it("Approves every pending Request when Access becomes Everyone, each Adding its version for its User", async () => {
+    const { path } = await byRequestPath(2);
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 1);
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 2);
+    await requestVersion(env.DB, REQUESTER_TWO_ID, path.id, 2);
+
+    expect(await setAccess(env.DB, path, "request")).toBe(0);
+    expect(await pending(path.id)).toHaveLength(3);
+    expect(await setAccess(env.DB, path, "everyone")).toBe(3);
+
+    expect(await pending(path.id)).toEqual([]);
+    const held = async (userId: string) =>
+      (
+        await Promise.all(
+          [1, 2].map(async (n) => ({
+            n,
+            status: (await getTrailhead(env.DB, userId, path.id, n))?.status,
+          })),
+        )
+      )
+        .filter(({ status }) => status === "followable")
+        .map(({ n }) => n);
+    expect(await held(REQUESTER_ID)).toEqual([1, 2]);
+    expect(await held(REQUESTER_TWO_ID)).toEqual([2]);
+  });
+
+  it("takes a Request with the requester's account or the Path", async () => {
+    const { path } = await byRequestPath(1);
+    await requestVersion(env.DB, REQUESTER_ID, path.id, 1);
+    await requestVersion(env.DB, REQUESTER_TWO_ID, path.id, 1);
+
+    await env.DB.prepare('DELETE FROM "user" WHERE "id" = ?')
+      .bind(REQUESTER_ID)
+      .run();
+    expect(await pending(path.id)).toEqual([
+      { userId: REQUESTER_TWO_ID, number: 1 },
+    ]);
+
+    await env.DB.prepare('DELETE FROM "paths" WHERE "id" = ?')
+      .bind(path.id)
+      .run();
+    expect(await pending(path.id)).toEqual([]);
   });
 });
 

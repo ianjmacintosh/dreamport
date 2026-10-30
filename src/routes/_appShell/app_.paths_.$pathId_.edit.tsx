@@ -32,6 +32,7 @@ import Button from "../../components/Button";
 import Dialog from "../../components/Dialog";
 import Link from "../../components/Link";
 import Notice from "../../components/Notice";
+import Checkbox from "../../components/Checkbox";
 import Radio from "../../components/Radio";
 import TextArea from "../../components/TextArea";
 import TextInput from "../../components/TextInput";
@@ -77,6 +78,8 @@ interface Draft extends PathHead {
   matchesLatest: boolean;
   open: boolean;
   access: Access;
+  /** Requests waiting on the Guide, across every version. */
+  pendingRequests: number;
   /** Newest first. */
   versions: VersionSummary[];
 }
@@ -255,6 +258,8 @@ function versionLabel(
 /** A Notice's text, one paragraph per sentence. */
 type Sentences = readonly string[];
 
+const requests = (n: number) => (n === 1 ? "1 Request" : `${n} Requests`);
+
 /**
  * The Path's page (docs/design-decisions.md, #169, #191): its name, a
  * Guide's Path Status, which version the page is with Manage Versions,
@@ -277,6 +282,7 @@ function PathDraft() {
   const [versions, setVersions] = useState(draft.versions);
   const [open, setOpen] = useState(draft.open);
   const [access, setAccess] = useState(draft.access);
+  const [pendingRequests, setPendingRequests] = useState(draft.pendingRequests);
   const [isChangingAccess, setIsChangingAccess] = useState(false);
   const [notice, setNotice] = useState<Sentences | null>(null);
   const [isManagingVersions, setIsManagingVersions] = useState(false);
@@ -346,13 +352,18 @@ function PathDraft() {
     setOpenPending(next ? "opening" : "closing");
     try {
       const sent = await withMinimumDuration(() =>
-        send<object>(`${base}/open`, next ? "PUT" : "DELETE"),
+        send<{ denied?: number }>(`${base}/open`, next ? "PUT" : "DELETE"),
       );
       if (!sent.ok) {
         setSaveError(sent.conflict ?? PUBLISH_FAILED);
         return;
       }
       setOpen(next);
+      const denied = sent.body.denied ?? 0;
+      if (denied > 0) {
+        setPendingRequests(0);
+        setNotice([`${requests(denied)} Denied: this Path is closed.`]);
+      }
     } catch {
       setSaveError(CONNECTION_FAILED);
     } finally {
@@ -563,10 +574,19 @@ function PathDraft() {
         open={guide && isChangingAccess}
         access={access}
         pathUrl={base}
+        pendingRequests={pendingRequests}
         onClose={() => setIsChangingAccess(false)}
-        onChanged={(next) => {
+        onChanged={(next, approved) => {
           setAccess(next);
           setIsChangingAccess(false);
+          if (approved > 0) {
+            setPendingRequests(0);
+            setNotice([
+              `${requests(approved)} ${approved === 1 ? "was" : "were"} Approved: ${
+                approved === 1 ? "that User has" : "those Users have"
+              } the version they asked for.`,
+            ]);
+          }
         }}
       />
 
@@ -591,16 +611,26 @@ function PathDraft() {
                 ],
           );
         }}
-        onUnpublished={(version, closed) => {
+        onUnpublished={(version, closed, denied) => {
           showVersion(version);
           if (closed) setOpen(false);
-          setNotice(
-            closed
+          setPendingRequests((n) => (closed ? 0 : Math.max(0, n - denied)));
+          const sentences = [
+            ...(closed
               ? [
                   `Version ${version.number} was the only published version, so this Path is now closed.`,
                 ]
-              : null,
-          );
+              : []),
+            ...(denied > 0
+              ? [
+                  `${requests(denied)} ${closed ? "were" : "for it"} Denied.`.replace(
+                    /^1 Request were/,
+                    "1 Request was",
+                  ),
+                ]
+              : []),
+          ];
+          setNotice(sentences.length > 0 ? sentences : null);
         }}
       />
 
@@ -1022,14 +1052,16 @@ function ChangeAccessDialog({
   open,
   access,
   pathUrl,
+  pendingRequests,
   onClose,
   onChanged,
 }: {
   open: boolean;
   access: Access;
   pathUrl: string;
+  pendingRequests: number;
   onClose: () => void;
-  onChanged: (access: Access) => void;
+  onChanged: (access: Access, approved: number) => void;
 }) {
   const [isPending, setIsPending] = useState(false);
   return (
@@ -1043,6 +1075,7 @@ function ChangeAccessDialog({
       <ChangeAccessForm
         access={access}
         pathUrl={pathUrl}
+        pendingRequests={pendingRequests}
         isPending={isPending}
         setIsPending={setIsPending}
         onCancel={onClose}
@@ -1055,6 +1088,7 @@ function ChangeAccessDialog({
 function ChangeAccessForm({
   access,
   pathUrl,
+  pendingRequests,
   isPending,
   setIsPending,
   onCancel,
@@ -1062,23 +1096,29 @@ function ChangeAccessForm({
 }: {
   access: Access;
   pathUrl: string;
+  pendingRequests: number;
   isPending: boolean;
   setIsPending: (isPending: boolean) => void;
   onCancel: () => void;
-  onChanged: (access: Access) => void;
+  onChanged: (access: Access, approved: number) => void;
 }) {
   const [picked, setPicked] = useState(access);
+  const [approving, setApproving] = useState(false);
   const [error, setError] = useState("");
+  // Everyone Approves every pending Request, so the Guide ticks to confirm.
+  const approves = picked === "everyone" && pendingRequests > 0;
 
   async function save() {
     setError("");
     setIsPending(true);
     try {
       const sent = await withMinimumDuration(() =>
-        send<object>(`${pathUrl}/access`, "PUT", { access: picked }),
+        send<{ approved?: number }>(`${pathUrl}/access`, "PUT", {
+          access: picked,
+        }),
       );
       if (sent.ok) {
-        onChanged(picked);
+        onChanged(picked, sent.body.approved ?? 0);
         return;
       }
       setError(sent.conflict ?? PUBLISH_FAILED);
@@ -1113,13 +1153,32 @@ function ChangeAccessForm({
           </label>
         ))}
       </div>
+      {approves && (
+        <>
+          <NoticeOf
+            sentences={[
+              `This Path has ${requests(pendingRequests)} pending. Making it Everyone Approves ${
+                pendingRequests === 1 ? "it" : "them all"
+              }: each of those Users gets the version they asked for.`,
+            ]}
+          />
+          <label>
+            <Checkbox
+              checked={approving}
+              disabled={isPending}
+              onChange={(e) => setApproving(e.target.checked)}
+            />
+            Approve the {requests(pendingRequests)} pending
+          </label>
+        </>
+      )}
       {error && <p role="alert">{error}</p>}
       <div className="button-group button-group--end">
         <Button variant="secondary" disabled={isPending} onClick={onCancel}>
           Cancel
         </Button>
         <Button
-          disabled={isPending}
+          disabled={isPending || (approves && !approving)}
           state={isPending ? "pending" : "ready"}
           onClick={() => void save()}
         >
@@ -1272,7 +1331,11 @@ function ManageVersionsDialog({
   notice: Sentences | null;
   onClose: () => void;
   onPublished: (version: VersionSummary) => void;
-  onUnpublished: (version: VersionSummary, closed: boolean) => void;
+  onUnpublished: (
+    version: VersionSummary,
+    closed: boolean,
+    denied: number,
+  ) => void;
 }) {
   const [pending, setPending] = useState<RowPending>(null);
   const [confirming, setConfirming] = useState<number | null>(null);
@@ -1291,7 +1354,7 @@ function ManageVersionsDialog({
     setPending({ number, action: next ? "publishing" : "unpublishing" });
     try {
       const sent = await withMinimumDuration(() =>
-        send<{ version: VersionSummary; closed?: boolean }>(
+        send<{ version: VersionSummary; closed?: boolean; denied?: number }>(
           `${pathUrl}/versions/${number}/published`,
           next ? "PUT" : "DELETE",
         ),
@@ -1303,7 +1366,11 @@ function ManageVersionsDialog({
       if (next) {
         onPublished(sent.body.version);
       } else {
-        onUnpublished(sent.body.version, sent.body.closed === true);
+        onUnpublished(
+          sent.body.version,
+          sent.body.closed === true,
+          sent.body.denied ?? 0,
+        );
       }
     } catch {
       setError(CONNECTION_FAILED);

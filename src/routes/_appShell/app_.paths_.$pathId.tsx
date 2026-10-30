@@ -62,6 +62,8 @@ interface Shown {
   };
   /** `request` when a User has to Request the Path rather than Add it (#214). */
   access: "everyone" | "request";
+  /** Offered only: whether the User has a Request pending for this version (#215). */
+  requested?: boolean;
   /** Newest first. */
   versions: { number: number; savedAt: string }[];
   newestNumber: number;
@@ -81,6 +83,7 @@ const LONG_DATE = new Intl.DateTimeFormat(undefined, { dateStyle: "long" });
 const START_JOURNEY_FAILED =
   "We couldn't start on this Path. Try again in a moment.";
 const ADD_FAILED = "We couldn't add this Path. Try again in a moment.";
+const REQUEST_FAILED = "We couldn't send your Request. Try again in a moment.";
 const CONNECTION_FAILED =
   "Something went wrong. Check your connection and try again.";
 
@@ -164,9 +167,13 @@ function TrailheadPage() {
 function ShownVersion({ trailhead }: { trailhead: Shown }) {
   const { path, version, versions, newestNumber, products } = trailhead;
   const search = Route.useSearch();
+  const { email } = Route.useRouteContext();
   const navigate = useNavigate();
   const router = useRouter();
   const [isAdding, setIsAdding] = useState(false);
+  const [isConfirmingRequest, setIsConfirmingRequest] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [requestError, setRequestError] = useState("");
   const pathHref = `/app/paths/${path.id}`;
   const [productId, setProductId] = useState(products?.[0]?.id ?? "");
   const [refusal, setRefusal] = useState<Refusal | null>(null);
@@ -208,6 +215,34 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
       setError(CONNECTION_FAILED);
     } finally {
       setIsAdding(false);
+    }
+  }
+
+  /** Request the version shown, then load the page again to show it Requested. */
+  async function sendRequest() {
+    setRequestError("");
+    setIsRequesting(true);
+    try {
+      const failed = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(
+          `/api/paths/${path.id}/versions/${version.number}/request`,
+          { method: "POST", headers: { "content-type": "application/json" } },
+        );
+        if (res.status === 409) {
+          return ((await res.json()) as { error: string }).error;
+        }
+        return res.ok ? null : REQUEST_FAILED;
+      });
+      setIsConfirmingRequest(false);
+      if (failed) {
+        setRequestError(failed);
+        return;
+      }
+      await router.invalidate();
+    } catch {
+      setRequestError(CONNECTION_FAILED);
+    } finally {
+      setIsRequesting(false);
     }
   }
 
@@ -335,6 +370,41 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
               {error && <p role="alert">{error}</p>}
             </>
           )}
+          {trailhead.status === "offered" && trailhead.access === "request" && (
+            <>
+              <Notice>
+                {trailhead.requested ? (
+                  <>
+                    <p>You&apos;ve Requested Version {version.number}.</p>
+                    <p>
+                      Waiting on the Guide. Come back to this page to see their
+                      answer.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p>The Guide of this Path decides who can Add it.</p>
+                    <p>
+                      Request it, and you&apos;ll find the answer here when you
+                      come back. There are no notifications.
+                    </p>
+                  </>
+                )}
+              </Notice>
+              <div className="button-group button-group--end">
+                <Button
+                  disabled={trailhead.requested === true}
+                  onClick={() => {
+                    setRequestError("");
+                    setIsConfirmingRequest(true);
+                  }}
+                >
+                  {trailhead.requested ? "Requested" : "Request"}
+                </Button>
+              </div>
+              {requestError && <p role="alert">{requestError}</p>}
+            </>
+          )}
           {products && (
             <>
               <div className="field-row">
@@ -412,6 +482,36 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
           )}
         </section>
       </div>
+      <Dialog
+        open={isConfirmingRequest}
+        onOpenChange={(open) => {
+          if (!open && !isRequesting) {
+            setIsConfirmingRequest(false);
+          }
+        }}
+        title={`Request Version ${version.number}?`}
+      >
+        <p>
+          The Guide will see your email address ({email}) with your Request.
+        </p>
+        <div className="button-group button-group--end">
+          <Button
+            variant="secondary"
+            disabled={isRequesting}
+            onClick={() => setIsConfirmingRequest(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={isRequesting}
+            state={isRequesting ? "pending" : "ready"}
+            onClick={() => void sendRequest()}
+          >
+            <Button.State name="ready">Send Request</Button.State>
+            <Button.State name="pending">Sending…</Button.State>
+          </Button>
+        </div>
+      </Dialog>
       <Dialog
         open={search.versions === true}
         onOpenChange={(open) => {
