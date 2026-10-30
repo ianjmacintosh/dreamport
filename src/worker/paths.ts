@@ -724,7 +724,9 @@ export type AddVersionResult =
  * Add version `number` of another User's Path (#192): copy its name,
  * description, Milestones and Tasks to the User, under their one copy of
  * the Path, made with the first Add. Adding a version they hold changes
- * nothing.
+ * nothing. `approving` is the Guide's Approve (#216): it Adds a By Request
+ * Path too, and is still refused for a closed Path or an unpublished
+ * version.
  *
  * One batch is one transaction. Every insert re-checks that the Path is
  * open and the version published, so a Close landing first stops it, and
@@ -737,6 +739,7 @@ export async function addVersion(
   userId: string,
   pathId: string,
   number: number,
+  { approving = false }: { approving?: boolean } = {},
 ): Promise<AddVersionResult> {
   const source = await db
     .prepare(
@@ -765,15 +768,16 @@ export async function addVersion(
   if (source.open !== 1 || source.published !== 1) {
     return { ok: false, reason: "unavailable" };
   }
-  if (source.access !== "everyone") {
+  if (source.access !== "everyone" && !approving) {
     return { ok: false, reason: "request" };
   }
 
   // ?1 the version Added, ?2 its copy's id, ?3 the Path, ?4 the User. Each
   // statement binds as many as its highest number, as D1 requires.
+  const accessOffered = approving ? "" : `AND "paths"."access" = 'everyone'`;
   const offered = `EXISTS (SELECT 1 FROM "paths"
     JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
-    WHERE "paths"."id" = ?3 AND "paths"."open" = 1 AND "paths"."access" = 'everyone'
+    WHERE "paths"."id" = ?3 AND "paths"."open" = 1 ${accessOffered}
       AND "path_versions"."id" = ?1 AND "path_versions"."published" = 1)`;
   const landed = `EXISTS (SELECT 1 FROM "path_versions" WHERE "id" = ?2)`;
   /** A source row's id with the copy's version id in place of the source's. */
@@ -874,8 +878,8 @@ export async function requestVersion(
 ): Promise<RequestVersionResult> {
   const { meta } = await db
     .prepare(
-      `INSERT OR IGNORE INTO "path_requests" ("userId", "pathId", "number", "createdAt")
-       SELECT ?3, ?1, ?2, ?4
+      `INSERT OR IGNORE INTO "path_requests" ("userId", "pathId", "number", "createdAt", "id")
+       SELECT ?3, ?1, ?2, ?4, ?5
        FROM "paths"
        JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id" AND "path_versions"."number" = ?2
        WHERE "paths"."id" = ?1 AND "paths"."userId" <> ?3 AND "paths"."addedFrom" IS NULL
@@ -884,7 +888,7 @@ export async function requestVersion(
            JOIN "path_versions" AS "held" ON "held"."pathId" = "copy"."id"
            WHERE "copy"."userId" = ?3 AND "copy"."addedFrom" = ?1 AND "held"."number" = ?2)`,
     )
-    .bind(pathId, number, userId, new Date().toISOString())
+    .bind(pathId, number, userId, new Date().toISOString(), crypto.randomUUID())
     .run();
   if (meta.changes > 0) {
     return { ok: true, requested: true };
@@ -923,6 +927,98 @@ export async function requestVersion(
     return { ok: false, reason: "unavailable" };
   }
   return { ok: false, reason: "everyone" };
+}
+
+/** A pending Request as the Guide sees it (#216): nothing of the User but their email address. */
+export interface PendingRequest {
+  readonly id: string;
+  readonly email: string;
+  readonly number: number;
+}
+
+/** How many Requests are pending on the Path, across every version (#216). */
+export async function countRequests(
+  db: D1Database,
+  pathId: string,
+): Promise<number> {
+  const row = await db
+    .prepare('SELECT count(*) AS "n" FROM "path_requests" WHERE "pathId" = ?')
+    .bind(pathId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+/** Every pending Request on the Path, for every version, oldest first (#216). */
+export async function listRequests(
+  db: D1Database,
+  path: OwnedPath,
+): Promise<PendingRequest[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT "path_requests"."id", "user"."email", "path_requests"."number"
+       FROM "path_requests"
+       JOIN "user" ON "user"."id" = "path_requests"."userId"
+       WHERE "path_requests"."pathId" = ?
+       ORDER BY "path_requests"."createdAt" ASC, "path_requests"."rowid" ASC`,
+    )
+    .bind(path.id)
+    .all<PendingRequest>();
+  return results;
+}
+
+export type ApproveRequestResult =
+  | { readonly ok: true }
+  /**
+   * `gone`: no such pending Request on this Path. `unavailable`: Add would
+   * refuse it; the Request stays.
+   */
+  | { readonly ok: false; readonly reason: "gone" | "unavailable" };
+
+/**
+ * Approve one pending Request on the Path (#216): Add its version for its
+ * User through `addVersion`, then delete the row.
+ */
+export async function approveRequest(
+  db: D1Database,
+  path: OwnedPath,
+  requestId: string,
+): Promise<ApproveRequestResult> {
+  const request = await db
+    .prepare(
+      'SELECT "userId", "number" FROM "path_requests" WHERE "id" = ? AND "pathId" = ?',
+    )
+    .bind(requestId, path.id)
+    .first<{ userId: string; number: number }>();
+  if (!request) {
+    return { ok: false, reason: "gone" };
+  }
+
+  const added = await addVersion(db, request.userId, path.id, request.number, {
+    approving: true,
+  });
+  if (!added.ok && added.reason === "unavailable") {
+    return { ok: false, reason: "unavailable" };
+  }
+  if (!added.ok) {
+    // Its version is gone, so it can never be Approved: clear it.
+    await denyRequest(db, path, requestId);
+    return { ok: false, reason: "gone" };
+  }
+  await denyRequest(db, path, requestId);
+  return { ok: true };
+}
+
+/** Delete one pending Request on the Path, leaving no trace (#216). False if it wasn't pending. */
+export async function denyRequest(
+  db: D1Database,
+  path: OwnedPath,
+  requestId: string,
+): Promise<boolean> {
+  const { meta } = await db
+    .prepare('DELETE FROM "path_requests" WHERE "id" = ? AND "pathId" = ?')
+    .bind(requestId, path.id)
+    .run();
+  return meta.changes > 0;
 }
 
 export async function getDraft(

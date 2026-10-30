@@ -338,6 +338,10 @@ export const TEST_EMAILS = {
     "delivered+e2e-trailhead-no-products+e2e-test@resend.dev",
   /** #205: open a Guide's published Path, then find it unavailable once closed. */
   e2eTrailheadVisitor: "delivered+e2e-trailhead-visitor+e2e-test@resend.dev",
+  /** #216: Requests a Guide's Path, is Approved, then starts a Journey and Advances. */
+  e2eRequestApproved: "delivered+e2e-request-approved+e2e-test@resend.dev",
+  /** #216: Requests a Guide's Path and is Denied, so is offered Request again. */
+  e2eRequestDenied: "delivered+e2e-request-denied+e2e-test@resend.dev",
   /** #192: Adds a Guide's Path from its link and follows their copy. */
   e2eAdder: "delivered+e2e-adder+e2e-test@resend.dev",
   /** #137: open a Product, start its Journey, see Milestone 1 current — then advance and return. */
