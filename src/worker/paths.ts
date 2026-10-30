@@ -87,10 +87,10 @@ export function getVersion(
 export type PathOwner = "dreamport" | "user" | "added";
 
 /**
- * Whether a User may Add a Path straight away (`free`), or has to Request
- * it first (`permission`, #215). Only its Guide changes it.
+ * Whether a User may Add a Path straight away (`everyone`), or has to
+ * Request it first (`request`, #215). Only its Guide changes it.
  */
-export type Access = "free" | "permission";
+export type Access = "everyone" | "request";
 
 /** A Path someone else made, as Pathfinder's "Your Added Paths" lists it. */
 export interface AddedPath {
@@ -191,6 +191,7 @@ export type Trailhead =
   /** Dream Sequence, the viewer's own Path, or their copy of another User's. */
   | {
       readonly status: "followable";
+      readonly access: Access;
       readonly owner: PathOwner;
       readonly version: FollowableVersion;
       readonly versions: readonly VersionSummary[];
@@ -266,7 +267,15 @@ export async function getTrailhead(
   const dreamports = head !== undefined && head.userId === null;
   const own = head !== undefined && head.userId === userId;
   if (dreamports || own) {
-    return ownTrailhead(db, pathId, own, saved, published, number);
+    return ownTrailhead(
+      db,
+      pathId,
+      head?.access ?? "everyone",
+      own,
+      saved,
+      published,
+      number,
+    );
   }
 
   const copies = held as (TrailheadRow & { pathId: string })[];
@@ -287,6 +296,7 @@ export async function getTrailhead(
   if (copy) {
     return {
       status: "followable",
+      access: head?.access ?? "everyone",
       owner: "added",
       version: (await versionWithMilestones(
         db,
@@ -308,7 +318,7 @@ export async function getTrailhead(
   }
   return {
     status: "offered",
-    access: head?.access ?? "free",
+    access: head?.access ?? "everyone",
     version: await versionWithMilestones(db, offer, pathId, pathId),
     versions: summaries,
   };
@@ -318,6 +328,7 @@ export async function getTrailhead(
 async function ownTrailhead(
   db: D1Database,
   pathId: string,
+  access: Access,
   own: boolean,
   saved: readonly TrailheadRow[],
   published: readonly TrailheadRow[],
@@ -334,6 +345,7 @@ async function ownTrailhead(
   }
   return {
     status: "followable",
+    access,
     owner: own ? "user" : "dreamport",
     version: (await versionWithMilestones(
       db,
@@ -688,12 +700,12 @@ export type AddVersionResult =
    * `not-found`: no such version of another User's Path, which takes in
    * the User's own and Dream Sequence, neither needing an Add.
    * `unavailable`: the Path is closed or the version isn't published.
-   * `permission`: the Path's Access is Permission required (#214) and the
+   * `request`: the Path's Access is By Request (#214) and the
    * User holds no copy of the version: they Request it instead (#215).
    */
   | {
       readonly ok: false;
-      readonly reason: "not-found" | "unavailable" | "permission";
+      readonly reason: "not-found" | "unavailable" | "request";
     };
 
 /**
@@ -741,15 +753,15 @@ export async function addVersion(
   if (source.open !== 1 || source.published !== 1) {
     return { ok: false, reason: "unavailable" };
   }
-  if (source.access !== "free") {
-    return { ok: false, reason: "permission" };
+  if (source.access !== "everyone") {
+    return { ok: false, reason: "request" };
   }
 
   // ?1 the version Added, ?2 its copy's id, ?3 the Path, ?4 the User. Each
   // statement binds as many as its highest number, as D1 requires.
   const offered = `EXISTS (SELECT 1 FROM "paths"
     JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
-    WHERE "paths"."id" = ?3 AND "paths"."open" = 1 AND "paths"."access" = 'free'
+    WHERE "paths"."id" = ?3 AND "paths"."open" = 1 AND "paths"."access" = 'everyone'
       AND "path_versions"."id" = ?1 AND "path_versions"."published" = 1)`;
   const landed = `EXISTS (SELECT 1 FROM "path_versions" WHERE "id" = ?2)`;
   /** A source row's id with the copy's version id in place of the source's. */
@@ -881,7 +893,7 @@ export async function getDraft(
     matchesLatest:
       versions.length > 0 && !!edited && edited.updatedAt <= edited.matchedAt,
     open: edited?.open === 1,
-    access: edited?.access ?? "free",
+    access: edited?.access ?? "everyone",
     versions,
     latestVersion: versions[0] ?? null,
   };
@@ -1124,7 +1136,7 @@ export function parseAccess(body: unknown): Access | null {
     body && typeof body === "object"
       ? (body as { access?: unknown }).access
       : null;
-  return access === "free" || access === "permission" ? access : null;
+  return access === "everyone" || access === "request" ? access : null;
 }
 
 export type DiscardChangesResult =

@@ -446,7 +446,7 @@ describe("a Path's Draft", () => {
       updatedAt: path.createdAt,
       matchesLatest: false,
       open: false,
-      access: "free",
+      access: "everyone",
       versions: [],
       latestVersion: null,
     });
@@ -1589,12 +1589,14 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
 
     expect(await getTrailhead(env.DB, PUBLISHER_ID, path.id, null)).toEqual({
       status: "followable",
+      access: "everyone",
       owner: "user",
       version: two,
       versions: all,
     });
     expect(await getTrailhead(env.DB, PUBLISHER_ID, path.id, 1)).toEqual({
       status: "followable",
+      access: "everyone",
       owner: "user",
       version: one,
       versions: all,
@@ -1611,6 +1613,7 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
     expect(await isOpen(path)).toBe(false);
     expect(await getTrailhead(env.DB, PUBLISHER_ID, path.id, null)).toEqual({
       status: "followable",
+      access: "everyone",
       owner: "user",
       version: one,
       versions: published,
@@ -1650,13 +1653,13 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
     const root = await getTrailhead(env.DB, STRANGER_ID, path.id, null);
     expect(root).toEqual({
       status: "offered",
-      access: "free",
+      access: "everyone",
       version: two,
       versions: published,
     });
     expect(await getTrailhead(env.DB, STRANGER_ID, path.id, 1)).toEqual({
       status: "offered",
-      access: "free",
+      access: "everyone",
       version: one,
       versions: published,
     });

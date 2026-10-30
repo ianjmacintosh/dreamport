@@ -68,7 +68,7 @@ interface Milestone extends MilestoneFields {
   tasks: Task[];
 }
 
-type Access = "free" | "permission";
+type Access = "everyone" | "request";
 
 interface Draft extends PathHead {
   milestones: Milestone[];
@@ -419,7 +419,7 @@ function PathDraft() {
       </p>
       {guide && (
         <p className="text-sm">
-          Access: {access === "free" ? "Free" : "Permission required"}
+          Access: {access === "everyone" ? "Everyone" : "By Request"}
           <span aria-hidden="true"> · </span>
           <a
             href="#"
@@ -1003,19 +1003,19 @@ function MilestoneInputs({
 
 const ACCESS_CHOICES: { value: Access; name: string; hint: string }[] = [
   {
-    value: "free",
-    name: "Free",
+    value: "everyone",
+    name: "Everyone",
     hint: "Any User can Add this Path straight away.",
   },
   {
-    value: "permission",
-    name: "Permission required",
+    value: "request",
+    name: "By Request",
     hint: "A User Requests this Path, and you Approve or Deny each Request.",
   },
 ];
 
 /**
- * Change Access (#214): Free or Permission required. Affects only Users who
+ * Change Access (#214): Everyone or By Request. Affects only Users who
  * Add the Path from now on.
  */
 function ChangeAccessDialog({

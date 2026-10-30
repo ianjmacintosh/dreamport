@@ -222,13 +222,13 @@ pathRoutes.delete("/open", async (c) => {
 });
 
 /**
- * Set the Path's Access (#214): `{ access: "free" | "permission" }`. Only
+ * Set the Path's Access (#214): `{ access: "everyone" | "request" }`. Only
  * later Adds are affected. Answers the Access as it now stands.
  */
 pathRoutes.put("/access", async (c) => {
   const access = parseAccess(await c.req.json().catch(() => null));
   if (!access) {
-    return c.json({ error: 'access must be "free" or "permission".' }, 400);
+    return c.json({ error: 'access must be "everyone" or "request".' }, 400);
   }
 
   await setAccess(c.env.DB, c.var.path, access);

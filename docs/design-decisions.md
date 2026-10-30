@@ -647,10 +647,10 @@ Add an entry only once a sign-off conversation resolves something repeatable
 
 - **Access in the Path editor** (#214): a Guide sees their Path's Access
   on a line of its own under the version line, at `.text-sm`: "Access:
-  Free" or "Access: Permission required", a middle dot (hidden from
+  Everyone" or "Access: By Request", a middle dot (hidden from
   screen readers), then a `.link-quiet` **Change Access**. A plain User
-  sees no Access line. Dream Sequence's line would read "Access: Free ·
-  _Dream Sequence is always Free._" with no link.
+  sees no Access line. Dream Sequence's line would read "Access: Everyone ·
+  _Dream Sequence is always Everyone._" with no link.
   - Change Access opens a `Dialog` titled "Change Access": "Access
     affects only Users who Add this Path from now on. Users who already
     Added it keep it.", then a `.radio-group` with a `Radio` for each
@@ -660,9 +660,14 @@ Add an entry only once a sign-off conversation resolves something repeatable
     Path, and you Approve or Deny each Request."). The hint is inside the
     label, so it is part of what's clicked and sets the group's width.
     Cancel and **Save** sit at the bottom right.
-  - A change with no consequence saves on one click. Picking Free while
+  - Renamed after sign-off: the values are **Everyone** and **By Request**
+    (were Free and Permission required), so "Free" is left to Price, a
+    separate future field. The Trailhead's version line reads "Version 2 ·
+    Access: By Request · Price: Free" (Price is text for now: every Path is
+    Free until Paid exists).
+  - A change with no consequence saves on one click. Picking Everyone while
     Requests are pending shows a `Notice` in the Dialog straight away:
-    "This Path has {n} pending Requests. Making it Free Approves them all:
+    "This Path has {n} pending Requests. Making it Everyone Approves them all:
     each of those Users gets the version they asked for." Under it is a
     check box, "Approve the {n} pending Requests", and Save stays disabled
     until it's ticked. After saving, a `Notice` under the Path's status

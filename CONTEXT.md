@@ -146,29 +146,32 @@ is yours, it doesn't change when the Guide publishes a later version (no
 later versions reach you, for now), and you can't change it either. Any
 published version can be Added, and you can hold copies of several versions
 of the same Path. Nobody starts a Journey on another User's Path without
-Adding it first. A User Adds a Path whose Access is Free themselves; on a
-Path whose Access is Permission required, they Request it and the Guide's
+Adding it first. A User Adds a Path whose Access is Everyone themselves; on a
+Path whose Access is By Request, they Request it and the Guide's
 Approve Adds it for them. Later, a Purchase Adds the version it pays for.
 _Avoid_: import, save, subscribe, install, clone, fork, follow (for this)
 
 **Access** _(working term)_:
 Whether a User may Add a Path straight away or has to ask first. It's set
 for the whole Path, not per version, by its Guide in Trailblazer, beside
-Open and Close. Two values for now: **Free**, where any User Adds it, and
-**Permission required**, where a User Requests it and its Guide decides. A
-Path's Access is Free until its Guide changes it, and Dream Sequence's is
-always Free. Changing it affects only later Adds and Requests: copies
-already Added stay with their Users. Changing it to Free Approves every
-pending Request, so the Guide is warned how many first. There is no
-payment inside Dreamport yet: any a Guide asks for happens between them
-and the User, and Dreamport plays no part in a dispute over it.
+Open and Close. Two values for now: **Everyone**, where any User Adds it, and
+**By Request**, where a User Requests it and its Guide decides. A
+Path's Access is Everyone until its Guide changes it, and Dream Sequence's is
+always Everyone. Changing it affects only later Adds and Requests: copies
+already Added stay with their Users. Changing it to Everyone Approves every
+pending Request, so the Guide is warned how many first. Access
+says who decides, not what it costs: **Price** is a separate thing, Free
+for every Path today, so a Path can later be both By Request and Paid.
+There is no payment inside Dreamport yet: any a Guide asks for happens
+between them and the User, and Dreamport plays no part in a dispute over
+it.
 _Avoid_: visibility, privacy, public, private (Private space means
 something else)
 
 **Request** _(working term)_:
 A User asking a Path's Guide for permission to Add one published version
 of it, the one shown on the Trailhead they asked from, when the Path's
-Access is Permission required. Like asking for one edition of a book: each
+Access is By Request. Like asking for one edition of a book: each
 version is its own Request, even for a User who already holds a copy of
 another. Every time, before it's sent, the User is warned that the Guide
 will see their email address, the one thing about a User a Guide ever
