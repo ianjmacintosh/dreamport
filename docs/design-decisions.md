@@ -735,3 +735,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
   does. Picked from a prototype on local branch `215-prototype-request`
   (four variants: an italic line, the `Notice`, numbered steps, a button
   beside the h1).
+
+- **Denied notices in the Path editor** (#215): Close and Unpublish add a
+  line to the existing `Notice` when Requests were Denied: "{n} Requests
+  were Denied: this Path is closed." after Close, and after Unpublish
+  "{n} Requests for it were Denied." (or "{n} Requests were Denied." when
+  it closed the Path too). Nothing is added when none were pending.

@@ -362,7 +362,9 @@ function PathDraft() {
       const denied = sent.body.denied ?? 0;
       if (denied > 0) {
         setPendingRequests(0);
-        setNotice([`${requests(denied)} Denied: this Path is closed.`]);
+        setNotice([
+          `${requests(denied)} ${denied === 1 ? "was" : "were"} Denied: this Path is closed.`,
+        ]);
       }
     } catch {
       setSaveError(CONNECTION_FAILED);
@@ -623,10 +625,9 @@ function PathDraft() {
               : []),
             ...(denied > 0
               ? [
-                  `${requests(denied)} ${closed ? "were" : "for it"} Denied.`.replace(
-                    /^1 Request were/,
-                    "1 Request was",
-                  ),
+                  closed
+                    ? `${requests(denied)} ${denied === 1 ? "was" : "were"} Denied.`
+                    : `${requests(denied)} for it ${denied === 1 ? "was" : "were"} Denied.`,
                 ]
               : []),
           ];

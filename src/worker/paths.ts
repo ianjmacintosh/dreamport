@@ -1268,8 +1268,10 @@ export async function setAccess(
     )
     .bind(path.id)
     .all<{ userId: string; number: number }>();
+  let approved = 0;
   for (const { userId, number } of results) {
-    await addVersion(db, userId, path.id, number);
+    const added = await addVersion(db, userId, path.id, number);
+    if (added.ok) approved++;
     await db
       .prepare(
         'DELETE FROM "path_requests" WHERE "userId" = ? AND "pathId" = ? AND "number" = ?',
@@ -1277,7 +1279,7 @@ export async function setAccess(
       .bind(userId, path.id, number)
       .run();
   }
-  return results.length;
+  return approved;
 }
 
 export function parseAccess(body: unknown): Access | null {
