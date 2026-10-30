@@ -996,11 +996,13 @@ export async function approveRequest(
   const added = await addVersion(db, request.userId, path.id, request.number, {
     approving: true,
   });
+  if (!added.ok && added.reason === "unavailable") {
+    return { ok: false, reason: "unavailable" };
+  }
   if (!added.ok) {
-    return {
-      ok: false,
-      reason: added.reason === "unavailable" ? "unavailable" : "gone",
-    };
+    // Its version is gone, so it can never be Approved: clear it.
+    await denyRequest(db, path, requestId);
+    return { ok: false, reason: "gone" };
   }
   await denyRequest(db, path, requestId);
   return { ok: true };
