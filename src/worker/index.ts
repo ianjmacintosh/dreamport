@@ -436,9 +436,10 @@ export function createApp(deps: AppDeps = {}) {
         milestones: version.milestones,
       },
       access: trailhead.access,
-      // Only a Guide, on their own Path, hears how many are waiting (#216).
+      // Only a Guide, on their own By Request Path, hears how many are waiting (#216).
       ...(trailhead.status === "followable" &&
         trailhead.owner === "user" &&
+        trailhead.access === "request" &&
         isGuide(c.env, session.user.email) && {
           pendingRequests: await countRequests(c.env.DB, pathId),
         }),

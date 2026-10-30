@@ -258,7 +258,8 @@ function versionLabel(
 /** A Notice's text, one paragraph per sentence. */
 type Sentences = readonly string[];
 
-const requests = (n: number) => (n === 1 ? "1 Request" : `${n} Requests`);
+const requestCount = (n: number) => (n === 1 ? "1 Request" : `${n} Requests`);
+const were = (n: number) => (n === 1 ? "was" : "were");
 
 /**
  * The Path's page (docs/design-decisions.md, #169, #191): its name, a
@@ -297,6 +298,26 @@ function PathDraft() {
   const [isDiscarding, setIsDiscarding] = useState(false);
 
   const base = `/api/paths/${path.id}`;
+
+  /**
+   * Open Change Access with the pending count fetched fresh, so the warning
+   * that Everyone Approves them counts Requests made since the page loaded.
+   * If the fetch fails, the count the page loaded with stands.
+   */
+  function openChangeAccess() {
+    setIsChangingAccess(true);
+    void (async () => {
+      try {
+        const res = await fetchWithTimeout(`${base}/requests`, {});
+        if (res.ok) {
+          const { requests } = (await res.json()) as { requests: unknown[] };
+          setPendingRequests(requests.length);
+        }
+      } catch {
+        // Keep the count the page loaded with.
+      }
+    })();
+  }
   const latestVersion = versions.at(0);
   const anyPublished = versions.some((v) => v.published);
   // The first Milestone until one is picked, and when the URL names one
@@ -363,7 +384,7 @@ function PathDraft() {
       if (denied > 0) {
         setPendingRequests(0);
         setNotice([
-          `${requests(denied)} ${denied === 1 ? "was" : "were"} Denied: this Path is closed.`,
+          `${requestCount(denied)} ${were(denied)} Denied: this Path is closed.`,
         ]);
       }
     } catch {
@@ -441,12 +462,12 @@ function PathDraft() {
             className="link-quiet"
             onClick={(e) => {
               e.preventDefault();
-              setIsChangingAccess(true);
+              openChangeAccess();
             }}
             onKeyDown={(e) => {
               if (e.key === " ") {
                 e.preventDefault();
-                setIsChangingAccess(true);
+                openChangeAccess();
               }
             }}
           >
@@ -584,7 +605,7 @@ function PathDraft() {
           if (approved > 0) {
             setPendingRequests(0);
             setNotice([
-              `${requests(approved)} ${approved === 1 ? "was" : "were"} Approved: ${
+              `${requestCount(approved)} ${were(approved)} Approved: ${
                 approved === 1 ? "that User has" : "those Users have"
               } the version they asked for.`,
             ]);
@@ -626,8 +647,8 @@ function PathDraft() {
             ...(denied > 0
               ? [
                   closed
-                    ? `${requests(denied)} ${denied === 1 ? "was" : "were"} Denied.`
-                    : `${requests(denied)} for it ${denied === 1 ? "was" : "were"} Denied.`,
+                    ? `${requestCount(denied)} ${were(denied)} Denied.`
+                    : `${requestCount(denied)} for it ${were(denied)} Denied.`,
                 ]
               : []),
           ];
@@ -1158,7 +1179,7 @@ function ChangeAccessForm({
         <>
           <NoticeOf
             sentences={[
-              `This Path has ${requests(pendingRequests)} pending. Making it Everyone Approves ${
+              `This Path has ${requestCount(pendingRequests)} pending. Making it Everyone Approves ${
                 pendingRequests === 1 ? "it" : "them all"
               }: each of those Users gets the version they asked for.`,
             ]}
@@ -1169,7 +1190,8 @@ function ChangeAccessForm({
               disabled={isPending}
               onChange={(e) => setApproving(e.target.checked)}
             />
-            Approve the {requests(pendingRequests)} pending
+            Approve the {pendingRequests} pending{" "}
+            {pendingRequests === 1 ? "Request" : "Requests"}
           </label>
         </>
       )}

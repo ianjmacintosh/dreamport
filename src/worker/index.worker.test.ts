@@ -3809,5 +3809,117 @@ describe("Request list routes (#216)", () => {
     expect(await trailhead(user, guide.path.id)).not.toHaveProperty(
       "pendingRequests",
     );
+
+    await callApi("PUT", `/api/paths/${guide.path.id}/access`, guide.cookie, {
+      access: "everyone",
+    });
+    expect(await trailhead(guide.cookie, guide.path.id)).not.toHaveProperty(
+      "pendingRequests",
+    );
+  });
+});
+
+/**
+ * A Request is pending, Approved (its User holds the version) or gone
+ * (Denied, settled by Close or Unpublish, or taken with its User's
+ * account). Each row makes one Request, moves it through `before`, then
+ * checks that `move` answers `status` and leaves it in `state` (#213).
+ */
+describe("a Request's states (#213)", () => {
+  type Move =
+    | "approve"
+    | "deny"
+    | "close"
+    | "unpublish"
+    | "everyone"
+    | "delete account";
+  type State = "pending" | "approved" | "gone";
+  let made: string | undefined;
+  afterEach(async () => {
+    // The Guide would run out of Paths across these rows.
+    if (made) {
+      await env.DB.prepare('DELETE FROM "paths" WHERE "id" = ?')
+        .bind(made)
+        .run();
+    }
+    made = undefined;
+  });
+
+  it.each<[string, Move[], Move, number, State]>([
+    ["Approve Adds the version", [], "approve", 200, "approved"],
+    ["Deny leaves no trace", [], "deny", 200, "gone"],
+    ["Close Denies it", [], "close", 200, "gone"],
+    ["Unpublish Denies it", [], "unpublish", 200, "gone"],
+    ["Everyone Approves it", [], "everyone", 200, "approved"],
+    ["deleting the account takes it", [], "delete account", 302, "gone"],
+    ["a second Approve is refused", ["approve"], "approve", 404, "approved"],
+    ["Deny after Approve is refused", ["approve"], "deny", 404, "approved"],
+    ["Approve after Deny is refused", ["deny"], "approve", 404, "gone"],
+    ["Deny after Close is refused", ["close"], "deny", 404, "gone"],
+    [
+      "Approve after the account is deleted is refused",
+      ["delete account"],
+      "approve",
+      404,
+      "gone",
+    ],
+    [
+      "Deny after the account is deleted is refused",
+      ["delete account"],
+      "deny",
+      404,
+      "gone",
+    ],
+  ])("%s", async (_, before, move, status, state) => {
+    const guide = await openGuidesPath();
+    made = guide.path.id;
+    await callApi("PUT", `/api/paths/${guide.path.id}/access`, guide.cookie, {
+      access: "request",
+    });
+    const user = await signIn(TEST_EMAILS.requestStates);
+    const base = `/api/paths/${guide.path.id}`;
+    await callApi("POST", `${base}/versions/1/request`, user);
+    const listed = async () =>
+      (
+        (await (
+          await callApi("GET", `${base}/requests`, guide.cookie)
+        ).json()) as {
+          requests: { id: string }[];
+        }
+      ).requests.map(({ id }) => id);
+    const [id] = await listed();
+
+    const moves: Record<Move, () => Promise<Response>> = {
+      approve: () =>
+        callApi("POST", `${base}/requests/${id}/approve`, guide.cookie),
+      deny: () => callApi("POST", `${base}/requests/${id}/deny`, guide.cookie),
+      close: () => callApi("DELETE", `${base}/open`, guide.cookie),
+      unpublish: () =>
+        callApi("DELETE", `${base}/versions/1/published`, guide.cookie),
+      everyone: () =>
+        callApi("PUT", `${base}/access`, guide.cookie, { access: "everyone" }),
+      "delete account": async () => {
+        await requestAccountDeletion(user);
+        return fetchWorker(deleteLinkPathFor(TEST_EMAILS.requestStates), {
+          headers: { cookie: user },
+        });
+      },
+    };
+    for (const earlier of before) {
+      await moves[earlier]();
+    }
+
+    expect((await moves[move]()).status).toBe(status);
+    const holds =
+      (
+        (await (await callApi("GET", `${base}/trailhead`, user)).json()) as {
+          status?: string;
+        }
+      ).status === "followable";
+    const pending = (await listed()).includes(id);
+    expect({ pending, holds }).toEqual({
+      pending: state === "pending",
+      holds: state === "approved",
+    });
   });
 });

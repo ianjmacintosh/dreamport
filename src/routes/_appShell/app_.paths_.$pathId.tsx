@@ -192,16 +192,6 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState("");
   const product = products?.find((p) => p.id === productId);
-  const [isListingRequests, setIsListingRequests] = useState(false);
-  const [requests, setRequests] = useState<PendingRequest[] | null>(null);
-  const [requestsError, setRequestsError] = useState("");
-  const [deciding, setDeciding] = useState<{
-    id: string;
-    verb: "approve" | "deny";
-  } | null>(null);
-  const [decisionErrors, setDecisionErrors] = useState<Record<string, string>>(
-    {},
-  );
 
   /** Drop `?versions` without a new history entry, keeping the version shown. */
   function closeVersions() {
@@ -211,67 +201,6 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
       search: { version: search.version },
       replace: true,
     });
-  }
-
-  /** Open the Guide's Request list, loading it fresh. */
-  async function openRequests() {
-    setRequests(null);
-    setRequestsError("");
-    setDecisionErrors({});
-    setIsListingRequests(true);
-    try {
-      const res = await fetchWithTimeout(`/api/paths/${path.id}/requests`, {});
-      if (!res.ok) {
-        setRequestsError(REQUESTS_FAILED);
-        return;
-      }
-      setRequests(
-        ((await res.json()) as { requests: PendingRequest[] }).requests,
-      );
-    } catch {
-      setRequestsError(CONNECTION_FAILED);
-    }
-  }
-
-  /** Close the list, then reload the page so the count is the server's. */
-  async function closeRequests() {
-    setIsListingRequests(false);
-    await router.invalidate();
-    setRequests(null);
-  }
-
-  /** Approve or Deny one Request: its row leaves once the server confirms. */
-  async function decide(request: PendingRequest, verb: "approve" | "deny") {
-    setDecisionErrors((errors) => ({ ...errors, [request.id]: "" }));
-    setDeciding({ id: request.id, verb });
-    const fail = (message: string) =>
-      setDecisionErrors((errors) => ({ ...errors, [request.id]: message }));
-    try {
-      const failed = await withMinimumDuration(async () => {
-        const res = await fetchWithTimeout(
-          `/api/paths/${path.id}/requests/${request.id}/${verb}`,
-          { method: "POST", headers: { "content-type": "application/json" } },
-        );
-        if (res.status === 404) {
-          return NO_LONGER_PENDING;
-        }
-        if (res.status === 409) {
-          return ((await res.json()) as { error: string }).error;
-        }
-        return res.ok ? null : DECISION_FAILED;
-      });
-      if (failed) {
-        fail(failed);
-        return;
-      }
-      setRequests(
-        (current) => current?.filter(({ id }) => id !== request.id) ?? null,
-      );
-    } catch {
-      fail(CONNECTION_FAILED);
-    } finally {
-      setDeciding(null);
-    }
   }
 
   /** Add the version shown, then load the page again to show the copy. */
@@ -377,12 +306,12 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
         <div className="heading-row">
           <h1>{path.name}</h1>
           <div className="button-group">
-            {trailhead.pendingRequests !== undefined &&
-              trailhead.access === "request" && (
-                <Button variant="secondary" onClick={() => void openRequests()}>
-                  Requests ({requests?.length ?? trailhead.pendingRequests})
-                </Button>
-              )}
+            {trailhead.pendingRequests !== undefined && (
+              <GuideRequests
+                pathId={path.id}
+                pending={trailhead.pendingRequests}
+              />
+            )}
             <Link
               href={`${pathHref}/edit`}
               className="button button--secondary"
@@ -607,69 +536,6 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
         </div>
       </Dialog>
       <Dialog
-        open={isListingRequests}
-        onOpenChange={(open) => {
-          if (!open) {
-            void closeRequests();
-          }
-        }}
-        title="Requests"
-      >
-        {requestsError ? (
-          <p role="alert">{requestsError}</p>
-        ) : requests === null ? (
-          <p>Loading…</p>
-        ) : requests.length === 0 ? (
-          <p>No one is waiting.</p>
-        ) : (
-          <ul className="list">
-            {requests.map((request) => {
-              const isBusy = deciding !== null;
-              const mine = deciding?.id === request.id ? deciding.verb : null;
-              return (
-                <li key={request.id} className="list-row">
-                  <span className="list-row-name">
-                    {request.email}
-                    <span aria-hidden="true"> · </span>
-                    Version {request.number}
-                  </span>
-                  <div className="list-row-action">
-                    <div className="button-group">
-                      <Button
-                        variant="secondary"
-                        disabled={isBusy}
-                        state={mine === "deny" ? "pending" : "ready"}
-                        onClick={() => void decide(request, "deny")}
-                      >
-                        <Button.State name="ready">Deny</Button.State>
-                        <Button.State name="pending">Denying…</Button.State>
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        disabled={isBusy}
-                        state={mine === "approve" ? "pending" : "ready"}
-                        onClick={() => void decide(request, "approve")}
-                      >
-                        <Button.State name="ready">Approve</Button.State>
-                        <Button.State name="pending">Approving…</Button.State>
-                      </Button>
-                    </div>
-                    {decisionErrors[request.id] && (
-                      <p role="alert">{decisionErrors[request.id]}</p>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <div className="button-group button-group--end">
-          <Button variant="secondary" onClick={() => void closeRequests()}>
-            Done
-          </Button>
-        </div>
-      </Dialog>
-      <Dialog
         open={search.versions === true}
         onOpenChange={(open) => {
           if (!open) {
@@ -708,6 +574,166 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
         <div className="button-group button-group--end">
           <Button variant="secondary" onClick={() => closeVersions()}>
             Close
+          </Button>
+        </div>
+      </Dialog>
+    </>
+  );
+}
+
+/**
+ * The Guide's Requests on their own By Request Path (#216): a button with
+ * how many are pending, opening a Dialog of every one, oldest first, each
+ * with Approve and Deny. Only the row being decided waits on the server.
+ */
+function GuideRequests({
+  pathId,
+  pending,
+}: {
+  pathId: string;
+  pending: number;
+}) {
+  const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
+  const [requests, setRequests] = useState<PendingRequest[] | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [deciding, setDeciding] = useState<Record<string, "approve" | "deny">>(
+    {},
+  );
+  const [decisionErrors, setDecisionErrors] = useState<Record<string, string>>(
+    {},
+  );
+
+  /** Open the list, loading it fresh. */
+  async function open() {
+    setRequests(null);
+    setLoadError("");
+    setDecisionErrors({});
+    setIsOpen(true);
+    try {
+      const res = await fetchWithTimeout(`/api/paths/${pathId}/requests`, {});
+      if (!res.ok) {
+        setLoadError(REQUESTS_FAILED);
+        return;
+      }
+      setRequests(
+        ((await res.json()) as { requests: PendingRequest[] }).requests,
+      );
+    } catch {
+      setLoadError(CONNECTION_FAILED);
+    }
+  }
+
+  /** Close the list, then reload the page so the count is the server's. */
+  async function close() {
+    setIsOpen(false);
+    await router.invalidate();
+    setRequests(null);
+  }
+
+  /** Approve or Deny one Request: its row leaves once the server confirms. */
+  async function decide(request: PendingRequest, verb: "approve" | "deny") {
+    setDecisionErrors((errors) => ({ ...errors, [request.id]: "" }));
+    setDeciding((current) => ({ ...current, [request.id]: verb }));
+    const fail = (message: string) =>
+      setDecisionErrors((errors) => ({ ...errors, [request.id]: message }));
+    try {
+      const failed = await withMinimumDuration(async () => {
+        const res = await fetchWithTimeout(
+          `/api/paths/${pathId}/requests/${request.id}/${verb}`,
+          { method: "POST", headers: { "content-type": "application/json" } },
+        );
+        if (res.status === 404) {
+          return NO_LONGER_PENDING;
+        }
+        if (res.status === 409) {
+          return ((await res.json()) as { error: string }).error;
+        }
+        return res.ok ? null : DECISION_FAILED;
+      });
+      if (failed) {
+        fail(failed);
+        return;
+      }
+      setRequests(
+        (current) => current?.filter(({ id }) => id !== request.id) ?? null,
+      );
+    } catch {
+      fail(CONNECTION_FAILED);
+    } finally {
+      setDeciding((current) => {
+        const rest = { ...current };
+        delete rest[request.id];
+        return rest;
+      });
+    }
+  }
+
+  return (
+    <>
+      <Button variant="secondary" onClick={() => void open()}>
+        Requests ({requests?.length ?? pending})
+      </Button>
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            void close();
+          }
+        }}
+        title="Requests"
+      >
+        {loadError ? (
+          <p role="alert">{loadError}</p>
+        ) : requests === null ? (
+          <p>Loading…</p>
+        ) : requests.length === 0 ? (
+          <p>No one is waiting.</p>
+        ) : (
+          <ul className="list">
+            {requests.map((request) => {
+              const mine = deciding[request.id];
+              const isBusy = mine !== undefined;
+              return (
+                <li key={request.id} className="list-row">
+                  <span className="list-row-name">
+                    {request.email}
+                    <span aria-hidden="true"> · </span>
+                    Version {request.number}
+                  </span>
+                  <div className="list-row-action">
+                    <div className="button-group">
+                      <Button
+                        variant="secondary"
+                        disabled={isBusy}
+                        state={mine === "deny" ? "pending" : "ready"}
+                        onClick={() => void decide(request, "deny")}
+                      >
+                        <Button.State name="ready">Deny</Button.State>
+                        <Button.State name="pending">Denying…</Button.State>
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={isBusy}
+                        state={mine === "approve" ? "pending" : "ready"}
+                        onClick={() => void decide(request, "approve")}
+                      >
+                        <Button.State name="ready">Approve</Button.State>
+                        <Button.State name="pending">Approving…</Button.State>
+                      </Button>
+                    </div>
+                    {decisionErrors[request.id] && (
+                      <p role="alert">{decisionErrors[request.id]}</p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="button-group button-group--end">
+          <Button variant="secondary" onClick={() => void close()}>
+            Done
           </Button>
         </div>
       </Dialog>

@@ -743,17 +743,18 @@ Add an entry only once a sign-off conversation resolves something repeatable
   it closed the Path too). Nothing is added when none were pending.
 
 - **The Guide's Request list** (#216): on the Trailhead of their own
-  Permission-required Path, the Guide alone sees **Requests ({n})**, a
+  By Request Path, the Guide alone sees **Requests ({n})**, a
   secondary button beside Edit Path at the h1's end (a `.button-group`
   in the `.heading-row`, Requests first). It shows the count even at
   zero, "Requests (0)", so the Guide can always see whether anyone is
-  waiting. A Free Path shows no Requests button. It opens a `Dialog`
+  waiting. An Everyone Path shows no Requests button. It opens a `Dialog`
   titled "Requests": every pending Request for every version, oldest
   first, as `.list` rows, "{email address} · Version {n}" (the dot
   hidden from screen readers) with no timestamp, then Deny and Approve,
   both secondary, as Manage Versions' row buttons are. Each acts on one
   click, with no confirmation, relabelling to "Denying…" or
-  "Approving…" while it runs. The row leaves the list once the server
+  "Approving…" while it runs; only that row's buttons wait on it, so the
+  Guide can decide the next row meanwhile. The row leaves the list once the server
   confirms, and that is the only sign it worked: no message names the
   decision. If it fails, the row stays and a `role="alert"` line under
   its buttons says why, as for any action that didn't go through

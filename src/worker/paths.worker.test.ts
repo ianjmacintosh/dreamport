@@ -43,7 +43,7 @@ import {
   requestVersion,
   listRequests,
   approveRequest,
-  denyRequest,
+  deleteRequest,
   saveVersion,
   setAccess,
   TASK_TITLE_MAX_LENGTH,
@@ -1980,8 +1980,8 @@ describe("Requesting a version (#215)", () => {
       (r) => r.email === TEST_EMAILS.pathsModuleRequester,
     )!;
 
-    expect(await denyRequest(env.DB, path, theirs.id)).toBe(true);
-    expect(await denyRequest(env.DB, path, theirs.id)).toBe(false);
+    expect(await deleteRequest(env.DB, path, theirs.id)).toBe(true);
+    expect(await deleteRequest(env.DB, path, theirs.id)).toBe(false);
     expect(await pending(path.id)).toEqual([
       { userId: REQUESTER_TWO_ID, number: 1 },
     ]);
@@ -2000,7 +2000,7 @@ describe("Requesting a version (#215)", () => {
     await requestVersion(env.DB, REQUESTER_ID, path.id, 1);
     const [request] = await listRequests(env.DB, path);
 
-    expect(await denyRequest(env.DB, elsewhere, request.id)).toBe(false);
+    expect(await deleteRequest(env.DB, elsewhere, request.id)).toBe(false);
     expect(await approveRequest(env.DB, elsewhere, request.id)).toEqual({
       ok: false,
       reason: "gone",
