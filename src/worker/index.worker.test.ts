@@ -3429,7 +3429,13 @@ describe("request gates, across every route (#154)", () => {
       );
       return {
         cookie,
-        params: { pathId: path.id, milestoneId, taskId, number: "1" },
+        params: {
+          pathId: path.id,
+          milestoneId,
+          taskId,
+          number: "1",
+          requestId: "request",
+        },
       };
     }
 
@@ -3652,5 +3658,156 @@ describe("Request route (#215)", () => {
       guide.cookie,
     );
     expect(await unpublished.json()).toMatchObject({ closed: true, denied: 1 });
+  });
+});
+
+describe("Request list routes (#216)", () => {
+  const request = (cookie: string, pathId: string) =>
+    callApi("POST", `/api/paths/${pathId}/versions/1/request`, cookie);
+  const listOf = async (cookie: string, pathId: string) =>
+    (await (
+      await callApi("GET", `/api/paths/${pathId}/requests`, cookie)
+    ).json()) as { requests: { id: string; email: string; number: number }[] };
+  const decide = (
+    cookie: string,
+    pathId: string,
+    requestId: string,
+    verb: "approve" | "deny",
+  ) =>
+    callApi(
+      "POST",
+      `/api/paths/${pathId}/requests/${requestId}/${verb}`,
+      cookie,
+    );
+  const trailhead = async (cookie: string, pathId: string) =>
+    (await (
+      await callApi("GET", `/api/paths/${pathId}/trailhead`, cookie)
+    ).json()) as { status: string; pendingRequests?: number };
+  const byRequest = async () => {
+    const guide = await openGuidesPath();
+    await callApi("PUT", `/api/paths/${guide.path.id}/access`, guide.cookie, {
+      access: "request",
+    });
+    return guide;
+  };
+
+  it("lists a Guide's pending Requests with the requester's email address and the version, and nothing else", async () => {
+    const guide = await byRequest();
+    const user = await signIn(TEST_EMAILS.requestRoute);
+    expect(await listOf(guide.cookie, guide.path.id)).toEqual({ requests: [] });
+
+    await request(user, guide.path.id);
+    const res = await callApi(
+      "GET",
+      `/api/paths/${guide.path.id}/requests`,
+      guide.cookie,
+    );
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(JSON.parse(text)).toEqual({
+      requests: [
+        { id: expect.any(String), email: TEST_EMAILS.requestRoute, number: 1 },
+      ],
+    });
+    expect(text).not.toContain('"userId"');
+  });
+
+  it("refuses a plain User with 403 and another Guide's Path with 404, listing and deciding nothing", async () => {
+    const guide = await byRequest();
+    const user = await signIn(TEST_EMAILS.requestRoute);
+    await request(user, guide.path.id);
+    const [{ id }] = (await listOf(guide.cookie, guide.path.id)).requests;
+
+    const plain = await savedPath(TEST_EMAILS.pathsRoutesPlainUser);
+    for (const [method, url] of [
+      ["GET", `/api/paths/${plain.path.id}/requests`],
+      ["POST", `/api/paths/${plain.path.id}/requests/${id}/approve`],
+      ["POST", `/api/paths/${plain.path.id}/requests/${id}/deny`],
+    ]) {
+      const res = await callApi(method, url, plain.cookie);
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: "Only a Guide can do that." });
+    }
+
+    // The requester can't reach the Guide's Path at all.
+    expect((await decide(user, guide.path.id, id, "approve")).status).toBe(404);
+    expect(
+      (await callApi("GET", `/api/paths/${guide.path.id}/requests`, user))
+        .status,
+    ).toBe(404);
+    expect(await listOf(guide.cookie, guide.path.id)).toMatchObject({
+      requests: [{ id }],
+    });
+  });
+
+  it("Approves a Request: the User then holds the version, and a second Approve is 404", async () => {
+    const guide = await byRequest();
+    const user = await signIn(TEST_EMAILS.requestRoute);
+    await request(user, guide.path.id);
+    const [{ id }] = (await listOf(guide.cookie, guide.path.id)).requests;
+
+    expect(
+      (await decide(guide.cookie, guide.path.id, id, "approve")).status,
+    ).toBe(200);
+    expect(await trailhead(user, guide.path.id)).toMatchObject({
+      status: "followable",
+    });
+    expect(await listOf(guide.cookie, guide.path.id)).toEqual({ requests: [] });
+
+    const again = await decide(guide.cookie, guide.path.id, id, "approve");
+    expect(again.status).toBe(404);
+    expect(await again.json()).toEqual({
+      error: "That Request is no longer pending.",
+    });
+  });
+
+  it("Denies a Request leaving no trace: the User is offered it again, and a second Deny is 404", async () => {
+    const guide = await byRequest();
+    const user = await signIn(TEST_EMAILS.requestRoute);
+    await request(user, guide.path.id);
+    const [{ id }] = (await listOf(guide.cookie, guide.path.id)).requests;
+
+    expect((await decide(guide.cookie, guide.path.id, id, "deny")).status).toBe(
+      200,
+    );
+    expect(await trailhead(user, guide.path.id)).toMatchObject({
+      status: "offered",
+      requested: false,
+    });
+    expect(await listOf(guide.cookie, guide.path.id)).toEqual({ requests: [] });
+    expect((await decide(guide.cookie, guide.path.id, id, "deny")).status).toBe(
+      404,
+    );
+  });
+
+  it("answers 404 for a Request a Close Denied while the list was open", async () => {
+    const guide = await byRequest();
+    const user = await signIn(TEST_EMAILS.requestRoute);
+    await request(user, guide.path.id);
+    const [{ id }] = (await listOf(guide.cookie, guide.path.id)).requests;
+    await callApi("DELETE", `/api/paths/${guide.path.id}/open`, guide.cookie);
+
+    expect(
+      (await decide(guide.cookie, guide.path.id, id, "approve")).status,
+    ).toBe(404);
+    expect((await decide(guide.cookie, guide.path.id, id, "deny")).status).toBe(
+      404,
+    );
+  });
+
+  it("tells only the Guide, on their own Path, how many Requests are pending", async () => {
+    const guide = await byRequest();
+    const user = await signIn(TEST_EMAILS.requestRoute);
+    expect(await trailhead(guide.cookie, guide.path.id)).toMatchObject({
+      pendingRequests: 0,
+    });
+
+    await request(user, guide.path.id);
+    expect(await trailhead(guide.cookie, guide.path.id)).toMatchObject({
+      pendingRequests: 1,
+    });
+    expect(await trailhead(user, guide.path.id)).not.toHaveProperty(
+      "pendingRequests",
+    );
   });
 });

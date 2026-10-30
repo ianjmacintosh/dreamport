@@ -359,3 +359,104 @@ test("a User Requests a By Request Path after the email warning, sees Requested 
   ).toBeVisible();
   await visitorContext.close();
 });
+
+test("a Guide Denies one Request and Approves another from the Requests list, and the Approved User starts a Journey on the Path and Advances", async ({
+  browser,
+  page,
+}) => {
+  const pathName = `Decided Launch ${Date.now()}`;
+  const productName = `A decided app ${Date.now()}`;
+  await signIn(page, TEST_EMAILS.guide);
+  const path = await savedPathThroughApi(page, pathName, 0);
+  const milestones = (await draftOf(path)).milestones;
+  expect(
+    (
+      await path.api("PATCH", `/api/paths/${path.id}`, {
+        name: pathName,
+        description: "Two days to sign-ups.",
+        milestones: [
+          { id: milestones[0].id },
+          {
+            name: "Grow",
+            description: "Find more people.",
+            doneWhen: "Ten people use it.",
+            outcome: "",
+          },
+        ],
+      })
+    ).status(),
+  ).toBe(200);
+  for (const [method, url, data] of [
+    ["POST", `/api/paths/${path.id}/versions`],
+    ["PUT", `/api/paths/${path.id}/versions/1/published`],
+    ["PUT", `/api/paths/${path.id}/open`],
+    ["PUT", `/api/paths/${path.id}/access`, { access: "request" }],
+  ] as const) {
+    expect((await path.api(method, url, data)).ok()).toBe(true);
+  }
+
+  /** Sign `email` in a context of its own and Request the Path. */
+  async function requester(email: string) {
+    const context = await browser.newContext();
+    const user = await context.newPage();
+    await signIn(user, email);
+    await user.goto(`/app/paths/${path.id}`);
+    await user.getByRole("button", { name: "Request", exact: true }).click();
+    await user
+      .getByRole("dialog", { name: "Request Version 1?" })
+      .getByRole("button", { name: "Send Request" })
+      .click();
+    await expect(
+      user.getByRole("button", { name: "Requested" }),
+    ).toBeDisabled();
+    return { context, user };
+  }
+  const approved = await requester(TEST_EMAILS.e2eRequestApproved);
+  const denied = await requester(TEST_EMAILS.e2eRequestDenied);
+
+  await page.goto(`/app/paths/${path.id}`);
+  await page.getByRole("button", { name: "Requests (2)" }).click();
+  const list = page.getByRole("dialog", { name: "Requests" });
+  const approvedRow = list.getByRole("listitem").filter({
+    hasText: TEST_EMAILS.e2eRequestApproved,
+  });
+  const deniedRow = list.getByRole("listitem").filter({
+    hasText: TEST_EMAILS.e2eRequestDenied,
+  });
+  await expect(approvedRow).toContainText("Version 1");
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+
+  await deniedRow.getByRole("button", { name: "Deny" }).click();
+  await expect(deniedRow).toHaveCount(0);
+  await approvedRow.getByRole("button", { name: "Approve" }).click();
+  await expect(approvedRow).toHaveCount(0);
+  await expect(list).toContainText("No one is waiting.");
+  await list.getByRole("button", { name: "Done" }).click();
+  await expect(
+    page.getByRole("button", { name: "Requests (0)" }),
+  ).toBeVisible();
+
+  // The Denied User is offered Request again; the Approved one can start.
+  await denied.user.reload();
+  await expect(
+    denied.user.getByRole("button", { name: "Request", exact: true }),
+  ).toBeEnabled();
+  await denied.context.close();
+
+  const user = approved.user;
+  await user.goto("/app");
+  await user.getByLabel("Product name").fill(productName);
+  await user.getByRole("button", { name: "Add Product" }).click();
+  await expect(user.getByRole("link", { name: productName })).toBeVisible();
+  await user.goto(`/app/paths/${path.id}`);
+  await user.getByLabel("Product").selectOption({ label: productName });
+  await user.getByRole("button", { name: "Start on Path" }).click();
+  await expect(user).toHaveURL(/\/app\/products\/[^/]+\/journeys\/[^/]+$/);
+  await user.getByRole("button", { name: "Advance to Next Milestone" }).click();
+  await expect(
+    user
+      .getByRole("list", { name: "Milestones" })
+      .locator('[aria-current="step"]'),
+  ).toContainText("Grow");
+  await approved.context.close();
+});
