@@ -267,3 +267,36 @@ async function draftOf(path: Awaited<ReturnType<typeof savedPathThroughApi>>) {
   return ((await res.json()) as { draft: { milestones: { id: string }[] } })
     .draft;
 }
+
+test("a Guide changes a Path's Access in the editor, and another User's Trailhead then reads Permission required with no Add", async ({
+  browser,
+  page,
+}) => {
+  const pathName = `Gated Launch ${Date.now()}`;
+  await signIn(page, TEST_EMAILS.guide);
+  const path = await savedPathThroughApi(page, pathName);
+  await path.api("PUT", `/api/paths/${path.id}/versions/1/published`);
+  await path.api("PUT", `/api/paths/${path.id}/open`);
+
+  await page.goto(`/app/paths/${path.id}/edit`);
+  await expect(page.getByText("Access: Free")).toBeVisible();
+  await page.getByRole("button", { name: "Change Access" }).click();
+  const dialog = page.getByRole("dialog", { name: "Change Access" });
+  await expect(dialog.getByRole("radio", { name: /^Free/ })).toBeChecked();
+  await dialog.getByRole("radio", { name: /^Permission required/ }).check();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText("Access: Permission required")).toBeVisible();
+
+  const visitorContext = await browser.newContext();
+  const visitor = await visitorContext.newPage();
+  await signIn(visitor, TEST_EMAILS.e2eTrailheadVisitor);
+  await visitor.goto(`/app/paths/${path.id}`);
+  await expect(
+    visitor.getByText("Version 1 · Free · Permission required"),
+  ).toBeVisible();
+  await expect(
+    visitor.getByRole("button", { name: "Add This Path" }),
+  ).toHaveCount(0);
+  await visitorContext.close();
+});

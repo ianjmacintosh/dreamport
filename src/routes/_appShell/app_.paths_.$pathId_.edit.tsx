@@ -32,6 +32,7 @@ import Button from "../../components/Button";
 import Dialog from "../../components/Dialog";
 import Link from "../../components/Link";
 import Notice from "../../components/Notice";
+import Radio from "../../components/Radio";
 import TextArea from "../../components/TextArea";
 import TextInput from "../../components/TextInput";
 
@@ -67,12 +68,15 @@ interface Milestone extends MilestoneFields {
   tasks: Task[];
 }
 
+type Access = "free" | "permission";
+
 interface Draft extends PathHead {
   milestones: Milestone[];
   updatedAt: string;
   /** Exactly what the latest version saved: nothing edited since. */
   matchesLatest: boolean;
   open: boolean;
+  access: Access;
   /** Newest first. */
   versions: VersionSummary[];
 }
@@ -272,6 +276,8 @@ function PathDraft() {
   const [matchesLatest, setMatchesLatest] = useState(draft.matchesLatest);
   const [versions, setVersions] = useState(draft.versions);
   const [open, setOpen] = useState(draft.open);
+  const [access, setAccess] = useState(draft.access);
+  const [isChangingAccess, setIsChangingAccess] = useState(false);
   const [notice, setNotice] = useState<Sentences | null>(null);
   const [isManagingVersions, setIsManagingVersions] = useState(false);
   const [openPending, setOpenPending] = useState<
@@ -411,6 +417,30 @@ function PathDraft() {
           </>
         )}
       </p>
+      {guide && (
+        <p className="text-sm">
+          Access: {access === "free" ? "Free" : "Permission required"}
+          <span aria-hidden="true"> · </span>
+          <a
+            href="#"
+            role="button"
+            aria-haspopup="dialog"
+            className="link-quiet"
+            onClick={(e) => {
+              e.preventDefault();
+              setIsChangingAccess(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === " ") {
+                e.preventDefault();
+                setIsChangingAccess(true);
+              }
+            }}
+          >
+            Change Access
+          </a>
+        </p>
+      )}
       {path.description && (
         <>
           <h2 className="text-h4">About This Path</h2>
@@ -527,6 +557,17 @@ function PathDraft() {
         pathUrl={base}
         onClose={() => setPathDialog(null)}
         onUpdated={showUpdatedDraft}
+      />
+
+      <ChangeAccessDialog
+        open={guide && isChangingAccess}
+        access={access}
+        pathUrl={base}
+        onClose={() => setIsChangingAccess(false)}
+        onChanged={(next) => {
+          setAccess(next);
+          setIsChangingAccess(false);
+        }}
       />
 
       <ManageVersionsDialog
@@ -965,6 +1006,136 @@ function MilestoneInputs({
  * that Dialog's list and is sent with Update Path, so adding sends
  * nothing.
  */
+const ACCESS_CHOICES: { value: Access; name: string; hint: string }[] = [
+  {
+    value: "free",
+    name: "Free",
+    hint: "Any User can Add this Path straight away.",
+  },
+  {
+    value: "permission",
+    name: "Permission required",
+    hint: "A User Requests this Path, and you Approve or Deny each Request.",
+  },
+];
+
+/**
+ * Change Access (#214): Free or Permission required. Affects only Users who
+ * Add the Path from now on.
+ */
+function ChangeAccessDialog({
+  open,
+  access,
+  pathUrl,
+  onClose,
+  onChanged,
+}: {
+  open: boolean;
+  access: Access;
+  pathUrl: string;
+  onClose: () => void;
+  onChanged: (access: Access) => void;
+}) {
+  const [isPending, setIsPending] = useState(false);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !isPending) onClose();
+      }}
+      title="Change Access"
+    >
+      <ChangeAccessForm
+        access={access}
+        pathUrl={pathUrl}
+        isPending={isPending}
+        setIsPending={setIsPending}
+        onCancel={onClose}
+        onChanged={onChanged}
+      />
+    </Dialog>
+  );
+}
+
+function ChangeAccessForm({
+  access,
+  pathUrl,
+  isPending,
+  setIsPending,
+  onCancel,
+  onChanged,
+}: {
+  access: Access;
+  pathUrl: string;
+  isPending: boolean;
+  setIsPending: (isPending: boolean) => void;
+  onCancel: () => void;
+  onChanged: (access: Access) => void;
+}) {
+  const [picked, setPicked] = useState(access);
+  const [error, setError] = useState("");
+
+  async function save() {
+    setError("");
+    setIsPending(true);
+    try {
+      const sent = await withMinimumDuration(() =>
+        send<object>(`${pathUrl}/access`, "PUT", { access: picked }),
+      );
+      if (sent.ok) {
+        onChanged(picked);
+        return;
+      }
+      setError(sent.conflict ?? PUBLISH_FAILED);
+    } catch {
+      setError(CONNECTION_FAILED);
+    }
+    setIsPending(false);
+  }
+
+  return (
+    <>
+      <p>
+        Access affects only Users who Add this Path from now on. Users who
+        already Added it keep it.
+      </p>
+      <div className="radio-group" role="radiogroup" aria-label="Access">
+        {ACCESS_CHOICES.map((choice) => (
+          <label key={choice.value}>
+            <Radio
+              name="access"
+              value={choice.value}
+              checked={picked === choice.value}
+              disabled={isPending}
+              onChange={() => setPicked(choice.value)}
+            />
+            <b>{choice.name}</b>
+            {choice.value === access && <i> (current)</i>}
+            <span className="text-sm">
+              <br />
+              {choice.hint}
+            </span>
+          </label>
+        ))}
+      </div>
+      {error && <p role="alert">{error}</p>}
+      <div className="button-group button-group--end">
+        <Button variant="secondary" disabled={isPending} onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button
+          disabled={isPending}
+          state={isPending ? "pending" : "ready"}
+          onClick={() => void save()}
+        >
+          <Button.State name="ready">Save</Button.State>
+          <Button.State name="pending">Saving…</Button.State>
+        </Button>
+      </div>
+    </>
+  );
+}
+
 function DeletePathDialog({
   open,
   path,

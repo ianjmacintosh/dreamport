@@ -2566,6 +2566,7 @@ describe("Pathfinder and Trailhead routes", () => {
     const text = await res.text();
     expect(JSON.parse(text)).toEqual({
       status: "offered",
+      access: "free",
       path: { id: path.id, name: path.name, dreamport: false, own: false },
       version: {
         id: guide.version.id,
@@ -2718,6 +2719,7 @@ describe("Trailblazer routes", () => {
         updatedAt: path.createdAt,
         matchesLatest: false,
         open: false,
+        access: "free",
         versions: [],
         latestVersion: null,
       },
@@ -2743,6 +2745,7 @@ describe("Trailblazer routes", () => {
         updatedAt: expect.any(String),
         matchesLatest: false,
         open: false,
+        access: "free",
         versions: [],
         latestVersion: null,
       },
@@ -3467,5 +3470,81 @@ describe("request gates, across every route (#154)", () => {
         );
       },
     );
+  });
+});
+
+describe("Access routes (#214)", () => {
+  const accessOf = async (cookie: string, pathId: string) => {
+    const { draft } = (await (
+      await callApi("GET", `/api/paths/${pathId}`, cookie)
+    ).json()) as { draft: { access: string } };
+    return draft.access;
+  };
+  const setAccess = (cookie: string, pathId: string, access: unknown) =>
+    callApi("PUT", `/api/paths/${pathId}/access`, cookie, { access });
+
+  it("starts every Path Free, and lets its Guide set it to Permission required and back", async () => {
+    const guide = await openGuidesPath();
+    expect(await accessOf(guide.cookie, guide.path.id)).toBe("free");
+
+    const set = await setAccess(guide.cookie, guide.path.id, "permission");
+    expect(set.status).toBe(200);
+    expect(await set.json()).toEqual({ access: "permission" });
+    expect(await accessOf(guide.cookie, guide.path.id)).toBe("permission");
+
+    expect((await setAccess(guide.cookie, guide.path.id, "free")).status).toBe(
+      200,
+    );
+    expect(await accessOf(guide.cookie, guide.path.id)).toBe("free");
+    expect((await setAccess(guide.cookie, guide.path.id, "paid")).status).toBe(
+      400,
+    );
+  });
+
+  it("refuses a plain User with 403 and 404s another User's Path and Dream Sequence", async () => {
+    const guide = await openGuidesPath();
+    const plain = await savedPath(TEST_EMAILS.pathsRoutesPlainUser);
+    const refused = await setAccess(plain.cookie, plain.path.id, "permission");
+    expect(refused.status).toBe(403);
+    expect(await accessOf(plain.cookie, plain.path.id)).toBe("free");
+
+    expect(
+      (await setAccess(plain.cookie, guide.path.id, "permission")).status,
+    ).toBe(404);
+    expect(
+      (await setAccess(guide.cookie, "dream-sequence", "permission")).status,
+    ).toBe(404);
+    expect(await accessOf(guide.cookie, guide.path.id)).toBe("free");
+  });
+
+  it("refuses Add on a Permission-required Path, keeps held copies theirs, and the Trailhead says so", async () => {
+    const guide = await openGuidesPath();
+    const holder = await signIn(TEST_EMAILS.addRoute);
+    const other = await signIn(TEST_EMAILS.pathsRoutesPlainUser);
+    const add = (cookie: string) =>
+      callApi("POST", `/api/paths/${guide.path.id}/versions/1/add`, cookie);
+    const trailhead = async (cookie: string) =>
+      (await (
+        await callApi("GET", `/api/paths/${guide.path.id}/trailhead`, cookie)
+      ).json()) as { status: string; access?: string };
+
+    expect((await add(holder)).status).toBe(201);
+    await setAccess(guide.cookie, guide.path.id, "permission");
+
+    const refused = await add(other);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({
+      error: "This Path needs its Guide's permission. Request it instead.",
+    });
+    expect(await trailhead(other)).toMatchObject({
+      status: "offered",
+      access: "permission",
+    });
+
+    expect((await add(holder)).status).toBe(200);
+    expect(await trailhead(holder)).toMatchObject({ status: "followable" });
+
+    await setAccess(guide.cookie, guide.path.id, "free");
+    expect((await add(other)).status).toBe(201);
   });
 });

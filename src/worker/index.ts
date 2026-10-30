@@ -433,6 +433,7 @@ export function createApp(deps: AppDeps = {}) {
         description: version.description,
         milestones: version.milestones,
       },
+      ...(trailhead.status === "offered" && { access: trailhead.access }),
       versions: versions.map(({ number, savedAt }) => ({ number, savedAt })),
       newestNumber: versions[0].number,
       // A copy's Journeys are on the copy, under its own id.
@@ -448,8 +449,8 @@ export function createApp(deps: AppDeps = {}) {
 
   /**
    * Add version `:number` of another User's Path (#192): 201 with a copy
-   * made, 200 if the User already held one. 409 for a closed Path or an
-   * unpublished version; 404 for an unknown one, and for the User's own
+   * made, 200 if the User already held one. 409 for a closed Path, an
+   * unpublished version or a Path whose Access is Permission required; 404 for an unknown one, and for the User's own
    * Path or Dream Sequence, which need no Add. Ahead of `pathRoutes`, like
    * the Trailhead.
    */
@@ -471,6 +472,14 @@ export function createApp(deps: AppDeps = {}) {
         : null;
     if (!added || (!added.ok && added.reason === "not-found")) {
       return c.json({ error: "Not found" }, 404);
+    }
+    if (!added.ok && added.reason === "permission") {
+      return c.json(
+        {
+          error: "This Path needs its Guide's permission. Request it instead.",
+        },
+        409,
+      );
     }
     if (!added.ok) {
       return c.json({ error: "This Path is no longer available." }, 409);

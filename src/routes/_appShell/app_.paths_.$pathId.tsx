@@ -60,6 +60,8 @@ interface Shown {
     description: string;
     milestones: { id: string; name: string; outcome: string }[];
   };
+  /** Offered only: `permission` when the User has to Request it (#214). */
+  access?: "free" | "permission";
   /** Newest first. */
   versions: { number: number; savedAt: string }[];
   newestNumber: number;
@@ -267,6 +269,12 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
         Version {version.number}
         <span aria-hidden="true"> · </span>
         Free
+        {trailhead.access === "permission" && (
+          <>
+            <span aria-hidden="true"> · </span>
+            Permission required
+          </>
+        )}
         {version.number < newestNumber && (
           <>
             <span aria-hidden="true"> · </span>
@@ -316,21 +324,22 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
           ) : (
             <p>{version.description}</p>
           )}
-          {trailhead.status === "offered" && (
-            <>
-              <p>
-                <Button
-                  disabled={isAdding}
-                  state={isAdding ? "pending" : "ready"}
-                  onClick={() => void addPath()}
-                >
-                  <Button.State name="ready">Add This Path</Button.State>
-                  <Button.State name="pending">Adding…</Button.State>
-                </Button>
-              </p>
-              {error && <p role="alert">{error}</p>}
-            </>
-          )}
+          {trailhead.status === "offered" &&
+            trailhead.access !== "permission" && (
+              <>
+                <p>
+                  <Button
+                    disabled={isAdding}
+                    state={isAdding ? "pending" : "ready"}
+                    onClick={() => void addPath()}
+                  >
+                    <Button.State name="ready">Add This Path</Button.State>
+                    <Button.State name="pending">Adding…</Button.State>
+                  </Button>
+                </p>
+                {error && <p role="alert">{error}</p>}
+              </>
+            )}
           {products && (
             <>
               <div className="field-row">
