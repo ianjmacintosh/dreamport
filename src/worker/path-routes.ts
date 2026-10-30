@@ -16,12 +16,14 @@ import {
   MILESTONES_AND_TASKS_PER_PATH,
   openPath,
   type OwnedPath,
+  parseAccess,
   parseMilestoneFields,
   parsePathUpdate,
   parseTaskFields,
   publishVersion,
   reorderTasks,
   saveVersion,
+  setAccess,
   type DraftGap,
   unpublishVersion,
   updateMilestone,
@@ -67,7 +69,7 @@ pathRoutes.use(async (c, next) => {
   await next();
 });
 
-/** Publish, Unpublish, Open and Close are a Guide's alone (#191): 403 for anyone else. */
+/** Publish, Unpublish, Open, Close and Access are a Guide's alone (#191): 403 for anyone else. */
 const guidesOnly = createMiddleware<PathEnv>(async (c, next) => {
   if (!c.var.guide) {
     return c.json({ error: "Only a Guide can do that." }, 403);
@@ -76,6 +78,7 @@ const guidesOnly = createMiddleware<PathEnv>(async (c, next) => {
 });
 pathRoutes.use("/versions/:number/published", guidesOnly);
 pathRoutes.use("/open", guidesOnly);
+pathRoutes.use("/access", guidesOnly);
 
 /** A version number from the address: a positive whole number, or null. */
 export function versionNumber(raw: string): number | null {
@@ -216,6 +219,20 @@ pathRoutes.put("/open", async (c) => {
 pathRoutes.delete("/open", async (c) => {
   await closePath(c.env.DB, c.var.path);
   return c.json({}, 200);
+});
+
+/**
+ * Set the Path's Access (#214): `{ access: "everyone" | "request" }`. Only
+ * later Adds are affected. Answers the Access as it now stands.
+ */
+pathRoutes.put("/access", async (c) => {
+  const access = parseAccess(await c.req.json().catch(() => null));
+  if (!access) {
+    return c.json({ error: 'access must be "everyone" or "request".' }, 400);
+  }
+
+  await setAccess(c.env.DB, c.var.path, access);
+  return c.json({ access }, 200);
 });
 
 /**

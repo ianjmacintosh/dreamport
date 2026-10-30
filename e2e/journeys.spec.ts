@@ -65,7 +65,9 @@ test("sign in, open a Product, choose Dream Sequence in Pathfinder, start it fro
     "Pathfinder",
     "Dream Sequence",
   ]);
-  await expect(page.getByText("Version 1 · Free")).toBeVisible();
+  await expect(
+    page.getByText("Version 1 · Access: Everyone · Price: Free"),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { level: 1, name: "Dream Sequence" }),
   ).toBeVisible();
@@ -249,7 +251,9 @@ test("make a Path in Trailblazer with a Milestone and a Task, save a version, an
   const earlier = page.getByRole("link", {
     name: "A newer version is available.",
   });
-  await expect(page.getByText("Version 2 · Free")).toBeVisible();
+  await expect(
+    page.getByText("Version 2 · Access: Everyone · Price: Free"),
+  ).toBeVisible();
   await expect(earlier).toHaveCount(0);
   await page
     .getByRole("link", { name: "Looking for an older version?" })
@@ -260,7 +264,9 @@ test("make a Path in Trailblazer with a Milestone and a Task, save a version, an
   await versions.getByRole("link", { name: /^Version 1, saved / }).click();
   await expect(page).toHaveURL(/\/app\/paths\/[^/?]+\?version=1$/);
   await expect(versions).toHaveCount(0);
-  await expect(page.getByText("Version 1 · Free")).toBeVisible();
+  await expect(
+    page.getByText("Version 1 · Access: Everyone · Price: Free"),
+  ).toBeVisible();
   await earlier.click();
   await expect(page).toHaveURL(/\/app\/paths\/[^/?]+$/);
   await expect(earlier).toHaveCount(0);

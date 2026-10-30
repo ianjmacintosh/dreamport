@@ -86,6 +86,12 @@ export function getVersion(
  */
 export type PathOwner = "dreamport" | "user" | "added";
 
+/**
+ * Whether a User may Add a Path straight away (`everyone`), or has to
+ * Request it first (`request`, #215). Only its Guide changes it.
+ */
+export type Access = "everyone" | "request";
+
 /** A Path someone else made, as Pathfinder's "Your Added Paths" lists it. */
 export interface AddedPath {
   /** The id its Trailhead's address uses: for a copy, its source's. */
@@ -178,12 +184,14 @@ export type Trailhead =
   /** Another User's open Path, not followable until Add (#192). */
   | {
       readonly status: "offered";
+      readonly access: Access;
       readonly version: PathVersion;
       readonly versions: readonly VersionSummary[];
     }
   /** Dream Sequence, the viewer's own Path, or their copy of another User's. */
   | {
       readonly status: "followable";
+      readonly access: Access;
       readonly owner: PathOwner;
       readonly version: FollowableVersion;
       readonly versions: readonly VersionSummary[];
@@ -220,7 +228,7 @@ export async function getTrailhead(
   const [{ results }, { results: held }] = await db.batch([
     db
       .prepare(
-        `SELECT "paths"."userId", "paths"."addedFrom", "paths"."open", "path_versions"."id",
+        `SELECT "paths"."userId", "paths"."addedFrom", "paths"."open", "paths"."access", "path_versions"."id",
            "path_versions"."number", "path_versions"."name", "path_versions"."description",
            "path_versions"."savedAt", "path_versions"."published"
          FROM "paths"
@@ -242,7 +250,12 @@ export async function getTrailhead(
       .bind(userId, pathId),
   ]);
   const head = results[0] as
-    | { userId: string | null; addedFrom: string | null; open: number }
+    | {
+        userId: string | null;
+        addedFrom: string | null;
+        open: number;
+        access: Access;
+      }
     | undefined;
   if (head?.addedFrom) {
     return null;
@@ -254,7 +267,15 @@ export async function getTrailhead(
   const dreamports = head !== undefined && head.userId === null;
   const own = head !== undefined && head.userId === userId;
   if (dreamports || own) {
-    return ownTrailhead(db, pathId, own, saved, published, number);
+    return ownTrailhead(
+      db,
+      pathId,
+      head?.access ?? "everyone",
+      own,
+      saved,
+      published,
+      number,
+    );
   }
 
   const copies = held as (TrailheadRow & { pathId: string })[];
@@ -275,6 +296,7 @@ export async function getTrailhead(
   if (copy) {
     return {
       status: "followable",
+      access: head?.access ?? "everyone",
       owner: "added",
       version: (await versionWithMilestones(
         db,
@@ -296,6 +318,7 @@ export async function getTrailhead(
   }
   return {
     status: "offered",
+    access: head?.access ?? "everyone",
     version: await versionWithMilestones(db, offer, pathId, pathId),
     versions: summaries,
   };
@@ -305,6 +328,7 @@ export async function getTrailhead(
 async function ownTrailhead(
   db: D1Database,
   pathId: string,
+  access: Access,
   own: boolean,
   saved: readonly TrailheadRow[],
   published: readonly TrailheadRow[],
@@ -321,6 +345,7 @@ async function ownTrailhead(
   }
   return {
     status: "followable",
+    access,
     owner: own ? "user" : "dreamport",
     version: (await versionWithMilestones(
       db,
@@ -463,6 +488,8 @@ export interface Draft extends PathSummary {
   readonly matchesLatest: boolean;
   /** Whether the Path accepts new Adds. Only ever true with a version published. */
   readonly open: boolean;
+  /** Whether Users Add the Path straight away or Request it (#214). */
+  readonly access: Access;
   /** Every saved version, newest first. */
   readonly versions: readonly VersionSummary[];
   readonly latestVersion: VersionSummary | null;
@@ -673,8 +700,13 @@ export type AddVersionResult =
    * `not-found`: no such version of another User's Path, which takes in
    * the User's own and Dream Sequence, neither needing an Add.
    * `unavailable`: the Path is closed or the version isn't published.
+   * `request`: the Path's Access is By Request (#214) and the
+   * User holds no copy of the version: they Request it instead (#215).
    */
-  | { readonly ok: false; readonly reason: "not-found" | "unavailable" };
+  | {
+      readonly ok: false;
+      readonly reason: "not-found" | "unavailable" | "request";
+    };
 
 /**
  * Add version `number` of another User's Path (#192): copy its name,
@@ -696,7 +728,7 @@ export async function addVersion(
 ): Promise<AddVersionResult> {
   const source = await db
     .prepare(
-      `SELECT "path_versions"."id", "paths"."open", "path_versions"."published",
+      `SELECT "path_versions"."id", "paths"."open", "paths"."access", "path_versions"."published",
          EXISTS (SELECT 1 FROM "paths" AS "copy"
            JOIN "path_versions" AS "held" ON "held"."pathId" = "copy"."id"
            WHERE "copy"."userId" = ?3 AND "copy"."addedFrom" = ?1 AND "held"."number" = ?2) AS "held"
@@ -705,7 +737,13 @@ export async function addVersion(
        WHERE "paths"."id" = ?1 AND "paths"."userId" <> ?3 AND "paths"."addedFrom" IS NULL`,
     )
     .bind(pathId, number, userId)
-    .first<{ id: string; open: number; published: number; held: number }>();
+    .first<{
+      id: string;
+      open: number;
+      access: Access;
+      published: number;
+      held: number;
+    }>();
   if (!source) {
     return { ok: false, reason: "not-found" };
   }
@@ -715,12 +753,15 @@ export async function addVersion(
   if (source.open !== 1 || source.published !== 1) {
     return { ok: false, reason: "unavailable" };
   }
+  if (source.access !== "everyone") {
+    return { ok: false, reason: "request" };
+  }
 
   // ?1 the version Added, ?2 its copy's id, ?3 the Path, ?4 the User. Each
   // statement binds as many as its highest number, as D1 requires.
   const offered = `EXISTS (SELECT 1 FROM "paths"
     JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
-    WHERE "paths"."id" = ?3 AND "paths"."open" = 1
+    WHERE "paths"."id" = ?3 AND "paths"."open" = 1 AND "paths"."access" = 'everyone'
       AND "path_versions"."id" = ?1 AND "path_versions"."published" = 1)`;
   const landed = `EXISTS (SELECT 1 FROM "path_versions" WHERE "id" = ?2)`;
   /** A source row's id with the copy's version id in place of the source's. */
@@ -818,10 +859,15 @@ export async function getDraft(
       .all<DraftTask & { milestoneId: string }>(),
     db
       .prepare(
-        'SELECT "updatedAt", "matchedAt", "open" FROM "paths" WHERE "id" = ?',
+        'SELECT "updatedAt", "matchedAt", "open", "access" FROM "paths" WHERE "id" = ?',
       )
       .bind(path.id)
-      .first<{ updatedAt: string; matchedAt: string; open: number }>(),
+      .first<{
+        updatedAt: string;
+        matchedAt: string;
+        open: number;
+        access: Access;
+      }>(),
     db
       .prepare(
         'SELECT "id", "number", "savedAt", "published" FROM "path_versions" WHERE "pathId" = ? ORDER BY "number" DESC',
@@ -847,6 +893,7 @@ export async function getDraft(
     matchesLatest:
       versions.length > 0 && !!edited && edited.updatedAt <= edited.matchedAt,
     open: edited?.open === 1,
+    access: edited?.access ?? "everyone",
     versions,
     latestVersion: versions[0] ?? null,
   };
@@ -1070,6 +1117,26 @@ export async function closePath(
     .prepare('UPDATE "paths" SET "open" = 0 WHERE "id" = ?')
     .bind(path.id)
     .run();
+}
+
+/** Set the Path's Access. Affects only later Adds; held copies are untouched. */
+export async function setAccess(
+  db: D1Database,
+  path: OwnedPath,
+  access: Access,
+): Promise<void> {
+  await db
+    .prepare('UPDATE "paths" SET "access" = ? WHERE "id" = ?')
+    .bind(access, path.id)
+    .run();
+}
+
+export function parseAccess(body: unknown): Access | null {
+  const access =
+    body && typeof body === "object"
+      ? (body as { access?: unknown }).access
+      : null;
+  return access === "everyone" || access === "request" ? access : null;
 }
 
 export type DiscardChangesResult =

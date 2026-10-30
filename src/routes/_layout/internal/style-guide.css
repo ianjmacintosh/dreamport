@@ -40,6 +40,12 @@
   margin-bottom: var(--space-10);
 }
 
+/* Every block in a section gets the same room above it, as `main > * + *`
+   does for a page, so a new demo is spaced without a margin of its own. */
+.sg-section > * + * {
+  margin-top: var(--space-3);
+}
+
 .sg-section-label {
   font-size: var(--text-xs);
   font-weight: 700;
@@ -62,7 +68,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
 }
 
 .sg-swatch {
@@ -133,7 +138,6 @@
   border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-3);
   overflow-x: auto;
 }
 
@@ -150,7 +154,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  margin-bottom: var(--space-3);
 }
 
 /* ── Buttons ── */
@@ -159,7 +162,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
-  margin-bottom: var(--space-3);
 }
 
 /* The bar-only button variants on the real bar surface: `.app-nav` brings
@@ -174,13 +176,11 @@
 /* ── Button label stack ── */
 
 .sg-button-label-stack-demo {
-  margin-bottom: var(--space-3);
 }
 
 /* ── Button group ── */
 
 .sg-button-group-demo {
-  margin-bottom: var(--space-3);
 }
 
 .sg-checkbox-demo {
@@ -188,16 +188,13 @@
   grid-auto-flow: column;
   justify-content: start;
   gap: var(--space-4);
-  margin-bottom: var(--space-3);
 }
 
 .sg-action-card-demo {
   max-width: 40rem;
-  margin-bottom: var(--space-3);
 }
 
 .sg-dropdown-demo {
-  margin-bottom: var(--space-3);
 }
 
 /* The real Header/AppNav size their content to --page-width (a share of
@@ -205,7 +202,6 @@
    gives them the column's own width instead. */
 .sg-bar-demo {
   --page-width: 100%;
-  margin-bottom: var(--space-3);
 }
 
 /* ── Text inputs ── */
@@ -215,21 +211,18 @@
   flex-wrap: wrap;
   gap: var(--space-5);
   max-width: 320px;
-  margin-bottom: var(--space-3);
 }
 
 /* ── Field with action ── */
 
 .sg-field-row-demo {
   max-width: 320px;
-  margin-bottom: var(--space-3);
 }
 
 /* ── Row with action ── */
 
 .sg-list-row-demo {
   max-width: 480px;
-  margin-bottom: var(--space-3);
 }
 
 /* ── Turnstile container ── */
@@ -239,7 +232,6 @@
 .sg-turnstile-demo {
   width: 300px;
   border: 1px dashed var(--color-border);
-  margin-bottom: var(--space-3);
 }
 
 /* ── Form shell ── */
@@ -249,7 +241,6 @@
 .sg-form-shell-demo {
   border: 1px dashed var(--color-border);
   padding: var(--space-4);
-  margin-bottom: var(--space-3);
 }
 
 /* ── Spacing ── */

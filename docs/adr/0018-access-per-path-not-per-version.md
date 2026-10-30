@@ -1,7 +1,7 @@
 # A Path's Access is set for the whole Path, not per version
 
 A Guide decides once, for the whole Path, whether a User may Add it straight
-away (Free) or has to Request it first (Permission required). Every
+away (Everyone) or has to Request it first (By Request). Every
 published version of the Path has the same Access. This matches Open and
 Close, which are also per Path. It also gives the Guide one list of
 Requests, not one list per version. A Request itself is still for one

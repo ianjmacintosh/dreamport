@@ -113,7 +113,9 @@ test("another User sees a Guide's open Path's published version with Add This Pa
 
   // The Guide sees what everyone sees, plus Edit Path.
   await page.goto(`/app/paths/${path.id}`);
-  await expect(page.getByText("Version 1 · Free")).toBeVisible();
+  await expect(
+    page.getByText("Version 1 · Access: Everyone · Price: Free"),
+  ).toBeVisible();
   await expect(page.getByRole("link", { name: "Edit Path" })).toBeVisible();
 
   const visitorContext = await browser.newContext();
@@ -123,7 +125,9 @@ test("another User sees a Guide's open Path's published version with Add This Pa
   await expect(
     visitor.getByRole("heading", { level: 1, name: pathName }),
   ).toBeVisible();
-  await expect(visitor.getByText("Version 1 · Free")).toBeVisible();
+  await expect(
+    visitor.getByText("Version 1 · Access: Everyone · Price: Free"),
+  ).toBeVisible();
   await expect(visitor.getByRole("list", { name: "Milestones" })).toContainText(
     "Launch",
   );
@@ -267,3 +271,36 @@ async function draftOf(path: Awaited<ReturnType<typeof savedPathThroughApi>>) {
   return ((await res.json()) as { draft: { milestones: { id: string }[] } })
     .draft;
 }
+
+test("a Guide changes a Path's Access in the editor, and another User's Trailhead then reads By Request with no Add", async ({
+  browser,
+  page,
+}) => {
+  const pathName = `Gated Launch ${Date.now()}`;
+  await signIn(page, TEST_EMAILS.guide);
+  const path = await savedPathThroughApi(page, pathName);
+  await path.api("PUT", `/api/paths/${path.id}/versions/1/published`);
+  await path.api("PUT", `/api/paths/${path.id}/open`);
+
+  await page.goto(`/app/paths/${path.id}/edit`);
+  await expect(page.getByText("Access: Everyone")).toBeVisible();
+  await page.getByRole("button", { name: "Change Access" }).click();
+  const dialog = page.getByRole("dialog", { name: "Change Access" });
+  await expect(dialog.getByRole("radio", { name: /^Everyone/ })).toBeChecked();
+  await dialog.getByRole("radio", { name: /^By Request/ }).check();
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText("Access: By Request")).toBeVisible();
+
+  const visitorContext = await browser.newContext();
+  const visitor = await visitorContext.newPage();
+  await signIn(visitor, TEST_EMAILS.e2eTrailheadVisitor);
+  await visitor.goto(`/app/paths/${path.id}`);
+  await expect(
+    visitor.getByText("Version 1 · Access: By Request · Price: Free"),
+  ).toBeVisible();
+  await expect(
+    visitor.getByRole("button", { name: "Add This Path" }),
+  ).toHaveCount(0);
+  await visitorContext.close();
+});

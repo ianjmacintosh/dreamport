@@ -60,6 +60,8 @@ interface Shown {
     description: string;
     milestones: { id: string; name: string; outcome: string }[];
   };
+  /** `request` when a User has to Request the Path rather than Add it (#214). */
+  access: "everyone" | "request";
   /** Newest first. */
   versions: { number: number; savedAt: string }[];
   newestNumber: number;
@@ -266,7 +268,9 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
       <p className="text-sm">
         Version {version.number}
         <span aria-hidden="true"> · </span>
-        Free
+        Access: {trailhead.access === "everyone" ? "Everyone" : "By Request"}
+        <span aria-hidden="true"> · </span>
+        Price: Free
         {version.number < newestNumber && (
           <>
             <span aria-hidden="true"> · </span>
@@ -316,7 +320,7 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
           ) : (
             <p>{version.description}</p>
           )}
-          {trailhead.status === "offered" && (
+          {trailhead.status === "offered" && trailhead.access !== "request" && (
             <>
               <p>
                 <Button
