@@ -11,7 +11,7 @@ function Terms() {
     <>
       <header>
         <h1>Terms of Service</h1>
-        <p className="text-sm">Last updated: September 30, 2026</p>
+        <p className="text-sm">Last updated: October 30, 2026</p>
       </header>
 
       <section>
@@ -51,7 +51,29 @@ function Terms() {
       </section>
 
       <section>
-        <h2>5. Availability</h2>
+        <h2>5. Paths from other Users</h2>
+        <p className="text-2xl">
+          Some Users, called &quot;Guides,&quot; can create and edit Paths of
+          their own that other Users can follow. Guides may limit access to any
+          of their own Paths, requiring permission for other Users to access.
+          Users may request permission to access a specific version of a Path,
+          which the Guide may review. Each request lists the version number
+          requested and the email address associated with the user requesting
+          access. A Guide may accept or deny a user&apos;s request at will, at
+          their sole discretion. Access to a particular version of a Path does
+          not grant access to any other version of the same Path.
+        </p>
+        <p className="text-2xl">
+          Any arrangement you make with a Guide to get that permission,
+          including any payment, is between you and the Guide. Dreamport
+          doesn&apos;t process payments for Paths, isn&apos;t a party to those
+          arrangements, and isn&apos;t responsible for disputes about them, such
+          as a Guide who doesn&apos;t approve a request after you&apos;ve paid.
+        </p>
+      </section>
+
+      <section>
+        <h2>6. Availability</h2>
         <p className="text-2xl">
           Dreamport is provided &quot;as is&quot; and &quot;as available,&quot;
           without warranties of any kind. Features may change, and the service
@@ -61,7 +83,7 @@ function Terms() {
       </section>
 
       <section>
-        <h2>6. Limitation of liability</h2>
+        <h2>7. Limitation of liability</h2>
         <p className="text-2xl">
           To the fullest extent permitted by law, Dreamport and its operator
           aren&apos;t liable for any indirect, incidental, or consequential
@@ -71,7 +93,7 @@ function Terms() {
       </section>
 
       <section>
-        <h2>7. Ending your use</h2>
+        <h2>8. Ending your use</h2>
         <p className="text-2xl">
           You can stop using Dreamport and delete your account at any time from
           your account settings. Access may be suspended or ended for accounts
@@ -80,7 +102,7 @@ function Terms() {
       </section>
 
       <section>
-        <h2>8. Changes to these terms</h2>
+        <h2>9. Changes to these terms</h2>
         <p className="text-2xl">
           These terms may be updated from time to time. Any changes will be
           posted on this page with a new &quot;last updated&quot; date.
@@ -90,7 +112,7 @@ function Terms() {
       </section>
 
       <section>
-        <h2>9. Contact</h2>
+        <h2>10. Contact</h2>
         <p className="text-2xl">
           Questions about these terms?{" "}
           <Link href="https://ianjmacintosh.com/contact" external>
