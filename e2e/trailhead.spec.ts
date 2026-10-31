@@ -362,7 +362,7 @@ test("a User Requests a By Request Path after the email warning, sees Requested 
   await visitorContext.close();
 });
 
-test("a Guide Denies one Request and Approves another from the Requests list, and the Approved User starts a Journey on the Path and Advances", async ({
+test("a Guide Denies one Request and Approves another from the Requests list, and the Approved User then finds the Path among their Added Paths on Pathfinder, starts a Journey from there and Advances", async ({
   browser,
   page,
 }) => {
@@ -415,6 +415,14 @@ test("a Guide Denies one Request and Approves another from the Requests list, an
   }
   const approved = await requester(TEST_EMAILS.e2eRequestApproved);
   const denied = await requester(TEST_EMAILS.e2eRequestDenied);
+  const addedPath = approved.user
+    .getByRole("list", { name: "Your Added Paths" })
+    .getByRole("link", { name: pathName });
+  await approved.user.goto("/app/paths");
+  await expect(
+    approved.user.getByRole("list", { name: "Your Added Paths" }),
+  ).toBeVisible();
+  await expect(addedPath).toHaveCount(0);
 
   await page.goto(`/app/paths/${path.id}`);
   await page.getByRole("button", { name: "Requests (2)" }).click();
@@ -450,7 +458,9 @@ test("a Guide Denies one Request and Approves another from the Requests list, an
   await user.getByLabel("Product name").fill(productName);
   await user.getByRole("button", { name: "Add Product" }).click();
   await expect(user.getByRole("link", { name: productName })).toBeVisible();
-  await user.goto(`/app/paths/${path.id}`);
+  await user.getByRole("link", { name: "Pathfinder", exact: true }).click();
+  await expect(addedPath).toHaveAttribute("href", `/app/paths/${path.id}`);
+  await addedPath.click();
   await user.getByLabel("Product").selectOption({ label: productName });
   await user.getByRole("button", { name: "Start on Path" }).click();
   await expect(user).toHaveURL(/\/app\/products\/[^/]+\/journeys\/[^/]+$/);
