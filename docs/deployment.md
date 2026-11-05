@@ -328,6 +328,59 @@ the verifier and `src/worker/turnstile.test.ts` stubs `fetch`. The Playwright
 suite runs against a local worker with the test pair injected, never a
 deployed environment.
 
+## Stripe (Guides' payout accounts)
+
+A Guide connects a Stripe account through Stripe's hosted onboarding (#230).
+The Worker reads two secrets:
+
+- **`STRIPE_SECRET_KEY`**: the Stripe secret key. Its presence decides
+  whether selling is available. Unset (production, until going live),
+  `GET /api/stripe/connect` answers `{ "status": "unavailable" }`, Connect
+  answers 503, and the app offers no Connect button. Nothing crashes.
+- **`STRIPE_WEBHOOK_SECRET`**: the signing secret of the webhook endpoint,
+  `POST /api/stripe/webhook`. The endpoint checks every event's
+  `Stripe-Signature` against it and answers 400 to a bad one. Unset, it
+  answers 503 to every event.
+
+The Worker logs ids and outcomes only, never either secret, a signature or
+an event body (AGENTS.md, Logging).
+
+Every request is pinned to API version `2026-10-28.endive`
+(`src/worker/stripe.ts`).
+
+### Local dev
+
+Put the sandbox's test secret key in `.dev.vars` as `STRIPE_SECRET_KEY` (see
+[`.dev.vars.example`](../.dev.vars.example)). Never commit it.
+
+The devcontainer has no Stripe CLI. To receive webhooks locally, install it
+([docs.stripe.com/stripe-cli](https://docs.stripe.com/stripe-cli)), sign in
+to the sandbox with `stripe login`, then run:
+
+```sh
+stripe listen --forward-to localhost:5173/api/stripe/webhook
+```
+
+It prints a `whsec_...` signing secret. Put that in `.dev.vars` as
+`STRIPE_WEBHOOK_SECRET` and restart the dev server.
+
+### Staging and production (Ian)
+
+Agents can't run `wrangler secret put`, so these are dashboard steps:
+
+1. **Turn off Express Dashboard payouts** in the sandbox's Connect settings,
+   so a Guide can't pay themselves out and skip the $3 fee and the holding
+   period. Check it: a test Guide's Express Dashboard shows no payout
+   button. Do the same in live mode before going live.
+2. **Add a webhook endpoint** in the Stripe sandbox, pointing at
+   `https://<staging host>/api/stripe/webhook`.
+3. On `dreamport-staging`: Settings → Variables and Secrets → Add, **Type:
+   Secret (encrypted)**, for `STRIPE_SECRET_KEY` (the sandbox's test secret
+   key) and `STRIPE_WEBHOOK_SECRET` (step 2's signing secret).
+
+Production gets the same two secrets, with live values, only once the
+live-readiness checklist is done (#229).
+
 ## Observability (Workers Logs)
 
 Configured in `wrangler.jsonc`, not the dashboard — a value toggled in the
@@ -492,6 +545,10 @@ deploy`). Staging uses Cloudflare's always-pass test secret
   `VITE_TURNSTILE_SITE_KEY` (from the `vite.config.ts` map) and the
   hostname/action check are covered in
   [Turnstile](#turnstile-bot-check-on-the-send-otp-path).
+- **`STRIPE_SECRET_KEY`** and **`STRIPE_WEBHOOK_SECRET`** — optional (#230).
+  Unset, selling is unavailable and the webhook endpoint refuses every
+  event. Dashboard secrets on staging, set by Ian; see
+  [Stripe](#stripe-guides-payout-accounts).
 
 Because production and staging are separate Worker scripts, the same secret
 name can (and for `RESEND_API_KEY`, generally should) hold different values

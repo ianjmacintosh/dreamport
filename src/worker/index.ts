@@ -25,6 +25,7 @@ import {
 } from "./products";
 import { productRoutes } from "./product-routes";
 import { pathRoutes, versionNumber } from "./path-routes";
+import { connectRoutes, stripeWebhook } from "./stripe-routes";
 import { productsOnPath } from "./journeys";
 import {
   addVersion,
@@ -49,6 +50,8 @@ import { verifyTurnstile, type TurnstileVerifier } from "./turnstile";
  * keys don't echo a stable action.
  */
 const TURNSTILE_ACTION = "send-otp";
+
+const STRIPE_WEBHOOK_PATH = "/api/stripe/webhook";
 
 /**
  * Overrides for {@link createApp}. `verifyTurnstile` lets the Seam 1 tests
@@ -92,13 +95,16 @@ export function createApp(deps: AppDeps = {}) {
    * else under `/api/*` is Dreamport's own and gets none of that for free,
    * so it gets the same self-trust-or-TRUSTED_ORIGINS check here — see
    * `isTrustedRequestOrigin`. GET and HEAD pass: browsers leave `Origin`
-   * off same-origin reads, and they change nothing.
+   * off same-origin reads, and they change nothing. Stripe's webhook
+   * passes too: Stripe sends no `Origin`, and the endpoint checks each
+   * event's signature instead (#230).
    */
   app.use("/api/*", async (c, next) => {
     if (
       c.req.method !== "GET" &&
       c.req.method !== "HEAD" &&
       !c.req.path.startsWith("/api/auth/") &&
+      c.req.path !== STRIPE_WEBHOOK_PATH &&
       !isTrustedRequestOrigin(
         c.req.header("origin") ?? null,
         c.req.header("host") ?? "",
@@ -542,6 +548,11 @@ export function createApp(deps: AppDeps = {}) {
   // Every route about one Path: session and ownership checked once, in
   // front of them all. See `path-routes.ts`.
   app.route("/api/paths/:pathId", pathRoutes);
+
+  // A Guide's Stripe connection, and Stripe's webhook (#230). See
+  // `stripe-routes.ts`.
+  app.route("/api/stripe/connect", connectRoutes);
+  app.post(STRIPE_WEBHOOK_PATH, stripeWebhook);
 
   /**
    * Issue #113: the fixed Tag catalog. No session needed — it's the same

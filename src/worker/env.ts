@@ -51,6 +51,20 @@ export interface WorkerEnv {
    * Never sent to the browser.
    */
   GUIDE_EMAILS?: string;
+  /**
+   * Stripe secret key (#230). Its presence decides whether selling is
+   * available at all: unset, a Guide is offered no Connect and the Connect
+   * routes answer 503. `.dev.vars` locally; a dashboard secret on staging
+   * and production. Never logged.
+   */
+  STRIPE_SECRET_KEY?: string;
+  /**
+   * Signing secret of the Stripe webhook endpoint (#230), which
+   * `POST /api/stripe/webhook` checks every event against. Unset, the
+   * endpoint refuses every event. Set the same way as `STRIPE_SECRET_KEY`.
+   * Never logged.
+   */
+  STRIPE_WEBHOOK_SECRET?: string;
   /** The static SPA assets (`wrangler.jsonc` `assets.binding`). */
   ASSETS: Fetcher;
 }

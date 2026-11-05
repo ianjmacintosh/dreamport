@@ -406,6 +406,10 @@ export const TEST_EMAILS = {
   /** Never on any `GUIDE_EMAILS` list. */
   notGuide: "delivered+not-guide@resend.dev",
 
+  // --- Seam 1: Stripe Connect (#230) ---
+  /** A plain User, never a Guide, who must get 403 from the Connect routes. */
+  stripeNotGuide: "delivered+stripe-not-guide@resend.dev",
+
   // --- Seam 1: real ResendEmailSender path, MSW-stubbed (#66) ---
   /** Send with RESEND_API_KEY set and MSW stubbing Resend's response. */
   resendPathMsw: "delivered+resend-path-msw@resend.dev",
