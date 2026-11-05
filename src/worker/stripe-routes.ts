@@ -3,7 +3,7 @@ import Stripe from "stripe";
 
 import { currentSession } from "./auth";
 import type { WorkerEnv } from "./env";
-import { isGuide } from "./guides";
+import { guidesOnly, isGuide } from "./guides";
 import { createStripe, verifyWebhookEvent } from "./stripe";
 import {
   connectStatus,
@@ -22,33 +22,34 @@ export const CONNECT_RETURN_PATH = "/app/settings";
 
 type ConnectEnv = {
   Bindings: WorkerEnv;
-  Variables: { guide: ConnectingGuide; stripe: Stripe | null };
+  Variables: { user: ConnectingGuide; guide: boolean; stripe: Stripe | null };
 };
 
 /**
  * A Guide's Stripe connection (#230), mounted at `/api/stripe/connect`.
- * 401 with no session and 403 for anyone but a Guide, as #191's Guide
- * routes do. Past the middleware, `c.var.stripe` is null when this
+ * The app's own calls answer JSON: 401 with no session and 403 for anyone
+ * but a Guide. Past the middleware, `c.var.stripe` is null when this
  * environment has no `STRIPE_SECRET_KEY`: selling isn't available there.
+ * `/refresh` is a page the browser lands on from Stripe, so it only ever
+ * redirects.
  *
  * The origin check on requests that change data is `index.ts`'s.
  */
 export const connectRoutes = new Hono<ConnectEnv>();
 
-connectRoutes.use(async (c, next) => {
+connectRoutes.use("/", async (c, next) => {
   const session = await currentSession(c.env, c.req.raw);
   if (!session) {
     return c.json({ error: "Not signed in" }, 401);
   }
-  if (!isGuide(c.env, session.user.email)) {
-    return c.json({ error: "Only a Guide can do that." }, 403);
-  }
 
-  c.set("guide", { userId: session.user.id, email: session.user.email });
+  c.set("user", { userId: session.user.id, email: session.user.email });
+  c.set("guide", isGuide(c.env, session.user.email));
   const key = c.env.STRIPE_SECRET_KEY;
   c.set("stripe", key ? createStripe(key) : null);
   await next();
 });
+connectRoutes.use("/", guidesOnly);
 
 /** Where the Guide's account stands, or `unavailable` with no Stripe key. */
 connectRoutes.get("/", async (c) => {
@@ -59,14 +60,15 @@ connectRoutes.get("/", async (c) => {
 
   return withStripe(c, async () =>
     c.json({
-      status: await connectStatus(stripe, c.env.DB, c.var.guide.userId),
+      status: await connectStatus(stripe, c.env.DB, c.var.user.userId),
     }),
   );
 });
 
 /**
  * A fresh link into Stripe's hosted onboarding, making the Guide's account
- * on the first call. The client sends the Guide to `url`.
+ * when they have none or Stripe closed theirs. The client sends the Guide
+ * to `url`.
  */
 connectRoutes.post("/", async (c) => {
   const stripe = c.var.stripe;
@@ -79,7 +81,7 @@ connectRoutes.post("/", async (c) => {
       url: await onboardingLink(
         stripe,
         c.env.DB,
-        c.var.guide,
+        c.var.user,
         onboardingUrls(c),
       ),
     }),
@@ -87,25 +89,30 @@ connectRoutes.post("/", async (c) => {
 });
 
 /**
- * Stripe's `refresh_url`: a link expired or was used, so make a fresh one
- * and send the Guide straight on. A Guide with no account yet goes back to
- * the app instead, since a GET mustn't make one.
+ * Stripe's `refresh_url`: the browser arrives here when an onboarding link
+ * expired or was used. A Guide with an account goes straight on to a fresh
+ * link. Everyone else, and everyone when Stripe fails, goes back to the
+ * app page, which reads the account's status itself. Changes nothing.
  */
 connectRoutes.get("/refresh", async (c) => {
-  const stripe = c.var.stripe;
-  if (!stripe) {
+  const session = await currentSession(c.env, c.req.raw);
+  const key = c.env.STRIPE_SECRET_KEY;
+  if (!session || !key || !isGuide(c.env, session.user.email)) {
     return c.redirect(CONNECT_RETURN_PATH);
   }
 
-  return withStripe(c, async () => {
+  try {
     const url = await continueOnboardingLink(
-      stripe,
+      createStripe(key),
       c.env.DB,
-      c.var.guide,
+      session.user.id,
       onboardingUrls(c),
     );
     return c.redirect(url ?? CONNECT_RETURN_PATH);
-  });
+  } catch (error) {
+    logStripeError(error);
+    return c.redirect(CONNECT_RETURN_PATH);
+  }
 });
 
 function onboardingUrls(c: Context): OnboardingUrls {
@@ -128,13 +135,25 @@ async function withStripe(
   try {
     return await run();
   } catch (error) {
-    if (!(error instanceof Stripe.errors.StripeError)) throw error;
-    console.error(
-      `stripe connect: failed (${error.type}${error.code ? ` ${error.code}` : ""})`,
-    );
+    logStripeError(error);
     return c.json({ error: "Stripe didn't answer. Try again." }, 502);
   }
 }
+
+/** Logs only a Stripe error's type and code; rethrows anything else. */
+function logStripeError(error: unknown) {
+  if (!(error instanceof Stripe.errors.StripeError)) throw error;
+  console.error(
+    `stripe connect: failed (${error.type}${error.code ? ` ${error.code}` : ""})`,
+  );
+}
+
+/**
+ * Where Stripe sends events. It sits outside `/api/*`, the routes the
+ * app's own pages call, so `index.ts`'s Origin check never applies: Stripe
+ * sends no `Origin`, and the signature check below takes its place.
+ */
+export const STRIPE_WEBHOOK_PATH = "/webhooks/stripe";
 
 /**
  * Stripe's webhook endpoint (#230). Every event's `Stripe-Signature` is

@@ -60,7 +60,7 @@ export interface WorkerEnv {
   STRIPE_SECRET_KEY?: string;
   /**
    * Signing secret of the Stripe webhook endpoint (#230), which
-   * `POST /api/stripe/webhook` checks every event against. Unset, the
+   * `POST /webhooks/stripe` checks every event against. Unset, the
    * endpoint refuses every event. Set the same way as `STRIPE_SECRET_KEY`.
    * Never logged.
    */

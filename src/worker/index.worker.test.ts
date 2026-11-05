@@ -3300,10 +3300,7 @@ describe("request gates, across every route (#154)", () => {
       (route) =>
         route.method !== "GET" &&
         route.path.startsWith("/api/") &&
-        !route.path.startsWith("/api/auth/") &&
-        // Stripe sends no Origin; the webhook checks a signature instead,
-        // covered in `stripe.worker.test.ts`.
-        route.path !== "/api/stripe/webhook",
+        !route.path.startsWith("/api/auth/"),
     );
 
     it("finds the routes that change data", () => {

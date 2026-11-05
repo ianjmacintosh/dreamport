@@ -8,7 +8,7 @@ import { network } from "../../test/msw-network";
 import { getMockSender } from "./email/sender";
 import { createApp } from "./index";
 import { STRIPE_API_VERSION } from "./stripe";
-import { CONNECT_RETURN_PATH } from "./stripe-routes";
+import { CONNECT_RETURN_PATH, STRIPE_WEBHOOK_PATH } from "./stripe-routes";
 
 /**
  * Stripe Connect and the webhook endpoint (#230), through the Worker's
@@ -237,7 +237,7 @@ describe("Stripe Connect for a Guide", () => {
     ]);
   });
 
-  it("continues the same account on a second click, with a fresh link", async () => {
+  it("continues the same account on a second click, with a fresh link and nothing else", async () => {
     stubStripe();
     const cookie = await signIn(TEST_EMAILS.guide);
 
@@ -246,8 +246,56 @@ describe("Stripe Connect for a Guide", () => {
 
     expect(again.status).toBe(200);
     expect(callsTo("POST", "/v2/core/accounts")).toHaveLength(1);
+    expect(callsTo("POST", `/v1/accounts/${ACCOUNT_ID}`)).toHaveLength(1);
     expect(callsTo("POST", "/v2/core/account_links")).toHaveLength(2);
     expect((await storedAccounts()).results).toHaveLength(1);
+  });
+
+  it("says the account is gone when Stripe deleted it, and makes a new one on the next click", async () => {
+    stubStripe();
+    const cookie = await signIn(TEST_EMAILS.guide);
+    await callApi("POST", "/api/stripe/connect", cookie);
+    const gone = { error: { type: "invalid_request_error" } };
+    const NEW_ACCOUNT_ID = "acct_test_replacement";
+    network.use(
+      http.get(`${STRIPE}/v2/core/accounts/${ACCOUNT_ID}`, () =>
+        HttpResponse.json(gone, { status: 404 }),
+      ),
+      http.post(`${STRIPE}/v2/core/account_links`, async ({ request }) => {
+        const { account } = (await request.clone().json()) as {
+          account: string;
+        };
+        return account === ACCOUNT_ID
+          ? HttpResponse.json(gone, { status: 404 })
+          : undefined;
+      }),
+      http.post(`${STRIPE}/v2/core/accounts`, async ({ request }) => {
+        calls.push({
+          method: "POST",
+          path: "/v2/core/accounts",
+          headers: request.headers,
+          body: await request.text(),
+        });
+        return HttpResponse.json({
+          id: NEW_ACCOUNT_ID,
+          object: "v2.core.account",
+        });
+      }),
+    );
+
+    const status = await callApi("GET", "/api/stripe/connect", cookie);
+    expect(await status.json()).toEqual({ status: "gone" });
+
+    const connect = await callApi("POST", "/api/stripe/connect", cookie);
+    expect(connect.status).toBe(200);
+    const [first, replacement] = callsTo("POST", "/v2/core/accounts");
+    expect(replacement.headers.get("idempotency-key")).not.toBe(
+      first.headers.get("idempotency-key"),
+    );
+    expect(callsTo("POST", `/v1/accounts/${NEW_ACCOUNT_ID}`)).toHaveLength(1);
+    expect((await storedAccounts()).results).toEqual([
+      { userId: await userId(TEST_EMAILS.guide), accountId: NEW_ACCOUNT_ID },
+    ]);
   });
 
   it("sends the same idempotency key on every attempt to make the account", async () => {
@@ -284,17 +332,35 @@ describe("Stripe Connect for a Guide", () => {
     expect(callsTo("GET", `/v2/core/accounts/${ACCOUNT_ID}`)).toHaveLength(2);
   });
 
-  it("answers Stripe's refresh_url with a fresh link for the same account", async () => {
+  it("answers Stripe's refresh_url with a fresh link for the same account, changing nothing", async () => {
     stubStripe();
     const cookie = await signIn(TEST_EMAILS.guide);
     await callApi("POST", "/api/stripe/connect", cookie);
+    calls = [];
 
     const res = await callApi("GET", "/api/stripe/connect/refresh", cookie);
 
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe(LINK_URL);
-    expect(callsTo("POST", "/v2/core/accounts")).toHaveLength(1);
-    expect(callsTo("POST", "/v2/core/account_links")).toHaveLength(2);
+    expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual([
+      "POST /v2/core/account_links",
+    ]);
+  });
+
+  it("sends the Guide back to the app from refresh_url when Stripe fails", async () => {
+    stubStripe();
+    const cookie = await signIn(TEST_EMAILS.guide);
+    await callApi("POST", "/api/stripe/connect", cookie);
+    network.use(
+      http.post(`${STRIPE}/v2/core/account_links`, () =>
+        HttpResponse.json({ error: { type: "api_error" } }, { status: 500 }),
+      ),
+    );
+
+    const res = await callApi("GET", "/api/stripe/connect/refresh", cookie);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe(CONNECT_RETURN_PATH);
   });
 
   it("sends a Guide with no account back to the app from refresh_url, making none", async () => {
@@ -333,24 +399,27 @@ describe("Stripe Connect for a Guide", () => {
 });
 
 describe("Stripe Connect for anyone else", () => {
-  it("refuses a plain User every Connect route with 403, and calls Stripe for none", async () => {
+  it("refuses a plain User with 403, sends them back to the app from refresh_url, and calls Stripe for none", async () => {
     stubStripe();
     const cookie = await signIn(TEST_EMAILS.stripeNotGuide);
 
-    for (const [method, path] of [
-      ["GET", "/api/stripe/connect"],
-      ["POST", "/api/stripe/connect"],
-      ["GET", "/api/stripe/connect/refresh"],
-    ]) {
-      const res = await callApi(method, path, cookie);
-      expect(res.status, `${method} ${path}`).toBe(403);
+    for (const method of ["GET", "POST"]) {
+      const res = await callApi(method, "/api/stripe/connect", cookie);
+      expect(res.status, method).toBe(403);
+      expect(await res.json()).toEqual({ error: "Only a Guide can do that." });
     }
+    const refresh = await callApi("GET", "/api/stripe/connect/refresh", cookie);
+    expect(refresh.headers.get("location")).toBe(CONNECT_RETURN_PATH);
     expect(calls).toEqual([]);
   });
 
-  it("answers 401 with no session", async () => {
+  it("answers 401 with no session, and sends the browser back to the app from refresh_url", async () => {
     const res = await callApi("GET", "/api/stripe/connect");
     expect(res.status).toBe(401);
+
+    const refresh = await callApi("GET", "/api/stripe/connect/refresh");
+    expect(refresh.status).toBe(302);
+    expect(refresh.headers.get("location")).toBe(CONNECT_RETURN_PATH);
   });
 });
 
@@ -373,7 +442,7 @@ describe("with no STRIPE_SECRET_KEY", () => {
   });
 });
 
-describe("POST /api/stripe/webhook", () => {
+describe("Stripe's webhook", () => {
   const payload = JSON.stringify({
     id: "evt_test_1",
     object: "event",
@@ -391,7 +460,7 @@ describe("POST /api/stripe/webhook", () => {
 
   /** As Stripe sends it: no Origin, no cookie. */
   function deliver(body: string, signature?: string) {
-    return fetchWorker("/api/stripe/webhook", {
+    return fetchWorker(STRIPE_WEBHOOK_PATH, {
       method: "POST",
       headers: {
         "content-type": "application/json",

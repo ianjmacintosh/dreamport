@@ -33,6 +33,6 @@ TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 # Stripe (#230). Unset, selling is unavailable: no Connect for Guides. Use
 # the sandbox's test secret key, never a live one. The webhook secret is
 # the `whsec_...` that `stripe listen --forward-to
-# localhost:5173/api/stripe/webhook` prints; see docs/deployment.md.
+# localhost:5173/webhooks/stripe` prints; see docs/deployment.md.
 # STRIPE_SECRET_KEY=sk_test_...
 # STRIPE_WEBHOOK_SECRET=whsec_...

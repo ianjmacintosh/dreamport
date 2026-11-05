@@ -1,3 +1,5 @@
+import { createMiddleware } from "hono/factory";
+
 import type { WorkerEnv } from "./env";
 
 /**
@@ -19,3 +21,16 @@ export function isGuide(
 function normalise(email: string): string {
   return email.trim().toLowerCase();
 }
+
+/**
+ * 403 for anyone but a Guide (#191). Runs after a middleware that has set
+ * `c.var.guide` from {@link isGuide}.
+ */
+export const guidesOnly = createMiddleware<{ Variables: { guide: boolean } }>(
+  async (c, next) => {
+    if (!c.var.guide) {
+      return c.json({ error: "Only a Guide can do that." }, 403);
+    }
+    await next();
+  },
+);

@@ -338,7 +338,7 @@ The Worker reads two secrets:
   `GET /api/stripe/connect` answers `{ "status": "unavailable" }`, Connect
   answers 503, and the app offers no Connect button. Nothing crashes.
 - **`STRIPE_WEBHOOK_SECRET`**: the signing secret of the webhook endpoint,
-  `POST /api/stripe/webhook`. The endpoint checks every event's
+  `POST /webhooks/stripe`. The endpoint checks every event's
   `Stripe-Signature` against it and answers 400 to a bad one. Unset, it
   answers 503 to every event.
 
@@ -358,7 +358,7 @@ The devcontainer has no Stripe CLI. To receive webhooks locally, install it
 to the sandbox with `stripe login`, then run:
 
 ```sh
-stripe listen --forward-to localhost:5173/api/stripe/webhook
+stripe listen --forward-to localhost:5173/webhooks/stripe
 ```
 
 It prints a `whsec_...` signing secret. Put that in `.dev.vars` as
@@ -373,7 +373,7 @@ Agents can't run `wrangler secret put`, so these are dashboard steps:
    period. Check it: a test Guide's Express Dashboard shows no payout
    button. Do the same in live mode before going live.
 2. **Add a webhook endpoint** in the Stripe sandbox, pointing at
-   `https://<staging host>/api/stripe/webhook`.
+   `https://<staging host>/webhooks/stripe`.
 3. On `dreamport-staging`: Settings → Variables and Secrets → Add, **Type:
    Secret (encrypted)**, for `STRIPE_SECRET_KEY` (the sandbox's test secret
    key) and `STRIPE_WEBHOOK_SECRET` (step 2's signing secret).
