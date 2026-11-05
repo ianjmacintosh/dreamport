@@ -1,9 +1,8 @@
 import { Hono } from "hono";
-import { createMiddleware } from "hono/factory";
 
 import { currentSession } from "./auth";
 import type { WorkerEnv } from "./env";
-import { isGuide } from "./guides";
+import { guidesOnly, isGuide } from "./guides";
 import {
   addTask,
   approveRequest,
@@ -72,13 +71,7 @@ pathRoutes.use(async (c, next) => {
   await next();
 });
 
-/** Publish, Unpublish, Open, Close and Access are a Guide's alone (#191): 403 for anyone else. */
-const guidesOnly = createMiddleware<PathEnv>(async (c, next) => {
-  if (!c.var.guide) {
-    return c.json({ error: "Only a Guide can do that." }, 403);
-  }
-  await next();
-});
+// Publish, Unpublish, Open, Close, Access and Requests are a Guide's alone (#191).
 pathRoutes.use("/versions/:number/published", guidesOnly);
 pathRoutes.use("/open", guidesOnly);
 pathRoutes.use("/access", guidesOnly);

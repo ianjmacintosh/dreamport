@@ -52,5 +52,5 @@ Each file has an H1 and one paragraph, then four H2s in this order:
 - [Pathfinder and Adding a Path](./pathfinder.md): the two sections on
   `/app/paths`, Add This Path on another User's Trailhead, a Journey on the
   copy, and the Guide's refused delete.
-- [Account](./account.md): the account menu, sign out, Settings, and
-  delete account.
+- [Account](./account.md): the account menu, sign out, Settings, a
+  Guide's Getting paid (Stripe Connect), and delete account.

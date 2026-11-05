@@ -25,6 +25,11 @@ import {
 } from "./products";
 import { productRoutes } from "./product-routes";
 import { pathRoutes, versionNumber } from "./path-routes";
+import {
+  connectRoutes,
+  STRIPE_WEBHOOK_PATH,
+  stripeWebhook,
+} from "./stripe-routes";
 import { productsOnPath } from "./journeys";
 import {
   addVersion,
@@ -92,7 +97,9 @@ export function createApp(deps: AppDeps = {}) {
    * else under `/api/*` is Dreamport's own and gets none of that for free,
    * so it gets the same self-trust-or-TRUSTED_ORIGINS check here — see
    * `isTrustedRequestOrigin`. GET and HEAD pass: browsers leave `Origin`
-   * off same-origin reads, and they change nothing.
+   * off same-origin reads, and they change nothing. Calls from other
+   * services, which send no `Origin`, live outside `/api/*` (see the
+   * webhooks below).
    */
   app.use("/api/*", async (c, next) => {
     if (
@@ -543,6 +550,9 @@ export function createApp(deps: AppDeps = {}) {
   // front of them all. See `path-routes.ts`.
   app.route("/api/paths/:pathId", pathRoutes);
 
+  // A Guide's Stripe connection (#230). See `stripe-routes.ts`.
+  app.route("/api/stripe/connect", connectRoutes);
+
   /**
    * Issue #113: the fixed Tag catalog. No session needed — it's the same
    * Dreamport-curated list for everyone, nothing private in it.
@@ -605,6 +615,13 @@ export function createApp(deps: AppDeps = {}) {
 
   // Any other `/api/*` path is the Worker's to own and currently unhandled.
   app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
+
+  /**
+   * Webhooks: calls from other services, not from Dreamport's pages. Each
+   * proves its sender by checking a signature, so none goes through the
+   * Origin check on `/api/*`.
+   */
+  app.post(STRIPE_WEBHOOK_PATH, stripeWebhook);
 
   // Everything else is the static SPA.
   app.all("*", (c) => c.env.ASSETS.fetch(c.req.raw));
