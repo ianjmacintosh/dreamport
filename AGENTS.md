@@ -16,10 +16,9 @@ picking up the issue — do it without being asked.
   the first push creates the matching `origin/<branch>`.
 - **Move the issue to In progress.** Picking up an issue also means setting
   its Status to **In progress** on GitHub Project 12 before the first commit.
-  Work doesn't need an iteration to start, so don't wait for one. Look up the
-  item and option ids once with `gh project item-list 12 --owner
-  ianjmacintosh --format json`, then use `gh project item-edit` on the Status
-  field.
+  Work doesn't need an iteration to start, so don't wait for one. Find the
+  item and option ids with `gh project item-list 12`, then change the Status
+  field with `gh project item-edit`.
 
 **Before every commit, run `npm run format`.** CI's Static Analysis workflow
 runs `format:check`/`lint`/`build` (typecheck) as three separate jobs, and a
