@@ -763,3 +763,19 @@ Add an entry only once a sign-off conversation resolves something repeatable
   (four variants: this button, a link in the version line, a `Notice`
   above the version line, a line and button at the end of the right
   column); its `Notice` naming each decision was dropped at sign-off.
+
+- **Getting paid** (a Guide's Stripe account, #230): on Settings, for a
+  Guide only, an h2 "Getting paid" after the signed-in line, before
+  Delete account. It isn't shown where selling isn't available. What
+  follows depends on the account: never connected, a line ("Connect a
+  Stripe account to be paid for your Paths. Stripe asks for your details
+  and a bank account.") and **Connect Stripe**; onboarding unfinished, a
+  `Notice` ("Stripe needs more details before it can pay you." then "Pick
+  up where you left off.") and **Continue on Stripe**; closed or deleted
+  by Stripe, a `Notice` ("Your Stripe account is no longer active." then
+  "Connect a new one to be paid for your Paths.") and **Connect a New
+  Stripe Account**; ready, the line "Your Stripe account is connected and
+  ready to be paid." and no button. The button is primary and sits at the
+  right (`.button-group--end`), reading "Connecting…" until the browser
+  leaves for Stripe. A failure is a `role="alert"` line under it. No
+  prototype round: Ian signed it off in the running app.

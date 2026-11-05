@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
 import Button from "../../components/Button";
+import Notice from "../../components/Notice";
 import { authClient } from "../../utils/auth-client";
 
 // Filename note: `app_.settings.tsx`, not `app.settings.tsx` or
@@ -47,7 +48,7 @@ const CONNECTION_FAILED =
  * this page is where a visitor can always read it in full.
  */
 function Settings() {
-  const { email } = Route.useRouteContext();
+  const { email, guide } = Route.useRouteContext();
   const [deleteStep, setDeleteStep] = useState<DeleteStep>("resting");
   const [error, setError] = useState("");
 
@@ -70,6 +71,8 @@ function Settings() {
     <>
       <h1>Settings</h1>
       <p>Signed in as {email}</p>
+
+      {guide && <GettingPaid />}
 
       <h2>Delete account</h2>
       {deleteStep === "resting" && (
@@ -113,4 +116,130 @@ function Settings() {
       {error && <p role="alert">{error}</p>}
     </>
   );
+}
+
+/** Where the Guide's Stripe account stands, as `GET /api/stripe/connect` says (#230). */
+type ConnectStatus =
+  | "unavailable"
+  | "not-started"
+  | "incomplete"
+  | "ready"
+  | "gone";
+
+const CONNECT_FAILED = "We couldn't reach Stripe. Try again in a few minutes.";
+
+/**
+ * A Guide's Stripe account (#230): connect one, finish onboarding, or
+ * replace one Stripe closed. Hidden where selling isn't available. Stripe's
+ * onboarding sends the Guide back here, so the status is read fresh each
+ * time the page loads.
+ */
+function GettingPaid() {
+  const [status, setStatus] = useState<ConnectStatus | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let current = true;
+    fetch("/api/stripe/connect")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { status: ConnectStatus } | null) => {
+        if (current) setStatus(body?.status ?? "unavailable");
+      })
+      .catch(() => {
+        if (current) setStatus("unavailable");
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  async function connect() {
+    setError("");
+    setConnecting(true);
+    try {
+      const res = await withMinimumDuration(() =>
+        fetch("/api/stripe/connect", { method: "POST" }),
+      );
+      if (!res.ok) {
+        setError(CONNECT_FAILED);
+        setConnecting(false);
+        return;
+      }
+      const { url } = (await res.json()) as { url: string };
+      // Stays "Connecting…" while the browser leaves for Stripe.
+      window.location.assign(url);
+    } catch {
+      setError(CONNECTION_FAILED);
+      setConnecting(false);
+    }
+  }
+
+  if (status === null || status === "unavailable") return null;
+
+  const label = {
+    "not-started": "Connect Stripe",
+    incomplete: "Continue on Stripe",
+    gone: "Connect a New Stripe Account",
+    ready: "",
+  }[status];
+
+  return (
+    <>
+      <h2>Getting paid</h2>
+      {status === "not-started" && (
+        <p>
+          Connect a Stripe account to be paid for your Paths. Stripe asks for
+          your details and a bank account.
+        </p>
+      )}
+      {status === "incomplete" && (
+        <Notice>
+          <p>Stripe needs more details before it can pay you.</p>
+          <p>Pick up where you left off.</p>
+        </Notice>
+      )}
+      {status === "gone" && (
+        <Notice>
+          <p>Your Stripe account is no longer active.</p>
+          <p>Connect a new one to be paid for your Paths.</p>
+        </Notice>
+      )}
+      {status === "ready" && (
+        <p>Your Stripe account is connected and ready to be paid.</p>
+      )}
+      {label && (
+        <div className="button-group button-group--end">
+          <Button
+            variant="primary"
+            disabled={connecting}
+            onClick={() => void connect()}
+          >
+            {connecting ? "Connecting…" : label}
+          </Button>
+        </div>
+      )}
+      {error && <p role="alert">{error}</p>}
+    </>
+  );
+}
+
+/**
+ * Runs `fn`, then waits out the rest of `minMs`, so a pending button state
+ * is perceivable rather than a flicker (docs/adr/0013). Same helper `/app`
+ * and the Product pages each keep a copy of.
+ */
+async function withMinimumDuration<T>(
+  fn: () => Promise<T>,
+  minMs = 400,
+): Promise<T> {
+  const startedAt = Date.now();
+  try {
+    return await fn();
+  } finally {
+    const remaining = minMs - (Date.now() - startedAt);
+    if (remaining > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remaining));
+    }
+  }
 }
