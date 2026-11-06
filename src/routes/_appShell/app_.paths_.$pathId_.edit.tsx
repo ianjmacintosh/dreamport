@@ -7,7 +7,11 @@ import {
   type RefObject,
 } from "react";
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
-import { DotsSixVerticalIcon, LockIcon } from "@phosphor-icons/react";
+import {
+  DotsSixVerticalIcon,
+  HourglassIcon,
+  LockIcon,
+} from "@phosphor-icons/react";
 import { LiveRegion, useAnnouncement } from "@dnd-kit/accessibility";
 import {
   closestCenter,
@@ -327,9 +331,12 @@ function PathDraft() {
         if (res.ok) {
           const { status } = (await res.json()) as { status: string };
           setStripeStatus(status);
+        } else {
+          setStripeStatus("unknown");
         }
       } catch {
         // Unknown: Paid stays locked.
+        setStripeStatus("unknown");
       }
     })();
   }
@@ -1230,16 +1237,19 @@ function ChangeAccessForm({
           if (paid && stripeStatus === "unavailable" && access !== "paid") {
             return null;
           }
-          // Paid waits on a ready Stripe account (#231). Its text stays at
-          // full strength; the disabled radio and the lock mark it.
-          const locked = paid && stripeStatus !== "ready";
+          // Paid waits on a ready Stripe account (#231). While the status is
+          // being fetched it shows as checking, not locked; a failed check
+          // leaves it locked. Its text stays at full strength.
+          const checking = paid && stripeStatus === null;
+          const locked =
+            paid && stripeStatus !== null && stripeStatus !== "ready";
           return (
             <label key={choice.value}>
               <Radio
                 name="access"
                 value={choice.value}
                 checked={picked === choice.value}
-                disabled={isPending || locked}
+                disabled={isPending || locked || checking}
                 onChange={() => setPicked(choice.value)}
               />
               <span className="nowrap">
@@ -1250,12 +1260,24 @@ function ChangeAccessForm({
                     <LockIcon aria-hidden="true" className="icon-inline" />
                   </>
                 )}
+                {checking && (
+                  <>
+                    {" "}
+                    <HourglassIcon aria-hidden="true" className="icon-inline" />
+                  </>
+                )}
               </span>
               {choice.value === access && <i> (current)</i>}
               <span className="text-sm">
                 <br />
                 {choice.hint}
               </span>
+              {checking && (
+                <span className="text-sm">
+                  <br />
+                  <i>Checking Stripe connection…</i>
+                </span>
+              )}
               {locked && stripeStatus !== null && (
                 <span className="text-sm">
                   <br />
