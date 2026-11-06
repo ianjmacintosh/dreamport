@@ -1266,8 +1266,8 @@ function ChangeAccessForm({
                     <TimerIcon aria-hidden="true" className="icon-inline" />
                   </>
                 )}
+                {choice.value === access && <i> (current)</i>}
               </span>
-              {choice.value === access && <i> (current)</i>}
               <span className="text-sm">
                 <br />
                 {choice.hint}
