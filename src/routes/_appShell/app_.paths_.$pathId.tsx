@@ -8,6 +8,7 @@ import {
 
 import type { BreadcrumbsProps } from "../../components/Breadcrumbs";
 import Button from "../../components/Button";
+import Checkbox from "../../components/Checkbox";
 import Dialog from "../../components/Dialog";
 import Link from "../../components/Link";
 import Notice from "../../components/Notice";
@@ -60,18 +61,36 @@ interface Shown {
     description: string;
     milestones: { id: string; name: string; outcome: string }[];
   };
-  /** `request` when a User has to Request the Path rather than Add it (#214). */
-  access: "everyone" | "request";
+  /**
+   * `request` when a User has to Request the Path rather than Add it
+   * (#214), `paid` when they Buy each version (#231).
+   */
+  access: Access;
+  /** A Paid Path only: its price, in cents (#231). */
+  priceCents?: number;
   /** A Guide's own Path only: how many Requests are waiting on it (#216). */
   pendingRequests?: number;
   /** Offered only: whether the User has a Request pending for this version (#215). */
   requested?: boolean;
+  /** Offered only: the other versions the User holds, newest first (#231). */
+  held?: number[];
   /** Newest first. */
   versions: { number: number; savedAt: string }[];
   newestNumber: number;
   /** Followable only: the User's Products, each with its Journey in progress on this Path. */
   products?: { id: string; name: string; journeyId: string | null }[];
 }
+
+type Access = "everyone" | "request" | "paid";
+
+const ACCESS_NAME: Record<Access, string> = {
+  everyone: "Everyone",
+  request: "By Request",
+  paid: "Paid",
+};
+
+/** Cents as dollars: 800 is "$8.00". */
+const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
 type Trailhead =
   | { status: "unavailable"; path: { id: string; name: string } }
@@ -93,6 +112,7 @@ const START_JOURNEY_FAILED =
   "We couldn't start on this Path. Try again in a moment.";
 const ADD_FAILED = "We couldn't add this Path. Try again in a moment.";
 const REQUEST_FAILED = "We couldn't send your Request. Try again in a moment.";
+const BUY_FAILED = "We couldn't start your purchase. Try again in a moment.";
 const REQUESTS_FAILED = "We couldn't load the Requests. Try again in a moment.";
 const DECISION_FAILED = "We couldn't save that. Try again in a moment.";
 const NO_LONGER_PENDING = "That Request is no longer pending.";
@@ -102,11 +122,40 @@ const CONNECTION_FAILED =
 export const Route = createFileRoute("/_appShell/app_/paths_/$pathId")({
   validateSearch: (
     search: Record<string, unknown>,
-  ): { version?: number; versions?: true } => ({
+  ): {
+    version?: number;
+    versions?: true;
+    checkout?: string;
+    refunded?: true;
+  } => ({
     ...(typeof search.version === "number" && { version: search.version }),
     ...(search.versions === true && { versions: true }),
+    ...(typeof search.checkout === "string" && { checkout: search.checkout }),
+    ...(search.refunded === true && { refunded: true }),
   }),
   beforeLoad: async ({ params, search }) => {
+    // Back from Stripe Checkout (#231): fulfil the Purchase now, so the
+    // version shows as theirs without waiting on the webhook, then drop the
+    // session id from the address. A refunded payment says so on the page.
+    if (search.checkout !== undefined) {
+      const outcome = await fetch(
+        `/api/checkout-sessions/${encodeURIComponent(search.checkout)}/fulfil`,
+        { method: "POST", headers: { "content-type": "application/json" } },
+      )
+        .then(async (res) =>
+          res.ok ? ((await res.json()) as { outcome: string }).outcome : null,
+        )
+        .catch(() => null);
+      throw redirect({
+        to: "/app/paths/$pathId",
+        params: { pathId: params.pathId },
+        search: {
+          version: search.version,
+          ...(outcome === "refunded" && { refunded: true }),
+        },
+        replace: true,
+      });
+    }
     const query =
       search.version === undefined ? "" : `?version=${search.version}`;
     const res = await fetch(
@@ -144,7 +193,11 @@ export const Route = createFileRoute("/_appShell/app_/paths_/$pathId")({
  * description), then, on a Path the User can follow, a Product picker
  * beside Start on Path. On another User's Path, that's Add This Path
  * (#192) until the User holds a copy of the version shown, which the page
- * then shows them. A closed Path or an unpublished version of another
+ * then shows them. On a Paid Path (#231) it's the price as a one-row
+ * list, two terms to tick, and Buy, which goes to Stripe Checkout; Stripe
+ * sends the User back here, and the version is theirs. A User who holds an
+ * older version is told this one is paid for separately. A closed Path or
+ * an unpublished version of another
  * User's, with no copy, says it's no longer available.
  *
  * It opens on the newest version offered. "Looking for an older version?"
@@ -186,7 +239,18 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
   const [isConfirmingRequest, setIsConfirmingRequest] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
   const [requestError, setRequestError] = useState("");
+  const [noUpdatesUnderstood, setNoUpdatesUnderstood] = useState(false);
+  const [finalUnderstood, setFinalUnderstood] = useState(false);
+  const [isBuying, setIsBuying] = useState(false);
+  const [buyError, setBuyError] = useState("");
   const pathHref = `/app/paths/${path.id}`;
+  const buying =
+    trailhead.status === "offered" && trailhead.access === "paid"
+      ? {
+          price: dollars(trailhead.priceCents ?? 0),
+          held: trailhead.held ?? [],
+        }
+      : null;
   const [productId, setProductId] = useState(products?.[0]?.id ?? "");
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [isStarting, setIsStarting] = useState(false);
@@ -258,6 +322,34 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
     }
   }
 
+  /**
+   * Buy the version shown (#231): the server makes a Stripe Checkout
+   * Session, and the browser leaves for it. The button stays pending
+   * until it does.
+   */
+  async function buy() {
+    setBuyError("");
+    setIsBuying(true);
+    try {
+      const res = await fetchWithTimeout(
+        `/api/paths/${path.id}/versions/${version.number}/buy`,
+        { method: "POST", headers: { "content-type": "application/json" } },
+      );
+      if (res.ok) {
+        window.location.assign(((await res.json()) as { url: string }).url);
+        return;
+      }
+      setBuyError(
+        res.status === 409
+          ? ((await res.json()) as { error: string }).error
+          : BUY_FAILED,
+      );
+    } catch {
+      setBuyError(CONNECTION_FAILED);
+    }
+    setIsBuying(false);
+  }
+
   async function startJourney() {
     setError("");
     if (!product) {
@@ -326,9 +418,18 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
       <p className="text-sm">
         Version {version.number}
         <span aria-hidden="true"> · </span>
-        Access: {trailhead.access === "everyone" ? "Everyone" : "By Request"}
-        <span aria-hidden="true"> · </span>
-        Price: Free
+        {buying ? (
+          "All sales are final"
+        ) : (
+          <>
+            Access: {ACCESS_NAME[trailhead.access]}
+            <span aria-hidden="true"> · </span>
+            Price:{" "}
+            {trailhead.priceCents === undefined
+              ? "Free"
+              : dollars(trailhead.priceCents)}
+          </>
+        )}
         {version.number < newestNumber && (
           <>
             <span aria-hidden="true"> · </span>
@@ -353,6 +454,26 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
           ))}
         </ol>
         <section>
+          {search.refunded && (
+            <Notice>
+              <p>
+                We couldn&apos;t add Version {version.number}, so your payment
+                was refunded in full.
+              </p>
+            </Notice>
+          )}
+          {buying && buying.held.length > 0 && (
+            <Notice>
+              <p>
+                You already have Version {buying.held.join(", ")}, which
+                doesn&apos;t include Version {version.number}.
+              </p>
+              <p>
+                To get Version {version.number}, you&apos;d pay for it
+                separately.
+              </p>
+            </Notice>
+          )}
           {path.dreamport ? (
             <>
               <p>
@@ -378,21 +499,68 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
           ) : (
             <p>{version.description}</p>
           )}
-          {trailhead.status === "offered" && trailhead.access !== "request" && (
+          {buying && (
             <>
-              <p>
+              <ul className="list">
+                <li className="list-row">
+                  <span className="list-row-name">
+                    {path.name}
+                    <span aria-hidden="true"> · </span>
+                    Version {version.number}
+                  </span>
+                  <b>{buying.price}</b>
+                </li>
+              </ul>
+              <div className="checkbox-group">
+                <label>
+                  <Checkbox
+                    checked={noUpdatesUnderstood}
+                    disabled={isBuying}
+                    onChange={(e) => setNoUpdatesUnderstood(e.target.checked)}
+                  />
+                  I understand buying this version of this path does not entitle
+                  me to future updates or versions of this same path.
+                </label>
+                <label>
+                  <Checkbox
+                    checked={finalUnderstood}
+                    disabled={isBuying}
+                    onChange={(e) => setFinalUnderstood(e.target.checked)}
+                  />
+                  I understand all sales are final. No refunds.
+                </label>
+              </div>
+              <div className="button-group button-group--end">
                 <Button
-                  disabled={isAdding}
-                  state={isAdding ? "pending" : "ready"}
-                  onClick={() => void addPath()}
+                  disabled={
+                    isBuying || !noUpdatesUnderstood || !finalUnderstood
+                  }
+                  state={isBuying ? "pending" : "ready"}
+                  onClick={() => void buy()}
                 >
-                  <Button.State name="ready">Add This Path</Button.State>
-                  <Button.State name="pending">Adding…</Button.State>
+                  <Button.State name="ready">Buy</Button.State>
+                  <Button.State name="pending">Going to Stripe…</Button.State>
                 </Button>
-              </p>
-              {error && <p role="alert">{error}</p>}
+              </div>
+              {buyError && <p role="alert">{buyError}</p>}
             </>
           )}
+          {trailhead.status === "offered" &&
+            trailhead.access === "everyone" && (
+              <>
+                <p>
+                  <Button
+                    disabled={isAdding}
+                    state={isAdding ? "pending" : "ready"}
+                    onClick={() => void addPath()}
+                  >
+                    <Button.State name="ready">Add This Path</Button.State>
+                    <Button.State name="pending">Adding…</Button.State>
+                  </Button>
+                </p>
+                {error && <p role="alert">{error}</p>}
+              </>
+            )}
           {trailhead.status === "offered" && trailhead.access === "request" && (
             <>
               <Notice>

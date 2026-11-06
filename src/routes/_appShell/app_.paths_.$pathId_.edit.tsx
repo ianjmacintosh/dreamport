@@ -7,7 +7,7 @@ import {
   type RefObject,
 } from "react";
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
-import { DotsSixVerticalIcon } from "@phosphor-icons/react";
+import { DotsSixVerticalIcon, LockIcon } from "@phosphor-icons/react";
 import { LiveRegion, useAnnouncement } from "@dnd-kit/accessibility";
 import {
   closestCenter,
@@ -69,7 +69,7 @@ interface Milestone extends MilestoneFields {
   tasks: Task[];
 }
 
-type Access = "everyone" | "request";
+type Access = "everyone" | "request" | "paid";
 
 interface Draft extends PathHead {
   milestones: Milestone[];
@@ -285,6 +285,8 @@ function PathDraft() {
   const [access, setAccess] = useState(draft.access);
   const [pendingRequests, setPendingRequests] = useState(draft.pendingRequests);
   const [isChangingAccess, setIsChangingAccess] = useState(false);
+  /** Where the Guide's Stripe account stands (`/api/stripe/connect`), so Paid can be picked once it's `ready` (#231). Null until known. */
+  const [stripeStatus, setStripeStatus] = useState<string | null>(null);
   const [notice, setNotice] = useState<Sentences | null>(null);
   const [isManagingVersions, setIsManagingVersions] = useState(false);
   const [openPending, setOpenPending] = useState<
@@ -301,8 +303,10 @@ function PathDraft() {
 
   /**
    * Open Change Access with the pending count fetched fresh, so the warning
-   * that Everyone Approves them counts Requests made since the page loaded.
-   * If the fetch fails, the count the page loaded with stands.
+   * that Everyone Approves them, or Paid Denies them, counts Requests made
+   * since the page loaded. If the fetch fails, the count the page loaded
+   * with stands. Whether the Guide's Stripe account is ready is read fresh
+   * too; until it's known, Paid can't be picked.
    */
   function openChangeAccess() {
     setIsChangingAccess(true);
@@ -315,6 +319,17 @@ function PathDraft() {
         }
       } catch {
         // Keep the count the page loaded with.
+      }
+    })();
+    void (async () => {
+      try {
+        const res = await fetchWithTimeout("/api/stripe/connect", {});
+        if (res.ok) {
+          const { status } = (await res.json()) as { status: string };
+          setStripeStatus(status);
+        }
+      } catch {
+        // Unknown: Paid stays locked.
       }
     })();
   }
@@ -453,7 +468,7 @@ function PathDraft() {
       </p>
       {guide && (
         <p className="text-sm">
-          Access: {access === "everyone" ? "Everyone" : "By Request"}
+          Access: {ACCESS_NAME[access]}
           <span aria-hidden="true"> · </span>
           <a
             href="#"
@@ -598,8 +613,9 @@ function PathDraft() {
         access={access}
         pathUrl={base}
         pendingRequests={pendingRequests}
+        stripeStatus={stripeStatus}
         onClose={() => setIsChangingAccess(false)}
-        onChanged={(next, approved) => {
+        onChanged={(next, { approved, denied }) => {
           setAccess(next);
           setIsChangingAccess(false);
           if (approved > 0) {
@@ -608,6 +624,14 @@ function PathDraft() {
               `${requestCount(approved)} ${were(approved)} Approved: ${
                 approved === 1 ? "that User has" : "those Users have"
               } the version they asked for.`,
+            ]);
+          }
+          if (denied > 0) {
+            setPendingRequests(0);
+            setNotice([
+              `${requestCount(denied)} ${were(denied)} Denied: this Path is Paid now, so ${
+                denied === 1 ? "that User" : "those Users"
+              } would Buy it instead.`,
             ]);
           }
         }}
@@ -1064,17 +1088,37 @@ const ACCESS_CHOICES: { value: Access; name: string; hint: string }[] = [
     name: "By Request",
     hint: "A User Requests this Path, and you Approve or Deny each Request.",
   },
+  {
+    value: "paid",
+    name: "Paid",
+    hint: "A User pays $8.00 to Add a version. You get $6.80 of each sale.",
+  },
 ];
 
+const ACCESS_NAME: Record<Access, string> = {
+  everyone: "Everyone",
+  request: "By Request",
+  paid: "Paid",
+};
+
+/** What a change of Access did to the pending Requests. */
+interface AccessChange {
+  approved: number;
+  denied: number;
+}
+
 /**
- * Change Access (#214): Everyone or By Request. Affects only Users who
- * Add the Path from now on.
+ * Change Access (#214): Everyone, By Request or Paid (#231). Affects only
+ * Users who Add the Path from now on. Paid can be picked only once the
+ * Guide's Stripe account is ready (`stripeStatus`), and isn't offered
+ * where selling isn't available.
  */
 function ChangeAccessDialog({
   open,
   access,
   pathUrl,
   pendingRequests,
+  stripeStatus,
   onClose,
   onChanged,
 }: {
@@ -1082,8 +1126,9 @@ function ChangeAccessDialog({
   access: Access;
   pathUrl: string;
   pendingRequests: number;
+  stripeStatus: string | null;
   onClose: () => void;
-  onChanged: (access: Access, approved: number) => void;
+  onChanged: (access: Access, change: AccessChange) => void;
 }) {
   const [isPending, setIsPending] = useState(false);
   return (
@@ -1098,6 +1143,7 @@ function ChangeAccessDialog({
         access={access}
         pathUrl={pathUrl}
         pendingRequests={pendingRequests}
+        stripeStatus={stripeStatus}
         isPending={isPending}
         setIsPending={setIsPending}
         onCancel={onClose}
@@ -1111,6 +1157,7 @@ function ChangeAccessForm({
   access,
   pathUrl,
   pendingRequests,
+  stripeStatus,
   isPending,
   setIsPending,
   onCancel,
@@ -1119,28 +1166,38 @@ function ChangeAccessForm({
   access: Access;
   pathUrl: string;
   pendingRequests: number;
+  stripeStatus: string | null;
   isPending: boolean;
   setIsPending: (isPending: boolean) => void;
   onCancel: () => void;
-  onChanged: (access: Access, approved: number) => void;
+  onChanged: (access: Access, change: AccessChange) => void;
 }) {
   const [picked, setPicked] = useState(access);
   const [approving, setApproving] = useState(false);
+  const [denying, setDenying] = useState(false);
   const [error, setError] = useState("");
-  // Everyone Approves every pending Request, so the Guide ticks to confirm.
+  // Everyone Approves every pending Request, and Paid Denies every one, so
+  // the Guide ticks to confirm.
   const approves = picked === "everyone" && pendingRequests > 0;
+  const denies = picked === "paid" && pendingRequests > 0;
+  const them = pendingRequests === 1 ? "it" : "them all";
 
   async function save() {
     setError("");
     setIsPending(true);
     try {
       const sent = await withMinimumDuration(() =>
-        send<{ approved?: number }>(`${pathUrl}/access`, "PUT", {
-          access: picked,
-        }),
+        send<{ approved?: number; denied?: number }>(
+          `${pathUrl}/access`,
+          "PUT",
+          { access: picked },
+        ),
       );
       if (sent.ok) {
-        onChanged(picked, sent.body.approved ?? 0);
+        onChanged(picked, {
+          approved: sent.body.approved ?? 0,
+          denied: sent.body.denied ?? 0,
+        });
         return;
       }
       setError(sent.conflict ?? PUBLISH_FAILED);
@@ -1157,23 +1214,57 @@ function ChangeAccessForm({
         already Added it keep it.
       </p>
       <div className="radio-group" role="radiogroup" aria-label="Access">
-        {ACCESS_CHOICES.map((choice) => (
-          <label key={choice.value}>
-            <Radio
-              name="access"
-              value={choice.value}
-              checked={picked === choice.value}
-              disabled={isPending}
-              onChange={() => setPicked(choice.value)}
-            />
-            <b>{choice.name}</b>
-            {choice.value === access && <i> (current)</i>}
-            <span className="text-sm">
-              <br />
-              {choice.hint}
-            </span>
-          </label>
-        ))}
+        {ACCESS_CHOICES.map((choice) => {
+          const paid = choice.value === "paid";
+          // No Paid where selling isn't available, as Settings offers no
+          // Connect there (#230), unless the Path is Paid already.
+          if (paid && stripeStatus === "unavailable" && access !== "paid") {
+            return null;
+          }
+          // Paid waits on a ready Stripe account (#231). Its text stays at
+          // full strength; the disabled radio and the lock mark it.
+          const locked = paid && stripeStatus !== "ready";
+          return (
+            <label
+              key={choice.value}
+              style={locked ? { cursor: "not-allowed" } : undefined}
+            >
+              <Radio
+                name="access"
+                value={choice.value}
+                checked={picked === choice.value}
+                disabled={isPending || locked}
+                onChange={() => setPicked(choice.value)}
+              />
+              <span style={{ whiteSpace: "nowrap" }}>
+                <b>{choice.name}</b>
+                {locked && (
+                  <>
+                    {" "}
+                    <LockIcon
+                      aria-hidden="true"
+                      style={{ display: "inline", verticalAlign: "-0.125em" }}
+                    />
+                  </>
+                )}
+              </span>
+              {choice.value === access && <i> (current)</i>}
+              <span className="text-sm">
+                <br />
+                {choice.hint}
+              </span>
+              {locked && stripeStatus !== null && (
+                <span className="text-sm">
+                  <br />
+                  <i>
+                    Your Stripe account isn&apos;t ready to be paid yet. Finish
+                    it in <Link href="/app/settings">Settings</Link>.
+                  </i>
+                </span>
+              )}
+            </label>
+          );
+        })}
       </div>
       {approves && (
         <>
@@ -1195,13 +1286,35 @@ function ChangeAccessForm({
           </label>
         </>
       )}
+      {denies && (
+        <>
+          <NoticeOf
+            sentences={[
+              `This Path has ${requestCount(pendingRequests)} pending. Making it Paid Denies ${them}: ${
+                pendingRequests === 1 ? "that User" : "those Users"
+              } would have to Buy it instead.`,
+            ]}
+          />
+          <label>
+            <Checkbox
+              checked={denying}
+              disabled={isPending}
+              onChange={(e) => setDenying(e.target.checked)}
+            />
+            Deny the {pendingRequests} pending{" "}
+            {pendingRequests === 1 ? "Request" : "Requests"}
+          </label>
+        </>
+      )}
       {error && <p role="alert">{error}</p>}
       <div className="button-group button-group--end">
         <Button variant="secondary" disabled={isPending} onClick={onCancel}>
           Cancel
         </Button>
         <Button
-          disabled={isPending || (approves && !approving)}
+          disabled={
+            isPending || (approves && !approving) || (denies && !denying)
+          }
           state={isPending ? "pending" : "ready"}
           onClick={() => void save()}
         >

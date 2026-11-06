@@ -1647,6 +1647,20 @@ button.tag-more[data-popup-open] {
   cursor: pointer;
 }
 
+/* A set of `Checkbox`es (#231): each on its own line in a column, as
+   `.radio-group` stacks radios, with the same gap, so the terms a User
+   accepts before a purchase read as separate statements. Each one stays
+   its own `<label>`, so its whole line is clickable. */
+.checkbox-group {
+  display: grid;
+  justify-content: start;
+  row-gap: var(--space-4);
+}
+
+.checkbox-group > label {
+  cursor: pointer;
+}
+
 .radio-group > label:hover .radio > input:not(:disabled) {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;

@@ -779,3 +779,31 @@ Add an entry only once a sign-off conversation resolves something repeatable
   right (`.button-group--end`), reading "Connecting…" until the browser
   leaves for Stripe. A failure is a `role="alert"` line under it. No
   prototype round: Ian signed it off in the running app.
+
+- **Checkbox group** (#231): a set of `Checkbox`es stacked one per line
+  with `.checkbox-group`, the same column and gap as `.radio-group`. Each
+  checkbox stays its own `<label>` so the whole line is clickable. Used
+  for the terms a User accepts before a purchase: "I understand I am not
+  entitled to future updates or versions of this path." and "I understand
+  all sales are final. No refunds." Ian signed off the CSS in the running
+  prototype (variant H, round 2), not in a separate round.
+
+- **Buy** (a Paid Path version, #231): on the Trailhead, for a User who
+  doesn't hold the version shown, the version line reads "Version {n} ·
+  All sales are final", and the description is followed by a one-row
+  `.list` ("{Path} · Version {n}", the price in bold at the right), the
+  two terms as a `.checkbox-group`, and **Buy** at the right, enabled once
+  both are ticked. The price is never on the button. Buy reads "Going to
+  Stripe…" until the browser leaves for Checkout. A User holding an older
+  version gets a `Notice` at the top of the column: "You already have
+  Version {held}, which doesn't include Version {n}." then "To get Version
+  {n}, you'd pay for it separately." Buying is apart from starting: once
+  Added, the Product picker and Start on Path show as ever. In the editor,
+  Paid is Access's third radio ("A User pays $8.00 to Add a version. You
+  get $6.80 of each sale."); until the Guide's Stripe account is ready it
+  is disabled with a lock beside its name, its text at full strength, and
+  "Your Stripe account isn't ready to be paid yet. Finish it in Settings."
+  under it. Switching from By Request warns and confirms the Denial as
+  Everyone does its Approval. Ian picked variant H, round 2, in the
+  running prototype on local branch `231-prototype-paid-buy`; it
+  supersedes the issue's "Request layout" UI section for #231.
