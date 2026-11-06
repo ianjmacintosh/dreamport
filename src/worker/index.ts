@@ -26,6 +26,15 @@ import {
 import { productRoutes } from "./product-routes";
 import { pathRoutes, versionNumber } from "./path-routes";
 import { fulfilCheckout, PRICE_CENTS, startCheckout } from "./purchases";
+
+/** A Path's name, for copy that names it. Falls back to a plain phrase. */
+async function pathName(db: D1Database, pathId: string): Promise<string> {
+  const row = await db
+    .prepare(`SELECT "name" FROM "paths" WHERE "id" = ?`)
+    .bind(pathId)
+    .first<{ name: string }>();
+  return row?.name ?? "this path";
+}
 import { createStripe } from "./stripe";
 import {
   connectRoutes,
@@ -508,7 +517,13 @@ export function createApp(deps: AppDeps = {}) {
       );
     }
     if (!added.ok && added.reason === "paid") {
-      return c.json({ error: "This Path is Paid. Buy it instead." }, 409);
+      const name = await pathName(c.env.DB, c.req.param("pathId"));
+      return c.json(
+        {
+          error: `Could not add path ${name} (version ${number}) because it must be purchased before adding`,
+        },
+        409,
+      );
     }
     if (!added.ok) {
       return c.json({ error: "This Path is no longer available." }, 409);
@@ -606,8 +621,15 @@ export function createApp(deps: AppDeps = {}) {
             return c.json({ error: "Not found" }, 404);
           case "held":
             return c.json({ error: "You already have this version." }, 409);
-          case "not-paid":
-            return c.json({ error: "This Path isn't Paid." }, 409);
+          case "not-paid": {
+            const name = await pathName(c.env.DB, pathId);
+            return c.json(
+              {
+                error: `Your payment was not accepted because this path, ${name} (version ${number}) is free`,
+              },
+              409,
+            );
+          }
           case "guide-not-ready":
             return c.json(
               { error: "This Path can't be bought right now." },

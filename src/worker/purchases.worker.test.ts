@@ -451,7 +451,7 @@ describe("Paid as an Access", () => {
     );
     expect(add.status).toBe(409);
     expect(await add.json()).toEqual({
-      error: "This Path is Paid. Buy it instead.",
+      error: `Could not add path Pop-Up Shop Launch (version 1) because it must be purchased before adding`,
     });
     const request = await callApi(
       "POST",
