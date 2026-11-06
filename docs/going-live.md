@@ -16,10 +16,6 @@ The decisions behind this are in #229, the wiki page
 and [ADR 0015](adr/0015-stripe-connect-per-sale-cut.md). How the secrets
 work in each environment is in [Deployment](deployment.md#stripe-guides-payout-accounts).
 
-> **Open:** the name of the ledger, Dreamport's record of each sale and
-> Withdrawal, is not decided (Ledger, Balance or Earnings). This page writes
-> it as **[LEDGER TERM]**. Replace it once Ian picks one.
-
 ## 1. Finish the live-readiness checklist
 
 Live charges wait until every item is done (#229, PW12-Planning wiki page).
@@ -35,7 +31,7 @@ Live charges wait until every item is done (#229, PW12-Planning wiki page).
       accounts, not Dreamport's, which probably helps. Confirm that
       Dreamport doesn't need a money-transmission licence before the first
       live payout.
-- [ ] **Disputes in the [LEDGER TERM].** Record a dispute as a negative row
+- [ ] **Disputes in the ledger.** Record a dispute as a negative row
       against the Guide. While the Guide's money is still in their Stripe
       account, Dreamport can recover it by reversing the transfer; after
       that, recovery is best effort (ADR 0015). This is the one item that
@@ -103,11 +99,11 @@ Agents can't run `wrangler secret put`, so these are dashboard steps. On
 `dreamport`: Settings → Variables and Secrets → Add, **Type: Secret
 (encrypted)**, not a plaintext var:
 
-| Secret                  | Value                                                  |
-| ----------------------- | ------------------------------------------------------ |
-| `STRIPE_WEBHOOK_SECRET` | The live endpoint's signing secret (2.4)               |
-| `ADMIN_EMAILS`          | Ian's address, for the admin [LEDGER TERM] page (#232) |
-| `STRIPE_SECRET_KEY`     | The live restricted key (2.5)                          |
+| Secret                  | Value                                           |
+| ----------------------- | ----------------------------------------------- |
+| `STRIPE_WEBHOOK_SECRET` | The live endpoint's signing secret (2.4)        |
+| `ADMIN_EMAILS`          | Ian's address, for the admin ledger page (#232) |
+| `STRIPE_SECRET_KEY`     | The live restricted key (2.5)                   |
 
 Set `STRIPE_SECRET_KEY` last. Its presence is what turns selling on: until
 it's set, production offers no Connect or Buy, and Connect answers 503. The secrets take effect on the next deploy of `dreamport`.
@@ -117,9 +113,9 @@ it's set, production offers no Connect or Buy, and Connect answers 503. The secr
 1. Sign in as a Guide on production and connect a Stripe account through
    the hosted onboarding. Its status should reach ready.
 2. Set a Path to Paid and buy it from another account with a real card.
-   The version is Added, the [LEDGER TERM] shows +$6.80 available in 14
+   The version is Added, the ledger shows +$6.80 available in 14
    days, and Stripe shows $6.80 in the Guide's account.
-3. Check the admin [LEDGER TERM] page against Stripe's dashboard.
+3. Check the admin ledger page against Stripe's dashboard.
 4. After the holding period, Withdraw. The Guide's bank receives the
    amount less $3.00, and Dreamport's balance gains $3.00.
 

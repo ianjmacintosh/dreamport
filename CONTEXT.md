@@ -241,6 +241,11 @@ full, by itself. Dreamport takes a cut of each Purchase. The Guide's share
 can be withdrawn once the holding period has passed.
 _Avoid_: subscription, order, enrollment
 
+**Ledger**:
+Dreamport's record of each Guide's money events: each sale, with when it
+becomes available, and each Withdrawal. The ledger, not Stripe, says what a
+Guide can withdraw.
+
 **Holding period**:
 The 14 days after a Purchase before the Guide can withdraw their share of
 it. It guards against early disputes and stolen-card purchases; it is not a

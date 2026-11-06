@@ -26,11 +26,6 @@ The per-sale cut stands. PW12 changes how the money moves, adds a fee, and
 drops refunds. The decisions are in #229 and the wiki page
 [Money Flow](https://github.com/ianjmacintosh/dreamport/wiki/Money-Flow).
 
-> **Open:** the name of Dreamport's record of each Guide's money events is
-> not decided. The candidates are Ledger, Balance and Earnings. This
-> section writes it as **[LEDGER TERM]**. Replace every **[LEDGER TERM]**
-> once Ian picks one, and add the term to `CONTEXT.md` then.
-
 ### Destination charges
 
 A sale is a destination charge, not a separate charge and transfer. The
@@ -44,7 +39,7 @@ Dreamport's Stripe account holds only Dreamport's money. It pays out to
 Ian's bank on Stripe's automatic daily schedule, so Ian can't withdraw a
 Guide's money by mistake.
 
-Dreamport records each sale and each Withdrawal in the **[LEDGER TERM]**,
+Dreamport records each sale and each Withdrawal in the **ledger**,
 one row per money event. A Guide's available money is the sum of the
 rows that are available, and it mirrors what is in their Stripe account.
 
@@ -65,7 +60,7 @@ both say "All sales are final" before the User pays. The 14 days are now a
 14 days after the purchase. The holding period guards against early
 disputes and purchases made with stolen cards. The money is in the Guide's
 Stripe account at once, and Dreamport enforces the holding period: a
-Withdrawal pays out only what the **[LEDGER TERM]** says is available.
+Withdrawal pays out only what the **ledger** says is available.
 
 A payment that can't be Added is refunded automatically, in full, with the
 transfer reversed. For example: a second payment for a version the User
@@ -81,7 +76,7 @@ merchant of record, so a card dispute is Dreamport's exposure. While the
 Guide's money is still in their Stripe account, Dreamport can recover it by
 reversing the transfer. After the Guide has withdrawn it, recovery is best
 effort, and Dreamport may absorb the loss. This sprint, disputes are
-handled by hand and are not recorded in the **[LEDGER TERM]**. Recording
+handled by hand and are not recorded in the **ledger**. Recording
 them as a negative row against the Guide is on the live-readiness
 checklist (`docs/going-live.md`).
 
@@ -105,4 +100,4 @@ must not be able to pay themselves out from Stripe's Express Dashboard,
 which would skip the fee and the holding period, so that feature is turned
 off. A Withdrawal must be idempotent, so a retry can't pay out twice. A
 goodwill refund made from Stripe's dashboard is not seen by the
-**[LEDGER TERM]** and has to be adjusted by hand.
+**ledger** and has to be adjusted by hand.
