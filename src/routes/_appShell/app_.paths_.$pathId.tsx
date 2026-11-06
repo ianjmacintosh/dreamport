@@ -457,8 +457,11 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
           {search.refunded && (
             <Notice>
               <p>
-                We couldn&apos;t add Version {version.number}, so your payment
-                was refunded in full.
+                We couldn&apos;t add{" "}
+                <i>
+                  {path.name} (version {version.number})
+                </i>
+                , so your payment was refunded in full.
               </p>
             </Notice>
           )}

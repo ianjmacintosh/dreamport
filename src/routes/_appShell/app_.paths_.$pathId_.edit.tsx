@@ -612,6 +612,8 @@ function PathDraft() {
         open={guide && isChangingAccess}
         access={access}
         pathUrl={base}
+        pathName={path.name}
+        versionNumber={latestVersion?.number}
         pendingRequests={pendingRequests}
         stripeStatus={stripeStatus}
         onClose={() => setIsChangingAccess(false)}
@@ -629,9 +631,7 @@ function PathDraft() {
           if (denied > 0) {
             setPendingRequests(0);
             setNotice([
-              `${requestCount(denied)} ${were(denied)} Denied: this Path is Paid now, so ${
-                denied === 1 ? "that User" : "those Users"
-              } would Buy it instead.`,
+              `${requestCount(denied)} ${were(denied)} denied. This path is now a paid path, and users may only gain access by paying.`,
             ]);
           }
         }}
@@ -1091,7 +1091,7 @@ const ACCESS_CHOICES: { value: Access; name: string; hint: string }[] = [
   {
     value: "paid",
     name: "Paid",
-    hint: "A User pays $8.00 to Add a version. You get $6.80 of each sale.",
+    hint: "Users can pay $8.00 to access this version of this path, and your account will be credited $6.80 for each sale.",
   },
 ];
 
@@ -1117,6 +1117,8 @@ function ChangeAccessDialog({
   open,
   access,
   pathUrl,
+  pathName,
+  versionNumber,
   pendingRequests,
   stripeStatus,
   onClose,
@@ -1125,6 +1127,8 @@ function ChangeAccessDialog({
   open: boolean;
   access: Access;
   pathUrl: string;
+  pathName: string;
+  versionNumber: number | undefined;
   pendingRequests: number;
   stripeStatus: string | null;
   onClose: () => void;
@@ -1142,6 +1146,8 @@ function ChangeAccessDialog({
       <ChangeAccessForm
         access={access}
         pathUrl={pathUrl}
+        pathName={pathName}
+        versionNumber={versionNumber}
         pendingRequests={pendingRequests}
         stripeStatus={stripeStatus}
         isPending={isPending}
@@ -1156,6 +1162,8 @@ function ChangeAccessDialog({
 function ChangeAccessForm({
   access,
   pathUrl,
+  pathName,
+  versionNumber,
   pendingRequests,
   stripeStatus,
   isPending,
@@ -1165,6 +1173,8 @@ function ChangeAccessForm({
 }: {
   access: Access;
   pathUrl: string;
+  pathName: string;
+  versionNumber: number | undefined;
   pendingRequests: number;
   stripeStatus: string | null;
   isPending: boolean;
@@ -1180,7 +1190,6 @@ function ChangeAccessForm({
   // the Guide ticks to confirm.
   const approves = picked === "everyone" && pendingRequests > 0;
   const denies = picked === "paid" && pendingRequests > 0;
-  const them = pendingRequests === 1 ? "it" : "them all";
 
   async function save() {
     setError("");
@@ -1284,9 +1293,11 @@ function ChangeAccessForm({
         <>
           <NoticeOf
             sentences={[
-              `This Path has ${requestCount(pendingRequests)} pending. Making it Paid Denies ${them}: ${
-                pendingRequests === 1 ? "that User" : "those Users"
-              } would have to Buy it instead.`,
+              `This path, ${pathName} (version ${versionNumber}) has ${pendingRequests} ${
+                pendingRequests === 1 ? "user" : "users"
+              } awaiting access. Switching access to "Paid" will deny ${
+                pendingRequests === 1 ? "them" : "all of them"
+              }, and they will need to purchase it in order to gain access.`,
             ]}
           />
           <label>
@@ -1295,8 +1306,8 @@ function ChangeAccessForm({
               disabled={isPending}
               onChange={(e) => setDenying(e.target.checked)}
             />
-            Deny the {pendingRequests} pending{" "}
-            {pendingRequests === 1 ? "Request" : "Requests"}
+            Switch to paid, deny {pendingRequests} pending{" "}
+            {pendingRequests === 1 ? "request" : "requests"}
           </label>
         </>
       )}
