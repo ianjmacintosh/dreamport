@@ -12,6 +12,10 @@ How Dreamport writes text that users read: buttons, notices, dialogs and labels.
 - **Use the terms from [CONTEXT.md](../CONTEXT.md).** Path, Version, Add, Request, Purchase and Access mean what CONTEXT.md says. Don't use them loosely.
 - **Avoid words that can be read two ways.** "Unlimited" can imply more than we mean. Say what is included, not how much.
 
+## Spelling
+
+Use US English: "fulfill", "color", "canceled". This is the rule for all product text, code identifiers included.
+
 ## Checklist before merging copy
 
 - [ ] Each sentence says one thing.
