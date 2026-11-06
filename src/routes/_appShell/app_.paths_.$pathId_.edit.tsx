@@ -1225,10 +1225,7 @@ function ChangeAccessForm({
           // full strength; the disabled radio and the lock mark it.
           const locked = paid && stripeStatus !== "ready";
           return (
-            <label
-              key={choice.value}
-              style={locked ? { cursor: "not-allowed" } : undefined}
-            >
+            <label key={choice.value}>
               <Radio
                 name="access"
                 value={choice.value}
@@ -1236,15 +1233,12 @@ function ChangeAccessForm({
                 disabled={isPending || locked}
                 onChange={() => setPicked(choice.value)}
               />
-              <span style={{ whiteSpace: "nowrap" }}>
+              <span className="nowrap">
                 <b>{choice.name}</b>
                 {locked && (
                   <>
                     {" "}
-                    <LockIcon
-                      aria-hidden="true"
-                      style={{ display: "inline", verticalAlign: "-0.125em" }}
-                    />
+                    <LockIcon aria-hidden="true" className="icon-inline" />
                   </>
                 )}
               </span>

@@ -1666,6 +1666,26 @@ button.tag-more[data-popup-open] {
   outline-offset: 2px;
 }
 
+/* A disabled choice in a `.radio-group` (#231): the whole label says it
+   can't be picked, not just the radio. Its text keeps full strength; the
+   lock icon and the reason beneath it say why. */
+.radio-group > label:has(input:disabled) {
+  cursor: not-allowed;
+}
+
+/* An icon set on a line of text (#231), such as the lock on a disabled
+   choice: it sits on the text's baseline, not on a line of its own. */
+.icon-inline {
+  display: inline;
+  vertical-align: -0.125em;
+}
+
+/* Text that must stay on one line, such as a label with an icon after it
+   (#231). */
+.nowrap {
+  white-space: nowrap;
+}
+
 /* A check box or radio straight inside a plain `<label>` (#214): centred
    on the text's capitals rather than its lowercase letters (`middle`
    left the text looking high), with `ActionCard`'s gap before the text.
