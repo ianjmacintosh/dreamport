@@ -42,6 +42,13 @@ a name-pattern kill (`pkill -f vite`, `pkill -f wrangler`, `killall node`,
 etc.) — that kills every matching process on the machine, including one a
 human started that has nothing to do with your task.
 
+Builds, installs and dev servers use the same memory as test runs, and the
+machine has about 8 GB. The test lock doesn't cover them. Before starting a
+dev server, a build or an install (`npm ci`), check `free -m`. Run at most one
+dev server and one build or install at a time per machine, and don't start
+e2e while another agent is running a dev server or a build. Stop your own
+processes when you finish.
+
 ## Testing
 
 Tests must only send email to an address defined in `TEST_EMAILS`
