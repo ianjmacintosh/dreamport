@@ -353,16 +353,33 @@ Every request is pinned to API version `2026-10-28.endive`
 Put the sandbox's test secret key in `.dev.vars` as `STRIPE_SECRET_KEY` (see
 [`.dev.vars.example`](../.dev.vars.example)). Never commit it.
 
-The devcontainer has no Stripe CLI. To receive webhooks locally, install it
-([docs.stripe.com/stripe-cli](https://docs.stripe.com/stripe-cli)), sign in
-to the sandbox with `stripe login`, then run:
+Most local testing needs no webhook. When a buyer returns from Checkout, the
+page completes the purchase itself (`POST /api/checkout-sessions/:sessionId/fulfill`),
+so a purchase shows as Added on return.
 
-```sh
-stripe listen --forward-to localhost:5173/webhooks/stripe
-```
+The webhook matters for two cases: a bank payment that settles later
+(`checkout.session.async_payment_succeeded`), and a buyer who closes the
+tab before returning. To test those locally:
 
-It prints a `whsec_...` signing secret. Put that in `.dev.vars` as
-`STRIPE_WEBHOOK_SECRET` and restart the dev server.
+1. Install the Stripe CLI ([docs.stripe.com/stripe-cli](https://docs.stripe.com/stripe-cli)).
+   The devcontainer doesn't have it. Install it in the devcontainer, not on
+   the host, because the dev server runs there.
+2. Sign in to the sandbox once with `stripe login`.
+3. Leave this running while you test:
+
+   ```sh
+   stripe listen --forward-to localhost:5173/webhooks/stripe
+   ```
+
+4. It prints a `whsec_...` signing secret. Put that in `.dev.vars` as
+   `STRIPE_WEBHOOK_SECRET`, then restart the dev server.
+
+`stripe listen` forwards every event, so the event list below doesn't
+matter locally. It matters for the endpoint in the Stripe dashboard.
+
+The events the webhook handles are `checkout.session.completed` and
+`checkout.session.async_payment_succeeded`. The sandbox's endpoint must
+have both switched on (Developers → Webhooks → the endpoint → event list).
 
 ### Staging and production (Ian)
 

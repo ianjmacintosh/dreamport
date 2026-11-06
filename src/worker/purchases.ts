@@ -97,10 +97,15 @@ export async function startCheckout(
  * yet, so nothing happened. `ignored`: not a Purchase, or not this
  * buyer's.
  */
-export type Fulfilment = "sold" | "already" | "refunded" | "unpaid" | "ignored";
+export type Fulfillment =
+  | "sold"
+  | "already"
+  | "refunded"
+  | "unpaid"
+  | "ignored";
 
 /**
- * Fulfil a Checkout Session from `startCheckout`: Add its version for its
+ * Fulfill a Checkout Session from `startCheckout`: Add its version for its
  * buyer and record the sale, in one batch, or refund it. Called by the
  * webhook and by the buyer's return to the app, in either order or at
  * once: the ledger is unique on the session, so one sale is recorded and
@@ -111,12 +116,12 @@ export type Fulfilment = "sold" | "already" | "refunded" | "unpaid" | "ignored";
  * version (they bought it in two tabs), or the Path closed, the version
  * was unpublished or the Path stopped being Paid since Checkout opened.
  */
-export async function fulfilCheckout(
+export async function fulfillCheckout(
   stripe: Stripe,
   db: D1Database,
   sessionId: string,
   buyerId?: string,
-): Promise<Fulfilment> {
+): Promise<Fulfillment> {
   const session = await stripe.checkout.sessions.retrieve(sessionId, {
     expand: ["payment_intent.latest_charge"],
   });

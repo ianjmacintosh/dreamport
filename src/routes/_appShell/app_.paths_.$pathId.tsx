@@ -134,12 +134,12 @@ export const Route = createFileRoute("/_appShell/app_/paths_/$pathId")({
     ...(search.refunded === true && { refunded: true }),
   }),
   beforeLoad: async ({ params, search }) => {
-    // Back from Stripe Checkout (#231): fulfil the Purchase now, so the
+    // Back from Stripe Checkout (#231): fulfill the Purchase now, so the
     // version shows as theirs without waiting on the webhook, then drop the
     // session id from the address. A refunded payment says so on the page.
     if (search.checkout !== undefined) {
       const outcome = await fetch(
-        `/api/checkout-sessions/${encodeURIComponent(search.checkout)}/fulfil`,
+        `/api/checkout-sessions/${encodeURIComponent(search.checkout)}/fulfill`,
         { method: "POST", headers: { "content-type": "application/json" } },
       )
         .then(async (res) =>

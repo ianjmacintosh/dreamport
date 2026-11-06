@@ -4,7 +4,7 @@ import Stripe from "stripe";
 import { currentSession } from "./auth";
 import type { WorkerEnv } from "./env";
 import { guidesOnly, isGuide } from "./guides";
-import { fulfilCheckout } from "./purchases";
+import { fulfillCheckout } from "./purchases";
 import { createStripe, verifyWebhookEvent } from "./stripe";
 import {
   connectStatus,
@@ -201,7 +201,7 @@ export async function stripeWebhook(
     }
     const sessionId = event.data.object.id;
     try {
-      const outcome = await fulfilCheckout(
+      const outcome = await fulfillCheckout(
         createStripe(key),
         c.env.DB,
         sessionId,

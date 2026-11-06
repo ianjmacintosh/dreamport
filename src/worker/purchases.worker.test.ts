@@ -586,7 +586,7 @@ describe("the Checkout webhook", () => {
     const results = await Promise.all([
       deliver(sessionId),
       deliver(sessionId),
-      callApi("POST", `/api/checkout-sessions/${sessionId}/fulfil`, user),
+      callApi("POST", `/api/checkout-sessions/${sessionId}/fulfill`, user),
     ]);
     expect(results.map((r) => r.status)).toEqual([200, 200, 200]);
     expect((await deliver(sessionId)).status).toBe(200);
@@ -713,20 +713,20 @@ describe("the Checkout webhook", () => {
 });
 
 describe("the buyer's return from Checkout", () => {
-  it("fulfils the buyer's own session, and ignores another User's", async () => {
+  it("fulfills the buyer's own session, and ignores another User's", async () => {
     stubStripe();
     const guide = await guidesPath();
     const user = await signIn(TEST_EMAILS.purchaseBuyer);
     const other = await signIn(TEST_EMAILS.purchaseOther);
     const sessionId = await checkout(user, guide.pathId);
-    const fulfil = (cookie: string) =>
-      callApi("POST", `/api/checkout-sessions/${sessionId}/fulfil`, cookie);
+    const fulfill = (cookie: string) =>
+      callApi("POST", `/api/checkout-sessions/${sessionId}/fulfill`, cookie);
 
-    expect(await (await fulfil(other)).json()).toEqual({ outcome: "ignored" });
+    expect(await (await fulfill(other)).json()).toEqual({ outcome: "ignored" });
     expect((await sales()).results).toEqual([]);
 
-    expect(await (await fulfil(user)).json()).toEqual({ outcome: "sold" });
-    expect(await (await fulfil(user)).json()).toEqual({ outcome: "already" });
+    expect(await (await fulfill(user)).json()).toEqual({ outcome: "sold" });
+    expect(await (await fulfill(user)).json()).toEqual({ outcome: "already" });
     expect(await heldVersions(TEST_EMAILS.purchaseBuyer, guide.pathId)).toEqual(
       [1],
     );

@@ -25,7 +25,7 @@ import {
 } from "./products";
 import { productRoutes } from "./product-routes";
 import { pathRoutes, versionNumber } from "./path-routes";
-import { fulfilCheckout, PRICE_CENTS, startCheckout } from "./purchases";
+import { fulfillCheckout, PRICE_CENTS, startCheckout } from "./purchases";
 
 /** A Path's name, for copy that names it. Falls back to a plain phrase. */
 async function pathName(db: D1Database, pathId: string): Promise<string> {
@@ -644,13 +644,13 @@ export function createApp(deps: AppDeps = {}) {
   });
 
   /**
-   * The buyer's return from Stripe Checkout (#231): fulfil their Checkout
+   * The buyer's return from Stripe Checkout (#231): fulfill their Checkout
    * Session now, rather than wait for the webhook, so the version is
-   * theirs when the page loads. The same fulfilment as the webhook's, so
+   * theirs when the page loads. The same fulfillment as the webhook's, so
    * either can land first. `outcome` is what it did; a session that isn't
    * the User's is `ignored` and changes nothing.
    */
-  app.post("/api/checkout-sessions/:sessionId/fulfil", async (c) => {
+  app.post("/api/checkout-sessions/:sessionId/fulfill", async (c) => {
     const session = await currentSession(c.env, c.req.raw);
     if (!session) {
       return c.json({ error: "Not signed in" }, 401);
@@ -664,7 +664,7 @@ export function createApp(deps: AppDeps = {}) {
       c,
       async () =>
         c.json({
-          outcome: await fulfilCheckout(
+          outcome: await fulfillCheckout(
             createStripe(key),
             c.env.DB,
             c.req.param("sessionId"),
