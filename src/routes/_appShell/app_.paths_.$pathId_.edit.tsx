@@ -1264,6 +1264,7 @@ function ChangeAccessForm({
                   <>
                     {" "}
                     <TimerIcon aria-hidden="true" className="icon-inline" />
+                    <i> (checking Stripe connection…)</i>
                   </>
                 )}
                 {choice.value === access && <i> (current)</i>}
@@ -1272,12 +1273,6 @@ function ChangeAccessForm({
                 <br />
                 {choice.hint}
               </span>
-              {checking && (
-                <span className="text-sm">
-                  <br />
-                  <i>Checking Stripe connection…</i>
-                </span>
-              )}
               {locked && stripeStatus !== null && (
                 <span className="text-sm">
                   <br />
