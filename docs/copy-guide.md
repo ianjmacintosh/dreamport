@@ -1,6 +1,6 @@
 # Copy guide
 
-How Dreamport writes text that users read: buttons, notices, dialogs and labels. Read this before writing or changing product copy. Decisions about what the product does belong in [`design-decisions.md`](design-decisions.md) or the planning page, not here.
+How Dreamport writes text that users read: buttons, notices, dialogs and labels. Read this before writing or changing product copy. This guide is about tone only. Product decisions belong in [`design-decisions.md`](design-decisions.md) or on the planning page.
 
 ## Tone
 
@@ -11,20 +11,6 @@ How Dreamport writes text that users read: buttons, notices, dialogs and labels.
 - **Say what's not included.** When something is limited, name the limit in the same place the user is deciding.
 - **Use the terms from [CONTEXT.md](../CONTEXT.md).** Path, Version, Add, Request, Purchase and Access mean what CONTEXT.md says. Don't use them loosely.
 - **Avoid words that can be read two ways.** "Unlimited" can imply more than we mean. Say what is included, not how much.
-
-## Paid Paths
-
-The model, for writers: a Path is like a book. Once a User has bought a version, they can read it as often as they like, on any Product they like. Versions are bought separately, so a new version is not included in an earlier purchase.
-
-Approved wording for buying a version (draft, pending review on the PR):
-
-> Users pay $8.00 for access to this version of the Path. They may use this Path as many times, on as many Products, as they want. Updates and newer versions are not included, and all sales are final. No refunds.
-
-Notes on the wording:
-
-- The price comes first, and says what it buys.
-- "Access to this version" names the limit in the same sentence that gives the price, so a User can't read it as covering future versions.
-- "Not included" and "No refunds" are separate sentences, so each one can be found on its own.
 
 ## Checklist before merging copy
 
