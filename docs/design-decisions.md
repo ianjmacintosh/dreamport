@@ -783,9 +783,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
 - **Checkbox group** (#231): a set of `Checkbox`es stacked one per line
   with `.checkbox-group`, the same column and gap as `.radio-group`. Each
   checkbox stays its own `<label>` so the whole line is clickable. Used
-  for the terms a User accepts before a purchase: "I understand I am not
-  entitled to future updates or versions of this path." and "I understand
-  all sales are final. No refunds." Ian signed off the CSS in the running
+  for the terms a User accepts before a purchase: "I understand buying this
+  version of this path does not entitle me to future updates or versions of
+  this same path." and "I understand all sales are final. No refunds." Ian signed off the CSS in the running
   prototype (variant H, round 2), not in a separate round.
 
 - **Buy** (a Paid Path version, #231): on the Trailhead, for a User who
