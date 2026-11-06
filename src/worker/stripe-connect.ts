@@ -64,18 +64,39 @@ export async function connectStatus(
   db: D1Database,
   userId: string,
 ): Promise<ConnectStatus> {
+  return (await connection(stripe, db, userId)).status;
+}
+
+/**
+ * The Guide's Stripe account id when it's ready to be paid (#231), read
+ * from Stripe as `connectStatus` is; null otherwise.
+ */
+export async function readyAccountId(
+  stripe: Stripe,
+  db: D1Database,
+  userId: string,
+): Promise<string | null> {
+  const { status, accountId } = await connection(stripe, db, userId);
+  return status === "ready" ? accountId : null;
+}
+
+async function connection(
+  stripe: Stripe,
+  db: D1Database,
+  userId: string,
+): Promise<{ status: ConnectStatus; accountId: string | null }> {
   const accountId = await findAccountId(db, userId);
-  if (!accountId) return "not-started";
+  if (!accountId) return { status: "not-started", accountId };
 
   const account = await liveAccount(stripe, accountId);
-  if (!account) return "gone";
+  if (!account) return { status: "gone", accountId };
 
   const balance =
     account.configuration?.recipient?.capabilities?.stripe_balance;
-  return balance?.stripe_transfers?.status === "active" &&
-    balance.payouts?.status === "active"
-    ? "ready"
-    : "incomplete";
+  const ready =
+    balance?.stripe_transfers?.status === "active" &&
+    balance.payouts?.status === "active";
+  return { status: ready ? "ready" : "incomplete", accountId };
 }
 
 /**

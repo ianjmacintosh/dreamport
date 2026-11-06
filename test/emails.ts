@@ -410,6 +410,12 @@ export const TEST_EMAILS = {
   /** A plain User, never a Guide, who must get 403 from the Connect routes. */
   stripeNotGuide: "delivered+stripe-not-guide@resend.dev",
 
+  // --- Seam 1: Paid Paths (#231) ---
+  /** Buys versions of the Guide's Paid Path through stubbed Checkout. */
+  purchaseBuyer: "delivered+purchase-buyer@resend.dev",
+  /** Requests the Guide's By Request Path before it turns Paid, or tries another buyer's session. */
+  purchaseOther: "delivered+purchase-other@resend.dev",
+
   // --- Seam 1: real ResendEmailSender path, MSW-stubbed (#66) ---
   /** Send with RESEND_API_KEY set and MSW stubbing Resend's response. */
   resendPathMsw: "delivered+resend-path-msw@resend.dev",

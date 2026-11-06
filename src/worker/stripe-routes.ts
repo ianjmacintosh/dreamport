@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import { currentSession } from "./auth";
 import type { WorkerEnv } from "./env";
 import { guidesOnly, isGuide } from "./guides";
+import { fulfilCheckout } from "./purchases";
 import { createStripe, verifyWebhookEvent } from "./stripe";
 import {
   connectStatus,
@@ -123,28 +124,32 @@ function onboardingUrls(c: Context): OnboardingUrls {
   };
 }
 
-function unavailable(c: Context) {
+export function unavailable(c: Context) {
   return c.json({ error: "Selling isn't available yet." }, 503);
 }
 
-/** 502 when Stripe refuses or can't be reached, logging only its type and code. */
-async function withStripe(
+/**
+ * 502 when Stripe refuses or can't be reached, logging only its type and
+ * code under `what`: the feature that called.
+ */
+export async function withStripe(
   c: Context,
   run: () => Promise<Response>,
+  what = "connect",
 ): Promise<Response> {
   try {
     return await run();
   } catch (error) {
-    logStripeError(error);
+    logStripeError(error, what);
     return c.json({ error: "Stripe didn't answer. Try again." }, 502);
   }
 }
 
 /** Logs only a Stripe error's type and code; rethrows anything else. */
-function logStripeError(error: unknown) {
+function logStripeError(error: unknown, what = "connect") {
   if (!(error instanceof Stripe.errors.StripeError)) throw error;
   console.error(
-    `stripe connect: failed (${error.type}${error.code ? ` ${error.code}` : ""})`,
+    `stripe ${what}: failed (${error.type}${error.code ? ` ${error.code}` : ""})`,
   );
 }
 
@@ -158,9 +163,14 @@ export const STRIPE_WEBHOOK_PATH = "/webhooks/stripe";
 /**
  * Stripe's webhook endpoint (#230). Every event's `Stripe-Signature` is
  * checked against `STRIPE_WEBHOOK_SECRET` before anything else: 400 for a
- * bad one, 503 with no secret set. #231 handles the first event; until
- * then a good event is acknowledged and nothing more. Logs the event's id
- * and type, never its body or signature.
+ * bad one, 503 with no secret set. A completed, paid Checkout is fulfilled
+ * (#231): the version Added and the sale recorded, or the payment
+ * refunded. An async payment method (a bank debit) is paid later, in
+ * `async_payment_succeeded`. Every other event is acknowledged and nothing
+ * more. 200 once an event is handled or was already handled, so Stripe
+ * stops retrying; 500 when Stripe or the database fails, so it retries.
+ * Logs the event's id and type and the outcome, never its body or
+ * signature.
  */
 export async function stripeWebhook(
   c: Context<{ Bindings: WorkerEnv }>,
@@ -181,5 +191,30 @@ export async function stripeWebhook(
   }
 
   console.log(`stripe webhook: received ${event.id} (${event.type})`);
+  if (
+    event.type === "checkout.session.completed" ||
+    event.type === "checkout.session.async_payment_succeeded"
+  ) {
+    const key = c.env.STRIPE_SECRET_KEY;
+    if (!key) {
+      return unavailable(c);
+    }
+    const sessionId = event.data.object.id;
+    try {
+      const outcome = await fulfilCheckout(
+        createStripe(key),
+        c.env.DB,
+        sessionId,
+      );
+      console.log(`stripe webhook: ${event.id} ${sessionId} ${outcome}`);
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeError) {
+        logStripeError(error, "webhook");
+      } else {
+        console.error(`stripe webhook: ${event.id} failed`);
+      }
+      return c.json({ error: "Not handled. Retry." }, 500);
+    }
+  }
   return c.json({ received: true });
 }

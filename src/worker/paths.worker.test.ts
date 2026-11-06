@@ -1663,6 +1663,7 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
       version: two,
       versions: published,
       requested: false,
+      held: [],
     });
     expect(await getTrailhead(env.DB, STRANGER_ID, path.id, 1)).toEqual({
       status: "offered",
@@ -1670,6 +1671,7 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
       version: one,
       versions: published,
       requested: false,
+      held: [],
     });
     expect(JSON.stringify(root)).not.toContain(PUBLISHER_ID);
     expect(JSON.stringify(root)).not.toContain(
@@ -1895,9 +1897,15 @@ describe("Requesting a version (#215)", () => {
     await requestVersion(env.DB, REQUESTER_ID, path.id, 2);
     await requestVersion(env.DB, REQUESTER_TWO_ID, path.id, 2);
 
-    expect(await setAccess(env.DB, path, "request")).toBe(0);
+    expect(await setAccess(env.DB, path, "request")).toEqual({
+      approved: 0,
+      denied: 0,
+    });
     expect(await pending(path.id)).toHaveLength(3);
-    expect(await setAccess(env.DB, path, "everyone")).toBe(3);
+    expect(await setAccess(env.DB, path, "everyone")).toEqual({
+      approved: 3,
+      denied: 0,
+    });
 
     expect(await pending(path.id)).toEqual([]);
     const held = async (userId: string) =>

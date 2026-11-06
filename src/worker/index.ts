@@ -25,10 +25,14 @@ import {
 } from "./products";
 import { productRoutes } from "./product-routes";
 import { pathRoutes, versionNumber } from "./path-routes";
+import { fulfilCheckout, PRICE_CENTS, startCheckout } from "./purchases";
+import { createStripe } from "./stripe";
 import {
   connectRoutes,
   STRIPE_WEBHOOK_PATH,
   stripeWebhook,
+  unavailable,
+  withStripe,
 } from "./stripe-routes";
 import { productsOnPath } from "./journeys";
 import {
@@ -443,6 +447,8 @@ export function createApp(deps: AppDeps = {}) {
         milestones: version.milestones,
       },
       access: trailhead.access,
+      // A Paid Path's fixed price, in cents (#231).
+      ...(trailhead.access === "paid" && { priceCents: PRICE_CENTS }),
       // Only a Guide, on their own By Request Path, hears how many are waiting (#216).
       ...(trailhead.status === "followable" &&
         trailhead.owner === "user" &&
@@ -452,6 +458,7 @@ export function createApp(deps: AppDeps = {}) {
         }),
       ...(trailhead.status === "offered" && {
         requested: trailhead.requested,
+        held: trailhead.held,
       }),
       versions: versions.map(({ number, savedAt }) => ({ number, savedAt })),
       newestNumber: versions[0].number,
@@ -500,6 +507,9 @@ export function createApp(deps: AppDeps = {}) {
         409,
       );
     }
+    if (!added.ok && added.reason === "paid") {
+      return c.json({ error: "This Path is Paid. Buy it instead." }, 409);
+    }
     if (!added.ok) {
       return c.json({ error: "This Path is no longer available." }, 409);
     }
@@ -536,6 +546,9 @@ export function createApp(deps: AppDeps = {}) {
     if (!requested.ok && requested.reason === "everyone") {
       return c.json({ error: "This Path is Everyone. Add it instead." }, 409);
     }
+    if (!requested.ok && requested.reason === "paid") {
+      return c.json({ error: "This Path is Paid. Buy it instead." }, 409);
+    }
     if (!requested.ok && requested.reason === "held") {
       return c.json({ error: "You already have this version." }, 409);
     }
@@ -544,6 +557,100 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     return c.json({}, requested.requested ? 201 : 200);
+  });
+
+  /**
+   * Buy version `:number` of another User's Paid Path (#231): a Stripe
+   * Checkout Session for it, and `url` to send the User to. Stripe sends
+   * them back to the version's Trailhead, which confirms the Purchase with
+   * the route below. 409 for a closed Path, an unpublished version, a Path
+   * that isn't Paid, a version the User holds, or a Guide whose Stripe
+   * account isn't ready; 404 as Add. 503 with no `STRIPE_SECRET_KEY`, 502
+   * when Stripe fails. Ahead of `pathRoutes`, like Add.
+   */
+  app.post("/api/paths/:pathId/versions/:number/buy", async (c) => {
+    const session = await currentSession(c.env, c.req.raw);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+    const key = c.env.STRIPE_SECRET_KEY;
+    if (!key) {
+      return unavailable(c);
+    }
+
+    const pathId = c.req.param("pathId");
+    const number = versionNumber(c.req.param("number"));
+    if (number === null) {
+      return c.json({ error: "Not found" }, 404);
+    }
+    const trailhead = `${new URL(c.req.url).origin}/app/paths/${encodeURIComponent(pathId)}?version=${number}`;
+    return withStripe(
+      c,
+      async () => {
+        const checkout = await startCheckout(
+          createStripe(key),
+          c.env.DB,
+          session.user.id,
+          pathId,
+          number,
+          {
+            returnUrl: `${trailhead}&checkout={CHECKOUT_SESSION_ID}`,
+            cancelUrl: trailhead,
+          },
+        );
+        if (checkout.ok) {
+          return c.json({ url: checkout.url });
+        }
+        switch (checkout.reason) {
+          case "not-found":
+            return c.json({ error: "Not found" }, 404);
+          case "held":
+            return c.json({ error: "You already have this version." }, 409);
+          case "not-paid":
+            return c.json({ error: "This Path isn't Paid." }, 409);
+          case "guide-not-ready":
+            return c.json(
+              { error: "This Path can't be bought right now." },
+              409,
+            );
+          case "unavailable":
+            return c.json({ error: "This Path is no longer available." }, 409);
+        }
+      },
+      "checkout",
+    );
+  });
+
+  /**
+   * The buyer's return from Stripe Checkout (#231): fulfil their Checkout
+   * Session now, rather than wait for the webhook, so the version is
+   * theirs when the page loads. The same fulfilment as the webhook's, so
+   * either can land first. `outcome` is what it did; a session that isn't
+   * the User's is `ignored` and changes nothing.
+   */
+  app.post("/api/checkout-sessions/:sessionId/fulfil", async (c) => {
+    const session = await currentSession(c.env, c.req.raw);
+    if (!session) {
+      return c.json({ error: "Not signed in" }, 401);
+    }
+    const key = c.env.STRIPE_SECRET_KEY;
+    if (!key) {
+      return unavailable(c);
+    }
+
+    return withStripe(
+      c,
+      async () =>
+        c.json({
+          outcome: await fulfilCheckout(
+            createStripe(key),
+            c.env.DB,
+            c.req.param("sessionId"),
+            session.user.id,
+          ),
+        }),
+      "checkout",
+    );
   });
 
   // Every route about one Path: session and ownership checked once, in

@@ -87,10 +87,11 @@ export function getVersion(
 export type PathOwner = "dreamport" | "user" | "added";
 
 /**
- * Whether a User may Add a Path straight away (`everyone`), or has to
- * Request it first (`request`, #215). Only its Guide changes it.
+ * Whether a User may Add a Path straight away (`everyone`), has to
+ * Request it first (`request`, #215), or buys each version (`paid`, #231).
+ * Only its Guide changes it.
  */
-export type Access = "everyone" | "request";
+export type Access = "everyone" | "request" | "paid";
 
 /** A Path someone else made, as Pathfinder's "Your Added Paths" lists it. */
 export interface AddedPath {
@@ -189,6 +190,8 @@ export type Trailhead =
       readonly versions: readonly VersionSummary[];
       /** Whether the viewer has a Request pending for `version` (#215). */
       readonly requested: boolean;
+      /** The other versions' numbers the viewer holds a copy of, newest first (#231). */
+      readonly held: readonly number[];
     }
   /** Dream Sequence, the viewer's own Path, or their copy of another User's. */
   | {
@@ -331,6 +334,7 @@ export async function getTrailhead(
     requested: (asked as { number: number }[]).some(
       (r) => r.number === offer.number,
     ),
+    held: copies.map((v) => v.number),
   };
 }
 
@@ -712,13 +716,47 @@ export type AddVersionResult =
    * `not-found`: no such version of another User's Path, which takes in
    * the User's own and Dream Sequence, neither needing an Add.
    * `unavailable`: the Path is closed or the version isn't published.
-   * `request`: the Path's Access is By Request (#214) and the
-   * User holds no copy of the version: they Request it instead (#215).
+   * An Access: the Path's Access doesn't let this kind of Add through, and
+   * the User holds no copy of the version. By Request (#214): they Request
+   * it instead (#215). Paid: they Buy it (#231). Everyone: a Purchase of a
+   * Path that's no longer Paid.
    */
   | {
       readonly ok: false;
-      readonly reason: "not-found" | "unavailable" | "request";
+      readonly reason: "not-found" | "unavailable" | Access;
     };
+
+/**
+ * The ledger row a Purchase writes with its Add (#231): the Guide's share
+ * of one sale, and the Stripe ids it came from.
+ */
+export interface Sale {
+  readonly checkoutSessionId: string;
+  readonly chargeId: string;
+  readonly transferId: string | null;
+  /** Cents, the Guide's share. */
+  readonly amount: number;
+  /** When it was paid, as an ISO timestamp. */
+  readonly paidAt: string;
+  /** When the Guide can withdraw it, as an ISO timestamp. */
+  readonly availableAt: string;
+}
+
+/**
+ * What lets an Add through. `add`: the User's own Add, on an Everyone
+ * Path. `approve`: the Guide's Approve (#216), on an Everyone or By
+ * Request Path. `purchase`: a paid Checkout (#231), on a Paid Path, which
+ * writes its sale to the ledger with the copy.
+ */
+export type Addition =
+  | { readonly via: "add" | "approve" }
+  | { readonly via: "purchase"; readonly sale: Sale };
+
+const ACCESS_LETTING: Record<Addition["via"], readonly Access[]> = {
+  add: ["everyone"],
+  approve: ["everyone", "request"],
+  purchase: ["paid"],
+};
 
 /** Whether User ?3 holds a copy of version ?2 of Path ?1. */
 const HOLDS_VERSION = `EXISTS (SELECT 1 FROM "paths" AS "copy"
@@ -729,23 +767,26 @@ const HOLDS_VERSION = `EXISTS (SELECT 1 FROM "paths" AS "copy"
  * Add version `number` of another User's Path (#192): copy its name,
  * description, Milestones and Tasks to the User, under their one copy of
  * the Path, made with the first Add. Adding a version they hold changes
- * nothing. `approving` is the Guide's Approve (#216): it Adds a By Request
- * Path too, and is still refused for a closed Path or an unpublished
- * version.
+ * nothing. `how` says which Access lets it through (see `Addition`);
+ * every kind is refused for a closed Path or an unpublished version.
  *
  * One batch is one transaction. Every insert re-checks that the Path is
- * open and the version published, so a Close landing first stops it, and
- * the copy's contents go in only if its version row landed in this batch,
- * the same pattern as `saveVersion`. The unique indexes on (User, source
- * Path) and (copy, number) make two Adds at once land one copy.
+ * open, its Access lets this Add through and the version is published, so
+ * a Close or an Access change landing first stops it, and the copy's
+ * contents go in only if its version row landed in this batch, the same
+ * pattern as `saveVersion`. A Purchase's ledger row goes in on the same
+ * condition, so a sale is recorded exactly when its copy is made. The
+ * unique indexes on (User, source Path) and (copy, number) make two Adds
+ * at once land one copy.
  */
 export async function addVersion(
   db: D1Database,
   userId: string,
   pathId: string,
   number: number,
-  { approving = false }: { approving?: boolean } = {},
+  how: Addition = { via: "add" },
 ): Promise<AddVersionResult> {
+  const letting = ACCESS_LETTING[how.via];
   const source = await db
     .prepare(
       `SELECT "path_versions"."id", "paths"."open", "paths"."access", "path_versions"."published",
@@ -771,16 +812,16 @@ export async function addVersion(
   if (source.open !== 1 || source.published !== 1) {
     return { ok: false, reason: "unavailable" };
   }
-  if (source.access !== "everyone" && !approving) {
-    return { ok: false, reason: "request" };
+  if (!letting.includes(source.access)) {
+    return { ok: false, reason: source.access };
   }
 
   // ?1 the version Added, ?2 its copy's id, ?3 the Path, ?4 the User. Each
   // statement binds as many as its highest number, as D1 requires.
-  const accessOffered = approving ? "" : `AND "paths"."access" = 'everyone'`;
+  const accessLetting = letting.map((a) => `'${a}'`).join(", ");
   const offered = `EXISTS (SELECT 1 FROM "paths"
     JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
-    WHERE "paths"."id" = ?3 AND "paths"."open" = 1 ${accessOffered}
+    WHERE "paths"."id" = ?3 AND "paths"."open" = 1 AND "paths"."access" IN (${accessLetting})
       AND "path_versions"."id" = ?1 AND "path_versions"."published" = 1)`;
   const landed = `EXISTS (SELECT 1 FROM "path_versions" WHERE "id" = ?2)`;
   /** A source row's id with the copy's version id in place of the source's. */
@@ -832,6 +873,7 @@ export async function addVersion(
          WHERE "milestones"."versionId" = ?1 AND ${landed}`,
       )
       .bind(source.id, copyId),
+    ...(how.via === "purchase" ? [recordSale(db, how.sale, copyId)] : []),
   ]);
   if (version.meta.changes > 0) {
     return { ok: true, added: true };
@@ -850,6 +892,112 @@ export async function addVersion(
     : { ok: false, reason: "unavailable" };
 }
 
+/**
+ * The ledger's sale row for a Purchase whose copy is version `copyId`,
+ * written only if that copy landed in the same batch. The Guide is the
+ * source Path's owner, and the Path and number are the source's. A second
+ * write for the same Checkout Session changes nothing.
+ */
+function recordSale(
+  db: D1Database,
+  sale: Sale,
+  copyId: string,
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO "ledger_entries" ("id", "kind", "guideId", "buyerId", "pathId", "number", "amount",
+         "occurredAt", "availableAt", "stripeChargeId", "stripeTransferId", "stripeCheckoutSessionId", "createdAt")
+       SELECT ?2, 'sale', "source"."userId", "copy"."userId", "source"."id", "held"."number", ?3,
+         ?4, ?5, ?6, ?7, ?8, ?9
+       FROM "path_versions" AS "held"
+       JOIN "paths" AS "copy" ON "copy"."id" = "held"."pathId"
+       JOIN "paths" AS "source" ON "source"."id" = "copy"."addedFrom"
+       WHERE "held"."id" = ?1
+       ON CONFLICT ("stripeCheckoutSessionId") DO NOTHING`,
+    )
+    .bind(
+      copyId,
+      crypto.randomUUID(),
+      sale.amount,
+      sale.paidAt,
+      sale.availableAt,
+      sale.chargeId,
+      sale.transferId,
+      sale.checkoutSessionId,
+      new Date().toISOString(),
+    );
+}
+
+export type PurchasableResult =
+  /** The version's name, and its Path's Guide, who is paid for it. */
+  | { readonly ok: true; readonly name: string; readonly guideId: string }
+  /**
+   * As `addVersion` refuses, plus `held`: the User already has a copy of
+   * this version, so buying it would pay for nothing. An Access: the Path
+   * isn't Paid.
+   */
+  | {
+      readonly ok: false;
+      readonly reason: "not-found" | "unavailable" | "held" | Access;
+    };
+
+/**
+ * Whether the User may buy version `number` of another User's Path (#231):
+ * a published version of an open, Paid Path they don't hold. Only a read
+ * before Checkout; the Purchase's `addVersion` checks it all again.
+ */
+export async function purchasable(
+  db: D1Database,
+  userId: string,
+  pathId: string,
+  number: number,
+): Promise<PurchasableResult> {
+  const source = await db
+    .prepare(
+      `SELECT "path_versions"."name", "paths"."userId" AS "guideId", "paths"."open", "paths"."access",
+         "path_versions"."published", ${HOLDS_VERSION} AS "held"
+       FROM "paths"
+       JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id" AND "path_versions"."number" = ?2
+       WHERE "paths"."id" = ?1 AND "paths"."userId" <> ?3 AND "paths"."addedFrom" IS NULL`,
+    )
+    .bind(pathId, number, userId)
+    .first<{
+      name: string;
+      guideId: string;
+      open: number;
+      access: Access;
+      published: number;
+      held: number;
+    }>();
+  if (!source) {
+    return { ok: false, reason: "not-found" };
+  }
+  if (source.held === 1) {
+    return { ok: false, reason: "held" };
+  }
+  if (source.open !== 1 || source.published !== 1) {
+    return { ok: false, reason: "unavailable" };
+  }
+  if (source.access !== "paid") {
+    return { ok: false, reason: source.access };
+  }
+  return { ok: true, name: source.name, guideId: source.guideId };
+}
+
+/** Whether the ledger has a sale for this Checkout Session (#231). */
+export async function saleRecorded(
+  db: D1Database,
+  checkoutSessionId: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      'SELECT 1 FROM "ledger_entries" WHERE "stripeCheckoutSessionId" = ?',
+    )
+    .bind(checkoutSessionId)
+    .first();
+  return row !== null;
+}
+
 export type RequestVersionResult =
   /** `requested` is false when the User already had this Request pending. */
   | { readonly ok: true; readonly requested: boolean }
@@ -857,11 +1005,17 @@ export type RequestVersionResult =
    * `not-found`: no such version of another User's Path (the User's own and
    * Dream Sequence read the same). `unavailable`: the Path is closed or the
    * version isn't published. `everyone`: the Path's Access is Everyone, so
-   * they Add it. `held`: they already hold a copy of the version.
+   * they Add it. `paid`: it's Paid, so they Buy it (#231). `held`: they
+   * already hold a copy of the version.
    */
   | {
       readonly ok: false;
-      readonly reason: "not-found" | "unavailable" | "everyone" | "held";
+      readonly reason:
+        | "not-found"
+        | "unavailable"
+        | "everyone"
+        | "paid"
+        | "held";
     };
 
 /**
@@ -925,7 +1079,7 @@ export async function requestVersion(
   if (source.open !== 1 || source.published !== 1) {
     return { ok: false, reason: "unavailable" };
   }
-  return { ok: false, reason: "everyone" };
+  return { ok: false, reason: source.access === "paid" ? "paid" : "everyone" };
 }
 
 /** A pending Request as the Guide sees it (#216): nothing of the User but their email address. */
@@ -993,7 +1147,7 @@ export async function approveRequest(
   }
 
   const added = await addVersion(db, request.userId, path.id, request.number, {
-    approving: true,
+    via: "approve",
   });
   if (!added.ok && added.reason === "unavailable") {
     return { ok: false, reason: "unavailable" };
@@ -1331,11 +1485,19 @@ export async function closePath(
   return denied.results.length;
 }
 
+/** What a change of Access did to the Path's pending Requests. */
+export interface AccessChange {
+  readonly approved: number;
+  readonly denied: number;
+}
+
 /**
  * Set the Path's Access. Affects only later Adds and Requests; held copies
- * are untouched, except that Everyone Approves every pending Request: each
- * Adds its version for its User, through `addVersion`, and its row is
- * deleted (#215). Answers how many were Approved.
+ * are untouched, except for pending Requests. Everyone Approves every one:
+ * each Adds its version for its User, through `addVersion`, and its row is
+ * deleted (#215). Paid Denies every one in the same transaction, as Close
+ * does (#231): those Users would Buy it now. Whether the Guide may choose
+ * Paid is the caller's to check.
  *
  * The Access changes first, so no Request can land during the sweep, and
  * the sweep runs whenever the Access is Everyone, so one a crash left
@@ -1345,13 +1507,24 @@ export async function setAccess(
   db: D1Database,
   path: OwnedPath,
   access: Access,
-): Promise<number> {
-  await db
+): Promise<AccessChange> {
+  const set = db
     .prepare('UPDATE "paths" SET "access" = ? WHERE "id" = ?')
-    .bind(access, path.id)
-    .run();
+    .bind(access, path.id);
+  if (access === "paid") {
+    const [, denied] = await db.batch([
+      set,
+      db
+        .prepare(
+          'DELETE FROM "path_requests" WHERE "pathId" = ? RETURNING "number"',
+        )
+        .bind(path.id),
+    ]);
+    return { approved: 0, denied: denied.results.length };
+  }
+  await set.run();
   if (access !== "everyone") {
-    return 0;
+    return { approved: 0, denied: 0 };
   }
   const { results } = await db
     .prepare(
@@ -1362,8 +1535,11 @@ export async function setAccess(
   let approved = 0;
   for (const { userId, number } of results) {
     const added = await addVersion(db, userId, path.id, number);
-    // Access went back to By Request mid-sweep: the rest stay pending.
-    if (!added.ok && added.reason === "request") break;
+    // Access changed again mid-sweep: By Request keeps the rest pending,
+    // and Paid has Denied them.
+    if (!added.ok && (added.reason === "request" || added.reason === "paid")) {
+      break;
+    }
     if (added.ok) approved++;
     await db
       .prepare(
@@ -1372,7 +1548,7 @@ export async function setAccess(
       .bind(userId, path.id, number)
       .run();
   }
-  return approved;
+  return { approved, denied: 0 };
 }
 
 export function parseAccess(body: unknown): Access | null {
@@ -1380,7 +1556,9 @@ export function parseAccess(body: unknown): Access | null {
     body && typeof body === "object"
       ? (body as { access?: unknown }).access
       : null;
-  return access === "everyone" || access === "request" ? access : null;
+  return access === "everyone" || access === "request" || access === "paid"
+    ? access
+    : null;
 }
 
 export type DiscardChangesResult =

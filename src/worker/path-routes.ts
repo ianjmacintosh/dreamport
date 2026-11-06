@@ -32,10 +32,13 @@ import {
   updatePath,
   updateTask,
 } from "./paths";
+import { createStripe } from "./stripe";
+import { readyAccountId } from "./stripe-connect";
+import { unavailable, withStripe } from "./stripe-routes";
 
 type PathEnv = {
   Bindings: WorkerEnv;
-  Variables: { path: OwnedPath; guide: boolean };
+  Variables: { path: OwnedPath; guide: boolean; userId: string };
 };
 
 /**
@@ -44,7 +47,8 @@ type PathEnv = {
  * which Path it's about, the same as `productRoutes`: 401 with no session, and
  * 404 for a Path that doesn't exist, is another User's, is Dreamport's, or is
  * the User's copy of another User's (#192), all alike. Past it, a handler gets
- * `c.var.path`, and `c.var.guide`: whether the User is a Guide.
+ * `c.var.path`, `c.var.userId`, and `c.var.guide`: whether the User is a
+ * Guide.
  *
  * The origin check on requests that change data is `index.ts`'s, in front
  * of every `/api/*` route.
@@ -68,6 +72,7 @@ pathRoutes.use(async (c, next) => {
 
   c.set("path", path);
   c.set("guide", isGuide(c.env, session.user.email));
+  c.set("userId", session.user.id);
   await next();
 });
 
@@ -224,19 +229,42 @@ pathRoutes.delete("/open", async (c) => {
 });
 
 /**
- * Set the Path's Access (#214): `{ access: "everyone" | "request" }`. Only
- * later Adds are affected, except that Everyone Approves every pending
- * Request (#215). Answers the Access as it now stands and how many Requests
- * were Approved.
+ * Set the Path's Access (#214): `{ access: "everyone" | "request" | "paid" }`.
+ * Only later Adds are affected, except that Everyone Approves every pending
+ * Request (#215) and Paid Denies every one (#231). Paid needs the Guide's
+ * Stripe account ready to be paid: 409 until it is, 503 with no
+ * `STRIPE_SECRET_KEY`, 502 when Stripe fails. Answers the Access as it now
+ * stands and how many Requests were Approved and Denied.
  */
 pathRoutes.put("/access", async (c) => {
   const access = parseAccess(await c.req.json().catch(() => null));
   if (!access) {
-    return c.json({ error: 'access must be "everyone" or "request".' }, 400);
+    return c.json(
+      { error: 'access must be "everyone", "request" or "paid".' },
+      400,
+    );
   }
 
-  const approved = await setAccess(c.env.DB, c.var.path, access);
-  return c.json({ access, approved }, 200);
+  const set = async () =>
+    c.json({ access, ...(await setAccess(c.env.DB, c.var.path, access)) });
+  if (access !== "paid") {
+    return set();
+  }
+  const key = c.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    return unavailable(c);
+  }
+  return withStripe(
+    c,
+    async () =>
+      (await readyAccountId(createStripe(key), c.env.DB, c.var.userId))
+        ? set()
+        : c.json(
+            { error: "Your Stripe account isn't ready to be paid yet." },
+            409,
+          ),
+    "access",
+  );
 });
 
 /**

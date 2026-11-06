@@ -2569,6 +2569,7 @@ describe("Pathfinder and Trailhead routes", () => {
     expect(JSON.parse(text)).toEqual({
       status: "offered",
       requested: false,
+      held: [],
       access: "everyone",
       path: { id: path.id, name: path.name, dreamport: false, own: false },
       version: {
@@ -3415,7 +3416,8 @@ describe("request gates, across every route (#154)", () => {
         route.path.startsWith("/api/paths/:") &&
         route.path !== "/api/paths/:pathId/trailhead" &&
         route.path !== "/api/paths/:pathId/versions/:number/add" &&
-        route.path !== "/api/paths/:pathId/versions/:number/request",
+        route.path !== "/api/paths/:pathId/versions/:number/request" &&
+        route.path !== "/api/paths/:pathId/versions/:number/buy",
     );
 
     async function ownedPath() {
@@ -3501,14 +3503,18 @@ describe("Access routes (#214)", () => {
 
     const set = await setAccess(guide.cookie, guide.path.id, "request");
     expect(set.status).toBe(200);
-    expect(await set.json()).toEqual({ access: "request", approved: 0 });
+    expect(await set.json()).toEqual({
+      access: "request",
+      approved: 0,
+      denied: 0,
+    });
     expect(await accessOf(guide.cookie, guide.path.id)).toBe("request");
 
     expect(
       (await setAccess(guide.cookie, guide.path.id, "everyone")).status,
     ).toBe(200);
     expect(await accessOf(guide.cookie, guide.path.id)).toBe("everyone");
-    expect((await setAccess(guide.cookie, guide.path.id, "paid")).status).toBe(
+    expect((await setAccess(guide.cookie, guide.path.id, "free")).status).toBe(
       400,
     );
   });
@@ -3630,7 +3636,11 @@ describe("Request route (#215)", () => {
       guide.cookie,
       { access: "everyone" },
     );
-    expect(await approved.json()).toEqual({ access: "everyone", approved: 2 });
+    expect(await approved.json()).toEqual({
+      access: "everyone",
+      approved: 2,
+      denied: 0,
+    });
     expect(await trailhead(user, guide.path.id)).toMatchObject({
       status: "followable",
     });
