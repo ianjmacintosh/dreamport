@@ -631,7 +631,7 @@ function PathDraft() {
           if (denied > 0) {
             setPendingRequests(0);
             setNotice([
-              `${requestCount(denied)} ${were(denied)} denied. This path is now a paid path, and users may only gain access by paying.`,
+              `${denied} ${denied === 1 ? "request was" : "requests were"} denied. This path is now a paid path, and users may only gain access by paying.`,
             ]);
           }
         }}
@@ -1291,15 +1291,18 @@ function ChangeAccessForm({
       )}
       {denies && (
         <>
-          <NoticeOf
-            sentences={[
-              `This path, ${pathName} (version ${versionNumber}) has ${pendingRequests} ${
-                pendingRequests === 1 ? "user" : "users"
-              } awaiting access. Switching access to "Paid" will deny ${
-                pendingRequests === 1 ? "them" : "all of them"
-              }, and they will need to purchase it in order to gain access.`,
-            ]}
-          />
+          <Notice>
+            <p>
+              This path,{" "}
+              <i>
+                {pathName} (version {versionNumber})
+              </i>{" "}
+              has {pendingRequests} {pendingRequests === 1 ? "user" : "users"}{" "}
+              awaiting access. Switching access to &quot;Paid&quot; will deny{" "}
+              {pendingRequests === 1 ? "them" : "all of them"}, and they will
+              need to purchase it in order to gain access.
+            </p>
+          </Notice>
           <label>
             <Checkbox
               checked={denying}
