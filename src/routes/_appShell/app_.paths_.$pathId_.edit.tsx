@@ -9,8 +9,8 @@ import {
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import {
   DotsSixVerticalIcon,
-  HourglassIcon,
   LockIcon,
+  TimerIcon,
 } from "@phosphor-icons/react";
 import { LiveRegion, useAnnouncement } from "@dnd-kit/accessibility";
 import {
@@ -1263,7 +1263,7 @@ function ChangeAccessForm({
                 {checking && (
                   <>
                     {" "}
-                    <HourglassIcon aria-hidden="true" className="icon-inline" />
+                    <TimerIcon aria-hidden="true" className="icon-inline" />
                   </>
                 )}
               </span>
