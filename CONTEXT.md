@@ -148,23 +148,23 @@ published version can be Added, and you can hold copies of several versions
 of the same Path. Nobody starts a Journey on another User's Path without
 Adding it first. A User Adds a Path whose Access is Everyone themselves; on a
 Path whose Access is By Request, they Request it and the Guide's
-Approve Adds it for them. Later, a Purchase Adds the version it pays for.
+Approve Adds it for them; on a Path whose Access is Paid, a Purchase Adds
+the version it pays for.
 _Avoid_: import, save, subscribe, install, clone, fork, follow (for this)
 
 **Access** _(working term)_:
-Whether a User may Add a Path straight away or has to ask first. It's set
+How a User gets a Path: Add it straight away, ask first, or pay. It's set
 for the whole Path, not per version, by its Guide in Trailblazer, beside
-Open and Close. Two values for now: **Everyone**, where any User Adds it, and
-**By Request**, where a User Requests it and its Guide decides. A
-Path's Access is Everyone until its Guide changes it, and Dream Sequence's is
-always Everyone. Changing it affects only later Adds and Requests: copies
-already Added stay with their Users. Changing it to Everyone Approves every
-pending Request, so the Guide is warned how many first. Access
-says who decides, not what it costs: **Price** is a separate thing, Free
-for every Path today, so a Path can later be both By Request and Paid.
-There is no payment inside Dreamport yet: any a Guide asks for happens
-between them and the User, and Dreamport plays no part in a dispute over
-it.
+Open and Close. Three values: **Everyone**, where any User Adds it;
+**By Request**, where a User Requests it and its Guide decides; and
+**Paid**, where a User makes a Purchase. A Guide can choose Paid only once
+their Stripe account is ready. A Path's Access is Everyone until its Guide
+changes it, and Dream Sequence's is always Everyone. Changing it affects
+only later Adds, Requests and Purchases: copies already held stay with
+their Users. Changing it to Everyone Approves every pending Request, and
+changing it to Paid Denies every pending Request, so the Guide is warned
+how many first. A payment a Guide asks for outside Dreamport is between
+them and the User, and Dreamport plays no part in a dispute over it.
 _Avoid_: visibility, privacy, public, private (Private space means
 something else)
 
@@ -176,7 +176,7 @@ version is its own Request, even for a User who already holds a copy of
 another. Every time, before it's sent, the User is warned that the Guide
 will see their email address, the one thing about a User a Guide ever
 sees. Until the Guide decides, the User sees it as Requested, and can't
-withdraw it; they find out by coming back to the page, not by being
+take it back; they find out by coming back to the page, not by being
 notified. A User can have Requests pending for several versions at once,
 but asking again for a version already Requested changes nothing. The
 Guide sees every pending Request for every version in one list, oldest
@@ -229,13 +229,33 @@ Trailhead link its Guide gives out.
 _Avoid_: marketplace, catalog, store
 
 **Purchase**:
-A User paying, once, for a Path version that a Guide sells. Paying Adds
-that version: the buyer gets their own read-only copy, with its Milestones
-and Tasks, to follow as often as they like. Dreamport
-takes a cut of each; a Guide pays nothing otherwise. The Guide sets the
-price per Path version, and a new price applies only to later Purchases. A
-Guide is paid out once the buyer's refund window has passed.
+A User paying, once, for a Path version on a Path whose Access is Paid.
+Paying Adds that version: the buyer gets their own read-only copy, with its
+Milestones and Tasks, to follow as often as they like. Each version is
+bought separately, like a Request: a User who bought one version pays again
+for another, and keeps the first. The price is fixed for now; a Guide
+can't set it. All sales are final: there are no refunds for a change of
+mind, and the buyer is told before they pay. A payment that can't be Added
+(a version they already hold, or a Path closed meanwhile) is refunded in
+full, by itself. Dreamport takes a cut of each Purchase. The Guide's share
+can be withdrawn once the holding period has passed.
 _Avoid_: subscription, order, enrollment
+
+**Holding period**:
+The 14 days after a Purchase before the Guide can withdraw their share of
+it. It guards against early disputes and stolen-card purchases; it is not a
+refund window, because all sales are final.
+_Avoid_: refund window, clearing period, escrow
+
+**Withdrawal**:
+A Guide taking the money from their sales that has passed the holding
+period, all of it at once, out to their bank. Only **Withdraw** in
+Dreamport does it; a Guide can't pay themselves out from Stripe. Each
+Withdrawal costs a flat payout fee, taken from the amount paid out, and
+there is no minimum. A Guide with no Withdrawal in a month pays Dreamport
+nothing that month.
+_Avoid_: payout (Stripe's word for the bank transfer underneath), cash
+out, transfer
 
 **Milestone**:
 One ordered step on a Path (e.g. "Rough One-Pager", then "Real Talk"),

@@ -379,7 +379,8 @@ Agents can't run `wrangler secret put`, so these are dashboard steps:
    key) and `STRIPE_WEBHOOK_SECRET` (step 2's signing secret).
 
 Production gets the same two secrets, with live values, only once the
-live-readiness checklist is done (#229).
+live-readiness checklist is done (#229). The steps are in
+[Going live with payments](going-live.md).
 
 ## Observability (Workers Logs)
 
