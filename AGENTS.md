@@ -14,6 +14,11 @@ picking up the issue — do it without being asked.
   from a remote ref sets that as upstream, which points a later `git push`
   at `main`. Run `git branch --unset-upstream` right after creating it so
   the first push creates the matching `origin/<branch>`.
+- **Move the issue to In progress.** Picking up an issue also means setting
+  its Status to **In progress** on GitHub Project 12 before the first commit.
+  Work doesn't need an iteration to start, so don't wait for one. Find the
+  item and option ids with `gh project item-list 12`, then change the Status
+  field with `gh project item-edit`.
 
 **Before every commit, run `npm run format`.** CI's Static Analysis workflow
 runs `format:check`/`lint`/`build` (typecheck) as three separate jobs, and a
