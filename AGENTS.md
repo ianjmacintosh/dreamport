@@ -162,3 +162,16 @@ The five canonical triage roles, each label string equal to its name
 
 Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See
 `docs/agents/domain.md`.
+
+### Scrum
+
+The `scrumbutt` skills (`/scrumbutt:daily`, `/scrumbutt:planning`) run on
+Dreamport's own rules, not the plugin defaults:
+
+- **Rules page:** the wiki's
+  [Process Specifics](https://github.com/ianjmacintosh/dreamport/wiki/Process-Specifics).
+- **Board:** GitHub Project 12.
+- **Flow table:** the wiki's
+  [Flow-Metrics](https://github.com/ianjmacintosh/dreamport/wiki/Flow-Metrics).
+- **Sprint pages:** one per sprint on the wiki, indexed on
+  [Daily-Scrum-Notes](https://github.com/ianjmacintosh/dreamport/wiki/Daily-Scrum-Notes).
