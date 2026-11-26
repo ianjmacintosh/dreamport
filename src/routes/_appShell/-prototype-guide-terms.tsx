@@ -15,6 +15,13 @@
 //      on their own Trailhead; the User reads them on a white sheet
 //   D  notes are part of the Draft, as a field right on the editor page;
 //      the User reads them full width at the top, above the two columns
+//
+// Round 2 (Ian's picks after round 1):
+//   E  notes are part of the Draft (a saved version never changes). In the
+//      editor they sit right after the description, edited in place with
+//      C's controls and D's "changed since" Notice. The User sees A's
+//      Trailhead with Ian's Notice copy; the Guide's own Trailhead
+//      (`?as=guide-trailhead`) shows the same notes read-only.
 import { useState } from "react";
 import type { ReactNode } from "react";
 
@@ -32,10 +39,15 @@ export const VARIANTS = [
   { key: "B", name: "Per saved version · Manage Versions · inside Notice" },
   { key: "C", name: "Per version · edit on own Trailhead · white sheet" },
   { key: "D", name: "Draft · field on the editor page · top of Trailhead" },
+  {
+    key: "E",
+    name: "Round 2 · Draft · edit in place in editor · A's Trailhead",
+  },
 ];
 
 export const VIEWERS = [
-  { key: "guide", name: "Guide" },
+  { key: "guide", name: "Guide · editor" },
+  { key: "guide-trailhead", name: "Guide · own Trailhead" },
   { key: "user", name: "User (not holding it)" },
 ] as const;
 export type Viewer = (typeof VIEWERS)[number]["key"];
@@ -194,6 +206,7 @@ export function UserTrailhead({
   email,
   state,
   setState,
+  asGuide = false,
 }: {
   variant: string;
   version: number;
@@ -201,6 +214,8 @@ export function UserTrailhead({
   email: string;
   state: ProtoState;
   setState: SetState;
+  /** The Guide's own Trailhead: Requests and Edit Path at the h1, no Request. */
+  asGuide?: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
   const shown =
@@ -208,27 +223,33 @@ export function UserTrailhead({
   const notes = shown.notes.trim();
   const isNewest = shown.number === newest(state).number;
 
-  const request = (notice: ReactNode) => (
-    <>
-      <Notice>
-        {state.requested ? (
-          <>
-            <p>You&apos;ve Requested Version {shown.number}.</p>
-            <p>
-              Waiting on the Guide. Come back to this page to see their answer.
-            </p>
-          </>
-        ) : (
-          notice
-        )}
-      </Notice>
-      <div className="button-group button-group--end">
-        <Button disabled={state.requested} onClick={() => setConfirming(true)}>
-          {state.requested ? "Requested" : "Request"}
-        </Button>
-      </div>
-    </>
-  );
+  // The Guide's own Trailhead shows no Request: they can't Request their own Path.
+  const request = (notice: ReactNode) =>
+    asGuide ? null : (
+      <>
+        <Notice>
+          {state.requested ? (
+            <>
+              <p>You&apos;ve Requested Version {shown.number}.</p>
+              <p>
+                Waiting on the Guide. Come back to this page to see their
+                answer.
+              </p>
+            </>
+          ) : (
+            notice
+          )}
+        </Notice>
+        <div className="button-group button-group--end">
+          <Button
+            disabled={state.requested}
+            onClick={() => setConfirming(true)}
+          >
+            {state.requested ? "Requested" : "Request"}
+          </Button>
+        </div>
+      </>
+    );
 
   const usualNotice = (
     <>
@@ -243,7 +264,38 @@ export function UserTrailhead({
   let column: ReactNode;
   let top: ReactNode = null;
 
-  if (variant === "A") {
+  if (variant === "E") {
+    // A's Trailhead with Ian's Notice copy (round 2).
+    column = (
+      <>
+        {notes && (
+          <>
+            <h2 className="text-h4">Notes About Getting Access</h2>
+            <NotesText text={notes} />
+          </>
+        )}
+        {request(
+          notes ? (
+            <>
+              <p>The Guide of this Path decides who can Add it.</p>
+              <p>
+                Dreamport cannot guarantee that the Guide will give you access,
+                even if you follow whatever steps they ask, including sending
+                payment. When the Guide grants you access, you will always have
+                access to that version of the Path.
+              </p>
+              <p>
+                Request it, then check back here. The Guide&apos;s answer shows
+                on this page once they decide. There are no notifications.
+              </p>
+            </>
+          ) : (
+            usualNotice
+          ),
+        )}
+      </>
+    );
+  } else if (variant === "A") {
     column = (
       <>
         {notes && (
@@ -346,7 +398,17 @@ export function UserTrailhead({
 
   return (
     <>
-      <h1>{PATH.name}</h1>
+      {asGuide ? (
+        <div className="heading-row">
+          <h1>{PATH.name}</h1>
+          <div className="button-group">
+            <Button variant="secondary">Requests (2)</Button>
+            <Button variant="secondary">Edit Path</Button>
+          </div>
+        </div>
+      ) : (
+        <h1>{PATH.name}</h1>
+      )}
       <p className="text-sm">
         Version {shown.number}
         <Dot />
@@ -523,6 +585,98 @@ export function GuideTrailhead({
 
 // --------------------------------------------------------------- Editor --
 
+/**
+ * E: the Draft's notes on the editor page, right after the description,
+ * read the way the Trailhead shows them and edited in place (C's controls).
+ * Saving changes the Draft only; Users see the latest version's notes.
+ */
+function EditorNotes({
+  draft,
+  latest,
+  onSave,
+}: {
+  draft: string;
+  latest: { number: number; notes: string };
+  onSave: (draft: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState("");
+  const notes = draft.trim();
+  const changed = draft !== latest.notes;
+  const save = (value: string) => {
+    onSave(value);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <>
+        <TextArea
+          id="editor-notes"
+          label="Notes About Getting Access"
+          helperText="What a User needs to know before they Request this Path, such as a price and how to pay, or how to reach you. Users see these notes on the Trailhead, above the Request button. Like the name and description, they go into the next version you save."
+          rows={8}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <div className="button-group button-group--end">
+          {draft && (
+            <Button variant="secondary" onClick={() => save("")}>
+              Clear Notes
+            </Button>
+          )}
+          <Button variant="secondary" onClick={() => setEditing(false)}>
+            Cancel
+          </Button>
+          <Button onClick={() => save(text)}>Save Notes</Button>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="heading-row">
+        <h2 className="text-h4">Notes About Getting Access</h2>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setText(draft);
+            setEditing(true);
+          }}
+        >
+          {notes ? "Edit Notes" : "Write Notes"}
+        </Button>
+      </div>
+      {changed ? (
+        <Notice>
+          <p>You&apos;ve changed these notes since Version {latest.number}.</p>
+          <p>
+            Users keep seeing Version {latest.number}&apos;s notes until you
+            Save as New Version.
+          </p>
+        </Notice>
+      ) : (
+        notes && (
+          <p className="text-sm">
+            These are Version {latest.number}&apos;s notes. Users see them on
+            the Trailhead, above the Request button.
+          </p>
+        )
+      )}
+      {notes ? (
+        <NotesText text={notes} />
+      ) : (
+        <p>
+          {changed
+            ? "No notes. Once you save a new version, Users see only the Request button."
+            : `Version ${latest.number} has no notes. Users see only the Request button.`}
+        </p>
+      )}
+    </>
+  );
+}
+
 /** A, B and D's Guide view: a stub of the Path editor. */
 export function Editor({
   variant,
@@ -534,7 +688,7 @@ export function Editor({
   setState: SetState;
 }) {
   const latest = newest(state);
-  const draftBased = variant === "A" || variant === "D";
+  const draftBased = variant === "A" || variant === "D" || variant === "E";
   const matches = !draftBased || state.draft === latest.notes;
   const [editPath, setEditPath] = useState(false);
   const [managing, setManaging] = useState(false);
@@ -604,6 +758,13 @@ export function Editor({
       )}
       <h2 className="text-h4">About This Path</h2>
       <p>{PATH.description}</p>
+      {variant === "E" && (
+        <EditorNotes
+          draft={state.draft}
+          latest={latest}
+          onSave={(draft) => setState((s) => ({ ...s, draft }))}
+        />
+      )}
       {variant === "A" && (
         <>
           <h2 className="text-h4">Notes About Getting Access</h2>

@@ -102,7 +102,20 @@ function Stage({
     version ?? state.versions[state.versions.length - 1].number;
 
   let page;
-  if (viewer === "user") {
+  if (viewer === "guide-trailhead" && variant !== "C") {
+    page = (
+      <UserTrailhead
+        key={`${variant}:${shownVersion}:guide`}
+        variant={variant}
+        version={shownVersion}
+        versionHref={versionHref}
+        email={email}
+        state={state}
+        setState={setState}
+        asGuide
+      />
+    );
+  } else if (viewer === "user") {
     page = (
       <UserTrailhead
         key={`${variant}:${shownVersion}`}
