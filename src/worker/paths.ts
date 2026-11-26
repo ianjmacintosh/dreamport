@@ -31,6 +31,7 @@ export const MILESTONE_DONE_WHEN_MAX_LENGTH = 2000;
 export const MILESTONE_OUTCOME_MAX_LENGTH = 200;
 export const TASK_TITLE_MAX_LENGTH = 200;
 export const MILESTONES_AND_TASKS_PER_PATH = 150;
+export const ACCESS_NOTES_MAX_LENGTH = 4000;
 
 export interface Milestone {
   readonly id: string;
@@ -189,6 +190,8 @@ export type Trailhead =
       readonly versions: readonly VersionSummary[];
       /** Whether the viewer has a Request pending for `version` (#215). */
       readonly requested: boolean;
+      /** `version`'s Notes About Getting Access (#247): empty unless By Request. */
+      readonly accessNotes: string;
     }
   /** Dream Sequence, the viewer's own Path, or their copy of another User's. */
   | {
@@ -197,6 +200,11 @@ export type Trailhead =
       readonly owner: PathOwner;
       readonly version: FollowableVersion;
       readonly versions: readonly VersionSummary[];
+      /**
+       * `version`'s Notes About Getting Access (#247) on the viewer's own
+       * By Request Path; empty otherwise, and always on a copy.
+       */
+      readonly accessNotes: string;
     };
 
 type TrailheadRow = Omit<
@@ -204,6 +212,7 @@ type TrailheadRow = Omit<
   "pathId" | "trailheadPathId" | "milestones"
 > & {
   readonly published: number;
+  readonly accessNotes: string;
 };
 
 /**
@@ -232,7 +241,7 @@ export async function getTrailhead(
       .prepare(
         `SELECT "paths"."userId", "paths"."addedFrom", "paths"."open", "paths"."access", "path_versions"."id",
            "path_versions"."number", "path_versions"."name", "path_versions"."description",
-           "path_versions"."savedAt", "path_versions"."published"
+           "path_versions"."savedAt", "path_versions"."published", "path_versions"."accessNotes"
          FROM "paths"
          LEFT JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
          WHERE "paths"."id" = ?
@@ -243,7 +252,7 @@ export async function getTrailhead(
       .prepare(
         `SELECT "path_versions"."id", "path_versions"."pathId", "path_versions"."number",
            "path_versions"."name", "path_versions"."description", "path_versions"."savedAt",
-           "path_versions"."published"
+           "path_versions"."published", "path_versions"."accessNotes"
          FROM "paths"
          JOIN "path_versions" ON "path_versions"."pathId" = "paths"."id"
          WHERE "paths"."userId" = ? AND "paths"."addedFrom" = ?
@@ -312,6 +321,7 @@ export async function getTrailhead(
         pathId,
       )) as FollowableVersion,
       versions: summaries,
+      accessNotes: "",
     };
   }
   // Nothing published reads like an unknown Path: no name for a Path its
@@ -323,14 +333,16 @@ export async function getTrailhead(
   if (!offer) {
     return { status: "unavailable", name: newest.name };
   }
+  const access = head?.access ?? "everyone";
   return {
     status: "offered",
-    access: head?.access ?? "everyone",
+    access,
     version: await versionWithMilestones(db, offer, pathId, pathId),
     versions: summaries,
     requested: (asked as { number: number }[]).some(
       (r) => r.number === offer.number,
     ),
+    accessNotes: notesShown(access, offer),
   };
 }
 
@@ -364,7 +376,13 @@ async function ownTrailhead(
       pathId,
     )) as FollowableVersion,
     versions: shown.map(versionSummary),
+    accessNotes: notesShown(access, picked),
   };
+}
+
+/** A version's notes are only for Users who have to Request it (#247). */
+function notesShown(access: Access, version: TrailheadRow): string {
+  return access === "request" ? version.accessNotes : "";
 }
 
 async function versionWithMilestones(
@@ -505,6 +523,10 @@ export interface Draft extends PathSummary {
   /** Every saved version, newest first. */
   readonly versions: readonly VersionSummary[];
   readonly latestVersion: VersionSummary | null;
+  /** The Draft's Notes About Getting Access (#246); empty for none. */
+  readonly accessNotes: string;
+  /** The latest version's notes, or null with nothing saved. */
+  readonly latestAccessNotes: string | null;
 }
 
 declare const owned: unique symbol;
@@ -1048,7 +1070,7 @@ export async function getDraft(
       .all<DraftTask & { milestoneId: string }>(),
     db
       .prepare(
-        'SELECT "updatedAt", "matchedAt", "open", "access" FROM "paths" WHERE "id" = ?',
+        'SELECT "updatedAt", "matchedAt", "open", "access", "accessNotes" FROM "paths" WHERE "id" = ?',
       )
       .bind(path.id)
       .first<{
@@ -1056,13 +1078,14 @@ export async function getDraft(
         matchedAt: string;
         open: number;
         access: Access;
+        accessNotes: string;
       }>(),
     db
       .prepare(
-        'SELECT "id", "number", "savedAt", "published" FROM "path_versions" WHERE "pathId" = ? ORDER BY "number" DESC',
+        'SELECT "id", "number", "savedAt", "published", "accessNotes" FROM "path_versions" WHERE "pathId" = ? ORDER BY "number" DESC',
       )
       .bind(path.id)
-      .all<VersionRow>(),
+      .all<VersionRow & { accessNotes: string }>(),
     countRequests(db, path.id),
   ]);
   const versions = saved.map(versionSummary);
@@ -1087,6 +1110,8 @@ export async function getDraft(
     pendingRequests: pending,
     versions,
     latestVersion: versions[0] ?? null,
+    accessNotes: edited?.accessNotes ?? "",
+    latestAccessNotes: saved[0]?.accessNotes ?? null,
   };
 }
 
@@ -1125,10 +1150,10 @@ export async function saveVersion(
   const [saved] = await db.batch<VersionRow>([
     db
       .prepare(
-        `INSERT INTO "path_versions" ("id", "pathId", "number", "name", "description", "savedAt")
+        `INSERT INTO "path_versions" ("id", "pathId", "number", "name", "description", "accessNotes", "savedAt")
          SELECT ?2, "id",
            (SELECT coalesce(max("number"), 0) + 1 FROM "path_versions" WHERE "pathId" = ?1),
-           "name", "description", ?3
+           "name", "description", "accessNotes", ?3
          FROM "paths"
          WHERE "id" = ?1 AND "name" <> '' AND "description" <> ''
            AND EXISTS (SELECT 1 FROM "draft_milestones" WHERE "pathId" = ?1)
@@ -1383,14 +1408,44 @@ export function parseAccess(body: unknown): Access | null {
   return access === "everyone" || access === "request" ? access : null;
 }
 
+/**
+ * The Draft's Notes About Getting Access from a request body (#246):
+ * trimmed, empty for none, refused over `ACCESS_NOTES_MAX_LENGTH`.
+ */
+export function parseAccessNotes(body: unknown): Parsed<string> {
+  const parsed = parseFields(
+    { accessNotes: { required: false, max: ACCESS_NOTES_MAX_LENGTH } },
+    body,
+  );
+  return parsed.ok ? { ok: true, value: parsed.value.accessNotes } : parsed;
+}
+
+/**
+ * Set the Draft's Notes About Getting Access (#246). Like its name and
+ * description, they reach a version only at Save as New Version; the
+ * saved versions' notes never change. Answers the Draft as it now stands.
+ */
+export async function setAccessNotes(
+  db: D1Database,
+  path: OwnedPath,
+  accessNotes: string,
+): Promise<Draft> {
+  await db
+    .prepare('UPDATE "paths" SET "accessNotes" = ? WHERE "id" = ?')
+    .bind(accessNotes, path.id)
+    .run();
+  return getDraft(db, path);
+}
+
 export type DiscardChangesResult =
   | { readonly ok: true; readonly draft: Draft }
   | { readonly ok: false; readonly reason: "no-version" };
 
 /**
  * Put the Draft back the way the Path's latest saved version has it: its
- * name, description, Milestones and Tasks. Refused, changing nothing, if
- * the Path has no saved version. Saved versions and Journeys are untouched.
+ * name, description, Notes About Getting Access, Milestones and Tasks.
+ * Refused, changing nothing, if the Path has no saved version. Saved
+ * versions and Journeys are untouched.
  *
  * One batch is one transaction, and every statement finds the latest
  * version itself, so with none they all do nothing. A saved row's id is
@@ -1409,7 +1464,8 @@ export async function discardChanges(
       .prepare(
         `UPDATE "paths" SET
            "name" = (SELECT "name" FROM "path_versions" WHERE "id" = ${latest}),
-           "description" = (SELECT "description" FROM "path_versions" WHERE "id" = ${latest})
+           "description" = (SELECT "description" FROM "path_versions" WHERE "id" = ${latest}),
+           "accessNotes" = (SELECT "accessNotes" FROM "path_versions" WHERE "id" = ${latest})
          WHERE "id" = ?1 AND ${latest} IS NOT NULL
          RETURNING "id", "name", "description", "createdAt"`,
       )

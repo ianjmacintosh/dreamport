@@ -19,6 +19,7 @@ import {
   openPath,
   type OwnedPath,
   parseAccess,
+  parseAccessNotes,
   parseMilestoneFields,
   parsePathUpdate,
   parseTaskFields,
@@ -26,6 +27,7 @@ import {
   reorderTasks,
   saveVersion,
   setAccess,
+  setAccessNotes,
   type DraftGap,
   unpublishVersion,
   updateMilestone,
@@ -71,10 +73,11 @@ pathRoutes.use(async (c, next) => {
   await next();
 });
 
-// Publish, Unpublish, Open, Close, Access and Requests are a Guide's alone (#191).
+// Publish, Unpublish, Open, Close, Access, its notes and Requests are a Guide's alone (#191).
 pathRoutes.use("/versions/:number/published", guidesOnly);
 pathRoutes.use("/open", guidesOnly);
 pathRoutes.use("/access", guidesOnly);
+pathRoutes.use("/access-notes", guidesOnly);
 pathRoutes.use("/requests/*", guidesOnly);
 pathRoutes.use("/requests", guidesOnly);
 
@@ -237,6 +240,23 @@ pathRoutes.put("/access", async (c) => {
 
   const approved = await setAccess(c.env.DB, c.var.path, access);
   return c.json({ access, approved }, 200);
+});
+
+/**
+ * Set the Draft's Notes About Getting Access (#246): `{ accessNotes }`,
+ * empty for none. Saved versions keep theirs until the next Save as New
+ * Version. Answers the Draft as it now stands.
+ */
+pathRoutes.put("/access-notes", async (c) => {
+  const notes = parseAccessNotes(await c.req.json().catch(() => null));
+  if (!notes.ok) {
+    return c.json({ error: notes.error }, 400);
+  }
+
+  return c.json(
+    { draft: await setAccessNotes(c.env.DB, c.var.path, notes.value) },
+    200,
+  );
 });
 
 /**
