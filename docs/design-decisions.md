@@ -721,8 +721,9 @@ Add an entry only once a sign-off conversation resolves something repeatable
   Trailhead of a By Request Path, for a User who doesn't hold the
   version shown, the right column ends with a `Notice` and, under it, a
   **Request** button at the right. The `Notice` reads "The Guide of this
-  Path decides who can Add it." then "Request it, and you'll find the
-  answer here when you come back. There are no notifications." Pressing
+  Path decides who can Add it." then "Request it, then check back here.
+  The Guide's answer shows on this page once they decide. There are no
+  notifications." (reworded in #246). Pressing
   Request opens a `Dialog` titled "Request Version {n}?" every time: "The
   Guide will see your email address ({address}) with your Request.",
   then Cancel and **Send Request** at the right. Once sent, the `Notice`
@@ -779,3 +780,37 @@ Add an entry only once a sign-off conversation resolves something repeatable
   right (`.button-group--end`), reading "Connecting…" until the browser
   leaves for Stripe. A failure is a `role="alert"` line under it. No
   prototype round: Ian signed it off in the running app.
+
+- **Notes About Getting Access** (#246, #247): free text a Guide writes
+  for Users who want to Request a By Request Path, such as a price and how
+  to pay. The notes belong to the Draft, like the name and description:
+  Save as New Version copies them into the version, Discard Changes puts
+  back the latest version's, and a saved version's notes never change.
+  In the Path editor, on a By Request Path only, the section comes right
+  after "About This Path" and before the Milestones: an h2 "Notes About
+  Getting Access" in a `.heading-row` with **Edit Notes** (or **Write
+  Notes** with none) at its right, then the notes. Edit Notes swaps the
+  section for a `TextArea` labelled "Notes About Getting Access" with
+  Clear Notes (only when there are notes), Cancel and **Save Notes** at the
+  right. Saving changes the Draft, so the version line turns to "Draft
+  (unpublished)", and while the Draft's notes differ from the latest
+  version's a `Notice` reads "You've changed these notes since Version
+  {n}." then "Users keep seeing Version {n}'s notes until you Save as New
+  Version." With none: "Version {n} has no notes. Users see only the
+  Request button." On the Trailhead, for a By Request Path whose version
+  shown has notes, a plain h2 "Notes About Getting Access" and the notes
+  follow the description in the right column, then the Request `Notice`:
+  "The Guide of this Path decides who can Add it.", "Dreamport cannot
+  guarantee that the Guide will give you access, even if you follow
+  whatever steps they ask, including sending payment. When the Guide
+  grants you access, you will always have access to that version of the
+  Path." and "Request it, then check back here. The Guide's answer shows
+  on this page once they decide. There are no notifications." With no
+  notes the `Notice` keeps only the first and last. The Guide's own
+  Trailhead shows the same notes in the same place, read only. Notes are
+  plain text: a blank line starts a paragraph and a line break stays one,
+  and nothing in them is read as HTML. Picked as variant E (minus its line
+  "These are Version {n}'s notes…") from a prototype on branch
+  `246-prototype-guide-terms` (commit `0364264`; five variants: a field in
+  Edit Path, per saved version in Manage Versions, edited on the Guide's
+  own Trailhead, a field on the editor page, and E).

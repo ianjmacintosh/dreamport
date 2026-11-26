@@ -71,16 +71,16 @@ _Avoid_: working copy, unsaved version
 
 **Discard Changes**:
 Put a Path's Draft back the way its latest Path version saved it: its
-name, description, Milestones and Tasks. Saved versions and the Journeys
-on them don't change. A Path with no saved version has nothing to go back
-to, so it can't. Not the same as **Return**, which moves a Journey back a
+name, description, Notes About Getting Access, Milestones and Tasks. Saved
+versions and the Journeys on them don't change. A Path with no saved
+version has nothing to go back to, so it can't. Not the same as **Return**, which moves a Journey back a
 Milestone, or as deleting the Path.
 _Avoid_: revert, reset, undo
 
 **Path version**:
 A snapshot of a Path made from its Draft when the User who made it uses
-**Save as New Version**: the name, description, Milestones and Tasks exactly as they
-stood. It never changes afterwards, and it needs a name, a description and
+**Save as New Version**: the name, description, Notes About Getting
+Access, Milestones and Tasks exactly as they stood. It never changes afterwards, and it needs a name, a description and
 at least one Milestone. A Journey stays on the version it started on; a newer version is
 a new release, never a free update to existing Journeys (for now). Every
 version is seen on the Path's Trailhead.
@@ -167,6 +167,14 @@ how many first. A payment a Guide asks for outside Dreamport is between
 them and the User, and Dreamport plays no part in a dispute over it.
 _Avoid_: visibility, privacy, public, private (Private space means
 something else)
+
+**Notes About Getting Access**:
+Free text a Guide writes for Users who want to Request a By Request Path,
+such as a price and how to pay, or how to reach them. Part of the Draft,
+like its name and description, so a version's notes are fixed when it's
+saved: new notes reach Users only with a new version. Users read the
+version's notes on the Trailhead, above Request. A payment they ask for
+is between the Guide and the User (see **Access**).
 
 **Request** _(working term)_:
 A User asking a Path's Guide for permission to Add one published version

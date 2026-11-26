@@ -546,3 +546,80 @@ test("a Guide's failed Approve keeps its row with the reason under its buttons, 
   await expect(failedRow).toHaveCount(0);
   await expect(list).toContainText("No one is waiting.");
 });
+
+test("a Guide writes Notes About Getting Access in the editor and saves them into a new version, and another User reads them as text, with their line breaks, before Request", async ({
+  browser,
+  page,
+}) => {
+  const pathName = `Noted Launch ${Date.now()}`;
+  await signIn(page, TEST_EMAILS.guide);
+  const path = await savedPathThroughApi(page, pathName);
+  for (const [method, url, data] of [
+    ["PUT", `/api/paths/${path.id}/versions/1/published`],
+    ["PUT", `/api/paths/${path.id}/open`],
+    ["PUT", `/api/paths/${path.id}/access`, { access: "request" }],
+  ] as const) {
+    expect((await path.api(method, url, data)).ok()).toBe(true);
+  }
+
+  await page.goto(`/app/paths/${path.id}/edit`);
+  await expect(
+    page.getByText(
+      "Version 1 has no notes. Users see only the Request button.",
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Write Notes" }).click();
+  await page
+    .getByLabel("Notes About Getting Access")
+    .fill(
+      "Send $40 by PayPal.\nPut your email in the note.\n\n<b>Then</b> Request.",
+    );
+  await page.getByRole("button", { name: "Save Notes" }).click();
+
+  await expect(page.getByText("Draft (unpublished)")).toBeVisible();
+  await expect(
+    page.getByText("You've changed these notes since Version 1."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit Notes" })).toBeVisible();
+  await page.getByRole("button", { name: "Save as New Version" }).click();
+  await expect(page.getByText("Version 2 (unpublished)")).toBeVisible();
+  await expect(
+    page.getByText("You've changed these notes since Version 1."),
+  ).toHaveCount(0);
+  expect(
+    (await path.api("PUT", `/api/paths/${path.id}/versions/2/published`)).ok(),
+  ).toBe(true);
+
+  const visitorContext = await browser.newContext();
+  const visitor = await visitorContext.newPage();
+  await signIn(visitor, TEST_EMAILS.e2eTrailheadVisitor);
+  await visitor.goto(`/app/paths/${path.id}`);
+  const column = visitor.locator(".journey-split > section");
+  await expect(
+    column.getByRole("heading", { name: "Notes About Getting Access" }),
+  ).toBeVisible();
+  const lines = column.locator("p", { hasText: "Send $40 by PayPal." });
+  await expect(lines).toHaveText(
+    "Send $40 by PayPal.Put your email in the note.",
+  );
+  await expect(lines.locator("br")).toHaveCount(1);
+  // The Guide's words are text, never HTML.
+  await expect(column.locator("p", { hasText: "<b>Then</b>" })).toHaveText(
+    "<b>Then</b> Request.",
+  );
+  await expect(
+    column.getByText(
+      "Dreamport cannot guarantee that the Guide will give you access",
+      { exact: false },
+    ),
+  ).toBeVisible();
+  await expect(
+    column.getByText(
+      "Request it, then check back here. The Guide's answer shows on this page once they decide. There are no notifications.",
+    ),
+  ).toBeVisible();
+  await expect(
+    visitor.getByRole("button", { name: "Request", exact: true }),
+  ).toBeEnabled();
+  await visitorContext.close();
+});
