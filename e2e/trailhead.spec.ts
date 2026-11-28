@@ -324,7 +324,9 @@ test("a User Requests a By Request Path after the email warning, sees Requested 
   await signIn(visitor, TEST_EMAILS.e2eTrailheadVisitor);
   await visitor.goto(`/app/paths/${path.id}`);
   await expect(
-    visitor.getByText("The Guide of this Path decides who can Add it."),
+    visitor.getByText(
+      "This path's guide controls its access independently of Dreamport.",
+    ),
   ).toBeVisible();
 
   await visitor.getByRole("button", { name: "Request", exact: true }).click();
@@ -336,7 +338,11 @@ test("a User Requests a By Request Path after the email warning, sees Requested 
 
   const requested = visitor.getByRole("button", { name: "Requested" });
   await expect(requested).toBeDisabled();
-  await expect(visitor.getByText("You've Requested Version 1.")).toBeVisible();
+  await expect(
+    visitor.getByText("You've requested access to this path.", {
+      exact: false,
+    }),
+  ).toBeVisible();
   await visitor.reload();
   await expect(requested).toBeDisabled();
 
@@ -563,12 +569,8 @@ test("a Guide writes Notes About Getting Access in the editor and saves them int
   }
 
   await page.goto(`/app/paths/${path.id}/edit`);
-  await expect(
-    page.getByText(
-      "Version 1 has no notes. Users see only the Request button.",
-    ),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Write Notes" }).click();
+  await expect(page.getByText("n/a", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit Notes" }).click();
   await page
     .getByLabel("Notes About Getting Access")
     .fill(
@@ -608,14 +610,13 @@ test("a Guide writes Notes About Getting Access in the editor and saves them int
     "<b>Then</b> Request.",
   );
   await expect(
-    column.getByText(
-      "Dreamport cannot guarantee that the Guide will give you access",
-      { exact: false },
-    ),
+    column.getByText("Dreamport cannot guarantee a guide will ever grant it", {
+      exact: false,
+    }),
   ).toBeVisible();
   await expect(
     column.getByText(
-      "Request it, then check back here. The Guide's answer shows on this page once they decide. There are no notifications.",
+      "If a guide provides access, you will not be notified -- keep checking back here to see if your request has been approved.",
     ),
   ).toBeVisible();
   await expect(

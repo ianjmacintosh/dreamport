@@ -1588,7 +1588,7 @@ function NotesText({ text }: { text: string }) {
 /**
  * The Draft's Notes About Getting Access on a By Request Path (#246,
  * docs/design-decisions.md): read as the Trailhead shows them, under a
- * heading with Edit Notes (or Write Notes), and edited in place. Saving
+ * heading with Edit Notes, and edited in place. Saving
  * changes the Draft only: Users keep seeing the latest version's notes,
  * which a Notice says once the two differ, until Save as New Version.
  */
@@ -1632,13 +1632,37 @@ function EditorNotes({
     }
   }
 
+  // The same row in both states, with Edit Notes hidden while editing but
+  // still holding its space, so the heading doesn't shift.
+  const heading = (
+    <div
+      className={
+        isEditing ? "heading-row heading-row--action-hidden" : "heading-row"
+      }
+    >
+      <h2 id="access-notes-heading" className="text-h4">
+        Notes About Getting Access
+      </h2>
+      <Button
+        variant="secondary"
+        onClick={() => {
+          setText(notes);
+          setIsEditing(true);
+        }}
+      >
+        Edit Notes
+      </Button>
+    </div>
+  );
+
   if (isEditing) {
     return (
       <>
+        {heading}
         <TextArea
           id="access-notes"
-          label="Notes About Getting Access"
-          helperText="What a User needs to know before they Request this Path, such as a price and how to pay, or how to reach you. Users see these notes on the Trailhead, above the Request button. Like the name and description, they go into the next version you save."
+          labelledBy="access-notes-heading"
+          autoFocus
           rows={8}
           maxLength={ACCESS_NOTES_MAX_LENGTH}
           value={text}
@@ -1683,18 +1707,7 @@ function EditorNotes({
 
   return (
     <>
-      <div className="heading-row">
-        <h2 className="text-h4">Notes About Getting Access</h2>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setText(notes);
-            setIsEditing(true);
-          }}
-        >
-          {notes ? "Edit Notes" : "Write Notes"}
-        </Button>
-      </div>
+      {heading}
       {changed && (
         <Notice>
           <p>You&apos;ve changed these notes since Version {latest.number}.</p>
@@ -1704,17 +1717,7 @@ function EditorNotes({
           </p>
         </Notice>
       )}
-      {notes ? (
-        <NotesText text={notes} />
-      ) : (
-        <p>
-          {latest === null
-            ? "No notes. Users see only the Request button."
-            : changed
-              ? "No notes. Once you save a new version, Users see only the Request button."
-              : `Version ${latest.number} has no notes. Users see only the Request button.`}
-        </p>
-      )}
+      {notes ? <NotesText text={notes} /> : <p>n/a</p>}
     </>
   );
 }

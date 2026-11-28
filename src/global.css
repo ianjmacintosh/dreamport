@@ -95,6 +95,14 @@ h4 {
   margin-bottom: 0;
 }
 
+/* The action hidden for now (Edit Notes while the notes are being edited,
+   #246) but still holding its space, so the heading doesn't shift.
+   `visibility: hidden` also takes it out of the tab order and the
+   accessibility tree. */
+.heading-row--action-hidden > :not(:is(h1, h2, h3, h4, h5, h6)) {
+  visibility: hidden;
+}
+
 /* Below 640px the action goes under the heading instead, as a row's
    actions go under its name: beside it, an h1 got so narrow its words
    broke mid-word. */
@@ -186,6 +194,13 @@ main {
    sits flush with its container. */
 main > * + * {
   margin-top: var(--space-4);
+}
+
+/* A block right after a heading belongs to it, so it keeps only the
+   heading's own small gap below, closer than the gap before the next
+   heading. */
+main > :is(h1, h2, h3, h4, h5, h6, .heading-row) + * {
+  margin-top: 0;
 }
 
 /* Text elements: margin-bottom, so trailing space follows them

@@ -428,28 +428,35 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
               <Notice>
                 {trailhead.requested ? (
                   <>
-                    <p>You&apos;ve Requested Version {version.number}.</p>
                     <p>
-                      Waiting on the Guide. Come back to this page to see their
-                      answer.
+                      You&apos;ve requested access to this path. If the guide
+                      grants access, this page will show it when you come back.
                     </p>
                   </>
                 ) : (
                   <>
-                    <p>The Guide of this Path decides who can Add it.</p>
+                    <p>
+                      This path&apos;s guide controls its access independently
+                      of Dreamport.
+                    </p>
                     {trailhead.accessNotes && (
                       <p>
-                        Dreamport cannot guarantee that the Guide will give you
-                        access, even if you follow whatever steps they ask,
-                        including sending payment. When the Guide grants you
-                        access, you will always have access to that version of
-                        the Path.
+                        After requesting access, Dreamport cannot guarantee a
+                        guide will ever grant it, even if you complete steps
+                        (including providing payment) they ask. Access is still
+                        at their sole discretion and Dreamport cannot intervene.
                       </p>
                     )}
                     <p>
-                      Request it, then check back here. The Guide&apos;s answer
-                      shows on this page once they decide. There are no
-                      notifications.
+                      If a guide provides access, you will not be notified --
+                      keep checking back here to see if your request has been
+                      approved.
+                    </p>
+                    <p>
+                      To report abuse, email{" "}
+                      <a href="mailto:hello@ianjmacintosh.com">
+                        hello@ianjmacintosh.com
+                      </a>
                     </p>
                   </>
                 )}
