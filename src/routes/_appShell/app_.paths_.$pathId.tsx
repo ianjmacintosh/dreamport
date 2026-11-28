@@ -62,6 +62,8 @@ interface Shown {
   };
   /** `request` when a User has to Request the Path rather than Add it (#214). */
   access: "everyone" | "request";
+  /** The Guide's Notes About Getting Access for this version (#247); empty for none. */
+  accessNotes: string;
   /** A Guide's own Path only: how many Requests are waiting on it (#216). */
   pendingRequests?: number;
   /** Offered only: whether the User has a Request pending for this version (#215). */
@@ -86,6 +88,27 @@ interface PendingRequest {
 
 /** Why Start on Path didn't start, shown after it's pressed. */
 type Refusal = "no-products" | "on-path";
+
+/**
+ * The Guide's notes as plain text (#247): a blank line starts a paragraph,
+ * and a single line break stays one. Never read as HTML. The Path editor
+ * keeps a copy.
+ */
+function NotesText({ text }: { text: string }) {
+  return text.split(/\n\s*\n/).map((paragraph, i) => {
+    const lines = paragraph.split("\n");
+    return (
+      <p key={i}>
+        {lines.map((line, j) => (
+          <span key={j}>
+            {line}
+            {j < lines.length - 1 && <br />}
+          </span>
+        ))}
+      </p>
+    );
+  });
+}
 
 const LONG_DATE = new Intl.DateTimeFormat(undefined, { dateStyle: "long" });
 
@@ -141,8 +164,9 @@ export const Route = createFileRoute("/_appShell/app_/paths_/$pathId")({
  * User's own Path, then a line naming the version and its price, then
  * `.journey-split`: the version's Milestones as a route on the left, and
  * on the right the pitch (Dream Sequence's own words, or the version's
- * description), then, on a Path the User can follow, a Product picker
- * beside Start on Path. On another User's Path, that's Add This Path
+ * description) and, on a By Request Path, the Guide's Notes About Getting
+ * Access for the version (#247), then, on a Path the User can follow, a
+ * Product picker beside Start on Path. On another User's Path, that's Add This Path
  * (#192) until the User holds a copy of the version shown, which the page
  * then shows them. A closed Path or an unpublished version of another
  * User's, with no copy, says it's no longer available.
@@ -378,6 +402,12 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
           ) : (
             <p>{version.description}</p>
           )}
+          {trailhead.accessNotes && (
+            <>
+              <h2 className="text-h4">Notes About Getting Access</h2>
+              <NotesText text={trailhead.accessNotes} />
+            </>
+          )}
           {trailhead.status === "offered" && trailhead.access !== "request" && (
             <>
               <p>
@@ -398,18 +428,35 @@ function ShownVersion({ trailhead }: { trailhead: Shown }) {
               <Notice>
                 {trailhead.requested ? (
                   <>
-                    <p>You&apos;ve Requested Version {version.number}.</p>
                     <p>
-                      Waiting on the Guide. Come back to this page to see their
-                      answer.
+                      You&apos;ve requested access to this path. If the guide
+                      grants access, this page will show it when you come back.
                     </p>
                   </>
                 ) : (
                   <>
-                    <p>The Guide of this Path decides who can Add it.</p>
                     <p>
-                      Request it, and you&apos;ll find the answer here when you
-                      come back. There are no notifications.
+                      This path&apos;s guide controls its access independently
+                      of Dreamport.
+                    </p>
+                    {trailhead.accessNotes && (
+                      <p>
+                        After requesting access, Dreamport cannot guarantee a
+                        guide will ever grant it, even if you complete steps
+                        (including providing payment) they ask. Access is still
+                        at their sole discretion and Dreamport cannot intervene.
+                      </p>
+                    )}
+                    <p>
+                      If a guide provides access, you will not be notified --
+                      keep checking back here to see if your request has been
+                      approved.
+                    </p>
+                    <p>
+                      To report abuse, email{" "}
+                      <a href="mailto:hello@ianjmacintosh.com">
+                        hello@ianjmacintosh.com
+                      </a>
                     </p>
                   </>
                 )}

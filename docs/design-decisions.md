@@ -720,14 +720,16 @@ Add an entry only once a sign-off conversation resolves something repeatable
 - **Request** (a Path version needing the Guide's permission, #215): on the
   Trailhead of a By Request Path, for a User who doesn't hold the
   version shown, the right column ends with a `Notice` and, under it, a
-  **Request** button at the right. The `Notice` reads "The Guide of this
-  Path decides who can Add it." then "Request it, and you'll find the
-  answer here when you come back. There are no notifications." Pressing
+  **Request** button at the right. The `Notice` reads "This path's guide
+  controls its access independently of Dreamport.", "If a guide provides
+  access, you will not be notified -- keep checking back here to see if
+  your request has been approved." and "To report abuse, email
+  hello@ianjmacintosh.com" (a mailto link) (reworded in #246). Pressing
   Request opens a `Dialog` titled "Request Version {n}?" every time: "The
   Guide will see your email address ({address}) with your Request.",
   then Cancel and **Send Request** at the right. Once sent, the `Notice`
-  reads "You've Requested Version {n}." then "Waiting on the Guide. Come
-  back to this page to see their answer.", and the button reads
+  reads "You've requested access to this path. If the guide grants
+  access, this page will show it when you come back." (reworded in #246), and the button reads
   **Requested**, disabled; a Request can't be withdrawn. After a Deny the
   User just sees Request again, with no message. Each version is its own
   Request: a version's own address shows that version's state, and holding
@@ -779,3 +781,39 @@ Add an entry only once a sign-off conversation resolves something repeatable
   right (`.button-group--end`), reading "Connecting…" until the browser
   leaves for Stripe. A failure is a `role="alert"` line under it. No
   prototype round: Ian signed it off in the running app.
+
+- **Notes About Getting Access** (#246, #247): free text a Guide writes
+  for Users who want to Request a By Request Path, such as a price and how
+  to pay. The notes belong to the Draft, like the name and description:
+  Save as New Version copies them into the version, Discard Changes puts
+  back the latest version's, and a saved version's notes never change.
+  In the Path editor, on a By Request Path only, the section comes right
+  after "About This Path" and before the Milestones: an h2 "Notes About
+  Getting Access" in a `.heading-row` with **Edit Notes** at its right,
+  then the notes. Edit Notes keeps the
+  heading row, with Edit Notes hidden but holding its space
+  (`.heading-row--action-hidden`) so the heading doesn't shift, and
+  swaps the notes for a `TextArea` named by that heading (`labelledBy`,
+  no label of its own) that takes focus, with
+  Clear Notes (only when there are notes), Cancel and **Save Notes** at the
+  right. Saving changes the Draft, so the version line turns to "Draft
+  (unpublished)", and while the Draft's notes differ from the latest
+  version's a `Notice` reads "You've changed these notes since Version
+  {n}." then "Users keep seeing Version {n}'s notes until you Save as New
+  Version." With none: "n/a". The text box has
+  no helper text. On the Trailhead, for a By Request Path whose version
+  shown has notes, a plain h2 "Notes About Getting Access" and the notes
+  follow the description in the right column, then the Request `Notice`
+  above with a second paragraph: "After requesting
+  access, Dreamport cannot guarantee a guide will ever grant it, even if
+  you complete steps (including providing payment) they ask. Access is
+  still at their sole discretion and Dreamport cannot intervene." With no
+  notes the `Notice` leaves that paragraph out. The copy is Ian's,
+  verbatim, lowercase "path" and "guide" included. The Guide's own
+  Trailhead shows the same notes in the same place, read only. Notes are
+  plain text: a blank line starts a paragraph and a line break stays one,
+  and nothing in them is read as HTML. Picked as variant E (minus its line
+  "These are Version {n}'s notes…") from a prototype on branch
+  `246-prototype-guide-terms` (commit `0364264`; five variants: a field in
+  Edit Path, per saved version in Manage Versions, edited on the Guide's
+  own Trailhead, a field on the editor page, and E).

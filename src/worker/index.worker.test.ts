@@ -2490,6 +2490,7 @@ describe("Pathfinder and Trailhead routes", () => {
     expect(await res.json()).toEqual({
       status: "followable",
       access: "everyone",
+      accessNotes: "",
       path: { id: path.id, name: path.name, dreamport: false, own: true },
       version: {
         id: latest.id,
@@ -2570,6 +2571,7 @@ describe("Pathfinder and Trailhead routes", () => {
       status: "offered",
       requested: false,
       access: "everyone",
+      accessNotes: "",
       path: { id: path.id, name: path.name, dreamport: false, own: false },
       version: {
         id: guide.version.id,
@@ -2726,6 +2728,8 @@ describe("Trailblazer routes", () => {
         access: "everyone",
         versions: [],
         latestVersion: null,
+        accessNotes: "",
+        latestAccessNotes: null,
       },
     });
 
@@ -2753,6 +2757,8 @@ describe("Trailblazer routes", () => {
         access: "everyone",
         versions: [],
         latestVersion: null,
+        accessNotes: "",
+        latestAccessNotes: null,
       },
     });
   });
@@ -3558,6 +3564,64 @@ describe("Access routes (#214)", () => {
 
     await setAccess(guide.cookie, guide.path.id, "everyone");
     expect((await add(other)).status).toBe(201);
+  });
+});
+
+describe("Notes About Getting Access route (#246, #247)", () => {
+  const writeNotes = (cookie: string, pathId: string, accessNotes: unknown) =>
+    callApi("PUT", `/api/paths/${pathId}/access-notes`, cookie, {
+      accessNotes,
+    });
+
+  it("lets a Guide set the Draft's notes, and another User reads them on the Trailhead once saved into a published version", async () => {
+    const guide = await openGuidesPath();
+    const user = await signIn(TEST_EMAILS.addRoute);
+    const trailhead = async () =>
+      (await (
+        await callApi("GET", `/api/paths/${guide.path.id}/trailhead`, user)
+      ).json()) as { accessNotes: string; version: { number: number } };
+    await callApi("PUT", `/api/paths/${guide.path.id}/access`, guide.cookie, {
+      access: "request",
+    });
+
+    const written = await writeNotes(
+      guide.cookie,
+      guide.path.id,
+      "  Pay first.\n\nThen Request.  ",
+    );
+    expect(written.status).toBe(200);
+    expect(await written.json()).toMatchObject({
+      draft: {
+        accessNotes: "Pay first.\n\nThen Request.",
+        latestAccessNotes: "",
+        matchesLatest: false,
+      },
+    });
+    expect(await trailhead()).toMatchObject({ accessNotes: "" });
+
+    await callApi("POST", `/api/paths/${guide.path.id}/versions`, guide.cookie);
+    await callApi(
+      "PUT",
+      `/api/paths/${guide.path.id}/versions/2/published`,
+      guide.cookie,
+    );
+    expect(await trailhead()).toMatchObject({
+      version: { number: 2 },
+      accessNotes: "Pay first.\n\nThen Request.",
+    });
+  });
+
+  it("refuses a plain User with 403, and notes that aren't text or are too long with 400", async () => {
+    const guide = await openGuidesPath();
+    const plain = await savedPath(TEST_EMAILS.pathsRoutesPlainUser);
+
+    expect((await writeNotes(plain.cookie, plain.path.id, "Pay")).status).toBe(
+      403,
+    );
+    expect((await writeNotes(guide.cookie, guide.path.id, 4)).status).toBe(400);
+    expect(
+      (await writeNotes(guide.cookie, guide.path.id, "x".repeat(4001))).status,
+    ).toBe(400);
   });
 });
 

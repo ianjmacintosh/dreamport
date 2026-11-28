@@ -12,6 +12,7 @@ import {
   startJourney,
 } from "./journeys";
 import {
+  ACCESS_NOTES_MAX_LENGTH,
   addTask,
   addVersion,
   closePath,
@@ -34,6 +35,7 @@ import {
   openPath,
   type OwnedPath,
   type PathUpdate,
+  parseAccessNotes,
   parseMilestoneFields,
   parsePathFields,
   parseTaskFields,
@@ -46,6 +48,7 @@ import {
   deleteRequest,
   saveVersion,
   setAccess,
+  setAccessNotes,
   TASK_TITLE_MAX_LENGTH,
   unpublishVersion,
   updateMilestone,
@@ -455,6 +458,8 @@ describe("a Path's Draft", () => {
       pendingRequests: 0,
       versions: [],
       latestVersion: null,
+      accessNotes: "",
+      latestAccessNotes: null,
     });
   });
 
@@ -1599,6 +1604,7 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
       owner: "user",
       version: two,
       versions: all,
+      accessNotes: "",
     });
     expect(await getTrailhead(env.DB, PUBLISHER_ID, path.id, 1)).toEqual({
       status: "followable",
@@ -1606,6 +1612,7 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
       owner: "user",
       version: one,
       versions: all,
+      accessNotes: "",
     });
     expect(await getTrailhead(env.DB, PUBLISHER_ID, path.id, 3)).toBeNull();
   });
@@ -1623,6 +1630,7 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
       owner: "user",
       version: one,
       versions: published,
+      accessNotes: "",
     });
     expect(await getTrailhead(env.DB, PUBLISHER_ID, path.id, 2)).toBeNull();
   });
@@ -1663,6 +1671,7 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
       version: two,
       versions: published,
       requested: false,
+      accessNotes: "",
     });
     expect(await getTrailhead(env.DB, STRANGER_ID, path.id, 1)).toEqual({
       status: "offered",
@@ -1670,6 +1679,7 @@ describe("a Path's Trailhead, for any viewer (#205)", () => {
       version: one,
       versions: published,
       requested: false,
+      accessNotes: "",
     });
     expect(JSON.stringify(root)).not.toContain(PUBLISHER_ID);
     expect(JSON.stringify(root)).not.toContain(
@@ -2413,5 +2423,146 @@ describe("Adding a published version as a read-only copy (#192)", () => {
       { id: path.id, name: "Renamed Path" },
     ]);
     expect(await addedEntries(mine.id)).toEqual([]);
+  });
+});
+
+describe("a Path's Notes About Getting Access (#246, #247)", () => {
+  const NOTES_GUIDE_ID = "paths-module-notes-guide";
+  const NOTES_READER_ID = "paths-module-notes-reader";
+  const PAY =
+    "Send $40 by PayPal.\nWrite your email in the note.\n\nThen Request.";
+
+  /** A Path of the notes Guide's with one Milestone and nothing saved. */
+  async function notesPath() {
+    await seedUser(NOTES_GUIDE_ID, TEST_EMAILS.pathsModuleNotesGuide);
+    await seedUser(NOTES_READER_ID, TEST_EMAILS.pathsModuleNotesReader);
+    return pathOf(NOTES_GUIDE_ID, "Pop-Up Shop", [BAKE]);
+  }
+
+  /** What the Trailhead shows `userId` as version `number`'s notes, or why it shows none. */
+  async function notesShown(
+    userId: string,
+    path: OwnedPath,
+    number: number | null,
+  ) {
+    const trailhead = await getTrailhead(env.DB, userId, path.id, number);
+    return trailhead?.status === "offered" || trailhead?.status === "followable"
+      ? trailhead.accessNotes
+      : (trailhead?.status ?? null);
+  }
+
+  it("belong to the Draft until Save as New Version copies them, and a saved version's never change", async () => {
+    const path = await notesPath();
+    await setAccess(env.DB, path, "request");
+    await tick();
+    await saved(path, NOTES_GUIDE_ID);
+    await tick();
+
+    const written = await setAccessNotes(env.DB, path, PAY);
+
+    expect(written).toMatchObject({
+      accessNotes: PAY,
+      latestAccessNotes: "",
+      matchesLatest: false,
+    });
+    expect(await notesShown(NOTES_GUIDE_ID, path, 1)).toBe("");
+
+    await saved(path, NOTES_GUIDE_ID);
+
+    expect(await currentDraft(path)).toMatchObject({
+      accessNotes: PAY,
+      latestAccessNotes: PAY,
+      matchesLatest: true,
+    });
+    expect(await notesShown(NOTES_GUIDE_ID, path, 2)).toBe(PAY);
+    expect(await notesShown(NOTES_GUIDE_ID, path, 1)).toBe("");
+
+    await tick();
+    await setAccessNotes(env.DB, path, "Message me first.");
+
+    expect(await notesShown(NOTES_GUIDE_ID, path, 2)).toBe(PAY);
+    expect(await currentDraft(path)).toMatchObject({
+      accessNotes: "Message me first.",
+      latestAccessNotes: PAY,
+      matchesLatest: false,
+    });
+  });
+
+  it("go back to the latest version's with Discard Changes", async () => {
+    const path = await notesPath();
+    await setAccessNotes(env.DB, path, PAY);
+    await saved(path, NOTES_GUIDE_ID);
+    await tick();
+    await setAccessNotes(env.DB, path, "");
+    expect((await currentDraft(path)).accessNotes).toBe("");
+
+    await tick();
+    await discarded(path);
+
+    expect(await currentDraft(path)).toMatchObject({
+      accessNotes: PAY,
+      matchesLatest: true,
+    });
+  });
+
+  it("show another User only a published version's, of an open By Request Path", async () => {
+    const path = await notesPath();
+    await setAccessNotes(env.DB, path, PAY);
+    await saved(path, NOTES_GUIDE_ID);
+    await setAccessNotes(env.DB, path, "Unpublished notes.");
+    await saved(path, NOTES_GUIDE_ID);
+    await publishVersion(env.DB, path, 1);
+    await openPath(env.DB, path);
+
+    // Everyone Adds it straight away, so there's nothing to read first.
+    expect(await notesShown(NOTES_READER_ID, path, 1)).toBe("");
+
+    await setAccess(env.DB, path, "request");
+    expect(await notesShown(NOTES_READER_ID, path, null)).toBe(PAY);
+    expect(await notesShown(NOTES_READER_ID, path, 1)).toBe(PAY);
+    expect(await notesShown(NOTES_READER_ID, path, 2)).toBe("unavailable");
+    expect(
+      JSON.stringify(await getTrailhead(env.DB, NOTES_READER_ID, path.id, 2)),
+    ).not.toContain("Unpublished notes.");
+
+    await closePath(env.DB, path);
+    expect(await notesShown(NOTES_READER_ID, path, 1)).toBe("unavailable");
+  });
+
+  it("are the Guide's own to see on their Trailhead, but not on a User's copy", async () => {
+    const path = await notesPath();
+    await setAccessNotes(env.DB, path, PAY);
+    await saved(path, NOTES_GUIDE_ID);
+    await publishVersion(env.DB, path, 1);
+    await openPath(env.DB, path);
+    await setAccess(env.DB, path, "request");
+
+    expect(await notesShown(NOTES_GUIDE_ID, path, null)).toBe(PAY);
+
+    await addVersion(env.DB, NOTES_READER_ID, path.id, 1, { approving: true });
+    expect(
+      await getTrailhead(env.DB, NOTES_READER_ID, path.id, 1),
+    ).toMatchObject({ status: "followable", owner: "added", accessNotes: "" });
+  });
+
+  it("parse from a request body trimmed, empty for none, and refused when too long or not text", () => {
+    expect(parseAccessNotes({ accessNotes: "  Pay first.\n\n  " })).toEqual({
+      ok: true,
+      value: "Pay first.",
+    });
+    expect(parseAccessNotes({ accessNotes: "" })).toEqual({
+      ok: true,
+      value: "",
+    });
+    expect(
+      parseAccessNotes({ accessNotes: "x".repeat(ACCESS_NOTES_MAX_LENGTH) }),
+    ).toMatchObject({ ok: true });
+    expect(
+      parseAccessNotes({
+        accessNotes: "x".repeat(ACCESS_NOTES_MAX_LENGTH + 1),
+      }),
+    ).toMatchObject({ ok: false });
+    expect(parseAccessNotes({ accessNotes: 4 })).toMatchObject({ ok: false });
+    expect(parseAccessNotes(null)).toMatchObject({ ok: false });
   });
 });

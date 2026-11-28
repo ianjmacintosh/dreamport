@@ -443,6 +443,8 @@ export function createApp(deps: AppDeps = {}) {
         milestones: version.milestones,
       },
       access: trailhead.access,
+      // Empty unless the Path is By Request and the viewer may see this version (#247).
+      accessNotes: trailhead.accessNotes,
       // Only a Guide, on their own By Request Path, hears how many are waiting (#216).
       ...(trailhead.status === "followable" &&
         trailhead.owner === "user" &&

@@ -82,6 +82,10 @@ interface Draft extends PathHead {
   pendingRequests: number;
   /** Newest first. */
   versions: VersionSummary[];
+  /** The Draft's Notes About Getting Access (#246); empty for none. */
+  accessNotes: string;
+  /** The latest version's notes, or null with nothing saved. */
+  latestAccessNotes: string | null;
 }
 
 /** Mirror `src/worker/paths.ts`; the server enforces the real limits. */
@@ -92,6 +96,7 @@ const MILESTONE_DESCRIPTION_MAX_LENGTH = 2000;
 const MILESTONE_DONE_WHEN_MAX_LENGTH = 2000;
 const MILESTONE_OUTCOME_MAX_LENGTH = 200;
 const TASK_TITLE_MAX_LENGTH = 200;
+const ACCESS_NOTES_MAX_LENGTH = 4000;
 
 const NO_MILESTONE: MilestoneFields = {
   name: "",
@@ -231,6 +236,7 @@ const SAVE_FAILED = "We couldn't save a version. Try again in a moment.";
 const DISCARD_FAILED =
   "We couldn't discard your changes. Try again in a moment.";
 const PUBLISH_FAILED = "We couldn't change that. Try again in a moment.";
+const NOTES_FAILED = "We couldn't save the notes. Try again in a moment.";
 const COPY_FAILED = "We couldn't copy that link. Try again in a moment.";
 /** How long Copy Link reads "Copied Link" before turning back. */
 const COPIED_HOLD_MS = 1500;
@@ -284,6 +290,10 @@ function PathDraft() {
   const [open, setOpen] = useState(draft.open);
   const [access, setAccess] = useState(draft.access);
   const [pendingRequests, setPendingRequests] = useState(draft.pendingRequests);
+  const [accessNotes, setAccessNotes] = useState(draft.accessNotes);
+  const [latestAccessNotes, setLatestAccessNotes] = useState(
+    draft.latestAccessNotes,
+  );
   const [isChangingAccess, setIsChangingAccess] = useState(false);
   const [notice, setNotice] = useState<Sentences | null>(null);
   const [isManagingVersions, setIsManagingVersions] = useState(false);
@@ -342,6 +352,8 @@ function PathDraft() {
     setMatchesLatest(updated.matchesLatest);
     setVersions(updated.versions);
     setOpen(updated.open);
+    setAccessNotes(updated.accessNotes);
+    setLatestAccessNotes(updated.latestAccessNotes);
     setPathDialog(null);
     // The breadcrumbs come from the loader; rerun it for the new name.
     void router.invalidate();
@@ -359,6 +371,7 @@ function PathDraft() {
         return;
       }
       setVersions((prev) => [saved.body.version, ...prev]);
+      setLatestAccessNotes(accessNotes);
       setMatchesLatest(true);
     } catch {
       setSaveError(CONNECTION_FAILED);
@@ -480,6 +493,21 @@ function PathDraft() {
           <h2 className="text-h4">About This Path</h2>
           <p>{path.description}</p>
         </>
+      )}
+      {guide && access === "request" && (
+        <EditorNotes
+          notes={accessNotes}
+          latest={
+            latestVersion && latestAccessNotes !== null
+              ? { number: latestVersion.number, notes: latestAccessNotes }
+              : null
+          }
+          notesUrl={`${base}/access-notes`}
+          onSaved={(updated) => {
+            setAccessNotes(updated.accessNotes);
+            setMatchesLatest(updated.matchesLatest);
+          }}
+        />
       )}
 
       {picked ? (
@@ -671,6 +699,7 @@ function PathDraft() {
           open={isDiscarding}
           path={path}
           version={latestVersion}
+          withNotes={guide && access === "request"}
           pathUrl={base}
           onClose={() => setIsDiscarding(false)}
           onDiscarded={(restored) => {
@@ -1535,10 +1564,169 @@ function ManageVersionsDialog({
   );
 }
 
+/**
+ * The Guide's own words as plain text (#246): a blank line starts a
+ * paragraph, and a single line break stays one. Never read as HTML. The
+ * Trailhead keeps a copy.
+ */
+function NotesText({ text }: { text: string }) {
+  return text.split(/\n\s*\n/).map((paragraph, i) => {
+    const lines = paragraph.split("\n");
+    return (
+      <p key={i}>
+        {lines.map((line, j) => (
+          <span key={j}>
+            {line}
+            {j < lines.length - 1 && <br />}
+          </span>
+        ))}
+      </p>
+    );
+  });
+}
+
+/**
+ * The Draft's Notes About Getting Access on a By Request Path (#246,
+ * docs/design-decisions.md): read as the Trailhead shows them, under a
+ * heading with Edit Notes, and edited in place. Saving
+ * changes the Draft only: Users keep seeing the latest version's notes,
+ * which a Notice says once the two differ, until Save as New Version.
+ */
+function EditorNotes({
+  notes,
+  latest,
+  notesUrl,
+  onSaved,
+}: {
+  notes: string;
+  /** The latest version's number and notes, or null with nothing saved. */
+  latest: { number: number; notes: string } | null;
+  notesUrl: string;
+  onSaved: (draft: Draft) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [text, setText] = useState("");
+  const [pending, setPending] = useState<"none" | "saving" | "clearing">(
+    "none",
+  );
+  const [error, setError] = useState("");
+  const changed = latest !== null && notes !== latest.notes;
+
+  async function save(value: string, kind: "saving" | "clearing") {
+    setError("");
+    setPending(kind);
+    try {
+      const sent = await withMinimumDuration(() =>
+        send<{ draft: Draft }>(notesUrl, "PUT", { accessNotes: value }),
+      );
+      if (!sent.ok) {
+        setError(sent.conflict ?? NOTES_FAILED);
+        return;
+      }
+      onSaved(sent.body.draft);
+      setIsEditing(false);
+    } catch {
+      setError(CONNECTION_FAILED);
+    } finally {
+      setPending("none");
+    }
+  }
+
+  // The same row in both states, with Edit Notes hidden while editing but
+  // still holding its space, so the heading doesn't shift.
+  const heading = (
+    <div
+      className={
+        isEditing ? "heading-row heading-row--action-hidden" : "heading-row"
+      }
+    >
+      <h2 id="access-notes-heading" className="text-h4">
+        Notes About Getting Access
+      </h2>
+      <Button
+        variant="secondary"
+        onClick={() => {
+          setText(notes);
+          setIsEditing(true);
+        }}
+      >
+        Edit Notes
+      </Button>
+    </div>
+  );
+
+  if (isEditing) {
+    return (
+      <>
+        {heading}
+        <TextArea
+          id="access-notes"
+          labelledBy="access-notes-heading"
+          autoFocus
+          rows={8}
+          maxLength={ACCESS_NOTES_MAX_LENGTH}
+          value={text}
+          disabled={pending !== "none"}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <div className="button-group button-group--end">
+          {notes && (
+            <Button
+              variant="secondary"
+              disabled={pending !== "none"}
+              state={pending === "clearing" ? "pending" : "ready"}
+              onClick={() => void save("", "clearing")}
+            >
+              <Button.State name="ready">Clear Notes</Button.State>
+              <Button.State name="pending">Clearing…</Button.State>
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            disabled={pending !== "none"}
+            onClick={() => {
+              setError("");
+              setIsEditing(false);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={pending !== "none"}
+            state={pending === "saving" ? "pending" : "ready"}
+            onClick={() => void save(text, "saving")}
+          >
+            <Button.State name="ready">Save Notes</Button.State>
+            <Button.State name="pending">Saving…</Button.State>
+          </Button>
+        </div>
+        {error && <p role="alert">{error}</p>}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {heading}
+      {changed && (
+        <Notice>
+          <p>You&apos;ve changed these notes since Version {latest.number}.</p>
+          <p>
+            Users keep seeing Version {latest.number}&apos;s notes until you
+            Save as New Version.
+          </p>
+        </Notice>
+      )}
+      {notes ? <NotesText text={notes} /> : <p>n/a</p>}
+    </>
+  );
+}
+
 function DiscardChangesDialog({
   open,
   path,
   version,
+  withNotes,
   pathUrl,
   onClose,
   onDiscarded,
@@ -1546,6 +1734,8 @@ function DiscardChangesDialog({
   open: boolean;
   path: PathHead;
   version: VersionSummary;
+  /** Whether to name the Notes About Getting Access among what goes back. */
+  withNotes: boolean;
   pathUrl: string;
   onClose: () => void;
   onDiscarded: (draft: Draft) => void;
@@ -1562,6 +1752,7 @@ function DiscardChangesDialog({
       <DiscardChangesForm
         path={path}
         version={version}
+        withNotes={withNotes}
         pathUrl={pathUrl}
         isPending={isPending}
         setIsPending={setIsPending}
@@ -1575,6 +1766,7 @@ function DiscardChangesDialog({
 function DiscardChangesForm({
   path,
   version,
+  withNotes,
   pathUrl,
   isPending,
   setIsPending,
@@ -1583,6 +1775,7 @@ function DiscardChangesForm({
 }: {
   path: PathHead;
   version: VersionSummary;
+  withNotes: boolean;
   pathUrl: string;
   isPending: boolean;
   setIsPending: (isPending: boolean) => void;
@@ -1614,7 +1807,8 @@ function DiscardChangesForm({
     <>
       <p>
         This will put "{path.name}" back the way Version {version.number} saved
-        it: its name, description, Milestones and Tasks. This cannot be undone!
+        it: its name, description, {withNotes && "Notes About Getting Access, "}
+        Milestones and Tasks. This cannot be undone!
       </p>
       {error && <p role="alert">{error}</p>}
       <div className="button-group button-group--end">

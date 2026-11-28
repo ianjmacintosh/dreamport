@@ -206,6 +206,10 @@ export const TEST_EMAILS = {
   pathsModuleRequestsGuide: "delivered+paths-module-requests-guide@resend.dev",
   /** A second Requester, so the Guide's Paths hold Requests from two Users (#215). */
   pathsModuleRequesterTwo: "delivered+paths-module-requester-two@resend.dev",
+  /** The Guide who writes Notes About Getting Access on their Paths (#246). */
+  pathsModuleNotesGuide: "delivered+paths-module-notes-guide@resend.dev",
+  /** Reads `pathsModuleNotesGuide`'s notes, and only the ones they may see (#247). */
+  pathsModuleNotesReader: "delivered+paths-module-notes-reader@resend.dev",
 
   // --- Seam 1: the Journey routes (#137-#140, #170), one test each ---
   /** Lists a Product's Journeys, none and then one. */
